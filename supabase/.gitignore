@@ -1,0 +1,6 @@
+# Supabase CLI local state
+.branches
+.temp
+
+# Local dumps produced by `supabase db dump`
+*.dump

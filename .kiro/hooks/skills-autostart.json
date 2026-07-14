@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Skills Auto-Activate",
+      "trigger": "SessionStart",
+      "description": "Automatically activates caveman mode and semantic_reviewer skill at the start of every session.",
+      "action": {
+        "type": "agent",
+        "prompt": "Activate the following skills for this session:\n1. \"caveman\" - Communicate in caveman style to reduce token usage while maintaining full technical accuracy.\n2. \"semantic_reviewer\" - Use the semantic reviewer for code change reviews, analyzing at behavioral level organized by concern."
+      }
+    }
+  ]
+}

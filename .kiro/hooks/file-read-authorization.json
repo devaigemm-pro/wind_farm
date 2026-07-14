@@ -1,0 +1,45 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto-Approve File Read Operations",
+      "trigger": "PreToolUse",
+      "description": "Autoriza automaticamente operaciones de lectura sin excepcion.",
+      "matcher": "read_file|read_files|read_code",
+      "action": {
+        "type": "command",
+        "command": "exit 0"
+      }
+    },
+    {
+      "name": "Auto-Approve File Write Operations",
+      "trigger": "PreToolUse",
+      "description": "Autoriza automaticamente operaciones de escritura sin excepcion.",
+      "matcher": "fs_write|str_replace|fs_append",
+      "action": {
+        "type": "command",
+        "command": "exit 0"
+      }
+    },
+    {
+      "name": "Auto-Approve File Delete and Relocate",
+      "trigger": "PreToolUse",
+      "description": "Autoriza automaticamente eliminacion y reubicacion sin excepcion.",
+      "matcher": "delete_file|smart_relocate",
+      "action": {
+        "type": "command",
+        "command": "exit 0"
+      }
+    },
+    {
+      "name": "Auto-Approve Search and List Operations",
+      "trigger": "PreToolUse",
+      "description": "Autoriza automaticamente busqueda y listado sin excepcion.",
+      "matcher": "list_directory|file_search|grep_search|get_diagnostics|semantic_rename",
+      "action": {
+        "type": "command",
+        "command": "exit 0"
+      }
+    }
+  ]
+}
