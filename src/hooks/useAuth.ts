@@ -39,30 +39,66 @@ export function useAuth() {
     }, SESSION_TIMEOUT_MS);
   }, [updateActivity, clearAuth]);
 
-  // Subscribe to auth state changes on mount
+  // Bootstrap auth on mount. Guaranteed to end with setLoading(false) so
+  // the AuthGuard spinner cannot get stuck if any auth call hangs or throws.
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
 
-    // Get initial session
-    void authService.getSession().then(async (initialSession) => {
-      setSession(initialSession);
-      if (initialSession?.user) {
-        const profile = await authService.getUserProfile(initialSession.user.id);
-        setUser(profile);
+    async function bootstrap() {
+      setLoading(true);
+      try {
+        // Race getSession against a 5s timeout. Some browsers/extensions
+        // can leave navigator.locks pending and make this call hang. The
+        // supabase client is also configured with a passthrough lock, but
+        // this timeout is a second line of defence.
+        const initialSession = await Promise.race([
+          authService.getSession(),
+          new Promise<null>((resolve) =>
+            setTimeout(() => {
+              console.warn('[useAuth] getSession timed out after 5s');
+              resolve(null);
+            }, 5000),
+          ),
+        ]);
+        if (cancelled) return;
+        setSession(initialSession);
+
+        if (initialSession?.user) {
+          try {
+            const profile = await authService.getUserProfile(
+              initialSession.user.id,
+            );
+            if (!cancelled) setUser(profile);
+          } catch (profileErr) {
+            console.error('[useAuth] getUserProfile failed', profileErr);
+          }
+        }
+      } catch (err) {
+        console.error('[useAuth] bootstrap failed', err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    });
+    }
 
-    // Listen for auth changes
+    void bootstrap();
+
     const subscription = authService.onAuthStateChange(
       async (event, newSession) => {
+        if (cancelled) return;
         setSession(newSession);
         if (
           newSession?.user &&
           (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
         ) {
-          const profile = await authService.getUserProfile(newSession.user.id);
-          setUser(profile);
+          try {
+            const profile = await authService.getUserProfile(newSession.user.id);
+            if (!cancelled) setUser(profile);
+          } catch (err) {
+            console.error(
+              '[useAuth] onAuthStateChange getUserProfile failed',
+              err,
+            );
+          }
         }
         if (event === 'SIGNED_OUT') {
           clearAuth();
@@ -71,6 +107,7 @@ export function useAuth() {
     );
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
     // Actions are stable Zustand references; run this exactly once on mount.
