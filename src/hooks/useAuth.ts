@@ -39,66 +39,57 @@ export function useAuth() {
     }, SESSION_TIMEOUT_MS);
   }, [updateActivity, clearAuth]);
 
-  // Bootstrap auth on mount. Guaranteed to end with setLoading(false) so
-  // the AuthGuard spinner cannot get stuck if any auth call hangs or throws.
+  // Bootstrap auth on mount.
+  //
+  // We do NOT call supabase.auth.getSession() here. That path hangs in some
+  // browsers (navigator.locks contention, storage lock contention). Instead
+  // we rely on onAuthStateChange, which supabase-js fires with an
+  // `INITIAL_SESSION` event as soon as the client finishes hydrating from
+  // storage. That event is deterministic and does not depend on the lock
+  // path that has been hanging.
+  //
+  // A safety timeout still guarantees setLoading(false) even if the SDK
+  // never fires INITIAL_SESSION for any reason.
   useEffect(() => {
     let cancelled = false;
+    let sawInitialSession = false;
 
-    async function bootstrap() {
-      setLoading(true);
+    async function loadProfile(userId: string, tag: string) {
       try {
-        // Race getSession against a 5s timeout. Some browsers/extensions
-        // can leave navigator.locks pending and make this call hang. The
-        // supabase client is also configured with a passthrough lock, but
-        // this timeout is a second line of defence.
-        const initialSession = await Promise.race([
-          authService.getSession(),
-          new Promise<null>((resolve) =>
-            setTimeout(() => {
-              console.warn('[useAuth] getSession timed out after 5s');
-              resolve(null);
-            }, 5000),
-          ),
-        ]);
-        if (cancelled) return;
-        setSession(initialSession);
-
-        if (initialSession?.user) {
-          try {
-            const profile = await authService.getUserProfile(
-              initialSession.user.id,
-            );
-            if (!cancelled) setUser(profile);
-          } catch (profileErr) {
-            console.error('[useAuth] getUserProfile failed', profileErr);
-          }
-        }
+        const profile = await authService.getUserProfile(userId);
+        if (!cancelled) setUser(profile);
       } catch (err) {
-        console.error('[useAuth] bootstrap failed', err);
-      } finally {
-        if (!cancelled) setLoading(false);
+        console.error(`[useAuth] getUserProfile failed (${tag})`, err);
       }
     }
 
-    void bootstrap();
+    console.log('[useAuth] mount: subscribing to auth state changes');
 
     const subscription = authService.onAuthStateChange(
       async (event, newSession) => {
+        console.log(
+          '[useAuth] event:',
+          event,
+          'user:',
+          newSession?.user?.email ?? null,
+        );
         if (cancelled) return;
         setSession(newSession);
+
+        if (event === 'INITIAL_SESSION') {
+          sawInitialSession = true;
+          if (newSession?.user) {
+            await loadProfile(newSession.user.id, event);
+          }
+          setLoading(false);
+          return;
+        }
+
         if (
           newSession?.user &&
           (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
         ) {
-          try {
-            const profile = await authService.getUserProfile(newSession.user.id);
-            if (!cancelled) setUser(profile);
-          } catch (err) {
-            console.error(
-              '[useAuth] onAuthStateChange getUserProfile failed',
-              err,
-            );
-          }
+          await loadProfile(newSession.user.id, event);
         }
         if (event === 'SIGNED_OUT') {
           clearAuth();
@@ -106,8 +97,19 @@ export function useAuth() {
       },
     );
 
+    // Safety net: if INITIAL_SESSION never arrives (SDK bug, storage lock,
+    // browser extension interference), drop the spinner after 5s so the
+    // user still lands on /login instead of an infinite loading screen.
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled && !sawInitialSession) {
+        console.warn('[useAuth] INITIAL_SESSION never fired, forcing loading=false');
+        setLoading(false);
+      }
+    }, 5000);
+
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
     // Actions are stable Zustand references; run this exactly once on mount.
