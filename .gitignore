@@ -28,3 +28,8 @@ dist-ssr
 !.kiro/tmp/.gitkeep
 !.kiro/tmp/README.md
 .kiro/.auth_queue/
+.vercel
+.env*
+
+# Vercel
+.vercel

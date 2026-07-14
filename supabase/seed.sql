@@ -18,10 +18,19 @@
 --    raw_user_meta_data to control the role assignment.
 --    Password for all seed users: "password123" (bcrypt hash below).
 ----------------------------------------------------------------------
-insert into auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, aud, role) values
-  ('a1b2c3d4-0001-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'inspector@windfarm.dev', '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "Carlos Vega", "role": "inspector"}', now(), now(), 'authenticated', 'authenticated'),
-  ('a1b2c3d4-0002-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'supervisor@windfarm.dev', '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "María López", "role": "supervisor"}', now(), now(), 'authenticated', 'authenticated'),
-  ('a1b2c3d4-0003-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'admin@windfarm.dev', '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "Andrés Ruiz", "role": "admin"}', now(), now(), 'authenticated', 'authenticated')
+-- GoTrue's user-loading query does a strict scan into Go string types on
+-- these columns, so NULLs cause "500: Database error querying schema"
+-- during password login. Setting them to '' up front keeps seed users
+-- usable without an extra fix-up pass.
+insert into auth.users (
+  id, instance_id, email, encrypted_password, email_confirmed_at,
+  raw_user_meta_data, raw_app_meta_data, created_at, updated_at, aud, role,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values
+  ('a1b2c3d4-0001-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'inspector@windfarm.dev',  '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "Carlos Vega", "role": "inspector"}',   '{"provider":"email","providers":["email"]}', now(), now(), 'authenticated', 'authenticated', '', '', '', '', '', '', '', ''),
+  ('a1b2c3d4-0002-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'supervisor@windfarm.dev', '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "María López", "role": "supervisor"}', '{"provider":"email","providers":["email"]}', now(), now(), 'authenticated', 'authenticated', '', '', '', '', '', '', '', ''),
+  ('a1b2c3d4-0003-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'admin@windfarm.dev',      '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "Andrés Ruiz", "role": "admin"}',      '{"provider":"email","providers":["email"]}', now(), now(), 'authenticated', 'authenticated', '', '', '', '', '', '', '', '')
 on conflict (id) do nothing;
 
 -- The trigger should have created profiles, but insert as fallback
