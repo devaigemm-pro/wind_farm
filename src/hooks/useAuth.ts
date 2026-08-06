@@ -58,30 +58,25 @@ export function useAuth() {
       try {
         const profile = await authService.getUserProfile(userId);
         if (!cancelled) setUser(profile);
-      } catch (err) {
-        console.error(`[useAuth] getUserProfile failed (${tag})`, err);
+      } catch {
+        // Profile fetch failed — user remains authenticated but without profile data
       }
     }
 
-    console.log('[useAuth] mount: subscribing to auth state changes');
-
     const subscription = authService.onAuthStateChange(
       async (event, newSession) => {
-        console.log(
-          '[useAuth] event:',
-          event,
-          'user:',
-          newSession?.user?.email ?? null,
-        );
         if (cancelled) return;
         setSession(newSession);
 
         if (event === 'INITIAL_SESSION') {
           sawInitialSession = true;
-          if (newSession?.user) {
-            await loadProfile(newSession.user.id, event);
-          }
+          // Mark loading complete immediately once we know auth state.
+          // Profile loads in background — UI can render with session info
+          // while profile hydrates (prevents long spinner wait).
           setLoading(false);
+          if (newSession?.user) {
+            void loadProfile(newSession.user.id, event);
+          }
           return;
         }
 
@@ -98,14 +93,13 @@ export function useAuth() {
     );
 
     // Safety net: if INITIAL_SESSION never arrives (SDK bug, storage lock,
-    // browser extension interference), drop the spinner after 5s so the
+    // browser extension interference), drop the spinner after 2s so the
     // user still lands on /login instead of an infinite loading screen.
     const safetyTimer = setTimeout(() => {
       if (!cancelled && !sawInitialSession) {
-        console.warn('[useAuth] INITIAL_SESSION never fired, forcing loading=false');
         setLoading(false);
       }
-    }, 5000);
+    }, 2000);
 
     return () => {
       cancelled = true;

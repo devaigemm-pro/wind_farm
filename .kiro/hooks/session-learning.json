@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Learn from Session on Stop",
+      "trigger": "Stop",
+      "description": "Al finalizar una sesión, ejecuta el script de análisis que instruye al agente a observar patrones de interacción y actualizar el perfil de usuario.",
+      "action": {
+        "type": "command",
+        "command": "bash .kiro/agents/analyze-session.sh"
+      }
+    }
+  ]
+}

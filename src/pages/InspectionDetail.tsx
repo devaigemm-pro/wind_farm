@@ -10,6 +10,13 @@ import { useToast } from '@/store/toastStore';
 import type { InspectionStatus } from '@/types';
 import type { BadgeVariant } from '@/components/atoms';
 
+const PHASE_STEPS = [
+  { num: 1, label: '1. INSPECT' },
+  { num: 2, label: '2. ANNOTATE' },
+  { num: 3, label: '3. ANALYZE' },
+  { num: 4, label: '4. RESULTS' },
+];
+
 type TabId = 'evidence' | 'defects' | 'timeline';
 
 const STATUS_BADGE_MAP: Record<InspectionStatus, BadgeVariant> = {
@@ -98,6 +105,45 @@ export function InspectionDetail() {
     alignItems: 'center',
     gap: 'var(--space-3)',
     flexShrink: 0,
+  };
+
+  const phaseBarStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0,
+    padding: 'var(--space-2) var(--space-6)',
+    borderBottom: '1px solid var(--color-neutral-100)',
+  };
+
+  const phaseButtonStyle: React.CSSProperties = {
+    padding: 'var(--space-2) var(--space-4)',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-family-sans)',
+    fontSize: 'var(--text-sm)',
+    fontWeight: 600,
+    transition: 'all 0.2s ease',
+  };
+
+  const phaseNormalStyle: React.CSSProperties = {
+    color: 'var(--color-neutral-500)',
+  };
+
+  const phaseActiveStyle: React.CSSProperties = {
+    color: 'var(--color-neutral-900)',
+    borderBottom: '2px solid var(--color-neutral-900)',
+    paddingBottom: 'calc(var(--space-2) - 2px)',
+  };
+
+  const phaseLabelNormalStyle: React.CSSProperties = {
+    textTransform: 'lowercase',
+  };
+
+  const phaseLabelActiveStyle: React.CSSProperties = {
+    textTransform: 'lowercase',
+    fontWeight: 700,
   };
 
   const metaRowStyle: React.CSSProperties = {
@@ -344,6 +390,27 @@ export function InspectionDetail() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Phase Stepper Bar */}
+      <div style={phaseBarStyle}>
+        {PHASE_STEPS.map((step) => {
+          const isActive = step.num === 4;
+          return (
+            <button
+              key={step.num}
+              style={{
+                ...phaseButtonStyle,
+                ...(isActive ? phaseActiveStyle : phaseNormalStyle),
+              }}
+              type="button"
+            >
+              <span style={isActive ? phaseLabelActiveStyle : phaseLabelNormalStyle}>
+                {step.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tabs */}

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="sky4" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9DB8D4"/>
+      <stop offset="100%" style="stop-color:#C8DCC4"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#sky4)"/>
+  <!-- Landscape -->
+  <path d="M 0 240 Q 100 220 200 235 Q 300 250 400 230 L 400 300 L 0 300 Z" fill="#5A8C4A"/>
+  <path d="M 0 260 Q 80 250 160 255 Q 240 260 320 252 Q 380 248 400 255 L 400 300 L 0 300 Z" fill="#4A7C3F"/>
+  <!-- Main turbine -->
+  <rect x="170" y="60" width="10" height="180" fill="#E0E0E0"/>
+  <rect x="163" y="52" width="24" height="12" fill="#CCC" rx="2"/>
+  <!-- Blades showing erosion on one -->
+  <rect x="174" y="0" width="5" height="55" fill="#E8E8E8" rx="2" transform="rotate(0, 176, 55)"/>
+  <rect x="174" y="0" width="5" height="55" fill="#E8E8E8" rx="2" transform="rotate(120, 176, 55)"/>
+  <rect x="174" y="0" width="5" height="55" fill="#D4A574" rx="2" transform="rotate(240, 176, 55)"/>
+  <!-- Erosion indicator -->
+  <circle cx="176" cy="55" r="3" fill="#FF0000" opacity="0.7"/>
+  <!-- Far turbine -->
+  <rect x="310" y="130" width="5" height="100" fill="#BBB" opacity="0.5"/>
+  <circle cx="312" cy="128" r="18" fill="none" stroke="#BBB" stroke-width="0.8" opacity="0.4"/>
+  <!-- Label -->
+  <text x="200" y="290" text-anchor="middle" font-size="10" fill="#555" font-family="sans-serif">Wide view - Blade with LE erosion</text>
+</svg>

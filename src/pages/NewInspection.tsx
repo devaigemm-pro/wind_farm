@@ -1,216 +1,235 @@
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect, type CSSProperties } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/atoms';
-import { FormField } from '@/components/molecules';
-import { useAssetTree } from '@/hooks/useAssetTree';
-import { useCreateInspection } from '@/hooks/useInspectionMutations';
+import { InspectionConfigForm } from '@/components/organisms/InspectionConfigForm';
+import { SubassetsSelectionPanel } from '@/components/organisms/SubassetsSelectionPanel';
+import { WeatherMapPanel } from '@/components/organisms/WeatherMapPanel';
+import {
+  useWindFarmsList,
+  useSubassetsForSelection,
+  useWindFarmCoordinates,
+  useCreateCampaignInspections,
+} from '@/hooks/useNewInspection';
 import { useToast } from '@/store/toastStore';
-import { inspectionSchema } from '@/utils/validation';
+import { newCampaignInspectionSchema } from '@/utils/validation';
+import type { InspectionType, InspectionMethod } from '@/types';
+
+function getDefaultCampaignName(): string {
+  const now = new Date();
+  return now.toLocaleString('en', { month: 'long', year: 'numeric' });
+}
+
+function getTodayISO(): string {
+  return new Date().toISOString().split('T')[0]!;
+}
 
 export function NewInspection() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
-  const { data: treeData, isLoading: treeLoading } = useAssetTree();
-  const createInspection = useCreateInspection();
 
-  const [bladeId, setBladeId] = useState('');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [errors, setErrors] = useState<{ blade_id?: string; scheduled_date?: string }>({});
+  // ─── Data hooks ─────────────────────────────────────────────────────────
+  const { data: windFarms = [], isLoading: isLoadingFarms } = useWindFarmsList();
+  const createMutation = useCreateCampaignInspections();
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  // ─── Form state ─────────────────────────────────────────────────────────
+  const [windFarmId, setWindFarmId] = useState<string | null>(
+    searchParams.get('windFarm') || null,
+  );
+  const [inspectionType, setInspectionType] = useState<InspectionType>('blades');
+  const [inspectionMethod, setInspectionMethod] = useState<InspectionMethod>('skyvisor');
+  const [scheduledDate, setScheduledDate] = useState(getTodayISO());
+  const [campaignName, setCampaignName] = useState(getDefaultCampaignName());
+  const [notes, setNotes] = useState('');
+  const [subscribeNotifications, setSubscribeNotifications] = useState(true);
+  const [selectedTurbineIds, setSelectedTurbineIds] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ─── Dependent data hooks ───────────────────────────────────────────────
+  const { data: subassets = [], isLoading: isLoadingSubassets } =
+    useSubassetsForSelection(windFarmId);
+  const { data: coordinates, isLoading: isLoadingCoords } =
+    useWindFarmCoordinates(windFarmId);
+
+  // ─── Auto-select first wind farm if none from URL ───────────────────────
+  useEffect(() => {
+    if (!windFarmId && windFarms.length > 0) {
+      setWindFarmId(windFarms[0]!.id);
+    }
+  }, [windFarms, windFarmId]);
+
+  // ─── Auto-select all turbines when subassets load ───────────────────────
+  useEffect(() => {
+    if (subassets.length > 0) {
+      setSelectedTurbineIds(subassets.map((s) => s.id));
+    }
+  }, [subassets]);
+
+  // ─── Handlers ───────────────────────────────────────────────────────────
+  const handleWindFarmChange = (id: string) => {
+    setWindFarmId(id);
+    setSelectedTurbineIds([]);
+    setErrors({});
+  };
+
+  const handleCreate = async () => {
     setErrors({});
 
-    const result = inspectionSchema.safeParse({
-      blade_id: bladeId,
-      scheduled_date: scheduledDate,
-    });
+    const input = {
+      windFarmId: windFarmId ?? '',
+      campaignName: campaignName.trim(),
+      inspectionType,
+      inspectionMethod,
+      scheduledDate,
+      notes,
+      subscribeNotifications,
+      selectedTurbineIds,
+    };
+
+    const result = newCampaignInspectionSchema.safeParse(input);
 
     if (!result.success) {
-      const fieldErrors: { blade_id?: string; scheduled_date?: string } = {};
+      const fieldErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
-        const field = issue.path[0] as 'blade_id' | 'scheduled_date';
-        fieldErrors[field] = issue.message;
+        const field = issue.path[0] as string;
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = issue.message;
+        }
       }
       setErrors(fieldErrors);
       return;
     }
 
     try {
-      const newInspection = await createInspection.mutateAsync({
-        blade_id: result.data.blade_id,
-        scheduled_date: result.data.scheduled_date,
-      });
-      toast.success('Inspection created successfully');
-      navigate(`/inspections/${newInspection.id}`);
+      await createMutation.mutateAsync(result.data);
+      toast.success('Campaign created successfully');
+      navigate(windFarmId ? `/assets-wind/${windFarmId}` : '/inspections');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create inspection';
+      const message = err instanceof Error ? err.message : 'Failed to create campaign';
       toast.error(message);
     }
   };
 
-  const handleCancel = () => {
-    navigate('/inspections');
-  };
+  const isCreateDisabled =
+    campaignName.trim() === '' || selectedTurbineIds.length === 0;
 
-  // Styles
-  const pageStyle: React.CSSProperties = {
+  // ─── Styles ─────────────────────────────────────────────────────────────
+  const pageStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
     fontFamily: 'var(--font-family-sans)',
   };
 
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-3)',
-    padding: 'var(--space-4)',
+  const headerStyle: CSSProperties = {
+    padding: 'var(--space-4) var(--space-5)',
     borderBottom: '1px solid var(--color-neutral-100)',
     flexShrink: 0,
   };
 
-  const headerTitleStyle: React.CSSProperties = {
+  const titleStyle: CSSProperties = {
     margin: 0,
     fontSize: 'var(--text-xl)',
-    fontWeight: 600,
-    color: 'var(--color-neutral-900)',
+    fontWeight: 700,
+    color: '#111827',
   };
 
-  const contentStyle: React.CSSProperties = {
+  const gridStyle: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1.4fr 1.6fr',
+    gap: 'var(--space-4)',
     flex: 1,
-    overflow: 'auto',
-    padding: 'var(--space-6)',
-    maxWidth: '560px',
+    overflow: 'hidden',
+    padding: 'var(--space-4) var(--space-5)',
   };
 
-  const formStyle: React.CSSProperties = {
+  const leftColumnStyle: CSSProperties = {
+    overflowY: 'auto',
+    paddingRight: 'var(--space-2)',
+  };
+
+  const centerColumnStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: 'var(--space-5)',
+    overflowY: 'auto',
   };
 
-  const fieldContainerStyle: React.CSSProperties = {
+  const rightColumnStyle: CSSProperties = {
+    overflow: 'hidden',
+    borderRadius: 'var(--radius-lg)',
+  };
+
+  const createButtonContainerStyle: CSSProperties = {
     display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--space-1)',
-    width: '100%',
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: 'var(--text-sm)',
-    fontWeight: 500,
-    color: 'var(--color-neutral-800)',
-    fontFamily: 'var(--font-family-sans)',
-  };
-
-  const selectStyle: React.CSSProperties = {
-    width: '100%',
-    borderRadius: 'var(--radius-md)',
-    border: `1px solid ${errors.blade_id ? 'var(--color-danger-500)' : 'var(--color-neutral-200)'}`,
-    backgroundColor: 'var(--color-neutral-0)',
-    color: 'var(--color-neutral-900)',
-    fontFamily: 'var(--font-family-sans)',
-    fontSize: 'var(--text-sm)',
-    padding: 'var(--space-2) var(--space-3)',
-    height: '40px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  };
-
-  const errorStyle: React.CSSProperties = {
-    fontSize: 'var(--text-xs)',
-    fontFamily: 'var(--font-family-sans)',
-    color: 'var(--color-danger-500)',
-    margin: 0,
-  };
-
-  const actionsStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 'var(--space-3)',
-    paddingTop: 'var(--space-2)',
+    justifyContent: 'flex-end',
+    padding: 'var(--space-3) 0',
+    marginTop: 'auto',
   };
 
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleCancel}
-          aria-label="Back to inspections"
-        >
-          <ArrowLeft size={16} />
-        </Button>
-        <h1 style={headerTitleStyle}>New Inspection</h1>
+        <h1 style={titleStyle}>Create new inspection</h1>
       </div>
 
-      <div style={contentStyle}>
-        <form onSubmit={handleSubmit} style={formStyle} noValidate>
-          {/* Blade selector - grouped by Farm → Turbine */}
-          <div style={fieldContainerStyle}>
-            <label htmlFor="blade-select" style={labelStyle}>
-              Blade<span style={{ color: 'var(--color-danger-500)', marginLeft: '2px' }} aria-hidden="true">*</span>
-            </label>
-            <select
-              id="blade-select"
-              value={bladeId}
-              onChange={(e) => setBladeId(e.target.value)}
-              style={selectStyle}
-              aria-required="true"
-              aria-invalid={errors.blade_id ? true : undefined}
-              aria-describedby={errors.blade_id ? 'blade-error' : undefined}
-              disabled={treeLoading}
-            >
-              <option value="">Select a blade...</option>
-              {treeData?.map((farm) => (
-                <optgroup key={farm.id} label={farm.name}>
-                  {farm.turbines?.map((turbine) =>
-                    turbine.blades?.map((blade) => (
-                      <option key={blade.id} value={blade.id}>
-                        {turbine.name} → {blade.position ?? blade.id.slice(0, 8)}
-                      </option>
-                    )),
-                  )}
-                </optgroup>
-              ))}
-            </select>
-            {errors.blade_id && (
-              <p id="blade-error" role="alert" style={errorStyle}>
-                {errors.blade_id}
-              </p>
-            )}
-          </div>
-
-          {/* Scheduled date */}
-          <FormField
-            label="Scheduled Date"
-            type="date"
-            required
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            error={errors.scheduled_date}
+      <div style={gridStyle}>
+        {/* Left Column — Form */}
+        <div style={leftColumnStyle}>
+          <InspectionConfigForm
+            windFarms={windFarms}
+            selectedWindFarmId={windFarmId}
+            inspectionType={inspectionType}
+            inspectionMethod={inspectionMethod}
+            scheduledDate={scheduledDate}
+            campaignName={campaignName}
+            notes={notes}
+            subscribeNotifications={subscribeNotifications}
+            errors={errors}
+            isLoadingFarms={isLoadingFarms}
+            onWindFarmChange={handleWindFarmChange}
+            onTypeChange={setInspectionType}
+            onMethodChange={setInspectionMethod}
+            onDateChange={setScheduledDate}
+            onCampaignNameChange={setCampaignName}
+            onNotesChange={setNotes}
+            onNotificationsChange={setSubscribeNotifications}
           />
+        </div>
 
-          {/* Actions */}
-          <div style={actionsStyle}>
+        {/* Center Column — Subassets Table + CREATE button */}
+        <div style={centerColumnStyle}>
+          <SubassetsSelectionPanel
+            data={subassets}
+            isLoading={isLoadingSubassets}
+            selectedIds={selectedTurbineIds}
+            onSelectionChange={setSelectedTurbineIds}
+          />
+          <div style={createButtonContainerStyle}>
             <Button
-              type="submit"
               variant="primary"
-              loading={createInspection.isPending}
+              onClick={handleCreate}
+              disabled={isCreateDisabled}
+              loading={createMutation.isPending}
+              style={{
+                backgroundColor: isCreateDisabled ? undefined : '#00A3E0',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+              }}
             >
-              Create Inspection
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleCancel}
-            >
-              Cancel
+              CREATE
             </Button>
           </div>
-        </form>
+        </div>
+
+        {/* Right Column — Weather Map */}
+        <div style={rightColumnStyle}>
+          <WeatherMapPanel
+            latitude={coordinates?.latitude ?? null}
+            longitude={coordinates?.longitude ?? null}
+            isLoading={isLoadingCoords}
+          />
+        </div>
       </div>
     </div>
   );

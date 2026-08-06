@@ -1,0 +1,2346 @@
+import { useState, useMemo, type CSSProperties } from 'react';
+import { FileDown, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { supabase } from '@/lib/supabase';
+import { savePdfBlob } from '@/utils/pdfStorage';
+import type { ResultsDefect } from '@/types';
+
+export interface ExportPanelProps {
+  inspectionId: string;
+  defects: ResultsDefect[];
+  turbineName: string;
+  windFarmName: string;
+  anchorEl: HTMLElement | null;
+  open: boolean;
+  onClose: () => void;
+  existingReport?: { storagePath: string; generatedAt?: string; generatedBy?: string } | null;
+  blades?: { position: string; serialNumber: string; id: string }[];
+  bladeLength?: number;
+  inspectionDate?: string;
+  windFarmCoords?: { lat: number; lon: number } | null;
+  windFarmId?: string;
+  turbineId?: string;
+}
+
+// ─── PDF Color constants ─────────────────────────────────────────────────────
+const PDF_COLORS = {
+  coverBg: [11, 37, 69] as [number, number, number],      // #0B2545 navy
+  titleBlue: [11, 37, 69] as [number, number, number],    // #0B2545
+  green: [39, 174, 96] as [number, number, number],       // #27AE60
+  orange: [39, 174, 96] as [number, number, number],      // Use green instead of orange for accent
+  white: [255, 255, 255] as [number, number, number],
+  darkText: [30, 30, 30] as [number, number, number],
+  mutedText: [120, 120, 120] as [number, number, number],
+  border: [200, 200, 200] as [number, number, number],
+  tableHeaderGray: [11, 37, 69] as [number, number, number], // Navy for table headers
+  lightBg: [245, 247, 250] as [number, number, number],   // Light gray bg
+  // Category colors (severity)
+  cat5: [220, 38, 38] as [number, number, number],
+  cat4: [249, 115, 22] as [number, number, number],
+  cat3: [234, 179, 8] as [number, number, number],
+  cat2: [8, 145, 178] as [number, number, number],
+  cat1: [16, 185, 129] as [number, number, number],
+  lightGray: [245, 247, 250] as [number, number, number],
+  headerGray: [80, 80, 80] as [number, number, number],
+};
+
+function catColor(cat: number): [number, number, number] {
+  switch (cat) {
+    case 5: return PDF_COLORS.cat5;
+    case 4: return PDF_COLORS.cat4;
+    case 3: return PDF_COLORS.cat3;
+    case 2: return PDF_COLORS.cat2;
+    case 1: return PDF_COLORS.cat1;
+    default: return PDF_COLORS.mutedText;
+  }
+}
+
+// ─── PDF Graphic Helper Types ────────────────────────────────────────────────
+interface BladeDefectMarker {
+  side: string;
+  distanceFromRoot: number;
+  cat: number;
+  displayId?: string;
+}
+
+// ─── drawBladeDiagram ────────────────────────────────────────────────────────
+// Draws a blade diagram with 4 vertical sections (PS, LE, SS, TE),
+// a meter scale on the left, and defect markers as colored circles.
+function drawBladeDiagram(
+  doc: any,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  bladeLength: number,
+  defects: BladeDefectMarker[],
+  bladeLabel: string,
+) {
+  const sections = ['PS', 'LE', 'SS', 'TE'];
+  const scaleMarginLeft = 12; // space for scale labels
+  const labelMarginTop = 8; // space for section labels
+  const diagramX = x + scaleMarginLeft;
+  const diagramY = y + labelMarginTop;
+  const diagramW = width - scaleMarginLeft;
+  const diagramH = height - labelMarginTop;
+  const sectionGap = 2;
+  const sectionW = (diagramW - sectionGap * (sections.length - 1)) / sections.length;
+
+  // Blade label above
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...PDF_COLORS.titleBlue);
+  doc.text(bladeLabel, x + width / 2, y, { align: 'center' });
+
+  // Section labels
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...PDF_COLORS.darkText);
+  for (let i = 0; i < sections.length; i++) {
+    const sx = diagramX + i * (sectionW + sectionGap) + sectionW / 2;
+    doc.text(sections[i]!, sx, diagramY - 1, { align: 'center' });
+  }
+
+  // Draw section rectangles
+  doc.setFillColor(232, 232, 232); // #E8E8E8
+  doc.setDrawColor(200, 200, 200);
+  for (let i = 0; i < sections.length; i++) {
+    const sx = diagramX + i * (sectionW + sectionGap);
+    doc.roundedRect(sx, diagramY, sectionW, diagramH, 1.5, 1.5, 'FD');
+  }
+
+  // Meter scale on the left
+  doc.setFontSize(5);
+  doc.setTextColor(...PDF_COLORS.mutedText);
+  doc.setDrawColor(180, 180, 180);
+  const steps = Math.min(Math.ceil(bladeLength / 5), 10); // show scale marks every ~5m, max 10
+  const stepSize = bladeLength / steps;
+  for (let i = 0; i <= steps; i++) {
+    const meters = Math.round(i * stepSize);
+    const sy = diagramY + (i / steps) * diagramH;
+    doc.text(`${meters}m`, x, sy + 1.5, { align: 'left' });
+    // Dashed line (draw dots)
+    doc.setLineDashPattern([0.5, 1], 0);
+    doc.line(diagramX, sy, diagramX + diagramW, sy);
+  }
+  doc.setLineDashPattern([], 0);
+
+  // Defect markers
+  const sideToIdx: Record<string, number> = { PS: 0, LE: 1, SS: 2, TE: 3 };
+  const markerRadius = Math.min(sectionW * 0.35, 2);
+  for (const d of defects) {
+    const sIdx = sideToIdx[d.side] ?? 1; // default to LE
+    const cx = diagramX + sIdx * (sectionW + sectionGap) + sectionW / 2;
+    const cy = diagramY + (d.distanceFromRoot / bladeLength) * diagramH;
+    const color = catColor(d.cat);
+    doc.setFillColor(...color);
+    doc.setDrawColor(...color);
+    doc.circle(cx, cy, markerRadius, 'F');
+  }
+}
+
+// ─── drawDonutChart ──────────────────────────────────────────────────────────
+// Draws a donut chart using arcs approximated with line segments.
+function drawDonutChart(
+  doc: any,
+  centerX: number,
+  centerY: number,
+  outerRadius: number,
+  innerRadius: number,
+  percentage: number,
+  label: string,
+  color: [number, number, number],
+) {
+  // Draw background ring (gray)
+  drawArc(doc, centerX, centerY, outerRadius, innerRadius, 0, 360, [220, 220, 220]);
+  // Draw active segment
+  if (percentage > 0) {
+    const endAngle = (percentage / 100) * 360;
+    drawArc(doc, centerX, centerY, outerRadius, innerRadius, -90, -90 + endAngle, color);
+  }
+  // Center label
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...PDF_COLORS.darkText);
+  doc.text(label, centerX, centerY - 1, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text(`${Math.round(percentage)}%`, centerX, centerY + 4, { align: 'center' });
+}
+
+function drawArc(
+  doc: any,
+  cx: number,
+  cy: number,
+  outerR: number,
+  innerR: number,
+  startDeg: number,
+  endDeg: number,
+  color: [number, number, number],
+) {
+  doc.setFillColor(...color);
+  // Approximate arc with a polygon of small segments
+  const segments = 60;
+  const startRad = (startDeg * Math.PI) / 180;
+  const endRad = (endDeg * Math.PI) / 180;
+  const step = (endRad - startRad) / segments;
+
+  // Build outer points
+  const outerPoints: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    const angle = startRad + i * step;
+    outerPoints.push([cx + outerR * Math.cos(angle), cy + outerR * Math.sin(angle)]);
+  }
+  // Build inner points (reversed)
+  const innerPoints: [number, number][] = [];
+  for (let i = segments; i >= 0; i--) {
+    const angle = startRad + i * step;
+    innerPoints.push([cx + innerR * Math.cos(angle), cy + innerR * Math.sin(angle)]);
+  }
+
+  // Draw as filled polygon using triangle fan approach (lines)
+  const allPoints = [...outerPoints, ...innerPoints];
+  if (allPoints.length < 3) return;
+
+  // Use doc.lines to draw the filled shape
+  const startPoint = allPoints[0]!;
+  const moves: [number, number][] = [];
+  for (let i = 1; i < allPoints.length; i++) {
+    moves.push([allPoints[i]![0] - allPoints[i - 1]![0], allPoints[i]![1] - allPoints[i - 1]![1]]);
+  }
+  // Close the shape
+  moves.push([startPoint[0] - allPoints[allPoints.length - 1]![0], startPoint[1] - allPoints[allPoints.length - 1]![1]]);
+
+  doc.setDrawColor(...color);
+  doc.lines(moves, startPoint[0], startPoint[1], [1, 1], 'F', true);
+}
+
+// ─── drawTurbineIcon ─────────────────────────────────────────────────────────
+// Draws a stylized turbine icon (hub + 3 blades + tower)
+function drawTurbineIcon(
+  doc: any,
+  x: number,
+  y: number,
+  size: number,
+  color: [number, number, number],
+  opacity: number,
+) {
+  // Set color with opacity approximation (jsPDF doesn't support true opacity on shapes,
+  // so we'll blend the color with white based on opacity)
+  const blended: [number, number, number] = [
+    Math.round(color[0] * opacity + 255 * (1 - opacity)),
+    Math.round(color[1] * opacity + 255 * (1 - opacity)),
+    Math.round(color[2] * opacity + 255 * (1 - opacity)),
+  ];
+  doc.setFillColor(...blended);
+  doc.setDrawColor(...blended);
+
+  // Tower (thin trapezoid)
+  const towerW = size * 0.06;
+  const towerH = size * 0.4;
+  const towerX = x - towerW / 2;
+  const towerY = y;
+  doc.rect(towerX, towerY, towerW, towerH, 'F');
+
+  // Hub (circle at top of tower)
+  const hubR = size * 0.04;
+  doc.circle(x, y, hubR, 'F');
+
+  // Blades (3 elongated ellipses radiating from hub)
+  const bladeLen = size * 0.45;
+  const bladeW = size * 0.04;
+  const angles = [90, 210, 330]; // degrees from center
+  for (const angleDeg of angles) {
+    const angleRad = (angleDeg * Math.PI) / 180;
+    // Draw blade as a series of small rectangles along the angle
+    const segments = 12;
+    for (let i = 0; i < segments; i++) {
+      const dist = (i / segments) * bladeLen;
+      const w = bladeW * (1 - i / segments * 0.7); // taper
+      const bx = x + dist * Math.cos(angleRad);
+      const by = y - dist * Math.sin(angleRad);
+      // Rotated rectangle approximation with a small circle
+      doc.circle(bx, by, w / 2, 'F');
+    }
+  }
+}
+
+// ─── drawMapPlaceholder ──────────────────────────────────────────────────────
+// Draws a placeholder map rectangle with location marker and coordinates
+function drawMapPlaceholder(
+  doc: any,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  windFarmName: string,
+  coords: { lat: number; lon: number } | null,
+) {
+  // Background
+  doc.setFillColor(235, 242, 248);
+  doc.setDrawColor(...PDF_COLORS.border);
+  doc.roundedRect(x, y, width, height, 2, 2, 'FD');
+
+  // Grid lines to simulate map
+  doc.setDrawColor(210, 225, 235);
+  doc.setLineDashPattern([1, 2], 0);
+  const gridSpacing = 10;
+  for (let gx = x + gridSpacing; gx < x + width; gx += gridSpacing) {
+    doc.line(gx, y, gx, y + height);
+  }
+  for (let gy = y + gridSpacing; gy < y + height; gy += gridSpacing) {
+    doc.line(x, gy, x + width, gy);
+  }
+  doc.setLineDashPattern([], 0);
+
+  // Location marker in center
+  const markerX = x + width / 2;
+  const markerY = y + height / 2 - 5;
+  // Pin body (teardrop shape via circle + triangle)
+  doc.setFillColor(44, 124, 181); // blue marker
+  doc.setDrawColor(44, 124, 181);
+  doc.circle(markerX, markerY, 4, 'F');
+  // Small triangle below the circle to form pin point
+  const triPoints: [number, number][] = [
+    [markerX - 2.5, markerY + 2],
+    [markerX + 2.5, markerY + 2],
+    [markerX, markerY + 7],
+  ];
+  const triMoves: [number, number][] = [
+    [triPoints[1]![0] - triPoints[0]![0], triPoints[1]![1] - triPoints[0]![1]],
+    [triPoints[2]![0] - triPoints[1]![0], triPoints[2]![1] - triPoints[1]![1]],
+    [triPoints[0]![0] - triPoints[2]![0], triPoints[0]![1] - triPoints[2]![1]],
+  ];
+  doc.lines(triMoves, triPoints[0]![0], triPoints[0]![1], [1, 1], 'F', true);
+  // White dot in center of pin
+  doc.setFillColor(255, 255, 255);
+  doc.circle(markerX, markerY, 1.5, 'F');
+
+  // Wind farm name
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...PDF_COLORS.darkText);
+  doc.text(windFarmName, x + width / 2, y + height - 14, { align: 'center' });
+
+  // Coordinates
+  if (coords) {
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...PDF_COLORS.mutedText);
+    doc.text(`${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`, x + width / 2, y + height - 8, { align: 'center' });
+  }
+}
+
+// ─── drawBladeProfile ────────────────────────────────────────────────────────
+// Draws a lateral blade profile (tapered vertical shape) with a defect marker
+function drawBladeProfile(
+  doc: any,
+  x: number,
+  y: number,
+  height: number,
+  bladeLength: number,
+  defect: BladeDefectMarker,
+) {
+  const topW = 4; // width at root (bottom visually = 0m)
+  const tipW = 1; // width at tip (top visually)
+  // Blade as vertical trapezoid (0m at top, bladeLength at bottom)
+  // We draw 0m at top, so root is top and tip is bottom
+  doc.setFillColor(210, 220, 230);
+  doc.setDrawColor(180, 190, 200);
+
+  // Trapezoid points: top-left, top-right, bottom-right, bottom-left
+  const tl: [number, number] = [x - topW / 2, y];
+  const tr: [number, number] = [x + topW / 2, y];
+  const br: [number, number] = [x + tipW / 2, y + height];
+  const bl: [number, number] = [x - tipW / 2, y + height];
+
+  const moves: [number, number][] = [
+    [tr[0] - tl[0], tr[1] - tl[1]],
+    [br[0] - tr[0], br[1] - tr[1]],
+    [bl[0] - br[0], bl[1] - br[1]],
+    [tl[0] - bl[0], tl[1] - bl[1]],
+  ];
+  doc.lines(moves, tl[0], tl[1], [1, 1], 'FD', true);
+
+  // Defect marker
+  const defectY = y + (defect.distanceFromRoot / bladeLength) * height;
+  const widthAtDist = topW - (topW - tipW) * (defect.distanceFromRoot / bladeLength);
+  doc.setFillColor(...catColor(defect.cat));
+  doc.circle(x, defectY, Math.max(widthAtDist * 0.4, 1.2), 'F');
+
+  // Side label at top
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...PDF_COLORS.darkText);
+  doc.text(defect.side, x, y - 2, { align: 'center' });
+
+  // Airfoil cross-section at bottom (small ellipse)
+  doc.setFillColor(210, 220, 230);
+  doc.setDrawColor(180, 190, 200);
+  doc.ellipse(x, y + height + 5, 3, 1.2, 'FD');
+}
+
+// ─── i18n texts ──────────────────────────────────────────────────────────────
+const texts = {
+  en: {
+    coverTitle: 'Wind Turbine Blades\nInspection Report',
+    generatedBy: 'Generated by',
+    withTech: 'With technology',
+    envNote: 'Please consider your environmental responsibility before printing this PDF',
+    toc: 'Table of Contents',
+    execSummary: '1. EXECUTIVE SUMMARY',
+    defectSummary: '1.1. Defect Summary',
+    defectAnalysis: '1.2. Defect Analysis',
+    methodology: '2. METHODOLOGY',
+    methodSoftware: '2.1 Inspection Software',
+    methodAcquisition: '2.2 Data Acquisition',
+    methodProcessing: '2.3 Data Processing',
+    methodDefinitions: '2.4 Definitions',
+    methodCategorization: '2.5 Categorization',
+    inspectionDetails: '3. INSPECTION DETAILS',
+    opSummary: '3.1 Operational Summary',
+    reportDetails: '3.2 Report Details',
+    turbineInfo: '4. TURBINE INFORMATION',
+    turbineSummary: '4.1 Summary',
+    bladeDetails: '4.3 Blade Details',
+    inspHistory: '4.4 Inspection History',
+    results: '5. RESULTS BY BLADE',
+    bladeSummary: 'Blade summary',
+    defect: 'Defect',
+    endReport: 'END OF REPORT',
+    blade: 'Blade',
+    totalDefects: 'Total defects',
+    type: 'Defect type',
+    category: 'Category',
+    side: 'Side',
+    distance: 'Distance from hub',
+    size: 'Defect size',
+    note: 'Note',
+    rootCause: 'Root cause',
+    nextStep: 'Next step',
+    status: 'Status',
+    resolved: 'Resolved',
+    unresolved: 'Unresolved',
+    inspMethod: 'Inspection method',
+    inspectedOn: 'Inspected on',
+    inspectedBy: 'Inspected by',
+    avgGSD: 'Average GSD',
+    reportDate: 'Report date',
+    generatedByLabel: 'Generated by',
+    analyzedBy: 'Analyzed by',
+    installName: 'Installation name',
+    turbine: 'Turbine',
+    serialNumber: 'Serial number',
+    model: 'Model',
+    totalPower: 'Total power',
+    commissionDate: 'Commission date',
+    manufacturer: 'Manufacturer/Type',
+    length: 'Length',
+    noDefects: 'No defects on blade',
+  },
+  es: {
+    coverTitle: 'Palas de turbina eólica\nInforme de Inspección',
+    generatedBy: 'Generado por',
+    withTech: 'Con tecnología',
+    envNote: 'Considere su responsabilidad medioambiental antes de imprimir este PDF',
+    toc: 'Índice',
+    execSummary: '1. RESUMEN EJECUTIVO',
+    defectSummary: '1.1. Resumen de defectos',
+    defectAnalysis: '1.2. Análisis de defectos',
+    methodology: '2. METODOLOGÍA',
+    methodSoftware: '2.1 Software de inspección',
+    methodAcquisition: '2.2 Adquisición de datos',
+    methodProcessing: '2.3 Procesamiento de datos',
+    methodDefinitions: '2.4 Definiciones',
+    methodCategorization: '2.5 Categorización',
+    inspectionDetails: '3. DETALLES DE LA INSPECCIÓN',
+    opSummary: '3.1 Resumen Operativo',
+    reportDetails: '3.2 Detalles del informe',
+    turbineInfo: '4. INFORMACIÓN DE LA TURBINA',
+    turbineSummary: '4.1 Resumen',
+    bladeDetails: '4.3 Detalles de las palas',
+    inspHistory: '4.4 Historial de inspecciones',
+    results: '5. RESULTADOS POR PALA',
+    bladeSummary: 'Resumen de la pala',
+    defect: 'Defecto',
+    endReport: 'FIN DEL INFORME',
+    blade: 'Pala',
+    totalDefects: 'Defectos totales',
+    type: 'Tipo de defecto',
+    category: 'Categoría',
+    side: 'Lado',
+    distance: 'Distancia del eje',
+    size: 'Tamaño del defecto',
+    note: 'Nota',
+    rootCause: 'Causa principal',
+    nextStep: 'Siguiente etapa',
+    status: 'Estado',
+    resolved: 'Resuelto',
+    unresolved: 'No resuelto',
+    inspMethod: 'Método de inspección',
+    inspectedOn: 'Inspeccionado en',
+    inspectedBy: 'Inspeccionado por',
+    avgGSD: 'GSD medio',
+    reportDate: 'Fecha del informe',
+    generatedByLabel: 'Generado por',
+    analyzedBy: 'Analizado por',
+    installName: 'Nombre de la instalación',
+    turbine: 'Turbina',
+    serialNumber: 'Número de serie',
+    model: 'Modelo',
+    totalPower: 'Potencia total',
+    commissionDate: 'Fecha puesta en marcha',
+    manufacturer: 'Fabricante/Tipo',
+    length: 'Longitud',
+    noDefects: 'Sin defectos en la pala',
+  },
+};
+
+/** Convert SVG text to a PNG base64 data URI via Canvas API */
+async function svgToBase64Png(svgText: string, width: number, height: number): Promise<string | null> {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const img = new Image();
+    const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(svgBlob);
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => { reject(new Error('SVG load timeout')); }, 8000);
+      img.onload = () => { clearTimeout(timeout); resolve(); };
+      img.onerror = () => { clearTimeout(timeout); reject(new Error('SVG load failed')); };
+      img.src = url;
+    });
+    ctx.drawImage(img, 0, 0, width, height);
+    URL.revokeObjectURL(url);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
+}
+
+function generateCSV(defects: ResultsDefect[], windFarmName: string, turbineName: string, photoUrls: Map<string, string>) {
+  const header =
+    'ID,Type,Category,Blade,Side,Distance from Root (m),Width (cm),Height (cm),Resolved,Description,Photo URL\n';
+  const rows = defects
+    .map(
+      (d) => {
+        const photoUrl = photoUrls.get(d.id) || '';
+        return `${d.displayId},${d.type},${d.severity},${d.blade},${d.side},${d.distanceFromRoot},${d.widthCm || ''},${d.heightCm || ''},${d.resolved},"${(d.description || '').replace(/"/g, '""')}","${photoUrl}"`;
+      },
+    )
+    .join('\n');
+  const csv = header + rows;
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Defects_${windFarmName}_${turbineName}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Defect type → test image path mapping
+const DEFECT_TYPE_IMAGES: Record<string, string> = {
+  'LE EROSION': '/test-images/defect-erosion-wide.svg',
+  'OIL': '/test-images/defect-oil-wide.svg',
+  'LIGHTNING DAMAGE': '/test-images/defect-crack-wide.svg',
+  'OTHER': '/test-images/defect-blade-wide.svg',
+  'OTHER ADD-ONS MISSING': '/test-images/defect-blade-wide.svg',
+  'CRACK': '/test-images/defect-crack-close.svg',
+  'VORTEX': '/test-images/defect-vortex-wide.svg',
+  'VORTEX (MISSING PANELS)': '/test-images/defect-vortex-wide.svg',
+  'PAINT DEFECT': '/test-images/defect-paint-wide.svg',
+  'PAINT DAMAGES': '/test-images/defect-paint-wide.svg',
+  'DELAMINATION': '/test-images/defect-delamination-wide.svg',
+};
+
+/** Fetch an image URL and convert to base64 ArrayBuffer for ExcelJS */
+async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; extension: 'png' | 'jpeg' } | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const contentType = resp.headers.get('content-type') || '';
+    const buffer = await resp.arrayBuffer();
+
+    // SVGs need to be converted to PNG via canvas
+    if (contentType.includes('svg') || url.endsWith('.svg')) {
+      const svgBlob = new Blob([buffer], { type: 'image/svg+xml' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const canvas = document.createElement('canvas');
+      canvas.width = 200;
+      canvas.height = 150;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject();
+        img.src = svgUrl;
+      });
+      ctx.drawImage(img, 0, 0, 200, 150);
+      URL.revokeObjectURL(svgUrl);
+      const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!pngBlob) return null;
+      return { buffer: await pngBlob.arrayBuffer(), extension: 'png' };
+    }
+
+    if (contentType.includes('png')) return { buffer, extension: 'png' };
+    return { buffer, extension: 'jpeg' };
+  } catch {
+    return null;
+  }
+}
+
+/** Render the CORE Insight logo as a PNG buffer using canvas */
+async function renderLogoPng(): Promise<ArrayBuffer | null> {
+  try {
+    const canvas = document.createElement('canvas');
+    // Use 3x scale for crisp rendering in Excel
+    const w = 900, h = 180;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Background rounded rect (dark navy blue matching the brand)
+    const bgColor = '#0B2545';
+    const radius = 16;
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(w - radius, 0);
+    ctx.arcTo(w, 0, w, radius, radius);
+    ctx.lineTo(w, h - radius);
+    ctx.arcTo(w, h, w - radius, h, radius);
+    ctx.lineTo(radius, h);
+    ctx.arcTo(0, h, 0, h - radius, radius);
+    ctx.lineTo(0, radius);
+    ctx.arcTo(0, 0, radius, 0, radius);
+    ctx.closePath();
+    ctx.fill();
+
+    const cy = h / 2;
+    const green = '#4CAF50';
+
+    // ─── Eye icon (insight) ─────────────────────────────────────────────
+    const eyeCx = 110;
+    const eyeCy = cy;
+    const eyeW = 50;
+    const eyeH = 28;
+
+    // Eye shape outline
+    ctx.strokeStyle = green;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(eyeCx - eyeW, eyeCy);
+    ctx.quadraticCurveTo(eyeCx, eyeCy - eyeH * 1.8, eyeCx + eyeW, eyeCy);
+    ctx.quadraticCurveTo(eyeCx, eyeCy + eyeH * 1.8, eyeCx - eyeW, eyeCy);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Iris circle
+    ctx.beginPath();
+    ctx.arc(eyeCx, eyeCy, 18, 0, Math.PI * 2);
+    ctx.strokeStyle = green;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Pupil with mini turbine blades
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.arc(eyeCx, eyeCy, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Mini blade up
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(eyeCx, eyeCy);
+    ctx.lineTo(eyeCx, eyeCy - 16);
+    ctx.stroke();
+    // Mini blade lower-right
+    ctx.beginPath();
+    ctx.moveTo(eyeCx, eyeCy);
+    ctx.lineTo(eyeCx + 14, eyeCy + 8);
+    ctx.stroke();
+    // Mini blade lower-left
+    ctx.beginPath();
+    ctx.moveTo(eyeCx, eyeCy);
+    ctx.lineTo(eyeCx - 14, eyeCy + 8);
+    ctx.stroke();
+
+    // ─── CORE text ──────────────────────────────────────────────────────
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+    ctx.textBaseline = 'middle';
+    const textStartX = 190;
+    ctx.fillText('CORE', textStartX, cy);
+
+    // ─── Insight text (lighter weight, spaced) ──────────────────────────
+    const coreWidth = ctx.measureText('CORE').width;
+    ctx.font = '300 60px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillText('Insight', textStartX + coreWidth + 30, cy);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) return null;
+    return await blob.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/** Generate XLSX with embedded images */
+async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turbineName: string) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Defects');
+
+  // Remove default grid lines
+  sheet.views = [{ showGridLines: false }];
+
+  const origin = window.location.origin;
+
+  // Merge cells for logo area so image doesn't split across column borders
+  sheet.mergeCells('A1:K2');
+
+  // Add logo at the top (rendered as PNG for consistent formatting)
+  const logoBuffer = await renderLogoPng();
+  if (logoBuffer) {
+    const logoId = workbook.addImage({ buffer: logoBuffer, extension: 'png' });
+    // Use tl/br anchoring to fit within merged area
+    sheet.addImage(logoId, {
+      tl: { col: 0.2, row: 0.1 },
+      ext: { width: 300, height: 60 },
+    });
+  }
+
+  // Set row heights for logo area
+  sheet.getRow(1).height = 35;
+  sheet.getRow(2).height = 30;
+
+  // Row 3: spacing
+  sheet.addRow([]);
+  sheet.addRow([]);
+  sheet.addRow([]);
+  sheet.getRow(3).height = 8;
+
+  // Title row (row 4)
+  const titleRow = sheet.addRow([`Defects Report - ${windFarmName} - ${turbineName}`]);
+  titleRow.font = { bold: true, size: 13, color: { argb: 'FF1B2B4B' } };
+  titleRow.height = 22;
+  sheet.addRow([]); // row 5 spacing
+
+  // Set column widths
+  sheet.getColumn(1).width = 6;
+  sheet.getColumn(2).width = 24;
+  sheet.getColumn(3).width = 10;
+  sheet.getColumn(4).width = 7;
+  sheet.getColumn(5).width = 6;
+  sheet.getColumn(6).width = 14;
+  sheet.getColumn(7).width = 11;
+  sheet.getColumn(8).width = 11;
+  sheet.getColumn(9).width = 9;
+  sheet.getColumn(10).width = 35;
+  sheet.getColumn(11).width = 28;
+
+  // Header row (row 6)
+  const headers = ['ID', 'Type', 'Category', 'Blade', 'Side', 'Distance (m)', 'Width (cm)', 'Height (cm)', 'Resolved', 'Description', 'Photo'];
+  const headerRow = sheet.addRow(headers);
+  headerRow.height = 20;
+  headerRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2B4B' } };
+    cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = {};
+  });
+
+  // Add data rows and embed images
+  const dataStartRow = sheet.rowCount + 1;
+  for (let i = 0; i < defects.length; i++) {
+    const d = defects[i]!;
+    const row = sheet.addRow([
+      d.displayId,
+      d.type,
+      d.severity,
+      d.blade,
+      d.side,
+      d.distanceFromRoot,
+      d.widthCm ?? '',
+      d.heightCm ?? '',
+      d.resolved ? 'Yes' : 'No',
+      d.description ?? '',
+      '',
+    ]);
+    row.height = 75;
+    row.alignment = { vertical: 'middle' };
+    // No borders on cells
+    row.eachCell((cell) => { cell.border = {}; });
+
+    // Fetch and embed defect image
+    const imgPath = DEFECT_TYPE_IMAGES[d.type.toUpperCase()] ?? DEFECT_TYPE_IMAGES[d.type] ?? '/test-images/defect-blade-wide.svg';
+    const imgData = await fetchImageAsBuffer(`${origin}${imgPath}`);
+    if (imgData) {
+      const imageId = workbook.addImage({ buffer: imgData.buffer, extension: imgData.extension });
+      const rowIdx = dataStartRow + i - 1;
+      sheet.addImage(imageId, {
+        tl: { col: 10, row: rowIdx },
+        ext: { width: 150, height: 90 },
+      });
+    }
+  }
+
+  // Protect the header area (rows 1-7) - by default all cells are locked when sheet is protected
+  // Only UNLOCK cells from row 8 onwards (data rows) so they can be edited
+  for (let r = 8; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+    for (let c = 1; c <= 11; c++) {
+      row.getCell(c).protection = { locked: false };
+    }
+  }
+  // Enable sheet protection directly (no password needed)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (sheet as any).sheetProtection = { sheet: true, objects: true, scenarios: true };
+
+  // Generate and download
+  const xlsxBuffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([xlsxBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Defects_${windFarmName}_${turbineName}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Try to load an image from URL as base64 data URI */
+async function loadImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 8000);
+      const reader = new FileReader();
+      reader.onloadend = () => { clearTimeout(timeout); resolve(reader.result as string); };
+      reader.onerror = () => { clearTimeout(timeout); resolve(null); };
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function ExportPanel({
+  inspectionId,
+  defects,
+  turbineName,
+  windFarmName,
+  open,
+  onClose,
+  blades,
+  bladeLength,
+  inspectionDate,
+  windFarmCoords,
+  windFarmId,
+  turbineId,
+}: ExportPanelProps) {
+  const [language, setLanguage] = useState<'en' | 'es'>('en');
+  const [includeDetails, setIncludeDetails] = useState(true);
+  const [resolvedFilter, setResolvedFilter] = useState<'all' | 'resolved' | 'unresolved'>('all');
+  const [selectedCategories, setSelectedCategories] = useState<Set<number>>(
+    new Set([1, 2, 3, 4, 5]),
+  );
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [typesInitialized, setTypesInitialized] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
+
+  // Sections collapsed state
+  const [resolvedOpen, setResolvedOpen] = useState(true);
+  const [categoryOpen, setCategoryOpen] = useState(true);
+  const [typeOpen, setTypeOpen] = useState(true);
+
+  // Compute available categories and types from defects
+  const { categoryCounts, availableTypes } = useMemo(() => {
+    const catCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    const types = new Set<string>();
+    for (const d of defects) {
+      catCounts[d.severity] = (catCounts[d.severity] || 0) + 1;
+      types.add(d.type);
+    }
+    return { categoryCounts: catCounts, availableTypes: Array.from(types).sort() };
+  }, [defects]);
+
+  // Initialize selectedTypes once when availableTypes are computed
+  if (!typesInitialized && availableTypes.length > 0) {
+    setSelectedTypes(new Set(availableTypes));
+    setTypesInitialized(true);
+  }
+
+  const toggleCategory = (cat: number) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const toggleType = (type: string) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  const handleGeneratePDF = async () => {
+    setIsGenerating(true);
+    setGenerateError(null);
+    try {
+      // Filter defects based on current selections
+      let filtered = [...defects];
+      if (resolvedFilter === 'resolved') filtered = filtered.filter((d) => d.resolved);
+      if (resolvedFilter === 'unresolved') filtered = filtered.filter((d) => !d.resolved);
+      filtered = filtered.filter((d) => selectedCategories.has(d.severity));
+      filtered = filtered.filter((d) => selectedTypes.has(d.type));
+
+      const t = texts[language];
+      const { jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+
+      // Load blade SVG and convert to PNG once
+      const bladeSvgText = await fetch('/blade.svg').then((r) => r.text()).catch(() => null);
+      const bladePng = bladeSvgText ? await svgToBase64Png(bladeSvgText, 200, 940) : null;
+
+      // App base URL for clickable links
+      const appBaseUrl = 'https://wind-farm-eight.vercel.app';
+
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageW = doc.internal.pageSize.getWidth(); // 210
+      const pageH = doc.internal.pageSize.getHeight(); // 297
+      const margin = 20;
+      const contentW = pageW - margin * 2;
+      let pageNum = 0;
+
+      const now = new Date();
+      const dateStr = inspectionDate
+        ? new Date(inspectionDate).toLocaleDateString(language === 'es' ? 'es-CL' : 'en-US')
+        : now.toLocaleDateString(language === 'es' ? 'es-CL' : 'en-US');
+      const nowStr = now.toLocaleDateString(language === 'es' ? 'es-CL' : 'en-US');
+
+      const bladeSerials: Record<string, string> = {};
+      if (blades) {
+        for (const b of blades) {
+          bladeSerials[b.position] = b.serialNumber;
+        }
+      }
+      const primarySerial = bladeSerials['A'] || 'N/A';
+
+      // Helper: add header/footer to internal pages
+      const addHeaderFooter = (pg: number) => {
+        // Header
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...PDF_COLORS.mutedText);
+        const headerText = `${windFarmName} - ${turbineName}`;
+        doc.text(headerText, pageW / 2, 12, { align: 'center' });
+        doc.setFontSize(8);
+        doc.text(dateStr, pageW / 2, 17, { align: 'center' });
+        // Footer
+        doc.setDrawColor(...PDF_COLORS.border);
+        doc.line(margin, pageH - 16, pageW - margin, pageH - 16);
+        doc.setFontSize(8);
+        doc.setTextColor(...PDF_COLORS.mutedText);
+        doc.text(windFarmName, margin, pageH - 10);
+        doc.text(`${pg}`, pageW / 2, pageH - 10, { align: 'center' });
+        doc.text('CORE Insight', pageW - margin, pageH - 10, { align: 'right' });
+      };
+
+      const newPage = () => {
+        doc.addPage();
+        pageNum++;
+        addHeaderFooter(pageNum);
+      };
+
+      const sectionTitle = (title: string, y: number): number => {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...PDF_COLORS.titleBlue);
+        doc.text(title, margin, y);
+        return y + 8;
+      };
+
+      const subTitle = (title: string, y: number): number => {
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...PDF_COLORS.titleBlue);
+        doc.text(title, margin, y);
+        return y + 7;
+      };
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 1: Cover
+      // ═══════════════════════════════════════════════════════════════════════
+      pageNum = 1;
+      // Blue background 70%
+      doc.setFillColor(...PDF_COLORS.coverBg);
+      doc.rect(0, 0, pageW, pageH * 0.7, 'F');
+
+      // Logo in top-left corner
+      const logoPng = await renderLogoPng();
+      if (logoPng) {
+        const logoBase64 = 'data:image/png;base64,' + btoa(String.fromCharCode(...new Uint8Array(logoPng)));
+        doc.addImage(logoBase64, 'PNG', margin, 15, 60, 12);
+      }
+
+      // (Cover decoration removed for clean minimalist style)
+
+      // Title
+      doc.setFontSize(28);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...PDF_COLORS.white);
+      const titleLines = t.coverTitle.split('\n');
+      let titleY = 80;
+      for (const line of titleLines) {
+        doc.text(line, pageW / 2, titleY, { align: 'center' });
+        titleY += 14;
+      }
+
+      // Subtitle info
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...PDF_COLORS.white);
+      doc.text(windFarmName, pageW / 2, titleY + 20, { align: 'center' });
+      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW / 2, titleY + 30, { align: 'center' });
+      doc.text(dateStr, pageW / 2, titleY + 40, { align: 'center' });
+
+      // Footer section (white area)
+      const footerStartY = pageH * 0.7 + 20;
+      doc.setFontSize(9);
+      doc.setTextColor(...PDF_COLORS.mutedText);
+      doc.text(t.generatedBy, margin + 10, footerStartY);
+      doc.text(windFarmName, margin + 10, footerStartY + 5);
+      doc.text(t.withTech, pageW - margin - 10, footerStartY, { align: 'right' });
+      doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
+
+      // Env note at bottom
+      doc.setFontSize(7);
+      doc.setTextColor(...PDF_COLORS.mutedText);
+      doc.text(t.envNote, pageW / 2, pageH - 10, { align: 'center' });
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 2: Table of Contents
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      let y = 28;
+      y = sectionTitle(t.toc, y);
+      y += 10;
+
+      // Professional TOC with dot leaders and section numbers
+      const tocSections = [
+        { level: 0, num: '1', text: language === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary' },
+        { level: 1, num: '1.1', text: language === 'es' ? 'Resumen de defectos' : 'Defect Summary' },
+        { level: 1, num: '1.2', text: language === 'es' ? 'Análisis de defectos' : 'Defect Analysis' },
+        { level: 0, num: '2', text: language === 'es' ? 'Metodología' : 'Methodology' },
+        { level: 1, num: '2.1', text: language === 'es' ? 'Software de inspección' : 'Inspection Software' },
+        { level: 1, num: '2.2', text: language === 'es' ? 'Adquisición de datos' : 'Data Acquisition' },
+        { level: 1, num: '2.3', text: language === 'es' ? 'Procesamiento de datos' : 'Data Processing' },
+        { level: 1, num: '2.4', text: language === 'es' ? 'Definiciones' : 'Definitions' },
+        { level: 1, num: '2.5', text: language === 'es' ? 'Categorización' : 'Categorization' },
+        { level: 0, num: '3', text: language === 'es' ? 'Detalles de la inspección' : 'Inspection Details' },
+        { level: 0, num: '4', text: language === 'es' ? 'Información de la turbina' : 'Turbine Information' },
+        { level: 0, num: '5', text: language === 'es' ? 'Resultados por pala' : 'Results by Blade' },
+      ];
+
+      for (const item of tocSections) {
+        const indent = item.level === 0 ? 0 : 10;
+        const fontSize = item.level === 0 ? 11 : 9.5;
+        const fontStyle = item.level === 0 ? 'bold' : 'normal';
+
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', fontStyle);
+        doc.setTextColor(...(item.level === 0 ? PDF_COLORS.titleBlue : PDF_COLORS.darkText));
+
+        // Number
+        doc.text(item.num, margin + indent, y);
+        // Text
+        doc.text(item.text, margin + indent + 12, y);
+
+        // Dot leader line
+        const textEndX = margin + indent + 12 + doc.getTextWidth(item.text) + 3;
+        const lineEndX = pageW - margin;
+        doc.setDrawColor(...PDF_COLORS.border);
+        doc.setLineDashPattern([0.5, 1.5], 0);
+        doc.line(textEndX, y, lineEndX, y);
+        doc.setLineDashPattern([], 0);
+
+        y += item.level === 0 ? 10 : 7;
+      }
+
+      // Separator line at bottom of TOC
+      y += 5;
+      doc.setDrawColor(...PDF_COLORS.green);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageW - margin, y);
+      doc.setLineWidth(0.2);
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 3: 1. Executive Summary - 1.1 Defect Summary
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      y = 28;
+      y = sectionTitle(t.execSummary, y);
+      y = subTitle(t.defectSummary, y + 2);
+      y += 4;
+
+      // Per-blade summary table
+      const bladeLetters = ['A', 'B', 'C'];
+      const bladeSummaryRows = bladeLetters.map((bl) => {
+        const bladeDefects = filtered.filter((d) => d.blade === bl);
+        return [
+          `${t.blade} ${bl}`,
+          String(bladeDefects.length),
+          String(bladeDefects.filter((d) => d.severity === 5).length),
+          String(bladeDefects.filter((d) => d.severity === 4).length),
+          String(bladeDefects.filter((d) => d.severity === 3).length),
+          String(bladeDefects.filter((d) => d.severity === 2).length),
+          String(bladeDefects.filter((d) => d.severity === 1).length),
+        ];
+      });
+      // Total row
+      bladeSummaryRows.push([
+        'Total',
+        String(filtered.length),
+        String(filtered.filter((d) => d.severity === 5).length),
+        String(filtered.filter((d) => d.severity === 4).length),
+        String(filtered.filter((d) => d.severity === 3).length),
+        String(filtered.filter((d) => d.severity === 2).length),
+        String(filtered.filter((d) => d.severity === 1).length),
+      ]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [[t.blade, t.totalDefects, 'Cat 5', 'Cat 4', 'Cat 3', 'Cat 2', 'Cat 1']],
+        body: bladeSummaryRows,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+          2: { fillColor: [255, 235, 235] },
+          3: { fillColor: [255, 243, 230] },
+          4: { fillColor: [255, 250, 230] },
+          5: { fillColor: [230, 248, 250] },
+          6: { fillColor: [230, 250, 245] },
+        },
+        margin: { left: margin, right: margin },
+      });
+
+      // Blade diagrams (3 small blades side by side using bladePng)
+      const tableEndY = (doc as any).lastAutoTable?.finalY || y + 40;
+      const diagramStartY = tableEndY + 10;
+      const diagramH = 90;
+      const diagramW = (contentW - 16) / 3; // 3 columns with 8mm gap between
+      const bLen = bladeLength || 43;
+      for (let i = 0; i < bladeLetters.length; i++) {
+        const bl = bladeLetters[i]!;
+        const blDefects = filtered.filter((d) => d.blade === bl).map((d) => ({
+          side: d.side,
+          distanceFromRoot: d.distanceFromRoot ?? 0,
+          cat: d.severity,
+          displayId: d.displayId,
+        }));
+        const dX = margin + i * (diagramW + 8);
+
+        // Blade label above
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...PDF_COLORS.titleBlue);
+        doc.text(`${t.blade} ${bl}`, dX + diagramW / 2, diagramStartY - 2, { align: 'center' });
+
+        if (bladePng) {
+          // Use real blade SVG (maintain aspect ratio within diagramH)
+          const imgW = diagramH / 4.7; // aspect ratio from SVG viewBox
+          const imgX = dX + (diagramW - imgW) / 2;
+          doc.addImage(bladePng, 'PNG', imgX, diagramStartY, imgW, diagramH);
+          // Defect markers
+          for (const dm of blDefects) {
+            const markerY = diagramStartY + (dm.distanceFromRoot / bLen) * diagramH;
+            const color = catColor(dm.cat);
+            doc.setFillColor(...color);
+            doc.setDrawColor(...color);
+            doc.circle(imgX + imgW / 2, markerY, 1.5, 'F');
+          }
+        } else {
+          drawBladeDiagram(doc, dX, diagramStartY, diagramW, diagramH, bLen, blDefects, '');
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 4: 1.2 Defect Analysis
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      y = 28;
+      y = subTitle(t.defectAnalysis, y);
+      y += 4;
+
+      // Category badges with counts
+      doc.setFontSize(9);
+      let badgeX = margin;
+      for (let cat = 5; cat >= 1; cat--) {
+        const count = filtered.filter((d) => d.severity === cat).length;
+        const color = catColor(cat);
+        doc.setFillColor(...color);
+        doc.roundedRect(badgeX, y, 30, 10, 2, 2, 'F');
+        doc.setTextColor(...PDF_COLORS.white);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Cat ${cat}: ${count}`, badgeX + 15, y + 6.5, { align: 'center' });
+        badgeX += 34;
+      }
+      y += 18;
+
+      // Donut charts per blade
+      const donutY = y + 5;
+      const donutSpacing = contentW / 3;
+      const totalDefectsCount = filtered.length;
+      for (let i = 0; i < bladeLetters.length; i++) {
+        const bl = bladeLetters[i]!;
+        const blCount = filtered.filter((d) => d.blade === bl).length;
+        const cx = margin + donutSpacing * i + donutSpacing / 2;
+        const cy = donutY + 18;
+        if (blCount === 0) {
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(...PDF_COLORS.mutedText);
+          doc.text(`${t.noDefects} ${bl}`, cx, cy, { align: 'center' });
+        } else {
+          const pct = totalDefectsCount > 0 ? (blCount / totalDefectsCount) * 100 : 0;
+          drawDonutChart(doc, cx, cy, 14, 8, pct, `${t.blade} ${bl}`, PDF_COLORS.orange);
+        }
+      }
+      y = donutY + 42;
+
+      // Type by category table
+      doc.setTextColor(...PDF_COLORS.darkText);
+      const typeMap: Record<string, Record<number, number>> = {};
+      for (const d of filtered) {
+        if (!typeMap[d.type]) typeMap[d.type] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        typeMap[d.type]![d.severity] = (typeMap[d.type]![d.severity] || 0) + 1;
+      }
+      const typeRows = Object.entries(typeMap).map(([type, cats]) => {
+        const total = Object.values(cats).reduce((a, b) => a + b, 0);
+        return [type, String(total), String(cats[5] || 0), String(cats[4] || 0), String(cats[3] || 0), String(cats[2] || 0), String(cats[1] || 0)];
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [[t.type, 'Total', 'Cat 5', 'Cat 4', 'Cat 3', 'Cat 2', 'Cat 1']],
+        body: typeRows,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        margin: { left: margin, right: margin },
+      });
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 5: 2. Methodology
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      y = 28;
+      y = sectionTitle(t.methodology, y);
+      y += 2;
+
+      // 2.1
+      y = subTitle(t.methodSoftware, y);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...PDF_COLORS.darkText);
+      const softwareText = language === 'es'
+        ? 'CORE Insight es una plataforma de software para la inspección digital de palas de aerogeneradores que utiliza inteligencia artificial para detectar y clasificar defectos automáticamente.'
+        : 'CORE Insight is a software platform for digital wind turbine blade inspection that uses artificial intelligence to detect and classify defects automatically.';
+      const lines1 = doc.splitTextToSize(softwareText, contentW);
+      doc.text(lines1, margin, y);
+      y += lines1.length * 4.5 + 6;
+
+      // 2.2
+      y = subTitle(t.methodAcquisition, y);
+      const acqText = language === 'es'
+        ? 'Los datos se adquieren mediante vuelos de dron planificados con rutas de vuelo optimizadas para capturar todas las superficies de las palas con alta resolución.'
+        : 'Data is acquired through planned drone flights with optimized flight paths to capture all blade surfaces at high resolution.';
+      const lines2 = doc.splitTextToSize(acqText, contentW);
+      doc.text(lines2, margin, y);
+      y += lines2.length * 4.5 + 6;
+
+      // 2.3
+      y = subTitle(t.methodProcessing, y);
+      const procText = language === 'es'
+        ? 'El procesamiento de datos incluye la detección automática de defectos mediante redes neuronales, seguida de revisión y validación por parte de ingenieros certificados.'
+        : 'Data processing includes automatic defect detection using neural networks, followed by review and validation by certified engineers.';
+      const lines3 = doc.splitTextToSize(procText, contentW);
+      doc.text(lines3, margin, y);
+      y += lines3.length * 4.5 + 8;
+
+      // 2.4 Definitions table
+      y = subTitle(t.methodDefinitions, y);
+      const defRows = language === 'es'
+        ? [
+            ['SS', 'Lado de succión (Suction Side)'],
+            ['PS', 'Lado de presión (Pressure Side)'],
+            ['LE', 'Borde de ataque (Leading Edge)'],
+            ['TE', 'Borde de fuga (Trailing Edge)'],
+            ['SMT', 'Montaje superior (Surface Mount)'],
+            ['LPS', 'Sistema de protección contra rayos'],
+          ]
+        : [
+            ['SS', 'Suction Side'],
+            ['PS', 'Pressure Side'],
+            ['LE', 'Leading Edge'],
+            ['TE', 'Trailing Edge'],
+            ['SMT', 'Surface Mount'],
+            ['LPS', 'Lightning Protection System'],
+          ];
+
+      autoTable(doc, {
+        startY: y,
+        head: [[language === 'es' ? 'Término' : 'Term', language === 'es' ? 'Definición' : 'Definition']],
+        body: defRows,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        margin: { left: margin, right: margin },
+        tableWidth: contentW * 0.7,
+      });
+      y = (doc as any).lastAutoTable?.finalY + 8 || y + 50;
+
+      // 2.5 Categorization table
+      if (y > pageH - 80) { newPage(); y = 28; }
+      y = subTitle(t.methodCategorization, y);
+      const catRows = language === 'es'
+        ? [
+            ['5', 'Crítico', 'Daño severo que requiere acción inmediata', 'Reparación urgente'],
+            ['4', 'Mayor', 'Daño significativo que requiere atención pronta', 'Reparación planificada'],
+            ['3', 'Moderado', 'Daño que requiere monitoreo', 'Monitorear / reparar en siguiente parada'],
+            ['2', 'Menor', 'Daño menor con bajo riesgo', 'Monitorear en siguiente inspección'],
+            ['1', 'Cosmético', 'Daño superficial sin impacto estructural', 'Sin acción requerida'],
+          ]
+        : [
+            ['5', 'Critical', 'Severe damage requiring immediate action', 'Urgent repair'],
+            ['4', 'Major', 'Significant damage requiring prompt attention', 'Planned repair'],
+            ['3', 'Moderate', 'Damage requiring monitoring', 'Monitor / repair at next stop'],
+            ['2', 'Minor', 'Minor damage with low risk', 'Monitor at next inspection'],
+            ['1', 'Cosmetic', 'Surface damage with no structural impact', 'No action required'],
+          ];
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Cat', language === 'es' ? 'Severidad' : 'Severity', language === 'es' ? 'Tipo de daño' : 'Damage type', language === 'es' ? 'Acción requerida' : 'Required action']],
+        body: catRows,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        bodyStyles: { textColor: PDF_COLORS.darkText },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 0) {
+            const catNum = parseInt(data.cell.raw as string, 10);
+            data.cell.styles.fillColor = catColor(catNum);
+            data.cell.styles.textColor = [255, 255, 255];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        },
+        margin: { left: margin, right: margin },
+      });
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 6: 3. Inspection Details
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      y = 28;
+      y = sectionTitle(t.inspectionDetails, y);
+      y += 2;
+
+      // 3.1 Operational Summary
+      y = subTitle(t.opSummary, y);
+      autoTable(doc, {
+        startY: y,
+        body: [
+          [t.inspMethod, 'CORE Insight'],
+          [t.inspectedOn, dateStr],
+          [t.inspectedBy, 'Inspector'],
+          [t.avgGSD, '0.07 cm/pixel'],
+        ],
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+        margin: { left: margin, right: margin },
+        tableWidth: contentW * 0.7,
+        theme: 'grid',
+      });
+      y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
+
+      // 3.2 Report Details
+      y = subTitle(t.reportDetails, y);
+      autoTable(doc, {
+        startY: y,
+        body: [
+          [t.reportDate, nowStr],
+          [t.generatedByLabel, 'Inspector'],
+          [t.analyzedBy, 'CORE Insight'],
+        ],
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+        margin: { left: margin, right: margin },
+        tableWidth: contentW * 0.7,
+        theme: 'grid',
+      });
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 7: 4. Turbine Information
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      y = 28;
+      y = sectionTitle(t.turbineInfo, y);
+      y += 2;
+
+      // 4.1 Summary
+      y = subTitle(t.turbineSummary, y);
+      autoTable(doc, {
+        startY: y,
+        body: [
+          [t.installName, windFarmName],
+          [t.turbine, turbineName],
+          [t.serialNumber, primarySerial],
+          [t.model, 'N/A'],
+          [t.totalPower, 'N/A'],
+          [t.commissionDate, 'N/A'],
+        ],
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+        margin: { left: margin, right: margin },
+        tableWidth: contentW * 0.7,
+        theme: 'grid',
+      });
+      y = (doc as any).lastAutoTable?.finalY + 12 || y + 50;
+
+      // 4.2 Location (map placeholder)
+      const locationTitle = language === 'es' ? '4.2 Ubicación' : '4.2 Location';
+      y = subTitle(locationTitle, y);
+      drawMapPlaceholder(doc, margin, y, contentW, 55, windFarmName, windFarmCoords ?? null);
+      y += 65;
+
+      // 4.3 Blade Details
+      y = subTitle(t.bladeDetails, y);
+      const bladeDetailRows = [
+        [t.manufacturer, 'N/A'],
+        [t.length, `${bladeLength || 43}m`],
+        [`${t.blade} A`, bladeSerials['A'] || 'N/A'],
+        [`${t.blade} B`, bladeSerials['B'] || 'N/A'],
+        [`${t.blade} C`, bladeSerials['C'] || 'N/A'],
+      ];
+      autoTable(doc, {
+        startY: y,
+        body: bladeDetailRows,
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+        margin: { left: margin, right: margin },
+        tableWidth: contentW * 0.7,
+        theme: 'grid',
+      });
+      y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
+
+      // 4.4 Inspection History
+      y = subTitle(t.inspHistory, y);
+      autoTable(doc, {
+        startY: y,
+        head: [[language === 'es' ? 'Fecha' : 'Date', t.totalDefects]],
+        body: [[dateStr, String(filtered.length)]],
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        margin: { left: margin, right: margin },
+        tableWidth: contentW * 0.5,
+      });
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGES 8+: 5. Results by Blade
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      y = 28;
+      y = sectionTitle(t.results, y);
+      y += 4;
+
+      // Clickable link to app Results view
+      if (windFarmId && turbineId) {
+        const resultsUrl = `${appBaseUrl}/assets-wind/${windFarmId}/turbine/${turbineId}?inspectionId=${inspectionId}`;
+        const linkText = language === 'es' ? 'Ver todos los defectos en CORE Insight' : 'View all defects in CORE Insight';
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 166, 255);
+        doc.text(linkText, margin, y);
+        const linkTextW = doc.getTextWidth(linkText);
+        doc.link(margin, y - 4, linkTextW, 5, { url: resultsUrl });
+        doc.setTextColor(...PDF_COLORS.darkText);
+        y += 8;
+      }
+
+      let bladeIdx = 1;
+      for (const bl of bladeLetters) {
+        const bladeDefects = filtered.filter((d) => d.blade === bl);
+        const serial = bladeSerials[bl] || 'N/A';
+
+        if (y > pageH - 160) { newPage(); y = 28; }
+
+        // Blade header
+        y = subTitle(`5.${bladeIdx}. ${t.bladeSummary} ${bl} - ${serial}`, y);
+        y += 2;
+
+        if (bladeDefects.length === 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(...PDF_COLORS.mutedText);
+          doc.text(`${t.noDefects} ${bl}`, margin, y);
+          y += 10;
+        } else {
+          // Blade SVG on the left (use rasterized bladePng with correct aspect ratio)
+          const blDefMarkers = bladeDefects.map((d) => ({
+            side: d.side,
+            distanceFromRoot: d.distanceFromRoot ?? 0,
+            cat: d.severity,
+            displayId: d.displayId,
+          }));
+          // Cap diagram height to available space on page (pageH - y - footer margin)
+          const availableH = pageH - y - 25;
+          const diagramH = Math.min(availableH, Math.min(140, bladeDefects.length * 15 + 50));
+          const bladeW = Math.min(25, diagramH / 4.7); // maintain SVG aspect ratio, max 25mm wide
+
+          if (bladePng) {
+            // Blade label above
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...PDF_COLORS.titleBlue);
+            doc.text(`${t.blade} ${bl}`, margin + bladeW / 2, y - 2, { align: 'center' });
+            // Draw blade image with correct aspect ratio
+            doc.addImage(bladePng, 'PNG', margin, y, bladeW, diagramH);
+            // Defect markers
+            for (const dm of blDefMarkers) {
+              const markerY = y + (dm.distanceFromRoot / (bladeLength || 43)) * diagramH;
+              const color = catColor(dm.cat);
+              doc.setFillColor(...color);
+              doc.setDrawColor(...color);
+              doc.circle(margin + bladeW / 2, markerY, 2, 'F');
+            }
+          } else {
+            drawBladeDiagram(doc, margin, y, 40, diagramH, bladeLength || 43, blDefMarkers, `${t.blade} ${bl}`);
+          }
+
+          // Defects summary table for this blade (to the right of the blade)
+          const bladeTableRows = bladeDefects.map((d, i) => [
+            String(i + 1),
+            d.displayId,
+            d.type,
+            String(d.severity),
+            d.side,
+            `${d.distanceFromRoot?.toFixed(1) ?? '-'} m`,
+          ]);
+
+          autoTable(doc, {
+            startY: y,
+            head: [['#', 'ID', t.type, 'Cat.', t.side, t.distance]],
+            body: bladeTableRows,
+            styles: { fontSize: 8, cellPadding: 2.5 },
+            headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+            didParseCell: (data: any) => {
+              if (data.section === 'body' && data.column.index === 3) {
+                const catNum = parseInt(data.cell.raw as string, 10);
+                if (catNum >= 1 && catNum <= 5) {
+                  data.cell.styles.fillColor = catColor(catNum);
+                  data.cell.styles.textColor = [255, 255, 255];
+                  data.cell.styles.fontStyle = 'bold';
+                }
+              }
+            },
+            margin: { left: margin + bladeW + 8, right: margin },
+          });
+          const tableBottom = (doc as any).lastAutoTable?.finalY || y + 30;
+          y = Math.max(tableBottom, y + diagramH) + 8;
+        }
+        bladeIdx++;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // Defect Details (if includeDetails is ON)
+      // ═══════════════════════════════════════════════════════════════════════
+      if (includeDetails) {
+        for (const d of filtered) {
+          // Ensure enough space for defect info + image together (~150mm needed)
+          if (y > pageH - 150) { newPage(); y = 28; }
+
+          // Defect header in green accent
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...PDF_COLORS.green);
+          doc.text(`${t.defect} #${d.displayId}`, margin, y);
+          y += 7;
+
+          // Blade image on the left + info table on the right (using bladePng)
+          const profileH = 55;
+          const profileX = margin;
+
+          if (bladePng) {
+            const bImgW = 12;
+            const bImgH = profileH;
+            doc.addImage(bladePng, 'PNG', profileX, y, bImgW, bImgH);
+            // Defect marker on blade image
+            const defectMarkerY = y + ((d.distanceFromRoot ?? 0) / (bladeLength || 43)) * bImgH;
+            const defectColor = catColor(d.severity);
+            doc.setFillColor(...defectColor);
+            doc.setDrawColor(...defectColor);
+            doc.circle(profileX + bImgW / 2, defectMarkerY, 1.5, 'F');
+          }
+
+          // Info table (shifted right to make room for blade)
+          const tableLeftMargin = margin + 18;
+          const sizeStr = (d.widthCm && d.heightCm)
+            ? `${d.widthCm} x ${d.heightCm} cm`
+            : '-';
+          const detailRows = [
+            [t.category, String(d.severity)],
+            [t.side, d.side],
+            [t.type, d.type],
+            [t.distance, `${d.distanceFromRoot?.toFixed(1) ?? '-'} m`],
+            [t.size, sizeStr],
+          ];
+          if (d.notes) detailRows.push([t.note, d.notes]);
+          if (d.rootCause) detailRows.push([t.rootCause, d.rootCause]);
+          if (d.nextStep) detailRows.push([t.nextStep, d.nextStep]);
+          detailRows.push([t.status, d.resolved ? t.resolved : t.unresolved]);
+
+          autoTable(doc, {
+            startY: y,
+            body: detailRows,
+            styles: { fontSize: 8, cellPadding: 2.5 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } },
+            margin: { left: tableLeftMargin, right: margin },
+            tableWidth: contentW - (tableLeftMargin - margin),
+            theme: 'grid',
+            didParseCell: (data: any) => {
+              // Color the category value cell
+              if (data.section === 'body' && data.row.index === 0 && data.column.index === 1) {
+                const catNum = parseInt(data.cell.raw as string, 10);
+                if (catNum >= 1 && catNum <= 5) {
+                  data.cell.styles.fillColor = catColor(catNum);
+                  data.cell.styles.textColor = [255, 255, 255];
+                  data.cell.styles.fontStyle = 'bold';
+                }
+              }
+            },
+          });
+          const detailTableEnd = (doc as any).lastAutoTable?.finalY || y + 40;
+          y = Math.max(detailTableEnd, y + profileH + 5) + 5;
+
+          // Clickable link per defect
+          if (windFarmId && turbineId) {
+            const defectUrl = `${appBaseUrl}/assets-wind/${windFarmId}/turbine/${turbineId}?inspectionId=${inspectionId}`;
+            const defectLinkText = language === 'es'
+              ? 'Ver más información sobre este defecto en CORE Insight'
+              : 'View more information about this defect in CORE Insight';
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'italic');
+            doc.setTextColor(0, 166, 255);
+            doc.text(defectLinkText, tableLeftMargin, y);
+            const defectLinkW = doc.getTextWidth(defectLinkText);
+            doc.link(tableLeftMargin, y - 4, defectLinkW, 5, { url: defectUrl });
+            doc.setTextColor(...PDF_COLORS.darkText);
+            doc.setFont('helvetica', 'normal');
+            y += 7;
+          }
+
+          // Try to include images — two per row side by side
+          // Build imagesToShow: try d.images first, then defect_image table, then annotation.thumbnail_id
+          const imagesToShow: string[] = [];
+
+          if (d.images && d.images.length > 0) {
+            // Use pre-loaded storage paths
+            for (const imgPath of d.images) {
+              try {
+                const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(imgPath);
+                if (urlData?.publicUrl) {
+                  const base64 = await loadImageAsBase64(urlData.publicUrl);
+                  if (base64) imagesToShow.push(base64);
+                }
+              } catch {
+                // Skip image on error
+              }
+            }
+          }
+
+          // Fallback: try defect_image table
+          if (imagesToShow.length === 0 && d.id) {
+            try {
+              const { data: defectImages } = await supabase
+                .from('defect_image')
+                .select('evidence_id')
+                .eq('defect_id', d.id);
+
+              if (defectImages && defectImages.length > 0) {
+                const evidenceIds = defectImages.map((di: any) => di.evidence_id);
+                const { data: evidenceRows } = await supabase
+                  .from('evidence')
+                  .select('id, storage_path')
+                  .in('id', evidenceIds);
+
+                for (const ev of evidenceRows || []) {
+                  if (ev.storage_path) {
+                    try {
+                      const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(ev.storage_path);
+                      if (urlData?.publicUrl) {
+                        const base64 = await loadImageAsBase64(urlData.publicUrl);
+                        if (base64) imagesToShow.push(base64);
+                      }
+                    } catch {
+                      // Skip
+                    }
+                  }
+                }
+              }
+            } catch {
+              // Skip on error
+            }
+          }
+
+          // Fallback: try annotation thumbnail_id → inspection_photo bucket
+          // NOTE: Currently inspection-photos bucket is empty, skip this to avoid 400 errors
+          // When real photos are uploaded, uncomment this block
+          /*
+          if (imagesToShow.length === 0 && d.id) {
+            try {
+              const { data: annot } = await supabase
+                .from('annotation')
+                .select('thumbnail_id')
+                .eq('id', d.id)
+                .single();
+
+              if (annot?.thumbnail_id) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const { data: inspPhoto } = await (supabase as any)
+                  .from('inspection_photo')
+                  .select('storage_path')
+                  .eq('id', annot.thumbnail_id)
+                  .single();
+
+                if (inspPhoto?.storage_path) {
+                  try {
+                    const { data: urlData } = supabase.storage.from('inspection-photos').getPublicUrl(inspPhoto.storage_path);
+                    if (urlData?.publicUrl) {
+                      const base64 = await loadImageAsBase64(urlData.publicUrl);
+                      if (base64) imagesToShow.push(base64);
+                    }
+                  } catch {
+                    // Skip
+                  }
+                }
+              }
+            } catch {
+              // Skip on error
+            }
+          }
+          */
+
+          // Fallback: use test images based on defect type
+          if (imagesToShow.length === 0) {
+            const DEFECT_TYPE_IMG: Record<string, string> = {
+              'LE EROSION': '/test-images/defect-erosion-wide.svg',
+              'VORTEX (MISSING PANELS)': '/test-images/defect-vortex-wide.svg',
+              'PAINT DAMAGES': '/test-images/defect-paint-wide.svg',
+              'CRACK': '/test-images/defect-crack-close.svg',
+              'OTHER ADD-ONS MISSING': '/test-images/defect-blade-wide.svg',
+              'DELAMINATION': '/test-images/defect-delamination-wide.svg',
+              'OIL': '/test-images/defect-oil-wide.svg',
+              'LIGHTNING DAMAGE': '/test-images/defect-crack-wide.svg',
+            };
+            const imgPath = DEFECT_TYPE_IMG[d.type] ?? '/test-images/defect-blade-wide.svg';
+            try {
+              const svgResp = await fetch(imgPath);
+              if (svgResp.ok) {
+                const svgText = await svgResp.text();
+                const base64 = await svgToBase64Png(svgText, 1200, 900);
+                if (base64) imagesToShow.push(base64);
+              }
+            } catch {
+              // Skip on error
+            }
+          }
+
+          if (imagesToShow.length > 0) {
+            const imgWidth = contentW / 2 - 3;
+            const imgHeight = imgWidth * 0.7;
+
+            if (y + imgHeight > pageH - 20) { newPage(); y = 28; }
+
+            if (imagesToShow.length >= 2) {
+              // 2 photos side by side
+              const img1 = imagesToShow[0]!;
+              const img2 = imagesToShow[1]!;
+              doc.setDrawColor(200, 200, 200);
+              doc.roundedRect(margin - 1, y - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S');
+              doc.roundedRect(margin + imgWidth + 6 - 1, y - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S');
+              doc.addImage(img1, 'PNG', margin, y, imgWidth, imgHeight);
+              doc.addImage(img2, 'PNG', margin + imgWidth + 6, y, imgWidth, imgHeight);
+              y += imgHeight + 5;
+            } else {
+              // 1 photo centered
+              const singleW = contentW * 0.8;
+              const singleH = singleW * 0.7;
+              const singleX = margin + contentW * 0.1;
+              if (y + singleH > pageH - 20) { newPage(); y = 28; }
+              doc.setDrawColor(200, 200, 200);
+              doc.roundedRect(singleX - 1, y - 1, singleW + 2, singleH + 2, 2, 2, 'S');
+              doc.addImage(imagesToShow[0]!, 'PNG', singleX, y, singleW, singleH);
+              y += singleH + 5;
+            }
+
+            // Remaining images (3rd+) stacked normally
+            for (let imgIdx = 2; imgIdx < imagesToShow.length; imgIdx++) {
+              if (y + imgHeight > pageH - 20) { newPage(); y = 28; }
+              doc.setDrawColor(200, 200, 200);
+              doc.roundedRect(margin - 1, y - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S');
+              doc.addImage(imagesToShow[imgIdx]!, 'JPEG', margin, y, imgWidth, imgHeight);
+              y += imgHeight + 5;
+            }
+          }
+          y += 5;
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // LAST PAGE: End of Report
+      // ═══════════════════════════════════════════════════════════════════════
+      newPage();
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...PDF_COLORS.titleBlue);
+      doc.text(t.endReport, pageW / 2, pageH / 2, { align: 'center' });
+
+      // Generate blob URL for download
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(url);
+      setLastGeneratedAt(new Date().toLocaleString());
+      setIsGenerating(false);
+
+      // Background operations (don't block UI)
+      (async () => {
+        try { await savePdfBlob(inspectionId, blob); } catch { /* ignore */ }
+        try {
+          await (supabase as any).from('inspection')
+            .update({ stage: 'finalized', status: 'completed', completed_at: new Date().toISOString() })
+            .eq('id', inspectionId);
+
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData.user?.id;
+          if (userId) {
+            const filename = `Inspection_${windFarmName}_${turbineName}_${Date.now()}.pdf`;
+            const storagePath = `${inspectionId}/${filename}`;
+
+            let finalStoragePath: string | null = null;
+            const { error: uploadError } = await supabase.storage
+              .from('reports')
+              .upload(storagePath, blob, { contentType: 'application/pdf', upsert: false });
+            if (!uploadError) finalStoragePath = storagePath;
+
+            await (supabase as any).from('report').insert({
+              reference_id: inspectionId,
+              type: 'inspection',
+              generated_by: userId,
+              generated_at: new Date().toISOString(),
+              filename,
+              storage_path: finalStoragePath || `pending/${inspectionId}/${filename}`,
+            });
+          }
+        } catch { /* silent */ }
+      })();
+    } catch (err: unknown) {
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate PDF');
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (pdfBlobUrl) {
+      const a = document.createElement('a');
+      a.href = pdfBlobUrl;
+      a.download = `Inspection_${windFarmName}_${turbineName}.pdf`;
+      a.click();
+    }
+  };
+
+  const handleDownloadCSV = async () => {
+    await generateXLSX(defects, windFarmName, turbineName);
+  };
+
+  if (!open) return null;
+
+  return (
+    <>
+      {/* Overlay */}
+      <div style={overlayStyle} onClick={onClose} />
+      {/* Panel */}
+      <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <h3 style={panelTitleStyle}>Filter defects and export to PDF &amp; XLSX</h3>
+
+        {/* Language select */}
+        <div style={fieldRowStyle}>
+          <label style={fieldLabelStyle}>Language</label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as 'en' | 'es')}
+            style={selectStyle}
+          >
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+        </div>
+
+        {/* Include details switch */}
+        <div
+          style={switchRowStyle}
+          onClick={() => setIncludeDetails(!includeDetails)}
+          role="switch"
+          aria-checked={includeDetails}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIncludeDetails(!includeDetails);
+            }
+          }}
+        >
+          <div style={{ ...switchTrackStyle, backgroundColor: includeDetails ? '#4CAF50' : '#CCC' }}>
+            <div style={{ ...switchThumbStyle, left: includeDetails ? '18px' : '2px' }} />
+          </div>
+          <span style={switchLabelStyle}>Include defects details and photos</span>
+        </div>
+
+        {/* Resolved status accordion */}
+        <div style={accordionStyle}>
+          <div style={accordionHeaderStyle} onClick={() => setResolvedOpen(!resolvedOpen)}>
+            <span style={accordionTitleStyle}>Resolved status</span>
+            {resolvedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </div>
+          {resolvedOpen && (
+            <div style={accordionContentStyle}>
+              <div style={buttonGroupStyle}>
+                {(['all', 'resolved', 'unresolved'] as const).map((value) => (
+                  <button
+                    key={value}
+                    style={{
+                      ...groupBtnStyle,
+                      ...(resolvedFilter === value ? groupBtnActiveStyle : {}),
+                    }}
+                    onClick={() => setResolvedFilter(value)}
+                  >
+                    {value === 'all' ? 'All' : value === 'resolved' ? 'Only resolved' : 'Only unresolved'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Category accordion */}
+        <div style={accordionStyle}>
+          <div style={accordionHeaderStyle} onClick={() => setCategoryOpen(!categoryOpen)}>
+            <span style={accordionTitleStyle}>Category</span>
+            {categoryOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </div>
+          {categoryOpen && (
+            <div style={accordionContentStyle}>
+              <div style={categoryRowStyle}>
+                {[1, 2, 3, 4, 5].map((cat) => {
+                  const count = categoryCounts[cat] || 0;
+                  const disabled = count === 0;
+                  const checked = selectedCategories.has(cat);
+                  return (
+                    <label
+                      key={cat}
+                      style={{
+                        ...categoryLabelStyle,
+                        opacity: disabled ? 0.4 : 1,
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked && !disabled}
+                        disabled={disabled}
+                        onChange={() => !disabled && toggleCategory(cat)}
+                        style={checkboxStyle}
+                      />
+                      <span>{cat}</span>
+                      <span style={categoryCountStyle}>({count})</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Type accordion */}
+        <div style={accordionStyle}>
+          <div style={accordionHeaderStyle} onClick={() => setTypeOpen(!typeOpen)}>
+            <span style={accordionTitleStyle}>Type</span>
+            {typeOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </div>
+          {typeOpen && (
+            <div style={accordionContentStyle}>
+              <div style={typeGridStyle}>
+                {availableTypes.map((type) => (
+                  <label key={type} style={typeLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={selectedTypes.has(type)}
+                      onChange={() => toggleType(type)}
+                      style={checkboxStyle}
+                    />
+                    <span style={typeTextStyle}>{type}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* PDF Section */}
+        <div style={sectionDividerStyle}>
+          <span style={sectionDividerTextStyle}>PDF</span>
+        </div>
+
+        {generateError && <div style={errorStyle}>{generateError}</div>}
+
+        <div style={actionRowStyle}>
+          <button
+            style={generatePdfBtnStyle}
+            onClick={handleGeneratePDF}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                Generating...
+              </>
+            ) : (
+              <>
+                <FileDown size={14} />
+                Generate PDF
+              </>
+            )}
+          </button>
+
+          {pdfBlobUrl && (
+            <button style={downloadPdfBtnStyle} onClick={handleDownloadPDF}>
+              <Download size={14} />
+              PDF
+            </button>
+          )}
+        </div>
+
+        {lastGeneratedAt && (
+          <p style={reportInfoStyle}>
+            Last generated on {lastGeneratedAt}
+          </p>
+        )}
+
+        {/* XLSX Section */}
+        <div style={sectionDividerStyle}>
+          <span style={sectionDividerTextStyle}>XLSX</span>
+        </div>
+
+        <div style={actionRowStyle}>
+          <button style={downloadCsvBtnStyle} onClick={handleDownloadCSV}>
+            <Download size={14} />
+            XLSX
+          </button>
+        </div>
+        <p style={csvNoteStyle}>Filters do not apply to XLSX</p>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Styles ---------- */
+
+const overlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'transparent',
+  zIndex: 999,
+};
+
+const panelStyle: CSSProperties = {
+  position: 'fixed',
+  top: '50px',
+  right: '20px',
+  width: '420px',
+  maxHeight: '80vh',
+  overflowY: 'auto',
+  background: 'white',
+  borderRadius: '8px',
+  boxShadow: '0px 5px 15px rgba(0,0,0,0.2)',
+  padding: '20px',
+  zIndex: 1000,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+};
+
+const panelTitleStyle: CSSProperties = {
+  fontSize: '14px',
+  fontWeight: 600,
+  color: '#1F2937',
+  margin: 0,
+};
+
+const fieldRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+};
+
+const fieldLabelStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 500,
+  color: '#374151',
+  minWidth: '70px',
+};
+
+const selectStyle: CSSProperties = {
+  padding: '6px 10px',
+  borderRadius: '6px',
+  border: '1px solid #D1D5DB',
+  fontSize: '12px',
+  color: '#374151',
+  background: 'white',
+  cursor: 'pointer',
+  outline: 'none',
+};
+
+const switchRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  cursor: 'pointer',
+  userSelect: 'none',
+};
+
+const switchTrackStyle: CSSProperties = {
+  position: 'relative',
+  width: '36px',
+  height: '20px',
+  borderRadius: '10px',
+  transition: 'background-color 200ms ease',
+  flexShrink: 0,
+};
+
+const switchThumbStyle: CSSProperties = {
+  position: 'absolute',
+  top: '2px',
+  width: '16px',
+  height: '16px',
+  borderRadius: '50%',
+  backgroundColor: '#FFFFFF',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+  transition: 'left 200ms ease',
+};
+
+const switchLabelStyle: CSSProperties = {
+  fontSize: '12px',
+  color: '#374151',
+};
+
+const accordionStyle: CSSProperties = {
+  border: '1px solid #E5E7EB',
+  borderRadius: '6px',
+  overflow: 'hidden',
+};
+
+const accordionHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '8px 12px',
+  cursor: 'pointer',
+  backgroundColor: '#F9FAFB',
+  userSelect: 'none',
+};
+
+const accordionTitleStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: '#374151',
+};
+
+const accordionContentStyle: CSSProperties = {
+  padding: '10px 12px',
+};
+
+const buttonGroupStyle: CSSProperties = {
+  display: 'flex',
+  gap: '4px',
+};
+
+const groupBtnStyle: CSSProperties = {
+  padding: '5px 10px',
+  borderRadius: '4px',
+  fontSize: '11px',
+  fontWeight: 500,
+  border: '1px solid #D1D5DB',
+  background: 'white',
+  color: '#374151',
+  cursor: 'pointer',
+  transition: 'all 150ms',
+};
+
+const groupBtnActiveStyle: CSSProperties = {
+  backgroundColor: '#4CAF50',
+  color: 'white',
+  borderColor: '#4CAF50',
+};
+
+const categoryRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  flexWrap: 'wrap',
+};
+
+const categoryLabelStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  fontSize: '12px',
+  color: '#374151',
+};
+
+const categoryCountStyle: CSSProperties = {
+  fontSize: '10px',
+  color: '#6B7280',
+};
+
+const checkboxStyle: CSSProperties = {
+  width: '14px',
+  height: '14px',
+  cursor: 'pointer',
+  accentColor: '#4CAF50',
+};
+
+const typeGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: '6px',
+};
+
+const typeLabelStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  fontSize: '11px',
+  color: '#374151',
+  cursor: 'pointer',
+};
+
+const typeTextStyle: CSSProperties = {
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+const sectionDividerStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: '4px',
+};
+
+const sectionDividerTextStyle: CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#6B7280',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  borderBottom: '1px solid #E5E7EB',
+  width: '100%',
+  paddingBottom: '4px',
+};
+
+const actionRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  alignItems: 'center',
+};
+
+const generatePdfBtnStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '7px 14px',
+  borderRadius: '6px',
+  border: '1.5px solid #4CAF50',
+  background: 'transparent',
+  color: '#4CAF50',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const downloadPdfBtnStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '7px 14px',
+  borderRadius: '6px',
+  border: 'none',
+  background: '#4CAF50',
+  color: 'white',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const downloadCsvBtnStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '7px 14px',
+  borderRadius: '6px',
+  border: 'none',
+  background: '#4CAF50',
+  color: 'white',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const reportInfoStyle: CSSProperties = {
+  fontSize: '11px',
+  color: '#6B7280',
+  margin: 0,
+};
+
+const csvNoteStyle: CSSProperties = {
+  fontSize: '11px',
+  color: '#6B7280',
+  margin: 0,
+  fontStyle: 'italic',
+};
+
+const errorStyle: CSSProperties = {
+  padding: '6px 10px',
+  borderRadius: '4px',
+  background: '#FEE2E2',
+  color: '#DC2626',
+  fontSize: '11px',
+};

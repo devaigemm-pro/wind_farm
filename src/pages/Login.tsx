@@ -10,7 +10,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: '1rem',
-    background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1a4068 100%)',
+    background: 'linear-gradient(135deg, #0B2545 0%, #1B4B7A 50%, #0F3A63 100%)',
   } as React.CSSProperties,
   card: {
     width: '100%',
@@ -31,7 +31,7 @@ const styles = {
   title: {
     fontSize: '1.25rem',
     fontWeight: 600,
-    color: '#1e3a5f',
+    color: '#0B2545',
     margin: 0,
   } as React.CSSProperties,
   subtitle: {
@@ -75,7 +75,7 @@ const styles = {
   button: {
     width: '100%',
     padding: '0.75rem 1rem',
-    background: '#1e3a5f',
+    background: '#0B2545',
     color: '#ffffff',
     border: 'none',
     borderRadius: '8px',
@@ -157,10 +157,10 @@ export default function Login() {
       <div style={styles.card}>
         <div style={styles.header}>
           <div style={styles.logo} aria-hidden="true">
-            🔍
+            <img src="/coretec-logo.svg" width="48" height="48" alt="CORE Insight" />
           </div>
-          <h1 style={styles.title}>Wind Blade Inspection</h1>
-          <p style={styles.subtitle}>Sign in to your account</p>
+          <h1 style={styles.title}>CORE Insight</h1>
+          <p style={styles.subtitle}>Inicia sesión</p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} style={styles.form} noValidate>

@@ -55,6 +55,10 @@ export const inspectionsService = {
             wind_farm:wind_farm!turbine_wind_farm_id_fkey(id, name)
           )
         ),
+        turbine:turbine!inspection_turbine_id_fkey(
+          id, name,
+          wind_farm:wind_farm!turbine_wind_farm_id_fkey(id, name)
+        ),
         inspector:profiles!inspection_inspector_id_fkey(id, name, email)
       `,
         { count: 'exact' },
@@ -113,6 +117,10 @@ export const inspectionsService = {
             *,
             wind_farm:wind_farm!turbine_wind_farm_id_fkey(*)
           )
+        ),
+        turbine:turbine!inspection_turbine_id_fkey(
+          *,
+          wind_farm:wind_farm!turbine_wind_farm_id_fkey(*)
         ),
         inspector:profiles!inspection_inspector_id_fkey(id, name, email, role),
         approved_by_profile:profiles!inspection_approved_by_fkey(id, name, email, role),
@@ -174,5 +182,21 @@ export const inspectionsService = {
 
     if (error) throw new InspectionServiceError(error.message, error.code);
     return data as unknown as Inspection;
+  },
+
+  /**
+   * Update the vertical blade setting for an inspection.
+   * Persists the user's choice of which blade is at the top/center position.
+   */
+  async updateVerticalBlade(
+    id: string,
+    verticalBlade: string,
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('inspection')
+      .update({ vertical_blade: verticalBlade } as any)
+      .eq('id', id);
+
+    if (error) throw new InspectionServiceError(error.message, error.code);
   },
 };

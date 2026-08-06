@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 100" width="500" height="100">
+  <!-- Globe with turbine blades -->
+  <g transform="translate(50, 50)">
+    <!-- Globe circle -->
+    <circle cx="0" cy="0" r="35" fill="none" stroke="#0B2545" stroke-width="3"/>
+    <!-- Globe arcs -->
+    <ellipse cx="0" cy="0" rx="18" ry="35" fill="none" stroke="#0B2545" stroke-width="1.5"/>
+    <line x1="-35" y1="0" x2="35" y2="0" stroke="#0B2545" stroke-width="1.5"/>
+    <!-- Turbine blades inside globe -->
+    <circle cx="0" cy="0" r="3" fill="#27AE60"/>
+    <!-- Blade 1 - top-left -->
+    <path d="M0 0 C-2 -8, -4 -18, -5 -28 C-5 -30, -3 -30, -3 -28 C-2 -18, -1 -8, 0 0" fill="#0B2545" stroke="#0B2545" stroke-width="0.5"/>
+    <!-- Blade 2 - right -->
+    <path d="M0 0 C6 4, 14 10, 22 14 C24 15, 24 13, 22 12 C14 8, 6 3, 0 0" fill="#0B2545" stroke="#0B2545" stroke-width="0.5"/>
+    <!-- Blade 3 - bottom-left -->
+    <path d="M0 0 C-5 5, -12 12, -18 17 C-19 18, -18 16, -17 15 C-11 10, -4 4, 0 0" fill="#0B2545" stroke="#0B2545" stroke-width="0.5"/>
+    <!-- Swoosh arc -->
+    <path d="M-40 15 Q-20 35, 10 38 Q30 40, 42 30" fill="none" stroke="#27AE60" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- CORE-TEC text -->
+  <text x="100" y="45" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#0B2545" letter-spacing="2">CORE</text>
+  <text x="230" y="45" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#0B2545">-</text>
+
+  <!-- T with green turbine -->
+  <g transform="translate(252, 10)">
+    <!-- T letter base -->
+    <rect x="0" y="0" width="28" height="5" fill="#0B2545"/>
+    <rect x="10" y="5" width="8" height="30" fill="#0B2545"/>
+    <!-- Green turbine on T -->
+    <circle cx="14" cy="3" r="2.5" fill="#27AE60"/>
+    <!-- Turbine blade up -->
+    <line x1="14" y1="3" x2="14" y2="-10" stroke="#27AE60" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Turbine blade right -->
+    <line x1="14" y1="3" x2="22" y2="10" stroke="#27AE60" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Turbine blade left -->
+    <line x1="14" y1="3" x2="6" y2="10" stroke="#27AE60" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <text x="285" y="45" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#0B2545" letter-spacing="2">EC</text>
+
+  <!-- Subtitle line -->
+  <line x1="100" y1="60" x2="140" y2="60" stroke="#0B2545" stroke-width="1"/>
+  <text x="148" y="65" font-family="Arial, sans-serif" font-size="10" font-weight="400" fill="#0B2545" letter-spacing="3">COMPOSITE REPAIR TECHNOLOGY</text>
+  <line x1="410" y1="60" x2="450" y2="60" stroke="#0B2545" stroke-width="1"/>
+</svg>

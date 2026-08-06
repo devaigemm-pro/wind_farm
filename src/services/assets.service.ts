@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { WindFarm, Turbine, Blade } from '@/types';
+import type { WindFarm, Turbine, Blade, WindFarmDashboardRow } from '@/types';
 
 // ─── Custom Error ───────────────────────────────────────────────────────────
 
@@ -167,5 +167,55 @@ export const assetsService = {
       .order('name');
     if (error) throw error;
     return data as WindFarm[];
+  },
+
+  // Wind Farms Dashboard (aggregated data via client-side calculation)
+
+  async getWindFarmsDashboard(): Promise<WindFarmDashboardRow[]> {
+    // Client-side aggregation using nested select
+    const { data: farms, error: farmError } = await supabase
+      .from('wind_farm')
+      .select(`
+        id,
+        name,
+        turbines:turbine(
+          id,
+          blades:blade(
+            inspections:inspection(id, created_at)
+          )
+        )
+      `)
+      .order('name');
+
+    if (farmError) throw farmError;
+
+    return ((farms as unknown) as Array<{
+      id: string;
+      name: string;
+      turbines: Array<{
+        id: string;
+        blades: Array<{
+          inspections: Array<{ id: string; created_at: string }>;
+        }>;
+      }> | null;
+    }>).map((farm) => {
+      const turbines = farm.turbines ?? [];
+      const allInspections = turbines.flatMap((t) =>
+        (t.blades ?? []).flatMap((b) => b.inspections ?? [])
+      );
+      const oldestDate = allInspections.length > 0
+        ? allInspections.reduce((min, i) => (i.created_at < min ? i.created_at : min), allInspections[0]!.created_at)
+        : null;
+
+      return {
+        id: farm.id,
+        name: farm.name,
+        subAssetsCount: turbines.length,
+        inspectionsCount: allInspections.length,
+        totalPower: 0,
+        poweringDate: null,
+        oldestInspection: oldestDate,
+      };
+    });
   },
 };

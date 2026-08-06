@@ -1,0 +1,1099 @@
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Info, CheckCircle, BarChart3, ListFilter, Pencil, Search, Plus, FileDown, Share2 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
+} from 'recharts';
+import { BladesDiagram } from '@/components/organisms/BladesDiagram';
+import { ExportPanel } from '@/components/organisms/ExportPanel';
+import { SharePopover } from '@/components/molecules/SharePopover';
+import { useTurbineInspection, type TurbineDefect } from '@/hooks/useTurbineInspection';
+import { useMultiAnnotations, useCampaignInspectionIds } from '@/hooks/useAnnotations';
+import { useAnnotationComments, useAddAnnotationComment } from '@/hooks/useAnnotationComments';
+import type { ResultsDefect } from '@/types';
+
+// ─── Palette (matches reference) ─────────────────────────────────────────────
+const C = {
+  cat5: '#FF0000',
+  cat4: '#FF5500',
+  cat3: '#F29D00',
+  cat2: '#006C7A',
+  cat1: '#008F98',
+  amber: '#F29D00',
+  orange: '#FF5500',
+  blue: '#4CAF50',
+  ring: '#EDEFF1',
+  text: '#535353',
+  muted: '#8A9099',
+  border: '#E5E7EB',
+};
+
+// ─── Thumbnail → blade/face mapping (same as AnalyzeStep) ────────────────────
+function deriveBladeFace(thumbnailId: string): { blade: string; face: string } {
+  // Legacy t1-t18 format
+  if (thumbnailId.startsWith('t')) {
+    const num = parseInt(thumbnailId.replace('t', ''), 10);
+    if (num >= 1 && num <= 4) return { blade: 'A', face: 'LE' };
+    if (num >= 5 && num <= 6) return { blade: 'A', face: 'SS' };
+    if (num >= 7 && num <= 9) return { blade: 'B', face: 'LE' };
+    if (num >= 10 && num <= 12) return { blade: 'B', face: 'SS' };
+    if (num >= 13 && num <= 15) return { blade: 'C', face: 'LE' };
+    if (num >= 16 && num <= 18) return { blade: 'C', face: 'SS' };
+  }
+  // UUID-based IDs from real photos — derive from annotation data not available here
+  return { blade: '?', face: '?' };
+}
+
+function imageForType(_type: string): string {
+  return '';
+}
+
+export function TurbineDetail({ shared = false }: { shared?: boolean }) {
+  const { windFarmId, turbineId } = useParams<{ windFarmId: string; turbineId: string }>();
+  const [searchParams] = useSearchParams();
+  const filterInspectionId = searchParams.get('inspectionId');
+  const filterCampaignId = searchParams.get('campaignId');
+  const navigate = useNavigate();
+  const isSharedView = shared;
+  const { data: inspectionData, isLoading } = useTurbineInspection(turbineId ?? '');
+
+  // Get inspection IDs for the specific campaign (when coming from workflow)
+  const { data: campaignInspIds = [] } = useCampaignInspectionIds(filterCampaignId);
+
+  // Determine which inspections to load annotations for:
+  // - If campaignId is provided, load ALL inspections from that campaign (all blades)
+  // - If only inspectionId, use that as fallback
+  // - Otherwise, load all of the turbine
+  const annotationInspectionIds = useMemo(() => {
+    if (filterCampaignId && campaignInspIds.length > 0) {
+      return campaignInspIds;
+    }
+    if (filterInspectionId) {
+      return [filterInspectionId];
+    }
+    return inspectionData?.inspectionIds ?? [];
+  }, [filterCampaignId, campaignInspIds, filterInspectionId, inspectionData]);
+
+  const { data: dbAnnotations = [] } = useMultiAnnotations(annotationInspectionIds);
+
+  // Map DB annotations to TurbineDefect format
+  const annotationDefects = useMemo<TurbineDefect[]>(() => {
+    if (!dbAnnotations || dbAnnotations.length === 0) return [];
+    const inspToBladeMap = inspectionData?.inspectionToBladePosition ?? {};
+    const counters: Record<string, number> = {};
+    return dbAnnotations.map((a) => {
+      // Use inspectionId to determine blade position (reliable for real data)
+      const blade = inspToBladeMap[a.inspectionId] || deriveBladeFace(a.thumbnailId).blade;
+      // Use saved side field (from annotation), with fallback
+      const face = a.side || (deriveBladeFace(a.thumbnailId).face !== '?' ? deriveBladeFace(a.thumbnailId).face : 'LE');
+      counters[blade] = (counters[blade] || 0) + 1;
+      const displayId = `${blade}${counters[blade]}`;
+      return {
+        id: a.id,
+        displayId,
+        type: a.type,
+        cat: a.category,
+        blade,
+        side: face,
+        root: Math.round(a.y * 0.43 * 10) / 10,
+        size: `${Math.round(a.w)} x ${Math.round(a.h)}`,
+        description: a.note,
+        resolved: false,
+        images: [],
+        notes: a.note,
+        rootCause: a.rootCause,
+        nextStep: a.nextStep,
+        comments: [],
+      };
+    });
+  }, [dbAnnotations, inspectionData]);
+
+  const [tab, setTab] = useState<'statistics' | 'details'>('statistics');
+  const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
+  const [resolvedMap, setResolvedMap] = useState<Record<string, boolean>>({});
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterBlade, setFilterBlade] = useState<string>('');
+  const [filterSide, setFilterSide] = useState<string>('');
+  const [exportAnchorEl, setExportAnchorEl] = useState<HTMLElement | null>(null);
+  const exportOpen = Boolean(exportAnchorEl);
+  const [shareAnchor, setShareAnchor] = useState<HTMLElement | null>(null);
+
+  // Use defects source:
+  // - When coming from workflow (campaignId present), use ONLY annotations
+  //   (same source as steps 2/3, guarantees consistency)
+  // - Otherwise, use defects table (for general turbine view)
+  const defects: TurbineDefect[] = (filterCampaignId || filterInspectionId)
+    ? annotationDefects
+    : ((inspectionData?.defects && inspectionData.defects.length > 0)
+        ? inspectionData.defects
+        : annotationDefects);
+  const windFarmName = inspectionData?.windFarmName ?? '';
+  const turbineName = inspectionData?.turbineName ?? '';
+  const inspectionDate = inspectionData?.inspectionDate
+    ? new Date(inspectionData.inspectionDate).toLocaleDateString('en-US')
+    : '';
+  const bladeLength = inspectionData?.bladeLength ?? 43;
+  const bladeSerials: Record<string, string> = useMemo(() => {
+    if (inspectionData?.blades) {
+      const map: Record<string, string> = {};
+      for (const b of inspectionData.blades) {
+        map[b.position] = b.serialNumber;
+      }
+      return map;
+    }
+    return { A: '—', B: '—', C: '—' };
+  }, [inspectionData]);
+
+  // Initialize resolved map when defects change
+  useEffect(() => {
+    const map: Record<string, boolean> = {};
+    defects.forEach((d) => { map[d.displayId] = d.resolved ?? false; });
+    setResolvedMap(map);
+  }, [defects]);
+
+  // Computed stats from real data
+  const catCounts = useMemo(() => {
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    defects.forEach((d) => { if (d.cat >= 1 && d.cat <= 5) counts[d.cat] = (counts[d.cat] ?? 0) + 1; });
+    return counts;
+  }, [defects]);
+
+  const typeBreakdown = useMemo(() => {
+    const map: Record<string, { total: number; cats: Record<number, number> }> = {};
+    defects.forEach((d) => {
+      if (!map[d.type]) map[d.type] = { total: 0, cats: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+      map[d.type]!.total++;
+      map[d.type]!.cats[d.cat] = (map[d.type]!.cats[d.cat] ?? 0) + 1;
+    });
+    return Object.entries(map)
+      .map(([type, data]) => ({
+        type,
+        short: type.length > 14 ? type.substring(0, 12) + '...' : type,
+        total: data.total,
+        cat5: data.cats[5] ?? 0,
+        cat4: data.cats[4] ?? 0,
+        cat3: data.cats[3] ?? 0,
+        cat2: data.cats[2] ?? 0,
+        cat1: data.cats[1] ?? 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [defects]);
+
+  const donutData = useMemo(() => {
+    const bladeLetters = ['A', 'B', 'C'];
+    return bladeLetters.map((bl) => {
+      const bladeDefects = defects.filter((d) => d.blade === bl);
+      const highSev = bladeDefects.filter((d) => d.cat >= 4).length;
+      const total = bladeDefects.length;
+      return { label: `Blade ${bl}`, orange: total > 0 ? Math.round((highSev / total) * 100) : 0 };
+    });
+  }, [defects]);
+
+  // Filtered defects for Details tab
+  const filteredDefects = useMemo(() => {
+    return defects.filter((d) => {
+      if (filterType && d.type !== filterType) return false;
+      if (filterCategory && d.cat !== Number(filterCategory)) return false;
+      if (filterBlade && d.blade !== filterBlade) return false;
+      if (filterSide && d.side !== filterSide) return false;
+      return true;
+    });
+  }, [defects, filterType, filterCategory, filterBlade, filterSide]);
+
+  const handleDefectClick = (defectId: string) => {
+    setSelectedDefectId(defectId);
+    setTab('details');
+  };
+
+  const handleResolvedToggle = (defectId: string) => {
+    setResolvedMap((prev) => ({ ...prev, [defectId]: !prev[defectId] }));
+  };
+
+  const resolvedCount = Object.values(resolvedMap).filter(Boolean).length;
+
+  // Unique values for filters
+  const uniqueTypes = useMemo(() => [...new Set(defects.map((d) => d.type))], [defects]);
+  const uniqueBlades = useMemo(() => [...new Set(defects.map((d) => d.blade))].sort(), [defects]);
+  const uniqueSides = useMemo(() => [...new Set(defects.map((d) => d.side))].sort(), [defects]);
+
+  // Scroll to selected defect row when switching to details
+  useEffect(() => {
+    if (tab === 'details' && selectedDefectId) {
+      setTimeout(() => {
+        const el = document.getElementById(`defect-row-${selectedDefectId}`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [tab, selectedDefectId]);
+
+  // Map defects for BladesDiagram (needs id as the display id)
+  const diagramDefects = useMemo(() => defects.map((d) => ({
+    id: d.displayId,
+    type: d.type,
+    cat: d.cat,
+    blade: d.blade,
+    side: d.side,
+    root: d.root,
+  })), [defects]);
+
+  if (isLoading) {
+    return <div style={page}><div style={{ padding: 40, textAlign: 'center', color: C.muted }}>Loading inspection data...</div></div>;
+  }
+
+  if (!inspectionData) {
+    return (
+      <div style={page}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16, padding: 48 }}>
+          <Info size={48} color="#ccc" />
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: '#555', margin: 0 }}>No finalized inspections for this turbine</h3>
+          <p style={{ fontSize: 14, color: '#888', margin: 0, textAlign: 'center', maxWidth: 400 }}>
+            Complete the inspection workflow to view results. The inspection must be finalized before data appears here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={page}>
+      {/* Toolbar: breadcrumb + phases + actions (hidden in shared view) */}
+      {!isSharedView && (
+        <div style={toolbarRow}>
+          <div style={toolbarLeftSt}>
+            <div style={breadcrumbSt}>
+              <Link to={`/assets-wind/${windFarmId}`} style={bcLinkSt}>{windFarmName}</Link>
+              <span style={bcSepSt}>&gt;</span>
+              <Link to={`/assets-wind/${windFarmId}/subasset/${turbineId}`} style={bcLinkSt}>Turbine {turbineName}</Link>
+              <span style={bcSepSt}>&gt;</span>
+              <span style={{ ...bcLinkSt, color: C.muted }}>{inspectionDate}</span>
+            </div>
+          </div>
+          <div style={toolbarCenterSt}>
+            {[
+              { num: 1, label: '1. INSPECT' },
+              { num: 2, label: '2. ANNOTATE' },
+              { num: 3, label: '3. ANALYZE' },
+              { num: 4, label: '4. RESULTS' },
+            ].map((step) => (
+              <button
+                key={step.num}
+                type="button"
+                style={step.num === 4 ? phaseBtnActive : phaseBtnNormal}
+                onClick={() => {
+                  if (inspectionData?.inspectionId) {
+                    navigate(`/inspections/${inspectionData.inspectionId}/workflow?step=${step.num}`);
+                  }
+                }}
+              >
+                <span style={step.num === 4 ? phaseLabelActive : phaseLabelNormal}>
+                  {step.label}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div style={toolbarRightSt}>
+            <div style={searchBarSt}>
+              <Search size={14} style={{ color: '#94a3b8' }} />
+              <input type="text" placeholder="Search all" style={searchInputSt} aria-label="Search" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar */}
+      <div style={topBar}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 style={{ color: C.blue, fontSize: 20, fontWeight: 700, margin: 0 }}>Blades</h2>
+          <span style={infoDot}><Info size={16} color="#fff" /></span>
+        </div>
+        <div style={tabRow}>
+          <button style={{ ...tabBtn, ...(tab === 'statistics' ? tabActive : {}) }} onClick={() => setTab('statistics')}>
+            <BarChart3 size={15} /> Statistics
+          </button>
+          <button style={{ ...tabBtn, ...(tab === 'details' ? tabActive : {}) }} onClick={() => setTab('details')}>
+            <ListFilter size={15} /> Details
+          </button>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: '1.5px solid #4CAF50', background: 'transparent', color: '#4CAF50', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            onClick={(e) => setExportAnchorEl(e.currentTarget)}
+          >
+            <FileDown size={14} />
+            Export
+          </button>
+          {!isSharedView && (
+            <button
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: 'none', background: '#4CAF50', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              onClick={(e) => setShareAnchor(e.currentTarget)}
+            >
+              <Share2 size={14} />
+              Share
+            </button>
+          )}
+        </div>
+      </div>
+
+      <SharePopover
+        anchorEl={shareAnchor}
+        open={Boolean(shareAnchor)}
+        onClose={() => setShareAnchor(null)}
+        shareKey={`turbine-${turbineId}`}
+        windFarmId={windFarmId}
+        turbineId={turbineId}
+      />
+
+      <ExportPanel
+        inspectionId={inspectionData?.inspectionId ?? ''}
+        defects={defects.map((d): ResultsDefect => ({
+          id: d.id,
+          displayId: d.displayId,
+          type: d.type,
+          severity: d.cat,
+          blade: d.blade,
+          side: d.side,
+          distanceFromRoot: d.root,
+          widthCm: d.size ? parseFloat(d.size.split(' x ')[0] ?? '0') : null,
+          heightCm: d.size ? parseFloat(d.size.split(' x ')[1] ?? '0') : null,
+          description: d.description,
+          resolved: resolvedMap[d.displayId] ?? d.resolved ?? false,
+          images: d.images,
+          notes: d.notes,
+          rootCause: d.rootCause,
+          nextStep: d.nextStep,
+        }))}
+        turbineName={turbineName}
+        windFarmName={windFarmName}
+        anchorEl={exportAnchorEl}
+        open={exportOpen}
+        onClose={() => setExportAnchorEl(null)}
+        existingReport={null}
+        blades={inspectionData?.blades}
+        bladeLength={inspectionData?.bladeLength}
+        inspectionDate={inspectionData?.inspectionDate}
+        windFarmCoords={inspectionData?.windFarmCoords}
+        windFarmId={windFarmId}
+        turbineId={turbineId}
+      />
+
+      <div style={body}>
+        {/* ── Column 1: Blades ── */}
+        <div style={col1}>
+          <BladesDiagram
+            defects={diagramDefects}
+            bladeSerials={bladeSerials}
+            bladeLength={bladeLength}
+            selectedDefectId={selectedDefectId}
+            onDefectClick={handleDefectClick}
+          />
+          <div style={counters}>
+            <span style={counterItem}><Info size={15} color={C.blue} /> <b>{defects.length}</b> defects</span>
+            <span style={counterItem}><CheckCircle size={15} color={C.cat1} /> <b>{resolvedCount}</b> resolved</span>
+          </div>
+          <div style={{ padding: '8px 0' }}>
+            <h3 style={{ color: C.blue, fontSize: 17, margin: '0 0 10px' }}>Conclusion</h3>
+            <p style={conclText}><b>Turbine ({turbineName}):</b><br /><i>No conclusion.</i></p>
+            {Object.entries(bladeSerials).map(([pos, serial]) => (
+              <p key={pos} style={conclText}><b>Blade {pos} ({serial}):</b><br /><i>No conclusion for this blade.</i></p>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {!isSharedView && (
+              <button style={planBtn} onClick={() => navigate(`/inspections/new?windFarm=${windFarmId}`)}>
+                PLAN NEXT INSPECTION
+              </button>
+            )}
+          </div>
+        </div>
+
+        {tab === 'statistics' ? (
+          <>
+            {/* ── Column 2: Breakdown by blade ── */}
+            <div style={col2}>
+              <h3 style={cardTitle}>Breakdown by blade</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'center' }}>
+                {donutData.map((d) => (
+                  <Donut key={d.label} label={d.label} orange={d.orange} />
+                ))}
+              </div>
+            </div>
+
+            {/* ── Column 3: Category + Type + Table ── */}
+            <div style={col3}>
+              <div style={card}>
+                <h3 style={cardTitle}>Breakdown by category</h3>
+                <div style={catRow}>
+                  {[
+                    { n: 5, v: catCounts[5], c: C.cat5 },
+                    { n: 4, v: catCounts[4], c: C.cat4 },
+                    { n: 3, v: catCounts[3], c: C.cat3 },
+                    { n: 2, v: catCounts[2], c: C.cat2 },
+                    { n: 1, v: catCounts[1], c: C.cat1 },
+                  ].map((c) => (
+                    <div key={c.n} style={catCell}>
+                      <span style={{ fontSize: 26, fontWeight: 700, color: C.text }}>{c.v}</span>
+                      <div style={{ height: 3, width: '100%', background: c.c, borderRadius: 2, margin: '6px 0' }} />
+                      <span style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Cat {c.n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={card}>
+                <h3 style={cardTitle}>Breakdown by type</h3>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={typeBreakdown} margin={{ top: 10, right: 10, left: -20, bottom: 30 }}>
+                      <CartesianGrid vertical={false} stroke={C.border} />
+                      <XAxis dataKey="short" tick={{ fontSize: 9, fill: C.muted }} interval={0} angle={0} />
+                      <YAxis tick={{ fontSize: 10, fill: C.muted }} />
+                      <RTooltip
+                        formatter={(val: number, name: string) => [val, name === 'cat4' ? 'Category 4' : name === 'cat5' ? 'Category 5' : 'Category 3']}
+                        contentStyle={{ fontSize: 11, borderRadius: 6 }}
+                      />
+                      <Bar dataKey="cat3" stackId="a" fill={C.cat3} />
+                      <Bar dataKey="cat4" stackId="a" fill={C.cat4} />
+                      <Bar dataKey="cat5" stackId="a" fill={C.cat5} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div style={card}>
+                <h3 style={cardTitle}>Defect overview table</h3>
+                <OverviewTable typeBreakdown={typeBreakdown} catCounts={catCounts} totalDefects={defects.length} />
+              </div>
+            </div>
+          </>
+        ) : (
+          /* ── Details tab ── */
+          <div style={{ display: 'flex', flex: 1, gap: 16, minWidth: 0 }}>
+            <div style={{ flex: '1 1 60%', minWidth: 0 }}>
+              <div style={card}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h3 style={cardTitle}>Defects Detail</h3>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <select style={filterSelect} value={filterType} onChange={(e) => setFilterType(e.target.value)} aria-label="Filter by type">
+                      <option value="">Type</option>
+                      {uniqueTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <select style={filterSelect} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} aria-label="Filter by category">
+                      <option value="">Category</option>
+                      {[5, 4, 3, 2, 1].map((c) => <option key={c} value={c}>Cat {c}</option>)}
+                    </select>
+                    <select style={filterSelect} value={filterBlade} onChange={(e) => setFilterBlade(e.target.value)} aria-label="Filter by blade">
+                      <option value="">Blade</option>
+                      {uniqueBlades.map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                    <select style={filterSelect} value={filterSide} onChange={(e) => setFilterSide(e.target.value)} aria-label="Filter by side">
+                      <option value="">Side</option>
+                      {uniqueSides.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <DetailsTable defects={filteredDefects} selectedId={selectedDefectId} onSelect={setSelectedDefectId} onEdit={(id) => navigate(`/inspections/${inspectionData?.inspectionId ?? id}/workflow?step=3`)} resolvedMap={resolvedMap} onResolvedToggle={handleResolvedToggle} readonly={isSharedView} />
+              </div>
+            </div>
+            {selectedDefectId && (
+              <div style={{ flex: '0 0 38%', minWidth: 0 }}>
+                <DefectDetailPanel defect={defects.find((d) => d.displayId === selectedDefectId) ?? null} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Defect Detail Panel (Note/Root Cause/Next Step, Comments, Images) ───────
+function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
+  const [zoomLevels, setZoomLevels] = useState<Record<number, number>>({});
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [showCommentPopover, setShowCommentPopover] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const { data: dbComments = [] } = useAnnotationComments(defect?.id);
+  const addComment = useAddAnnotationComment(defect?.id);
+
+  if (!defect) return null;
+
+  const handleZoom = (idx: number, direction: 'in' | 'out') => {
+    setZoomLevels((prev) => {
+      const current = prev[idx] ?? 1;
+      const next = direction === 'in' ? Math.min(current + 0.25, 4) : Math.max(current - 0.25, 0.5);
+      return { ...prev, [idx]: next };
+    });
+  };
+
+  const handleDownloadJpeg = async (imgSrc: string, idx: number) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = imgSrc;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image'));
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `defect-${defect.displayId}-image-${idx + 1}.jpeg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        },
+        'image/jpeg',
+        0.92
+      );
+    } catch {
+      window.open(imgSrc, '_blank');
+    }
+  };
+
+  const openLightbox = (img: string) => {
+    setLightboxZoom(1);
+    setLightboxImg(img);
+  };
+
+  const panelCard: React.CSSProperties = {
+    background: '#fff',
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  };
+  const labelSt: React.CSSProperties = { fontWeight: 700, fontSize: 12.5, color: '#333' };
+  const valueSt: React.CSSProperties = { fontSize: 12.5, color: '#555', marginLeft: 4 };
+
+  const comments = defect.comments ?? [];
+
+  const handleSaveComment = () => {
+    if (!commentText.trim()) return;
+    addComment.mutate(commentText.trim(), {
+      onSuccess: () => {
+        setCommentText('');
+        setShowCommentPopover(false);
+      },
+    });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Note / Root Cause / Next Step */}
+      <div style={panelCard}>
+        {defect.notes && (
+          <p style={{ margin: '0 0 8px', fontSize: 12.5 }}>
+            <span style={labelSt}>Note:</span>
+            <span style={valueSt}>{defect.notes}</span>
+          </p>
+        )}
+        {defect.rootCause && (
+          <p style={{ margin: '0 0 8px', fontSize: 12.5 }}>
+            <span style={labelSt}>Root cause:</span>
+            <span style={valueSt}>{defect.rootCause}</span>
+          </p>
+        )}
+        {defect.nextStep && (
+          <p style={{ margin: 0, fontSize: 12.5 }}>
+            <span style={labelSt}>Next step:</span>
+            <span style={valueSt}>{defect.nextStep}</span>
+          </p>
+        )}
+        {!defect.notes && !defect.rootCause && !defect.nextStep && defect.description && (
+          <p style={{ margin: 0, fontSize: 12.5 }}>
+            <span style={labelSt}>Description:</span>
+            <span style={valueSt}>{defect.description}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Comments */}
+      <div style={{ ...panelCard, position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#333' }}>Comments:</span>
+          <div
+            onClick={() => setShowCommentPopover(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: C.blue, fontSize: 12 }}
+          >
+            <Plus size={14} />
+            <span>Add</span>
+          </div>
+        </div>
+        {dbComments.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {dbComments.map((c) => (
+              <div key={c.id} style={{ fontSize: 12, color: '#555', borderBottom: '1px solid #f0f0f0', paddingBottom: 6 }}>
+                <span style={{ fontWeight: 600, color: '#333' }}>{c.authorName}</span>
+                <span style={{ color: '#999', marginLeft: 6 }}>{new Date(c.createdAt).toLocaleDateString()}</span>
+                <p style={{ margin: '4px 0 0', lineHeight: 1.4 }}>{c.text}</p>
+              </div>
+            ))}
+          </div>
+        ) : comments.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {comments.map((c, i) => (
+              <div key={i} style={{ fontSize: 12, color: '#555', borderBottom: i < comments.length - 1 ? '1px solid #f0f0f0' : 'none', paddingBottom: 6 }}>
+                <span style={{ fontWeight: 600, color: '#333' }}>{c.author}</span>
+                <span style={{ color: '#999', marginLeft: 6 }}>{c.date}</span>
+                <p style={{ margin: '4px 0 0', lineHeight: 1.4 }}>{c.text}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: C.muted }}>No comments yet</span>
+        )}
+
+        {/* Add Comment Popover */}
+        {showCommentPopover && (
+          <div
+            ref={popoverRef}
+            style={{
+              position: 'absolute',
+              top: 40,
+              right: 0,
+              zIndex: 100,
+              background: '#fff',
+              borderRadius: 8,
+              boxShadow: '0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12)',
+              padding: 16,
+              minWidth: 300,
+            }}
+          >
+            <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 13, color: '#333' }}>New comment</p>
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              maxLength={400}
+              placeholder="Write your comment..."
+              style={{
+                width: '100%',
+                minHeight: 80,
+                border: '1px solid #e5e7eb',
+                borderRadius: 6,
+                padding: 8,
+                fontSize: 12,
+                resize: 'vertical',
+                outline: 'none',
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+              <button
+                onClick={() => { setShowCommentPopover(false); setCommentText(''); }}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#E0E0E0',
+                  color: '#333B46',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Exit
+              </button>
+              <button
+                onClick={handleSaveComment}
+                disabled={addComment.isPending || !commentText.trim()}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#4CAF50',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: commentText.trim() ? 'pointer' : 'not-allowed',
+                  opacity: addComment.isPending ? 0.6 : 1,
+                }}
+              >
+                {addComment.isPending ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Images */}
+      {defect.images && defect.images.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', maxHeight: 500 }}>
+          {defect.images.map((img, idx) => (
+            <div key={idx} style={{ position: 'relative', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', background: '#f5f5f5' }}>
+              {/* Top-left: Fullscreen + Download */}
+              <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, display: 'flex', gap: 6 }}>
+                <button
+                  title="Fullscreen"
+                  onClick={() => openLightbox(img)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2.5">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+                  </svg>
+                </button>
+                <button
+                  title="Download JPEG"
+                  onClick={() => handleDownloadJpeg(img, idx)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+              </div>
+              {/* Image */}
+              <div style={{ overflow: 'hidden', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={img}
+                  alt={`Defect ${defect.displayId} image ${idx + 1}`}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transform: `scale(${zoomLevels[idx] ?? 1})`,
+                    transition: 'transform 0.2s',
+                  }}
+                />
+              </div>
+              {/* Zoom controls */}
+              <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', zIndex: 2 }}>
+                <button
+                  onClick={() => handleZoom(idx, 'out')}
+                  style={{ width: 28, height: 24, background: '#fff', border: `1px solid ${C.blue}`, borderRadius: '4px 0 0 4px', borderRight: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >-</button>
+                <button
+                  onClick={() => handleZoom(idx, 'in')}
+                  style={{ width: 28, height: 24, background: '#fff', border: `1px solid ${C.blue}`, borderRadius: '0 4px 4px 0', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxImg && (
+        <div
+          onClick={() => setLightboxImg(null)}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <img
+              src={lightboxImg}
+              alt="Defect fullscreen"
+              style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', transform: `scale(${lightboxZoom})`, transition: 'transform 0.2s' }}
+            />
+            <div style={{ position: 'absolute', bottom: 16, right: 16, display: 'flex', gap: 8 }}>
+              <button onClick={() => setLightboxZoom((z) => Math.max(z - 0.25, 0.5))} style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #fff', background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 18, cursor: 'pointer' }}>-</button>
+              <button onClick={() => setLightboxZoom((z) => Math.min(z + 0.25, 4))} style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #fff', background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 18, cursor: 'pointer' }}>+</button>
+            </div>
+            <button onClick={() => setLightboxImg(null)} style={{ position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Donut (Pure SVG – click to highlight segment) ──────────────────────────
+function Donut({ label, orange }: { label: string; orange: number }) {
+  const [active, setActive] = useState<number | null>(null);
+  const size = 180;
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = 82;
+  const innerR = 58;
+
+  // Build arc path for a donut segment (clockwise from top)
+  function arcPath(startAngle: number, endAngle: number, outer: number, inner: number) {
+    const toRad = (a: number) => ((a - 90) * Math.PI) / 180;
+    const x1 = cx + outer * Math.cos(toRad(startAngle));
+    const y1 = cy + outer * Math.sin(toRad(startAngle));
+    const x2 = cx + outer * Math.cos(toRad(endAngle));
+    const y2 = cy + outer * Math.sin(toRad(endAngle));
+    const x3 = cx + inner * Math.cos(toRad(endAngle));
+    const y3 = cy + inner * Math.sin(toRad(endAngle));
+    const x4 = cx + inner * Math.cos(toRad(startAngle));
+    const y4 = cy + inner * Math.sin(toRad(startAngle));
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return [
+      `M ${x1} ${y1}`,
+      `A ${outer} ${outer} 0 ${largeArc} 1 ${x2} ${y2}`,
+      `L ${x3} ${y3}`,
+      `A ${inner} ${inner} 0 ${largeArc} 0 ${x4} ${y4}`,
+      'Z',
+    ].join(' ');
+  }
+
+  const segments: { d: string; fill: string; pct: number; color: string }[] = [];
+  if (orange > 0) {
+    const orangeAngle = (orange / 100) * 360;
+    segments.push({ d: arcPath(0, orangeAngle, outerR, innerR), fill: C.orange, pct: orange, color: C.orange });
+    if (orangeAngle < 360) {
+      segments.push({ d: arcPath(orangeAngle, 360, outerR, innerR), fill: C.amber, pct: 100 - orange, color: C.amber });
+    }
+  } else {
+    segments.push({ d: arcPath(0, 359.99, outerR, innerR), fill: C.amber, pct: 100, color: C.amber });
+  }
+
+  const handleClick = (idx: number) => {
+    setActive(prev => prev === idx ? null : idx);
+  };
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, outline: 'none', userSelect: 'none' }}>
+      <svg width={size} height={size} style={{ display: 'block', outline: 'none' }} focusable="false">
+        <defs>
+          <filter id={`brightness-${label}`}>
+            <feComponentTransfer>
+              <feFuncR type="linear" slope="1.4" />
+              <feFuncG type="linear" slope="1.4" />
+              <feFuncB type="linear" slope="1.4" />
+            </feComponentTransfer>
+          </filter>
+        </defs>
+        {segments.map((s, i) => (
+          <path
+            key={i}
+            d={s.d}
+            fill={s.fill}
+            stroke="none"
+            style={{
+              cursor: 'pointer',
+              filter: active === i ? `url(#brightness-${label})` : 'none',
+              opacity: active !== null && active !== i ? 0.5 : 1,
+              transition: 'opacity 0.2s, filter 0.2s',
+            }}
+            onClick={() => handleClick(i)}
+          />
+        ))}
+      </svg>
+      <div style={{ ...donutCenter, pointerEvents: 'none' }}>
+        {orange > 0 && (
+          <span
+            onClick={() => handleClick(0)}
+            style={{
+              fontSize: active === 0 ? 16 : 13,
+              color: C.orange,
+              fontWeight: 700,
+              cursor: 'pointer',
+              opacity: active !== null && active !== 0 ? 0.4 : 1,
+              transition: 'font-size 0.2s, opacity 0.2s',
+              pointerEvents: 'auto',
+            }}
+          >
+            {orange}%
+          </span>
+        )}
+        <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{label}</span>
+        <span
+          onClick={() => handleClick(segments.length - 1)}
+          style={{
+            fontSize: active === segments.length - 1 ? 16 : 13,
+            color: C.amber,
+            fontWeight: 700,
+            cursor: 'pointer',
+            opacity: active !== null && active !== segments.length - 1 ? 0.4 : 1,
+            transition: 'font-size 0.2s, opacity 0.2s',
+            pointerEvents: 'auto',
+          }}
+        >
+          {100 - orange}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Overview table ──────────────────────────────────────────────────────────
+function OverviewTable({ typeBreakdown, catCounts, totalDefects }: { typeBreakdown: { type: string; total: number; cat5: number; cat4: number; cat3: number; cat2: number; cat1: number }[]; catCounts: Record<number, number>; totalDefects: number }) {
+  const hdr = [
+    { l: 'Category 5', c: C.cat5 }, { l: 'Category 4', c: C.cat4 },
+    { l: 'Category 3', c: C.cat3 }, { l: 'Category 2', c: C.cat2 }, { l: 'Category 1', c: C.cat1 },
+  ];
+  const tint = ['#FDECEC', '#FDF0E6', '#FEF6E6', '#E9F6F5', '#E6F5F3'];
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={table}>
+        <thead>
+          <tr>
+            <th style={{ ...th, background: C.muted, color: '#fff' }}>Defects</th>
+            <th style={{ ...th, background: C.muted, color: '#fff' }}>Total/Type</th>
+            {hdr.map((h) => <th key={h.l} style={{ ...th, background: h.c, color: '#fff' }}>{h.l}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {typeBreakdown.map((r) => (
+            <tr key={r.type}>
+              <td style={td}>{r.type}</td>
+              <td style={{ ...td, fontWeight: 700 }}>{r.total}</td>
+              <td style={{ ...td, background: tint[0], textAlign: 'center' }}>{r.cat5}</td>
+              <td style={{ ...td, background: tint[1], textAlign: 'center' }}>{r.cat4}</td>
+              <td style={{ ...td, background: tint[2], textAlign: 'center' }}>{r.cat3}</td>
+              <td style={{ ...td, background: tint[3], textAlign: 'center' }}>{r.cat2}</td>
+              <td style={{ ...td, background: tint[4], textAlign: 'center' }}>{r.cat1}</td>
+            </tr>
+          ))}
+          <tr>
+            <td style={{ ...td, fontWeight: 700, color: C.blue, background: '#F0FBFA' }}>Total/Category</td>
+            <td style={{ ...td, fontWeight: 700, color: C.blue, background: '#F0FBFA' }}>{totalDefects}</td>
+            <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat5, color: '#fff' }}>{catCounts[5]}</td>
+            <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat4, color: '#fff' }}>{catCounts[4]}</td>
+            <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat3, color: '#fff' }}>{catCounts[3]}</td>
+            <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat2, color: '#fff' }}>{catCounts[2]}</td>
+            <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat1, color: '#fff' }}>{catCounts[1]}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Details table ───────────────────────────────────────────────────────────
+function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onResolvedToggle, readonly = false }: { defects: TurbineDefect[]; selectedId: string | null; onSelect: (id: string) => void; onEdit: (id: string) => void; resolvedMap: Record<string, boolean>; onResolvedToggle: (id: string) => void; readonly?: boolean }) {
+  const catColor = (c: number) => c === 5 ? C.cat5 : c === 4 ? C.cat4 : c === 3 ? C.cat3 : c === 2 ? C.cat2 : C.cat1;
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={table}>
+        <thead>
+          <tr>
+            {['Id', 'Type', 'Category', 'Blade', 'Side', 'Root (m)', 'Size (cm)', 'Resolved', ...(readonly ? [] : ['Edit'])].map((h) => (
+              <th key={h} style={{ ...th, background: '#F3F4F6', color: C.muted }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {defects.map((d) => (
+            <tr
+              key={d.displayId}
+              id={`defect-row-${d.displayId}`}
+              onClick={() => onSelect(d.displayId)}
+              style={{
+                cursor: 'pointer',
+                backgroundColor: selectedId === d.displayId ? 'rgba(76, 175, 80, 0.12)' : undefined,
+                transition: 'background-color 0.15s',
+              }}
+            >
+              <td style={td}>{d.displayId}</td>
+              <td style={td}>{d.type}</td>
+              <td style={{ ...td, textAlign: 'center' }}>
+                <span style={{ ...badge, background: catColor(d.cat) }}>{d.cat}</span>
+              </td>
+              <td style={td}>{d.blade}</td>
+              <td style={td}>{d.side}</td>
+              <td style={td}>{d.root}</td>
+              <td style={td}>{d.size}</td>
+              <td style={{ ...td, textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); if (!readonly) onResolvedToggle(d.displayId); }}
+                  aria-label={resolvedMap[d.displayId] ? 'Mark as unresolved' : 'Mark as resolved'}
+                  aria-pressed={resolvedMap[d.displayId] ?? false}
+                  disabled={readonly}
+                  style={{
+                    position: 'relative',
+                    width: '36px',
+                    height: '20px',
+                    borderRadius: '10px',
+                    backgroundColor: resolvedMap[d.displayId] ? '#27AE60' : '#BDBDBD',
+                    cursor: readonly ? 'default' : 'pointer',
+                    transition: 'background-color 0.2s',
+                    border: 'none',
+                    padding: 0,
+                    display: 'inline-block',
+                    verticalAlign: 'middle',
+                    opacity: readonly ? 0.7 : 1,
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: resolvedMap[d.displayId] ? '18px' : '2px',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFFFFF',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }} />
+                </button>
+              </td>
+              {!readonly && (
+                <td style={td}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(d.id); }}
+                    style={editBtnStyle}
+                    title="Edit defect"
+                  >
+                    <Pencil size={14} color={C.blue} />
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Styles (forced light theme) ─────────────────────────────────────────────
+const page: React.CSSProperties = { minHeight: '100%', background: '#fff', color: C.text, fontFamily: 'var(--font-family-sans)' };
+const toolbarRow: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: '#fff', gap: 12, minHeight: 48 };
+const toolbarLeftSt: React.CSSProperties = { flex: '0 0 25%', minWidth: 0 };
+const toolbarCenterSt: React.CSSProperties = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 };
+const toolbarRightSt: React.CSSProperties = { flex: '0 0 25%', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' };
+const breadcrumbSt: React.CSSProperties = { fontSize: 13, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+const bcLinkSt: React.CSSProperties = { color: '#4CAF50', textDecoration: 'none', fontWeight: 500 };
+const bcSepSt: React.CSSProperties = { margin: '0 6px', color: '#999' };
+const searchBtnSt: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1px solid #ccc', borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#555' };
+const phaseBtnNormal: React.CSSProperties = { padding: '6px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 500, color: '#666', borderRadius: 4, transition: 'all 0.2s ease' };
+const phaseBtnActive: React.CSSProperties = { padding: '6px 16px', border: '2px solid #222', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 700, color: '#222', borderRadius: 20, transition: 'all 0.2s ease' };
+const phaseLabelNormal: React.CSSProperties = {};
+const phaseLabelActive: React.CSSProperties = { fontWeight: 700 };
+const topBar: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '14px 20px', borderBottom: `1px solid ${C.border}`, gap: 20 };
+const infoDot: React.CSSProperties = { width: 28, height: 28, borderRadius: '50%', background: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const tabRow: React.CSSProperties = { display: 'flex', gap: 24, borderBottom: 'none' };
+const tabBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.muted, padding: '4px 2px' };
+const tabActive: React.CSSProperties = { color: C.blue, borderBottom: `2px solid ${C.blue}` };
+const body: React.CSSProperties = { display: 'flex', gap: 16, padding: 16, alignItems: 'flex-start' };
+const col1: React.CSSProperties = { width: 480, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 };
+const col2: React.CSSProperties = { width: 220, flexShrink: 0, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, outline: 'none', overflow: 'hidden' };
+const col3: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 };
+const card: React.CSSProperties = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 };
+const cardTitle: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: C.text, margin: '0 0 14px' };
+const counters: React.CSSProperties = { display: 'flex', gap: 20, padding: '12px 0', borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` };
+const counterItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text };
+const conclText: React.CSSProperties = { fontSize: 12.5, color: '#555', margin: '0 0 8px', lineHeight: 1.45 };
+const planBtn: React.CSSProperties = { flex: 1, padding: '12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer' };
+const searchBarSt: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 20, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', minWidth: 180 };
+const searchInputSt: React.CSSProperties = { border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', flex: 1, color: '#1e293b', backgroundColor: 'transparent' };
+const filterSelect: React.CSSProperties = { padding: '4px 8px', fontSize: 11, border: `1px solid ${C.border}`, borderRadius: 4, fontFamily: 'inherit', backgroundColor: '#fff', color: C.text, cursor: 'pointer' };
+const donutCenter: React.CSSProperties = { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2, pointerEvents: 'none' };
+const catRow: React.CSSProperties = { display: 'flex', gap: 12, justifyContent: 'space-between' };
+const catCell: React.CSSProperties = { flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' };
+const table: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 11.5 };
+const th: React.CSSProperties = { padding: '7px 8px', fontWeight: 700, textAlign: 'left', fontSize: 10.5, whiteSpace: 'nowrap' };
+const td: React.CSSProperties = { padding: '7px 8px', borderBottom: `1px solid #F0F1F3`, color: C.text };
+const badge: React.CSSProperties = { display: 'inline-block', color: '#fff', fontWeight: 700, fontSize: 10.5, padding: '2px 7px', borderRadius: 4, minWidth: 18, textAlign: 'center' };
+const editBtnStyle: React.CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4 };

@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { LoadingSplash } from '@/components/atoms/LoadingSplash';
 import type { UserRole } from '@/types';
 
 interface AuthGuardProps {
@@ -10,7 +11,7 @@ interface AuthGuardProps {
 
 /**
  * AuthGuard protects routes by requiring authentication.
- * - Shows a loading state while auth is resolving.
+ * - Shows LoadingSplash while auth is resolving (same component used by Suspense).
  * - Redirects to /login if the user is not authenticated.
  * - Optionally enforces role-based access via `requiredRoles`.
  */
@@ -19,29 +20,7 @@ export function AuthGuard({ children, requiredRoles }: AuthGuardProps) {
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-        }}
-        aria-label="Loading"
-      >
-        <div
-          style={{
-            width: '2rem',
-            height: '2rem',
-            border: '3px solid #e5e7eb',
-            borderTopColor: '#3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }}
-        />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <LoadingSplash />;
   }
 
   if (!isAuthenticated) {

@@ -1,10 +1,10 @@
 :root {
   /* Primary colors */
-  --color-primary-50: #EEF4FF;
-  --color-primary-100: #D9E6FF;
-  --color-primary-500: #2563EB;
-  --color-primary-600: #1D4ED8;
-  --color-primary-700: #1E40AF;
+  --color-primary-50: #E8F0F8;
+  --color-primary-100: #C5DAED;
+  --color-primary-500: #1B4B7A;
+  --color-primary-600: #0F3A63;
+  --color-primary-700: #0B2545;
 
   /* Neutral colors */
   --color-neutral-0: #FFFFFF;
@@ -74,11 +74,11 @@
 
 /* Dark mode tokens */
 [data-theme="dark"] {
-  --color-primary-50: #1A2744;
-  --color-primary-100: #243A5E;
-  --color-primary-500: #5B9AFF;
-  --color-primary-600: #4A8AF5;
-  --color-primary-700: #3B7AE8;
+  --color-primary-50: #0D1F36;
+  --color-primary-100: #132D4F;
+  --color-primary-500: #4A90C4;
+  --color-primary-600: #2A6DB5;
+  --color-primary-700: #1B4B7A;
 
   --color-neutral-0: #0F1419;
   --color-neutral-50: #1A1F2E;

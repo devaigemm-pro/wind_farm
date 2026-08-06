@@ -28,11 +28,11 @@ export function NavItem({
     borderRadius: 'var(--radius-md)',
     cursor: 'pointer',
     backgroundColor: isActive
-      ? 'var(--color-primary-50)'
+      ? 'rgba(76, 175, 80, 0.15)'
       : 'transparent',
     color: isActive
-      ? 'var(--color-primary-700)'
-      : 'var(--color-neutral-500)',
+      ? '#ffffff'
+      : 'rgba(255, 255, 255, 0.7)',
     fontFamily: 'var(--font-family-sans)',
     fontSize: 'var(--text-sm)',
     fontWeight: isActive ? 500 : 400,
@@ -62,11 +62,9 @@ export function NavItem({
     fontWeight: 600,
     borderRadius: 'var(--radius-full)',
     backgroundColor: isActive
-      ? 'var(--color-primary-500)'
-      : 'var(--color-neutral-200)',
-    color: isActive
-      ? 'var(--color-neutral-0)'
-      : 'var(--color-neutral-800)',
+      ? '#4CAF50'
+      : 'rgba(255, 255, 255, 0.2)',
+    color: '#ffffff',
   };
 
   const content = (

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="sky-vw" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#42A5F5"/>
+      <stop offset="100%" style="stop-color:#BBDEFB"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#sky-vw)"/>
+  <!-- Blade full view -->
+  <path d="M 60 270 Q 120 230 160 160 Q 190 90 210 20" fill="#C0C0C0" stroke="#888" stroke-width="1.5"/>
+  <path d="M 90 270 Q 145 230 180 160 Q 205 90 225 20" fill="#E0E0E0" stroke="#888" stroke-width="1.5"/>
+  <!-- VG strip indication on blade -->
+  <path d="M 130 200 Q 155 170 170 140 Q 185 110 195 80" fill="none" stroke="#333" stroke-width="2" stroke-dasharray="3,8"/>
+  <!-- Missing VG zone highlighted -->
+  <rect x="145" y="110" width="35" height="80" fill="none" stroke="#FF6600" stroke-width="2.5" rx="4"/>
+  <!-- Arrow -->
+  <line x1="240" y1="130" x2="183" y2="140" stroke="#FF6600" stroke-width="1.5"/>
+  <polygon points="183,140 190,134 191,144" fill="#FF6600"/>
+  <text x="245" y="125" font-size="9" fill="#FF6600" font-family="sans-serif">Missing VG panels</text>
+  <text x="245" y="137" font-size="8" fill="#FF6600" font-family="sans-serif">4 of 8 absent</text>
+  <!-- Ground -->
+  <rect x="0" y="265" width="400" height="35" fill="#7CB342" opacity="0.35"/>
+  <!-- Label -->
+  <text x="200" y="290" text-anchor="middle" font-size="10" fill="#333" font-family="sans-serif">Wide view - Missing vortex generator panels</text>
+</svg>

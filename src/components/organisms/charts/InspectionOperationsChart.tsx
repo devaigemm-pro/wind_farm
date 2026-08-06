@@ -1,9 +1,10 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts';
 
 export interface OperationsDataItem {
   month: string;
   planned: number;
   done: number;
+  toPlan?: number;
 }
 
 export interface InspectionOperationsChartProps {
@@ -11,16 +12,67 @@ export interface InspectionOperationsChartProps {
 }
 
 export function InspectionOperationsChart({ data }: InspectionOperationsChartProps) {
+  // Find index of current month to draw a "Now" reference line
+  const now = new Date();
+  const currentMonthShort = now.toLocaleString('en', { month: 'short' });
+  const nowIndex = data.findIndex(
+    (d) => d.month.toLowerCase().startsWith(currentMonthShort.toLowerCase())
+  );
+
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="planned" fill="var(--color-primary-300, #93c5fd)" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="done" fill="var(--color-primary-600, #2563eb)" radius={[4, 4, 0, 0]} />
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-neutral-200, #e2e8f0)" vertical={false} />
+        <XAxis
+          dataKey="month"
+          tick={{ fontSize: 11, fill: 'var(--color-neutral-500, #64748b)' }}
+          axisLine={{ stroke: 'var(--color-neutral-200, #e2e8f0)' }}
+          tickLine={false}
+        />
+        <YAxis
+          allowDecimals={false}
+          tick={{ fontSize: 11, fill: 'var(--color-neutral-500, #64748b)' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          contentStyle={{
+            borderRadius: '8px',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            fontSize: '13px',
+          }}
+          cursor={{ fill: 'rgba(0,0,0,0.03)' }}
+        />
+        <Legend
+          iconType="circle"
+          iconSize={8}
+          wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+          formatter={(value: string) => {
+            const labels: Record<string, string> = {
+              toPlan: 'Inspections to Plan',
+              planned: 'Inspections Planned',
+              done: 'Inspections Done',
+            };
+            return labels[value] ?? value;
+          }}
+        />
+        {nowIndex >= 0 && (
+          <ReferenceLine
+            x={data[nowIndex]?.month}
+            stroke="green"
+            label={{ value: 'Now', position: 'top', fill: 'green', fontSize: 11, fontWeight: 600 }}
+          />
+        )}
+        <Bar dataKey="toPlan" fill="darkblue" radius={[4, 4, 0, 0]} maxBarSize={32}>
+          <LabelList dataKey="toPlan" position="top" fontSize={10} fill="var(--color-neutral-500, #64748b)" />
+        </Bar>
+        <Bar dataKey="planned" fill="grey" radius={[4, 4, 0, 0]} maxBarSize={32}>
+          <LabelList dataKey="planned" position="top" fontSize={10} fill="var(--color-neutral-500, #64748b)" />
+        </Bar>
+        <Bar dataKey="done" fill="#4CAF50" radius={[4, 4, 0, 0]} maxBarSize={32}>
+          <LabelList dataKey="done" position="top" fontSize={10} fill="var(--color-neutral-500, #64748b)" />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

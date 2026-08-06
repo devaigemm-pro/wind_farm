@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
 import { Breadcrumbs } from './Breadcrumbs';
 import type { BreadcrumbItem } from './Breadcrumbs';
 import type { Profile } from '@/types';
@@ -19,6 +18,21 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Remove tabindex from Recharts sectors to prevent focus ring on click
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('.recharts-sector[tabindex]').forEach(el => {
+        el.removeAttribute('tabindex');
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex'] });
+    // Initial cleanup
+    document.querySelectorAll('.recharts-sector[tabindex]').forEach(el => {
+      el.removeAttribute('tabindex');
+    });
+    return () => observer.disconnect();
+  }, [location.pathname]);
+
   const handleNavigate = (path: string) => {
     if (path === '/logout') {
       onLogout();
@@ -26,12 +40,6 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
     }
     navigate(path);
     setMobileMenuOpen(false);
-  };
-
-  const handleSearch = (query: string) => {
-    if (query) {
-      navigate(`/search?q=${encodeURIComponent(query)}`);
-    }
   };
 
   const wrapperStyle: React.CSSProperties = {
@@ -72,6 +80,7 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
     flex: 1,
     overflow: 'auto',
     padding: 'var(--space-6)',
+    outline: 'none',
   };
 
   const breadcrumbContainerStyle: React.CSSProperties = {
@@ -109,20 +118,13 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
 
       {/* Main content area */}
       <div style={mainAreaStyle}>
-        <TopBar
-          onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-          user={user}
-          onLogout={onLogout}
-          onSearch={handleSearch}
-        />
-
         {breadcrumbs.length > 0 && (
           <div style={breadcrumbContainerStyle}>
             <Breadcrumbs items={breadcrumbs} />
           </div>
         )}
 
-        <main style={contentStyle}>{children}</main>
+        <main style={contentStyle} tabIndex={-1}>{children}</main>
       </div>
     </div>
   );

@@ -1,240 +1,470 @@
-import { useState } from 'react';
-import { FileText, Download, Loader2, FolderOpen } from 'lucide-react';
-import { Button } from '@/components/atoms';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Download, Search, ChevronUp, ChevronDown, Loader2, Trash2 } from 'lucide-react';
+import { Skeleton } from '@/components/atoms/Skeleton';
 import { EmptyState } from '@/components/molecules';
-import { useReports } from '@/hooks/useReports';
-import {
-  useGenerateReport,
-  useGenerateConsolidatedReport,
-} from '@/hooks/useReportGeneration';
-import { reportsService } from '@/services/reports.service';
-import type { Report } from '@/types';
+import { useFinalizedInspections } from '@/hooks/useReports';
+import { getPdfBlob, downloadBlob } from '@/utils/pdfStorage';
+import { supabase } from '@/lib/supabase';
+import type { InspectionReportRow, ReportSortField } from '@/types';
+
+type SortDir = 'asc' | 'desc';
 
 export function Reports() {
-  const { data: reports, isLoading } = useReports();
-  const generateReport = useGenerateReport();
-  const generateConsolidated = useGenerateConsolidatedReport();
+  const { data: rows, isLoading } = useFinalizedInspections();
+  const navigate = useNavigate();
 
-  const [inspectionId, setInspectionId] = useState('');
-  const [windFarmId, setWindFarmId] = useState('');
+  // State
+  const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState<ReportSortField>('inspectionDate');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const handleGenerateInspection = () => {
-    if (inspectionId.trim()) {
-      generateReport.mutate(inspectionId.trim());
-      setInspectionId('');
-    }
-  };
+  // Filter
+  const filtered = useMemo(() => {
+    if (!rows) return [];
+    if (!search.trim()) return rows;
+    const q = search.toLowerCase();
+    return rows.filter(
+      (r) =>
+        r.asset.toLowerCase().includes(q) ||
+        r.subAsset.toLowerCase().includes(q) ||
+        r.type.toLowerCase().includes(q) ||
+        (r.note && r.note.toLowerCase().includes(q)) ||
+        r.inspectionDate.includes(q),
+    );
+  }, [rows, search]);
 
-  const handleGenerateConsolidated = () => {
-    if (windFarmId.trim()) {
-      generateConsolidated.mutate(windFarmId.trim());
-      setWindFarmId('');
-    }
-  };
-
-  const handleDownload = (storagePath: string) => {
-    const url = reportsService.getDownloadUrl(storagePath);
-    window.open(url, '_blank');
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+  // Sort
+  const sorted = useMemo(() => {
+    const data = [...filtered];
+    data.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'inspectionDate':
+          cmp = a.inspectionDate.localeCompare(b.inspectionDate);
+          break;
+        case 'asset':
+          cmp = a.asset.localeCompare(b.asset);
+          break;
+        case 'subAsset':
+          cmp = a.subAsset.localeCompare(b.subAsset);
+          break;
+        case 'type':
+          cmp = a.type.localeCompare(b.type);
+          break;
+        case 'defectsCount':
+          cmp = a.defectsCount - b.defectsCount;
+          break;
+        case 'note':
+          cmp = (a.note || '').localeCompare(b.note || '');
+          break;
+        case 'pdfReport':
+          cmp = (a.pdfStoragePath ? 1 : 0) - (b.pdfStoragePath ? 1 : 0);
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
     });
+    return data;
+  }, [filtered, sortField, sortDir]);
+
+  // Paginate
+  const paginated = useMemo(() => {
+    const start = page * rowsPerPage;
+    return sorted.slice(start, start + rowsPerPage);
+  }, [sorted, page, rowsPerPage]);
+
+  const totalPages = Math.ceil(sorted.length / rowsPerPage);
+
+  // Handlers
+  const handleSort = (field: ReportSortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+    setPage(0);
   };
 
-  const pageStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    fontFamily: 'var(--font-family-sans)',
+  const handleRowClick = (row: InspectionReportRow) => {
+    navigate(`/assets-wind/${row.assetId}/turbine/${row.subAssetId}`);
   };
 
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 'var(--space-4)',
-    borderBottom: '1px solid var(--color-neutral-100)',
-    flexShrink: 0,
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = async (e: React.MouseEvent, row: InspectionReportRow) => {
+    e.stopPropagation();
+    setDownloadingId(row.id);
+    try {
+      const blob = await getPdfBlob(row.id);
+      if (blob) {
+        const filename = `Inspection_${row.asset}_${row.subAsset}.pdf`;
+        downloadBlob(blob, filename.replace(/\s+/g, '_'));
+      } else {
+        alert('No se encontró el PDF generado. Por favor genera el reporte desde la vista de Resultados (Step 4).');
+      }
+    } catch {
+      alert('Error al descargar el reporte.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
-  const headerTitleStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: 'var(--text-xl)',
-    fontWeight: 600,
-    color: 'var(--color-neutral-900)',
+  const handleRemove = async (e: React.MouseEvent, row: InspectionReportRow) => {
+    e.stopPropagation();
+    if (!confirm('¿Eliminar este reporte de la lista?')) return;
+    try {
+      await (supabase as any).from('inspection')
+        .update({ stage: 'analyzed', completed_at: null })
+        .eq('id', row.id);
+      // Refresh the list
+      window.location.reload();
+    } catch {
+      alert('Error al eliminar.');
+    }
   };
 
-  const contentStyle: React.CSSProperties = {
-    flex: 1,
-    overflow: 'auto',
-    padding: 'var(--space-4)',
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   };
 
-  const generateSectionStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 'var(--space-3)',
-    flexWrap: 'wrap',
-    marginBottom: 'var(--space-6)',
-    padding: 'var(--space-4)',
-    background: 'var(--color-neutral-50)',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--color-neutral-100)',
-  };
+  // Column definitions
+  const columns: { field: ReportSortField; label: string; width?: string }[] = [
+    { field: 'inspectionDate', label: 'Inspection Date', width: '130px' },
+    { field: 'asset', label: 'Asset' },
+    { field: 'subAsset', label: 'SubAsset', width: '100px' },
+    { field: 'type', label: 'Type', width: '90px' },
+    { field: 'defectsCount', label: 'Defects', width: '80px' },
+    { field: 'note', label: 'Note' },
+    { field: 'pdfReport', label: 'PDF report', width: '130px' },
+  ];
 
-  const inputStyle: React.CSSProperties = {
-    padding: 'var(--space-2) var(--space-3)',
-    border: '1px solid var(--color-neutral-200)',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: 'var(--text-sm)',
-    minWidth: '200px',
-  };
-
-  const tableStyle: React.CSSProperties = {
-    width: '100%',
-    borderCollapse: 'collapse',
-  };
-
-  const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: 'var(--space-3)',
-    borderBottom: '2px solid var(--color-neutral-200)',
-    fontSize: 'var(--text-sm)',
-    fontWeight: 600,
-    color: 'var(--color-neutral-600)',
-  };
-
-  const tdStyle: React.CSSProperties = {
-    padding: 'var(--space-3)',
-    borderBottom: '1px solid var(--color-neutral-100)',
-    fontSize: 'var(--text-sm)',
-    color: 'var(--color-neutral-800)',
-  };
-
-  const typeIconStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
+  // Render sort indicator
+  const SortIcon = ({ field }: { field: ReportSortField }) => {
+    if (sortField !== field) return null;
+    return sortDir === 'asc' ? (
+      <ChevronUp size={12} style={{ marginLeft: 4 }} />
+    ) : (
+      <ChevronDown size={12} style={{ marginLeft: 4 }} />
+    );
   };
 
   if (isLoading) {
     return (
-      <div style={pageStyle}>
-        <div style={headerStyle}>
-          <h1 style={headerTitleStyle}>Reports</h1>
+      <div style={styles.page}>
+        <div style={styles.toolbar}>
+          <h5 style={styles.title}>Reports</h5>
         </div>
-        <div style={{ ...contentStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
-          <span style={{ marginLeft: 'var(--space-2)' }}>Loading reports...</span>
+        <div style={styles.content}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} variant="rect" height="52px" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={headerStyle}>
-        <h1 style={headerTitleStyle}>Reports</h1>
+    <div style={styles.page}>
+      {/* Toolbar */}
+      <div style={styles.toolbar}>
+        <h5 style={styles.title}>Reports</h5>
+        <div style={styles.searchContainer}>
+          <Search size={16} style={{ color: 'rgba(0, 0, 0, 0.4)' }} />
+          <input
+            type="text"
+            placeholder="Search all"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            style={styles.searchInput}
+            aria-label="Search reports"
+          />
+        </div>
+        <div style={{ width: '100px' }} />
       </div>
 
-      <div style={contentStyle}>
-        {/* Generate section */}
-        <div style={generateSectionStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <input
-              type="text"
-              placeholder="Inspection ID"
-              value={inspectionId}
-              onChange={(e) => setInspectionId(e.target.value)}
-              style={inputStyle}
-              aria-label="Inspection ID for report generation"
-            />
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleGenerateInspection}
-              disabled={!inspectionId.trim() || generateReport.isPending}
-            >
-              {generateReport.isPending ? <Loader2 size={14} /> : <FileText size={14} />}
-              {' '}Generate Inspection Report
-            </Button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <input
-              type="text"
-              placeholder="Wind Farm ID"
-              value={windFarmId}
-              onChange={(e) => setWindFarmId(e.target.value)}
-              style={inputStyle}
-              aria-label="Wind Farm ID for consolidated report"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleGenerateConsolidated}
-              disabled={!windFarmId.trim() || generateConsolidated.isPending}
-            >
-              {generateConsolidated.isPending ? <Loader2 size={14} /> : <FolderOpen size={14} />}
-              {' '}Generate Consolidated Report
-            </Button>
-          </div>
-        </div>
-
-        {/* Reports list */}
-        {!reports || reports.length === 0 ? (
+      {/* Table */}
+      <div style={styles.content}>
+        {sorted.length === 0 ? (
           <EmptyState
-            title="No reports generated yet"
-            description="Generate an inspection or consolidated report using the controls above."
+            title="No finalized inspections"
+            description="Reports will appear here once inspections are completed and finalized."
           />
         ) : (
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Generated</th>
-                <th style={thStyle}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports.map((report: Report) => (
-                <tr key={report.id}>
-                  <td style={tdStyle}>
-                    <span style={typeIconStyle}>
-                      {report.type === 'inspection' ? (
-                        <FileText size={16} color="var(--color-primary-500)" />
-                      ) : (
-                        <FolderOpen size={16} color="var(--color-secondary-500)" />
-                      )}
-                      {report.type === 'inspection' ? 'Inspection' : 'Consolidated'}
-                    </span>
-                  </td>
-
-                  <td style={tdStyle}>{report.filename || 'Untitled Report'}</td>
-                  <td style={tdStyle}>{formatDate(report.generated_at)}</td>
-                  <td style={tdStyle}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDownload(report.storage_path)}
-                      aria-label={`Download ${report.filename || 'report'}`}
+          <>
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    {columns.map((col) => (
+                      <th
+                        key={col.field}
+                        style={{ ...styles.th, width: col.width }}
+                        onClick={() => handleSort(col.field)}
+                        role="columnheader"
+                        aria-sort={
+                          sortField === col.field
+                            ? sortDir === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : 'none'
+                        }
+                      >
+                        <span style={styles.thContent}>
+                          {col.label}
+                          <SortIcon field={col.field} />
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map((row) => (
+                    <tr
+                      key={row.id}
+                      style={styles.row}
+                      onClick={() => handleRowClick(row)}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor =
+                          'rgba(76, 175, 80, 0.04)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                      }}
                     >
-                      <Download size={14} /> Download
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <td style={styles.td}>{formatDate(row.inspectionDate)}</td>
+                      <td style={styles.td}>{row.asset}</td>
+                      <td style={styles.td}>{row.subAsset}</td>
+                      <td style={styles.td}>{row.type}</td>
+                      <td style={styles.td}>{row.defectsCount}</td>
+                      <td style={styles.td}>{row.note || ''}</td>
+                      <td style={styles.td}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            style={styles.downloadIcon}
+                            onClick={(e) => handleDownload(e, row)}
+                            disabled={downloadingId === row.id}
+                            aria-label={row.pdfStoragePath ? 'Download report' : 'Generate and download report'}
+                          >
+                            {downloadingId === row.id ? (
+                              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#4CAF50' }} />
+                            ) : (
+                              <Download size={18} color="#4CAF50" />
+                            )}
+                          </button>
+                          <button
+                            style={styles.downloadIcon}
+                            onClick={(e) => handleRemove(e, row)}
+                            aria-label="Remove from reports"
+                          >
+                            <Trash2 size={16} color="#999" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div style={styles.pagination}>
+              <span style={styles.rowsPerPageLabel}>Rows per page:</span>
+              <div style={styles.rowsPerPage}>
+                <select
+                  value={rowsPerPage}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setPage(0);
+                  }}
+                  style={styles.select}
+                  aria-label="Rows per page"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div style={styles.pageInfo}>
+                {page * rowsPerPage + 1}–{Math.min((page + 1) * rowsPerPage, sorted.length)} of{' '}
+                {sorted.length}
+              </div>
+              <button
+                style={styles.pageBtn}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                aria-label="Go to previous page"
+              >
+                ‹
+              </button>
+              <button
+                style={styles.pageBtn}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                aria-label="Go to next page"
+              >
+                ›
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    fontFamily: 'Calibri, "Gill Sans", Arial, sans-serif',
+    backgroundColor: '#F4F6F8',
+  },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 20px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+    backgroundColor: '#fff',
+    flexShrink: 0,
+  },
+  title: {
+    margin: 0,
+    fontSize: '16.8px',
+    fontWeight: 400,
+    color: '#000',
+  },
+  searchContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    borderRadius: '20px',
+    border: '1px solid rgba(0, 0, 0, 0.2)',
+    backgroundColor: '#FFFFFF',
+    minWidth: '250px',
+  },
+  searchInput: {
+    border: 'none',
+    outline: 'none',
+    fontSize: '13px',
+    fontFamily: 'inherit',
+    flex: 1,
+    color: 'rgba(0, 0, 0, 0.87)',
+    backgroundColor: 'transparent',
+  },
+  content: {
+    flex: 1,
+    overflow: 'auto',
+    padding: '0',
+  },
+  tableWrapper: {
+    overflowX: 'auto',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    backgroundColor: '#fff',
+  },
+  th: {
+    textAlign: 'left',
+    padding: '14px 16px',
+    fontSize: '11px',
+    fontWeight: 700,
+    color: 'rgba(0, 0, 0, 0.87)',
+    backgroundColor: '#FAFAFA',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+    cursor: 'pointer',
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+  },
+  thContent: {
+    display: 'inline-flex',
+    alignItems: 'center',
+  },
+  row: {
+    cursor: 'pointer',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    height: '65px',
+    transition: 'background-color 0.15s',
+  },
+  td: {
+    padding: '16px',
+    fontSize: '12px',
+    color: 'rgba(0, 0, 0, 0.87)',
+    whiteSpace: 'nowrap',
+  },
+  downloadIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s',
+  },
+  pagination: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    padding: '10px 16px',
+    borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+    backgroundColor: '#fff',
+    fontSize: '12px',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  rowsPerPageLabel: {
+    fontSize: '12px',
+    color: 'rgba(0, 0, 0, 0.6)',
+    padding: '4px 8px',
+    border: '1px solid #4CAF50',
+    borderRadius: '4px',
+    backgroundColor: 'transparent',
+  },
+  rowsPerPage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  select: {
+    padding: '4px 8px',
+    fontSize: '12px',
+    border: '1px solid rgba(0, 0, 0, 0.2)',
+    borderRadius: '4px',
+    fontFamily: 'inherit',
+    backgroundColor: '#fff',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  pageInfo: {
+    fontSize: '12px',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  pageBtn: {
+    width: '28px',
+    height: '28px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid rgba(0, 0, 0, 0.12)',
+    borderRadius: '4px',
+    backgroundColor: '#fff',
+    cursor: 'pointer',
+    fontSize: '16px',
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+};

@@ -39,6 +39,132 @@ export type Database = {
   }
   public: {
     Tables: {
+      annotation: {
+        Row: {
+          angle: number
+          category: number
+          created_at: string
+          h: number
+          id: string
+          inspection_id: string
+          next_step: string | null
+          note: string | null
+          root_cause: string | null
+          thumbnail_id: string
+          type: string
+          updated_at: string
+          w: number
+          x: number
+          y: number
+        }
+        Insert: {
+          angle?: number
+          category: number
+          created_at?: string
+          h: number
+          id?: string
+          inspection_id: string
+          next_step?: string | null
+          note?: string | null
+          root_cause?: string | null
+          thumbnail_id: string
+          type: string
+          updated_at?: string
+          w: number
+          x: number
+          y: number
+        }
+        Update: {
+          angle?: number
+          category?: number
+          created_at?: string
+          h?: number
+          id?: string
+          inspection_id?: string
+          next_step?: string | null
+          note?: string | null
+          root_cause?: string | null
+          thumbnail_id?: string
+          type?: string
+          updated_at?: string
+          w?: number
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
+      annotation_comment: {
+        Row: {
+          annotation_id: string
+          author_name: string
+          created_at: string
+          id: string
+          text: string
+        }
+        Insert: {
+          annotation_id: string
+          author_name?: string
+          created_at?: string
+          id?: string
+          text: string
+        }
+        Update: {
+          annotation_id?: string
+          author_name?: string
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      asset_document: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          uploaded_by: string | null
+          wind_farm_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          uploaded_by?: string | null
+          wind_farm_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          uploaded_by?: string | null
+          wind_farm_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_document_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_document_wind_farm_id_fkey"
+            columns: ["wind_farm_id"]
+            isOneToOne: false
+            referencedRelation: "wind_farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blade: {
         Row: {
           created_at: string
@@ -77,36 +203,105 @@ export type Database = {
           },
         ]
       }
-      defect: {
+      campaign: {
         Row: {
           created_at: string
-          description: string | null
-          distance_from_root: number
+          created_by: string | null
           id: string
-          inspection_id: string
-          severity: number
-          type: string
+          name: string
           updated_at: string
+          wind_farm_id: string
         }
         Insert: {
           created_at?: string
-          description?: string | null
-          distance_from_root: number
+          created_by?: string | null
           id?: string
-          inspection_id: string
-          severity: number
-          type: string
+          name: string
           updated_at?: string
+          wind_farm_id: string
         }
         Update: {
           created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          wind_farm_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_wind_farm_id_fkey"
+            columns: ["wind_farm_id"]
+            isOneToOne: false
+            referencedRelation: "wind_farm"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      defect: {
+        Row: {
+          action_text: string | null
+          action_urgency: string | null
+          created_at: string
+          description: string | null
+          distance_from_root: number
+          height_cm: number | null
+          id: string
+          inspection_id: string
+          next_step: string | null
+          notes: string | null
+          resolved: boolean | null
+          root_cause: string | null
+          severity: number
+          side: string | null
+          type: string
+          updated_at: string
+          width_cm: number | null
+        }
+        Insert: {
+          action_text?: string | null
+          action_urgency?: string | null
+          created_at?: string
+          description?: string | null
+          distance_from_root: number
+          height_cm?: number | null
+          id?: string
+          inspection_id: string
+          next_step?: string | null
+          notes?: string | null
+          resolved?: boolean | null
+          root_cause?: string | null
+          severity: number
+          side?: string | null
+          type: string
+          updated_at?: string
+          width_cm?: number | null
+        }
+        Update: {
+          action_text?: string | null
+          action_urgency?: string | null
+          created_at?: string
           description?: string | null
           distance_from_root?: number
+          height_cm?: number | null
           id?: string
           inspection_id?: string
+          next_step?: string | null
+          notes?: string | null
+          resolved?: boolean | null
+          root_cause?: string | null
           severity?: number
+          side?: string | null
           type?: string
           updated_at?: string
+          width_cm?: number | null
         }
         Relationships: [
           {
@@ -114,6 +309,45 @@ export type Database = {
             columns: ["inspection_id"]
             isOneToOne: false
             referencedRelation: "inspection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      defect_comment: {
+        Row: {
+          author_id: string
+          created_at: string
+          defect_id: string
+          id: string
+          text: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          defect_id: string
+          id?: string
+          text: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          defect_id?: string
+          id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "defect_comment_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "defect_comment_defect_id_fkey"
+            columns: ["defect_id"]
+            isOneToOne: false
+            referencedRelation: "defect"
             referencedColumns: ["id"]
           },
         ]
@@ -197,40 +431,55 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           blade_id: string
+          campaign_id: string | null
           completed_at: string | null
           created_at: string
           id: string
+          inspection_type: string | null
           inspector_id: string
+          notes: string | null
+          photos_count: number | null
           scheduled_date: string
           stage: string
           status: string
           updated_at: string
+          viewed_percent: number | null
         }
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
           blade_id: string
+          campaign_id?: string | null
           completed_at?: string | null
           created_at?: string
           id?: string
+          inspection_type?: string | null
           inspector_id: string
+          notes?: string | null
+          photos_count?: number | null
           scheduled_date: string
           stage?: string
           status?: string
           updated_at?: string
+          viewed_percent?: number | null
         }
         Update: {
           approved_at?: string | null
           approved_by?: string | null
           blade_id?: string
+          campaign_id?: string | null
           completed_at?: string | null
           created_at?: string
           id?: string
+          inspection_type?: string | null
           inspector_id?: string
+          notes?: string | null
+          photos_count?: number | null
           scheduled_date?: string
           stage?: string
           status?: string
           updated_at?: string
+          viewed_percent?: number | null
         }
         Relationships: [
           {
@@ -245,6 +494,13 @@ export type Database = {
             columns: ["blade_id"]
             isOneToOne: false
             referencedRelation: "blade"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
             referencedColumns: ["id"]
           },
           {
@@ -323,26 +579,47 @@ export type Database = {
       }
       turbine: {
         Row: {
+          anticlockwise: boolean | null
           created_at: string
           id: string
+          latitude: number | null
+          longitude: number | null
           model: string | null
           name: string
+          power_kw: number | null
+          powering_date: string | null
+          serial_number: string | null
+          tower_serial_number: string | null
           updated_at: string
           wind_farm_id: string
         }
         Insert: {
+          anticlockwise?: boolean | null
           created_at?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           model?: string | null
           name: string
+          power_kw?: number | null
+          powering_date?: string | null
+          serial_number?: string | null
+          tower_serial_number?: string | null
           updated_at?: string
           wind_farm_id: string
         }
         Update: {
+          anticlockwise?: boolean | null
           created_at?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           model?: string | null
           name?: string
+          power_kw?: number | null
+          powering_date?: string | null
+          serial_number?: string | null
+          tower_serial_number?: string | null
           updated_at?: string
           wind_farm_id?: string
         }
@@ -364,6 +641,7 @@ export type Database = {
           location: string
           longitude: number | null
           name: string
+          powering_date: string | null
           updated_at: string
         }
         Insert: {
@@ -373,6 +651,7 @@ export type Database = {
           location: string
           longitude?: number | null
           name: string
+          powering_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -382,6 +661,7 @@ export type Database = {
           location?: string
           longitude?: number | null
           name?: string
+          powering_date?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -391,7 +671,80 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_defects_dashboard: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_sort_dir?: string
+          p_sort_field?: string
+        }
+        Returns: {
+          action_text: string
+          action_urgency: string
+          asset_name: string
+          blade_id: string
+          blade_position: number
+          category: number
+          defect_type: string
+          height_cm: number
+          id: string
+          inspection_id: string
+          next_step: string
+          notes: string
+          resolved: boolean
+          root_cause: string
+          root_distance: number
+          side: string
+          total_count: number
+          turbine_model: string
+          turbine_name: string
+          width_cm: number
+        }[]
+      }
       get_user_role: { Args: never; Returns: string }
+      get_wind_farm_detail: {
+        Args: { p_wind_farm_id: string }
+        Returns: {
+          id: string
+          inspections_count: number
+          location: string
+          name: string
+          oldest_inspection: string
+          powering_date: string
+          sub_assets_count: number
+          total_power: number
+        }[]
+      }
+      get_wind_farm_subassets: {
+        Args: { p_wind_farm_id: string }
+        Returns: {
+          id: string
+          inspections_count: number
+          last_inspection: string
+          model: string
+          name: string
+          power_kw: number
+          powering_date: string
+          serial_number: string
+        }[]
+      }
+      get_wind_farms_dashboard: {
+        Args: never
+        Returns: {
+          id: string
+          inspections_count: number
+          name: string
+          oldest_inspection: string
+          powering_date: string
+          sub_assets_count: number
+          total_power: number
+        }[]
+      }
+      toggle_defect_resolved: {
+        Args: { p_defect_id: string; p_resolved: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

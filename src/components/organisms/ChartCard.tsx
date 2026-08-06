@@ -8,6 +8,7 @@ export interface ChartCardProps {
   isError: boolean;
   isEmpty: boolean;
   filterSlot?: ReactNode;
+  className?: string;
 }
 
 export function ChartCard({
@@ -17,54 +18,24 @@ export function ChartCard({
   isError,
   isEmpty,
   filterSlot,
+  className = '',
 }: ChartCardProps) {
   return (
-    <div
-      style={{
-        border: '1px solid var(--color-neutral-200)',
-        borderRadius: 'var(--radius-lg)',
-        padding: 'var(--spacing-4)',
-        backgroundColor: 'var(--color-white, #fff)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--spacing-3)',
-        minHeight: '320px',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 'var(--spacing-2)',
-        }}
-      >
-        <h3
-          style={{
-            margin: 0,
-            fontSize: 'var(--font-size-md, 1rem)',
-            fontWeight: 600,
-          }}
-        >
-          {title}
-        </h3>
-        {filterSlot && <div>{filterSlot}</div>}
+    <div className={`chart-card ${className}`}>
+      <div className="chart-card__header">
+        <h3 className="chart-card__title">{title}</h3>
+        {filterSlot && <div className="chart-card__filters">{filterSlot}</div>}
       </div>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="chart-card__body">
         {isLoading ? (
           <div style={{ width: '100%' }}>
             <Skeleton variant="rect" height="200px" />
           </div>
         ) : isError ? (
-          <p style={{ color: 'var(--color-error-500, #ef4444)', margin: 0 }}>
-            Failed to load chart data.
-          </p>
+          <p className="chart-card__error">Failed to load chart data.</p>
         ) : isEmpty ? (
-          <p style={{ color: 'var(--color-neutral-500, #6b7280)', margin: 0 }}>
-            No data available.
-          </p>
+          <p className="chart-card__empty">No data available.</p>
         ) : (
           <div style={{ width: '100%', height: '100%' }}>{children}</div>
         )}

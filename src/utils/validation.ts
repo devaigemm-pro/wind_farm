@@ -54,3 +54,20 @@ export const defectSchema = z.object({
 });
 
 export type DefectFormData = z.infer<typeof defectSchema>;
+
+// ─── New Campaign Inspection Schema (RF-002) ────────────────────────────────
+
+export const newCampaignInspectionSchema = z.object({
+  windFarmId: z.string().uuid('Must select a wind farm'),
+  campaignName: z.string().min(1, 'Campaign name is required'),
+  inspectionType: z.enum(['blades', 'tower']),
+  inspectionMethod: z.enum(['skyvisor', 'external']),
+  scheduledDate: z.string().min(1, 'Inspection date is required'),
+  notes: z.string().optional().default(''),
+  subscribeNotifications: z.boolean().default(true),
+  selectedTurbineIds: z
+    .array(z.string().uuid())
+    .min(1, 'At least one turbine must be selected'),
+});
+
+export type NewCampaignInspectionFormData = z.infer<typeof newCampaignInspectionSchema>;

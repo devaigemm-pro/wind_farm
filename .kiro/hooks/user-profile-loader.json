@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Load User Profile on Session Start",
+      "trigger": "SessionStart",
+      "description": "Al iniciar una sesión, lee el perfil de usuario aprendido y lo inyecta como contexto para que el agente actúe como representante del usuario.",
+      "action": {
+        "type": "command",
+        "command": "cat .kiro/agents/user-profile.md 2>/dev/null && echo '' && echo '---' && echo 'INSTRUCCIÓN: Has leído el perfil de usuario arriba. Adapta tu estilo al perfil. Responde en español, sé directo y breve, no fuerces modos que el usuario no pidió. Dale alta autonomía cuando te la dé. Si la fecha de última actualización es de más de 1 día atrás y hay session-logs más recientes, actualiza el perfil con lo que puedas inferir al inicio de la sesión.'"
+      }
+    }
+  ]
+}

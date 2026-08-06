@@ -254,12 +254,26 @@ export function Inspections() {
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
-  // Loading skeleton
+  // Loading skeleton — preserves full page structure
   if (isLoading) {
     return (
       <div style={pageStyle}>
         <div style={headerStyle}>
           <h1 style={headerTitleStyle}>Inspections</h1>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => navigate('/inspections/new')}
+          >
+            New Inspection
+          </Button>
+        </div>
+        <div style={filterBarStyle}>
+          <Skeleton variant="rect" width="140px" height="36px" />
+          <Skeleton variant="rect" width="140px" height="36px" />
+          <Skeleton variant="rect" width="140px" height="36px" />
+          <Skeleton variant="rect" width="80px" height="36px" />
         </div>
         <div style={tableContainerStyle}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -460,30 +474,28 @@ export function Inspections() {
             </table>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div style={paginationStyle}>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={ChevronLeft}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                aria-label="Previous page"
-              />
-              <span style={pageIndicatorStyle}>
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={ChevronRight}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                aria-label="Next page"
-              />
-            </div>
-          )}
+          {/* Pagination — always rendered to prevent layout shift */}
+          <div style={paginationStyle}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={ChevronLeft}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              aria-label="Previous page"
+            />
+            <span style={pageIndicatorStyle}>
+              Page {page} of {totalPages || 1}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={ChevronRight}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              aria-label="Next page"
+            />
+          </div>
         </>
       )}
     </div>

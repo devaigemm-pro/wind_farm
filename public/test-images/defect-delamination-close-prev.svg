@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg-delamp" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#78909C"/>
+      <stop offset="100%" style="stop-color:#B0BEC5"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg-delamp)"/>
+  <!-- Blade surface -->
+  <rect x="50" y="30" width="300" height="240" fill="#ECEFF1" rx="4"/>
+  <!-- Incipient delamination - smaller area, less separation -->
+  <path d="M 170 110 Q 210 105 245 112 Q 255 130 248 148 Q 220 158 180 152 Q 165 135 170 110 Z" fill="#D8DCE0" stroke="#B0BEC5" stroke-width="1"/>
+  <!-- Slightly lifted layer - subtle -->
+  <path d="M 178 116 Q 210 111 238 117 Q 248 130 242 143 Q 217 151 186 146 Q 173 133 178 116 Z" fill="#E8EAF6" stroke="#7986CB" stroke-width="0.8" opacity="0.5"/>
+  <!-- Faint inner layer hint -->
+  <path d="M 195 125 Q 210 122 228 126 Q 235 133 231 140 Q 215 144 200 142 Q 190 136 195 125 Z" fill="#FFF9C4" stroke="#FBC02D" stroke-width="0.6" opacity="0.3"/>
+  <!-- Subtle separation line -->
+  <path d="M 172 113 Q 178 111 184 113" fill="none" stroke="#888" stroke-width="0.5" stroke-dasharray="2,2"/>
+  <!-- Measurement -->
+  <line x1="170" y1="190" x2="248" y2="190" stroke="#FF0000" stroke-width="1.5"/>
+  <line x1="170" y1="185" x2="170" y2="195" stroke="#FF0000" stroke-width="1.5"/>
+  <line x1="248" y1="185" x2="248" y2="195" stroke="#FF0000" stroke-width="1.5"/>
+  <text x="209" y="205" text-anchor="middle" font-size="9" fill="#FF0000" font-family="sans-serif">78mm</text>
+  <!-- Label -->
+  <text x="200" y="285" text-anchor="middle" font-size="10" fill="#333" font-family="sans-serif">Previous - Incipient delamination</text>
+</svg>

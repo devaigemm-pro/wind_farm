@@ -39,3 +39,15 @@ export function useApproveInspection() {
     },
   });
 }
+
+export function useUpdateVerticalBlade(inspectionId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (verticalBlade: string) =>
+      inspectionsService.updateVerticalBlade(inspectionId, verticalBlade),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] });
+    },
+  });
+}

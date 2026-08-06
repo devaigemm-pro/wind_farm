@@ -3,9 +3,9 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: var(--color-neutral-800, #1e293b);
+  background-color: var(--color-neutral-50, #f8fafc);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -17,4 +17,34 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+}
+
+/* Prevent ALL focus outlines - no exceptions */
+*:focus,
+*:focus-visible,
+*:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Recharts sector focus ring removal */
+.recharts-sector,
+.recharts-sector:focus,
+.recharts-sector:focus-visible,
+path[tabindex],
+path[tabindex]:focus,
+path[tabindex]:focus-visible {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

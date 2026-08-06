@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 70" width="340" height="70">
+  <!-- Background -->
+  <rect width="340" height="70" rx="6" fill="#1B2B4B"/>
+  
+  <!-- CORE text -->
+  <text x="25" y="45" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF" letter-spacing="1">CORE</text>
+  
+  <!-- Turbine tower + blades (the T) -->
+  <g transform="translate(155, 16)">
+    <!-- Tower -->
+    <rect x="4" y="14" width="3" height="34" fill="#4CAF50"/>
+    <!-- Hub -->
+    <circle cx="5.5" cy="14" r="3" fill="#4CAF50"/>
+    <!-- Blade up -->
+    <line x1="5.5" y1="14" x2="5.5" y2="0" stroke="#4CAF50" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- Blade bottom-right -->
+    <line x1="5.5" y1="14" x2="14" y2="24" stroke="#4CAF50" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- Blade bottom-left -->
+    <line x1="5.5" y1="14" x2="-3" y2="24" stroke="#4CAF50" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- Base -->
+    <rect x="1" y="48" width="9" height="2" rx="1" fill="#4CAF50"/>
+  </g>
+
+  <!-- EC text -->
+  <text x="175" y="45" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF" letter-spacing="1">EC</text>
+
+  <!-- Insight text -->
+  <text x="225" y="45" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="300" fill="#FFFFFF" letter-spacing="0.5">Insight</text>
+</svg>

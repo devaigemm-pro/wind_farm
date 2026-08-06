@@ -39,7 +39,7 @@ const navSections: NavSection[] = [
   },
   {
     title: 'Assets',
-    items: [{ icon: Wind, label: 'Wind Farms', path: '/wind-farms' }],
+    items: [{ icon: Wind, label: 'Wind Farms', path: '/assets-wind' }],
   },
   {
     title: 'Inspections',
@@ -70,8 +70,8 @@ export function Sidebar({
     flexDirection: 'column',
     width: isCollapsed ? '64px' : '256px',
     height: '100vh',
-    backgroundColor: 'var(--color-neutral-0)',
-    borderRight: '1px solid var(--color-neutral-200)',
+    backgroundColor: '#0B2545',
+    borderRight: 'none',
     transition: `width var(--duration-slow) var(--easing-default)`,
     overflow: 'hidden',
     flexShrink: 0,
@@ -83,28 +83,16 @@ export function Sidebar({
     alignItems: 'center',
     gap: 'var(--space-3)',
     padding: isCollapsed ? 'var(--space-4) var(--space-3)' : 'var(--space-4) var(--space-4)',
-    borderBottom: '1px solid var(--color-neutral-200)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
     minHeight: '64px',
     justifyContent: isCollapsed ? 'center' : 'flex-start',
-  };
-
-  const logoIconStyle: React.CSSProperties = {
-    width: '32px',
-    height: '32px',
-    borderRadius: 'var(--radius-md)',
-    backgroundColor: 'var(--color-primary-500)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--color-neutral-0)',
-    flexShrink: 0,
   };
 
   const logoTextStyle: React.CSSProperties = {
     fontSize: 'var(--text-lg)',
     fontWeight: 700,
     fontFamily: 'var(--font-family-sans)',
-    color: 'var(--color-neutral-900)',
+    color: '#ffffff',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
   };
@@ -122,7 +110,7 @@ export function Sidebar({
     fontSize: 'var(--text-xs)',
     fontWeight: 600,
     fontFamily: 'var(--font-family-sans)',
-    color: 'var(--color-neutral-400)',
+    color: 'rgba(255, 255, 255, 0.5)',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     padding: '0 var(--space-3)',
@@ -144,9 +132,9 @@ export function Sidebar({
     width: '100%',
     padding: 'var(--space-3)',
     border: 'none',
-    borderTop: '1px solid var(--color-neutral-200)',
+    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
     backgroundColor: 'transparent',
-    color: 'var(--color-neutral-400)',
+    color: 'rgba(255, 255, 255, 0.5)',
     cursor: 'pointer',
     fontFamily: 'var(--font-family-sans)',
     fontSize: 'var(--text-sm)',
@@ -156,10 +144,8 @@ export function Sidebar({
   return (
     <aside style={sidebarStyle} aria-label="Main navigation">
       <div style={logoAreaStyle}>
-        <div style={logoIconStyle}>
-          <Wind size={18} aria-hidden="true" />
-        </div>
-        {!isCollapsed && <span style={logoTextStyle}>WindBlade</span>}
+        {!isCollapsed && <img src="/coretec-wordmark.svg" height="28" alt="CORE Insight" style={{ flexShrink: 0 }} />}
+        {isCollapsed && <img src="/coretec-logo.svg" width="32" height="32" alt="CORE Insight" style={{ borderRadius: 'var(--radius-md)', flexShrink: 0 }} />}
       </div>
 
       <nav style={navStyle}>

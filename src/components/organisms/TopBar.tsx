@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Menu, Bell, LogOut, Sun, Moon } from 'lucide-react';
 import { Avatar } from '@/components/atoms';
-import { SearchBar } from '@/components/molecules';
 import type { Profile } from '@/types';
 
 export interface TopBarProps {
@@ -27,6 +26,7 @@ export function TopBar({
   const toggleTheme = () => {
     const next = isDarkTheme ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
     setIsDarkTheme(!isDarkTheme);
   };
 
@@ -55,11 +55,6 @@ export function TopBar({
     cursor: 'pointer',
     borderRadius: 'var(--radius-md)',
     flexShrink: 0,
-  };
-
-  const searchContainerStyle: React.CSSProperties = {
-    flex: 1,
-    maxWidth: '400px',
   };
 
   const actionsStyle: React.CSSProperties = {
@@ -171,10 +166,6 @@ export function TopBar({
       >
         <Menu size={20} aria-hidden="true" />
       </button>
-
-      <div style={searchContainerStyle}>
-        <SearchBar onSearch={onSearch} placeholder="Search..." />
-      </div>
 
       <div style={actionsStyle}>
         <button
