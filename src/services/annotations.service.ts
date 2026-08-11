@@ -116,6 +116,25 @@ export const annotationsService = {
       .single();
 
     if (error) throw new Error(error.message);
+
+    // Transition inspection stage to 'annotated' if this is the first annotation
+    try {
+      const { count } = await supabase
+        .from('annotation')
+        .select('id', { count: 'exact', head: true })
+        .eq('inspection_id', input.inspectionId);
+
+      if (count === 1) {
+        await supabase
+          .from('inspection')
+          .update({ stage: 'annotated' })
+          .eq('id', input.inspectionId)
+          .in('stage', ['to_plan', 'planned', 'uploaded']);
+      }
+    } catch (stageError) {
+      console.error('[annotations.service] Failed to update inspection stage:', stageError);
+    }
+
     return mapRow(data as Record<string, unknown>);
   },
 

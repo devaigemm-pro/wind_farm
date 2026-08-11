@@ -176,6 +176,24 @@ serve(withCors(async (req) => {
       })
     }
 
+    // Transition inspection stage to 'finalized' if this is the first report
+    try {
+      const { count } = await supabaseAdmin
+        .from('report')
+        .select('id', { count: 'exact', head: true })
+        .eq('reference_id', inspectionId)
+
+      if (count === 1) {
+        await supabaseAdmin
+          .from('inspection')
+          .update({ stage: 'finalized' })
+          .eq('id', inspectionId)
+          .neq('stage', 'finalized')
+      }
+    } catch (stageError) {
+      console.error('[generate-report] Failed to update inspection stage:', stageError)
+    }
+
     return new Response(JSON.stringify({ report }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
