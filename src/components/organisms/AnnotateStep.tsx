@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'lucide-react';
-import { useAnnotations, useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
+import { useAuth } from '@/hooks/useAuth';
+import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
 import { useInspectionPhotos, getPhotoPublicUrl, getFaceShort } from '@/hooks/useInspectionPhotos';
 import { useUpdateVerticalBlade } from '@/hooks/useInspectionMutations';
 import { useTogglePhotoTag, useMarkPhotoViewed } from '@/hooks/usePhotoTags';
@@ -19,7 +20,8 @@ export interface AnnotateStepProps {
 // ─── Thumbnail data derived from inspection_photo ────────────────────────────
 interface ThumbnailData {
   id: string;       // inspection_photo.id
-  src: string;      // public URL from storage
+  src: string;      // thumbnail URL (small, fast loading)
+  viewerSrc: string; // viewer URL (high quality for main display)
   blade: string;    // A, B, C (from blade position)
   face: string;     // SS, PS, LE, TE (short label)
   hasAnnotation: boolean; // derived from annotations
@@ -42,6 +44,7 @@ const C = {
 };
 
 export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaignId, savedThumbId, savedBlade, onSelectionChange }: AnnotateStepProps) {
+  const { role } = useAuth();
   // ─── Fetch ALL inspections of the campaign ─────────────────────────────────
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
   const { data: campaignInspIds = [] } = useCampaignInspectionIds(campaignId);
@@ -84,7 +87,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     const annotatedPhotoIds = new Set(dbAnnotations.map((a) => a.thumbnailId));
     return photos.map((photo) => ({
       id: photo.id,
-      src: getPhotoPublicUrl(photo.storagePath),
+      // Use pre-generated thumbnail URL if available, fallback to transform
+      src: photo.thumbnailUrl || getPhotoPublicUrl(photo.storagePath, 'thumbnail'),
+      viewerSrc: getPhotoPublicUrl(photo.storagePath, 'viewer'),
       blade: bladePositionMap[photo.bladeId] ?? 'A',
       face: getFaceShort(photo.face),
       hasAnnotation: annotatedPhotoIds.has(photo.id),
@@ -184,6 +189,33 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [metaRootDist, setMetaRootDist] = useState(15);
   const [metaDistBlade, setMetaDistBlade] = useState(6.9);
 
+  // ─── Image transition: show thumbnail as placeholder while full-res loads ──
+  const [viewerLoaded, setViewerLoaded] = useState(false);
+  const prevThumbRef = useRef<string>('');
+
+  // ─── Image adjustment controls (Contrast, Brightness, Saturation) ──────────
+  const [imgContrast, setImgContrast] = useState(1);
+  const [imgBrightness, setImgBrightness] = useState(1);
+  const [imgSaturation, setImgSaturation] = useState(1);
+  const [showImageAdjust, setShowImageAdjust] = useState(false);
+
+  // Reset loaded state when thumbnail changes
+  useEffect(() => {
+    if (selectedThumbnail && selectedThumbnail !== prevThumbRef.current) {
+      setViewerLoaded(false);
+      prevThumbRef.current = selectedThumbnail;
+    }
+  }, [selectedThumbnail]);
+
+  // Preload adjacent images for instant transitions
+  const preloadCache = useRef<Set<string>>(new Set());
+  const preloadImage = useCallback((src: string) => {
+    if (!src || preloadCache.current.has(src)) return;
+    preloadCache.current.add(src);
+    const img = new Image();
+    img.src = src;
+  }, []);
+
   const filteredThumbnails = useMemo(() => {
     return thumbnails.filter(t => {
       // Blade filter: if no blades selected, show all; otherwise filter
@@ -204,8 +236,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     const idx = Math.max(0, allBlades.indexOf(verticalBlade));
     const bladeOrder = [
       allBlades[idx]!,
-      allBlades[(idx + 2) % 3]!,  // right blade (CW)
-      allBlades[(idx + 1) % 3]!,  // left blade (CW)
+      allBlades[(idx + 1) % 3]!,  // right blade (CW)
+      allBlades[(idx + 2) % 3]!,  // left blade (CW)
     ];
     
     const groups: Record<string, ThumbnailData[]> = {};
@@ -248,6 +280,28 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   const currentThumbIndex = flatFilteredThumbs.findIndex(t => t.id === selectedThumbnail);
 
+  const groupBoundaries = useMemo(() => {
+    const boundaries: number[] = [];
+    let offset = 0;
+    for (const thumbs of Object.values(groupedThumbnails)) {
+      boundaries.push(offset);
+      offset += thumbs.length;
+    }
+    return boundaries;
+  }, [groupedThumbnails]);
+
+  // Preload next/prev viewer images when current changes
+  useEffect(() => {
+    if (flatFilteredThumbs.length === 0 || currentThumbIndex < 0) return;
+    const prevIdx = currentThumbIndex > 0 ? currentThumbIndex - 1 : flatFilteredThumbs.length - 1;
+    const nextIdx = currentThumbIndex < flatFilteredThumbs.length - 1 ? currentThumbIndex + 1 : 0;
+    preloadImage(flatFilteredThumbs[prevIdx]?.viewerSrc ?? '');
+    preloadImage(flatFilteredThumbs[nextIdx]?.viewerSrc ?? '');
+    // Also preload 2 ahead for fast scrolling
+    const next2Idx = (currentThumbIndex + 2) % flatFilteredThumbs.length;
+    preloadImage(flatFilteredThumbs[next2Idx]?.viewerSrc ?? '');
+  }, [currentThumbIndex, flatFilteredThumbs, preloadImage]);
+
   // Auto-scroll selected thumbnail into view in sidebar
   useEffect(() => {
     if (selectedThumbnail) {
@@ -287,7 +341,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const handleThumbnailSelect = (thumbId: string) => {
     setSelectedThumbnail(thumbId);
     // Mark photo as viewed in BD (only writes if not already viewed)
-    markViewed.mutate({ photoId: thumbId });
+    markViewed.mutate({ photoId: thumbId, campaignId });
     const thumb = thumbnails.find(t => t.id === thumbId);
     if (thumb) {
       setRightPanelBlade(thumb.blade);
@@ -307,17 +361,30 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   const handlePrevPhoto = () => {
     if (flatFilteredThumbs.length === 0) return;
-    const prevIndex = currentThumbIndex > 0 ? currentThumbIndex - 1 : flatFilteredThumbs.length - 1;
-    handleThumbnailSelect(flatFilteredThumbs[prevIndex]!.id);
+    if (fastForward) {
+      // Jump back 3 photos (one row in the thumbnail grid)
+      const prevIndex = (currentThumbIndex - 3 + flatFilteredThumbs.length) % flatFilteredThumbs.length;
+      handleThumbnailSelect(flatFilteredThumbs[prevIndex]!.id);
+    } else {
+      const prevIndex = currentThumbIndex > 0 ? currentThumbIndex - 1 : flatFilteredThumbs.length - 1;
+      handleThumbnailSelect(flatFilteredThumbs[prevIndex]!.id);
+    }
   };
 
   const handleNextPhoto = () => {
     if (flatFilteredThumbs.length === 0) return;
-    const nextIndex = currentThumbIndex < flatFilteredThumbs.length - 1 ? currentThumbIndex + 1 : 0;
-    handleThumbnailSelect(flatFilteredThumbs[nextIndex]!.id);
+    if (fastForward) {
+      // Jump forward 3 photos (one row in the thumbnail grid)
+      const nextIndex = (currentThumbIndex + 3) % flatFilteredThumbs.length;
+      handleThumbnailSelect(flatFilteredThumbs[nextIndex]!.id);
+    } else {
+      const nextIndex = currentThumbIndex < flatFilteredThumbs.length - 1 ? currentThumbIndex + 1 : 0;
+      handleThumbnailSelect(flatFilteredThumbs[nextIndex]!.id);
+    }
   };
 
   const handleToggleFlag = () => {
+    if (role === 'supervisor') return;
     if (!selectedThumbnail) return;
     const currentlyTagged = taggedPhotos.has(selectedThumbnail);
     toggleTag.mutate({ photoId: selectedThumbnail, isTagged: !currentlyTagged });
@@ -510,9 +577,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><path d="m6 18 8.5-6L6 6zM16 6v12h2V6z"/></svg>
               </button>
             </div>
+            {role !== 'supervisor' && (
             <button style={{ ...flagBtnStyle, background: taggedPhotos.has(selectedThumbnail) ? 'rgba(255, 235, 59, 0.2)' : 'transparent' }} title="Flag" onClick={handleToggleFlag}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFEB3B"><path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
             </button>
+            )}
           </div>
 
           {/* Center: metadata info */}
@@ -527,7 +596,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               <span>Distance to blade: </span><strong>{metaDistBlade} m</strong>
             </span>
             <div style={{ position: 'relative' }}>
-              <button style={editBtnStyle} onClick={() => setShowEditPopover(!showEditPopover)}>Edit</button>
+              {role !== 'supervisor' && <button style={editBtnStyle} onClick={() => setShowEditPopover(!showEditPopover)}>Edit</button>}
               {/* Edit popover anchored to Edit button */}
               {showEditPopover && (
                 <div style={editPopoverStyle}>
@@ -609,14 +678,19 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
           </div>
 
-          {/* Right: download + delete */}
+          {/* Right: adjustments + download + delete */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button style={{ ...actionBtnStyle, borderColor: showImageAdjust ? C.primary : undefined, background: showImageAdjust ? C.primaryLight : undefined }} title="Image adjustments" onClick={() => setShowImageAdjust(v => !v)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={showImageAdjust ? C.primary : '#555'}><path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-14v4h2V6h-2zm0 6v6h2v-6h-2z"/></svg>
+            </button>
             <button style={actionBtnStyle} title="Download photo">
               <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96M17 13l-5 5-5-5h3V9h4v4z"/></svg>
             </button>
+            {role !== 'supervisor' && (
             <button style={{ ...actionBtnStyle, borderColor: '#F15959', color: '#F15959' }} title="Delete photo">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#F15959"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>
             </button>
+            )}
           </div>
         </div>
 
@@ -624,6 +698,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
         <div
           style={{ ...mainViewerStyle, cursor: isDrawing ? 'crosshair' : 'crosshair', position: 'relative' }}
           onMouseDown={(e) => {
+            if (role === 'supervisor') return;
             if (showAnnotationPopover) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -651,12 +726,46 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           }}
         >
           {currentThumb ? (
-            <img
-              src={currentThumb.src}
-              alt="inspection view"
-              style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#1a1a1a', pointerEvents: 'none', userSelect: 'none' }}
-              draggable={false}
-            />
+            <>
+              {/* Thumbnail as instant placeholder (already cached from sidebar) */}
+              <img
+                src={currentThumb.src}
+                alt=""
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  background: '#1a1a1a',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  filter: `blur(2px) contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
+                  opacity: viewerLoaded ? 0 : 1,
+                  transition: 'opacity 0.15s ease-out',
+                }}
+                draggable={false}
+              />
+              {/* Full resolution image with fade-in */}
+              <img
+                key={currentThumb.id}
+                src={currentThumb.viewerSrc}
+                alt="inspection view"
+                onLoad={() => setViewerLoaded(true)}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  background: '#1a1a1a',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  filter: `contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
+                  opacity: viewerLoaded ? 1 : 0,
+                  transition: 'opacity 0.2s ease-in',
+                }}
+                draggable={false}
+              />
+            </>
           ) : (
             <div style={{ width: '100%', height: '100%', background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
               <span style={{ color: '#888', fontSize: 14 }}>Select an image to view</span>
@@ -664,13 +773,46 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           )}
 
           {/* Saved annotations for current thumbnail */}
+
+          {/* ─── Image Adjustment Panel (floating, top-right) ─────────────── */}
+          {showImageAdjust && (
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: '#fff', borderRadius: 8, padding: '16px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', minWidth: 220, pointerEvents: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Image Adjustments</span>
+                <button onClick={() => setShowImageAdjust(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#888"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>Contrast</span>
+                <input type="range" min="0" max="2" step="0.1" value={imgContrast} onChange={e => setImgContrast(Number(e.target.value))} style={{ width: '100%', accentColor: C.primary }} />
+                <span style={{ fontSize: 11, color: C.muted, float: 'right' }}>{imgContrast.toFixed(1)}</span>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>Brightness</span>
+                <input type="range" min="0" max="2" step="0.1" value={imgBrightness} onChange={e => setImgBrightness(Number(e.target.value))} style={{ width: '100%', accentColor: C.primary }} />
+                <span style={{ fontSize: 11, color: C.muted, float: 'right' }}>{imgBrightness.toFixed(1)}</span>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>Saturation</span>
+                <input type="range" min="0" max="10" step="0.5" value={imgSaturation} onChange={e => setImgSaturation(Number(e.target.value))} style={{ width: '100%', accentColor: C.primary }} />
+                <span style={{ fontSize: 11, color: C.muted, float: 'right' }}>{imgSaturation.toFixed(1)}</span>
+              </div>
+              <button onClick={() => { setImgContrast(1); setImgBrightness(1); setImgSaturation(1); }} style={{ width: '100%', padding: '6px 12px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: '#E0E0E0', color: '#333B46' }}>
+                Reset
+              </button>
+            </div>
+          )}
+
           {(savedAnnotations[selectedThumbnail] || []).map((ann, idx) => (
             <div key={idx} style={{ position: 'absolute', left: `${ann.x}%`, top: `${ann.y}%`, width: `${ann.w}%`, height: `${ann.h}%`, pointerEvents: 'none' }}>
               {/* Label with type + edit button */}
               <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto' }}>
                 <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 4, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#333', whiteSpace: 'nowrap' }}>{ann.type}</span>
+                  {role !== 'supervisor' && (
                   <button onClick={() => {
+                    
                     setAnnotationType(ann.type);
                     setAnnotationCategory(ann.category);
                     setAnnotationNote(ann.note);
@@ -690,6 +832,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                   </button>
+                  )}
                 </div>
               </div>
               {/* Rectangle border */}
@@ -804,6 +947,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setEditingAnnotationId(null); setSaveError(null); }}>Cancel</button>
               {editingAnnotationId !== null && (
                 <button style={{ ...confirmBtnStyle, background: '#F15959' }} onClick={() => {
+                  
                   // Delete annotation from DB
                   deleteAnnotation.mutate(editingAnnotationId);
                   setDrawStart(null);
@@ -814,6 +958,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 }}>Delete</button>
               )}
               <button style={{ ...confirmBtnStyle, background: C.primary }} onClick={() => {
+                
                 if (editingAnnotationId !== null) {
                   // Update existing annotation in DB
                   if (drawStart && drawEnd) {
@@ -914,7 +1059,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           </div>
 
           {/* Save button */}
+          {role !== 'supervisor' && (
           <button style={{ ...saveBtnStyle, cursor: 'pointer', background: C.primary }} onClick={() => {
+            
             if (drawStart && drawEnd) {
               const x = Math.min(drawStart.x, drawEnd.x);
               const y = Math.min(drawStart.y, drawEnd.y);
@@ -935,9 +1082,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             setDrawStart(null);
             setDrawEnd(null);
           }}>Save</button>
+          )}
         </div>
 
         {/* Change vertical blade accordion */}
+        {role !== 'supervisor' && (
         <div style={changeBladeAccordionStyle}>
           <button style={changeBladeBtn} onClick={() => setChangeBladeExpanded(!changeBladeExpanded)}>
             <span style={{ fontSize: 14, color: C.text }}>Change vertical blade</span>
@@ -959,14 +1108,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
           )}
         </div>
+        )}
 
         {/* Turbine Hub Diagram */}
         <div style={hubDiagramContainer}>
           <div style={{ margin: '0 auto', position: 'relative' }}>
             <svg width="147" height="140" viewBox="0 0 98 93" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M43.9217 49.1806C44.0764 50.1206 43.9217 54.5387 43.9217 54.5387C43.9217 54.5387 44.4631 55.0557 47.0155 55.0557C49.5679 55.0557 50.032 54.5387 50.032 54.5387C50.032 54.5387 50.264 1.52972 50.264 1.38138C50.264 1.23304 50.1094 0.958366 49.7226 1.00536C49.3359 1.05236 49.3359 1.14637 49.1812 1.56937C49.0265 1.99237 48.021 7.5854 45.4686 21.7325C42.9161 35.8796 41.524 38.6996 42.1428 42.5536C43.3421 46.8776 43.767 48.2406 43.9217 49.1806Z" fill={selectedDefectBlade === verticalBlade ? C.primary : '#EDEDED'} stroke="black" strokeWidth="1.5"/>
-              <path d="M54.3899 57.1826C53.4985 56.8466 49.7498 54.5036 49.7498 54.5036C49.7498 54.5036 49.0313 54.714 47.7551 56.9244C46.4789 59.1349 46.6946 59.7953 46.6946 59.7953C46.6946 59.7953 92.4857 86.5007 92.6142 86.5749C92.7426 86.649 93.0578 86.6524 93.2105 86.294C93.3632 85.9356 93.2818 85.8886 92.9928 85.5431C92.7038 85.1976 88.3628 81.5304 77.3873 72.2463C66.4118 62.9623 64.6657 60.3467 61.0186 58.9555C56.6742 57.8322 55.2814 57.5187 54.3899 57.1826Z" fill={(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); return selectedDefectBlade === blades[(idx + 2) % 3] ? C.primary : '#EDEDED'; })()} stroke="black" strokeWidth="1.5"/>
-              <path d="M43.7069 62.4702C44.3764 61.7926 48.0416 59.3209 48.0416 59.3209L44.4501 54.3775C44.4501 54.3775 1.42855 85.3477 1.30853 85.4349C1.18852 85.5221 1.05723 85.8087 1.32257 86.0939C1.58791 86.3792 1.66396 86.3239 2.09711 86.2004C2.53025 86.077 7.64609 83.6029 20.5916 77.3524C33.5371 71.1019 36.6369 70.5706 39.3911 67.8047C42.1844 64.2929 43.0373 63.1479 43.7069 62.4702Z" fill={(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); return selectedDefectBlade === blades[(idx + 1) % 3] ? C.primary : '#EDEDED'; })()} stroke="black" strokeWidth="1.5"/>
+              <path d="M54.3899 57.1826C53.4985 56.8466 49.7498 54.5036 49.7498 54.5036C49.7498 54.5036 49.0313 54.714 47.7551 56.9244C46.4789 59.1349 46.6946 59.7953 46.6946 59.7953C46.6946 59.7953 92.4857 86.5007 92.6142 86.5749C92.7426 86.649 93.0578 86.6524 93.2105 86.294C93.3632 85.9356 93.2818 85.8886 92.9928 85.5431C92.7038 85.1976 88.3628 81.5304 77.3873 72.2463C66.4118 62.9623 64.6657 60.3467 61.0186 58.9555C56.6742 57.8322 55.2814 57.5187 54.3899 57.1826Z" fill={(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); return selectedDefectBlade === blades[(idx + 1) % 3] ? C.primary : '#EDEDED'; })()} stroke="black" strokeWidth="1.5"/>
+              <path d="M43.7069 62.4702C44.3764 61.7926 48.0416 59.3209 48.0416 59.3209L44.4501 54.3775C44.4501 54.3775 1.42855 85.3477 1.30853 85.4349C1.18852 85.5221 1.05723 85.8087 1.32257 86.0939C1.58791 86.3792 1.66396 86.3239 2.09711 86.2004C2.53025 86.077 7.64609 83.6029 20.5916 77.3524C33.5371 71.1019 36.6369 70.5706 39.3911 67.8047C42.1844 64.2929 43.0373 63.1479 43.7069 62.4702Z" fill={(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); return selectedDefectBlade === blades[(idx + 2) % 3] ? C.primary : '#EDEDED'; })()} stroke="black" strokeWidth="1.5"/>
               <circle cx="46.9366" cy="57.0105" r="3.93249" fill="#D9D9D9" stroke="black"/>
             </svg>
             <div style={{ position: 'absolute', top: '5%', width: '40%', left: '6%' }}>
@@ -976,12 +1126,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
             <div style={{ position: 'absolute', top: '68%', width: '30%', left: '-28%' }}>
               <p style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textAlign: 'right', margin: 0 }}>
-                {(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); const lb = blades[(idx + 1) % 3]!; return `${lb} - ${bladeSerials[lb] || ''}`; })()}
+                {(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); const lb = blades[(idx + 2) % 3]!; return `${lb} - ${bladeSerials[lb] || ''}`; })()}
               </p>
             </div>
             <div style={{ position: 'absolute', top: '68%', width: '30%', left: '98%' }}>
               <p style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textAlign: 'left', margin: 0 }}>
-                {(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); const rb = blades[(idx + 2) % 3]!; return `${rb} - ${bladeSerials[rb] || ''}`; })()}
+                {(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); const rb = blades[(idx + 1) % 3]!; return `${rb} - ${bladeSerials[rb] || ''}`; })()}
               </p>
             </div>
           </div>
