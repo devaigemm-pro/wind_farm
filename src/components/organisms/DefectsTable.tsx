@@ -131,7 +131,7 @@ export function DefectsTable({
     borderBottom: '1px solid #E5E7EB',
     cursor: 'pointer',
     userSelect: 'none',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   };
