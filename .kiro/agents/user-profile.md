@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 70
+- **Sesiones analizadas**: 71
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -759,3 +759,13 @@
   - **REGLA**: Máximo 2 intentos de fix en mismo archivo. Si no resuelve, PARAR y preguntar.
   - **REGLA**: En session branches, estado correcto = commit anterior de misma branch, NO main.
 - **Patrones confirmados**: español, directo, alta autonomía, frustración por pérdida de trabajo, ejecutar scripts directamente, mínimo cambio necesario, "no busques soluciones superficiales"
+
+### Sesión 81 - 2026-08-13
+- **Tarea principal**: (1) Cambiar faceOrder labels a LE→TE→PS→SS sin mover fotos. (2) Traducir textos en inglés en step 2 (ANNOTATE) y en /assets-wind defects edit (DefectEditForm).
+- **Observaciones nuevas**:
+  - "sin mover las fotos del orden actual" — precaución explícita por experiencia previa (sesiones 77-79) donde el agente tocó más de lo pedido. El usuario anticipa errores del agente.
+  - Primera tarea resuelta con un solo cambio (faceOrder) sin correcciones — la regla "mínimo cambio necesario" fue acatada correctamente.
+  - "siguen algunas palabras sin traducir" — reporta bug de i18n sin listar cuáles son. Confía en que el agente haga auditoría completa.
+  - "lo mismo ocurre en X" — cuando reporta que el mismo bug existe en otra pantalla, da solo la URL y la sección ("defects edit"). No repite la explicación.
+  - Sesión con 2 tareas secuenciales: reorder + traducciones. Ambas aceptadas sin correcciones.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, mínimo cambio necesario, "lo mismo en X" = aplicar el mismo fix en otra pantalla, bug sistémico por pantalla, auditoría completa sin preguntar qué falta

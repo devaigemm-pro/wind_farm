@@ -101,14 +101,13 @@ export function DefectsTable({
   const { t } = useLanguage();
   
   const COLS: { field: DefectSortField; label: string; width?: string; sortable: boolean }[] = [
-    { field: 'assetName', label: t('defectsTable.asset'), width: '10%', sortable: true },
-    { field: 'turbineName', label: t('defectsTable.turbine'), width: '7%', sortable: true },
-    { field: 'turbineModel', label: t('defectsTable.model'), width: '9%', sortable: true },
-    { field: 'type', label: t('defectsTable.type'), width: '11%', sortable: true },
+    { field: 'turbineName', label: t('defectsTable.turbine'), width: '8%', sortable: true },
+    { field: 'turbineModel', label: t('defectsTable.model'), width: '10%', sortable: true },
+    { field: 'type', label: t('defectsTable.type'), width: '12%', sortable: true },
     { field: 'defectSize', label: t('defectsTable.defectSize'), width: '9%', sortable: false },
     { field: 'category', label: t('defectsTable.category'), width: '7%', sortable: true },
-    { field: 'action', label: t('defectsTable.action'), width: '13%', sortable: false },
-    { field: 'nextStep', label: t('defectsTable.nextStep'), width: '12%', sortable: true },
+    { field: 'action', label: t('defectsTable.action'), width: '14%', sortable: false },
+    { field: 'nextStep', label: t('defectsTable.nextStep'), width: '13%', sortable: true },
     { field: 'blade', label: t('defectsTable.blade'), width: '5%', sortable: true },
     { field: 'side', label: t('defectsTable.side'), width: '5%', sortable: true },
     { field: 'rootDistance', label: t('defectsTable.rootDistance'), width: '13%', sortable: true },
@@ -208,8 +207,7 @@ export function DefectsTable({
                   if (!isSelected) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
                 }}
               >
-                <td style={{ ...tdStyle, paddingLeft: '12px' }}>{row.assetName}</td>
-                <td style={tdStyle}>{row.turbineName}</td>
+                <td style={{ ...tdStyle, paddingLeft: '12px' }}>{row.turbineName}</td>
                 <td style={tdStyle}>{row.turbineModel}</td>
                 <td style={tdStyle}>{row.type}</td>
                 <td style={tdStyle}>{(row.defectWidth || row.defectHeight) ? `${row.defectWidth} x ${row.defectHeight}` : '—'}</td>
