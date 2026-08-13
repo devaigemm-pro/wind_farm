@@ -156,20 +156,20 @@
 
 /* Dark mode overrides */
 [data-theme="dark"] .dashboard-page {
-  background: var(--color-neutral-50, #1a1f2e);
+  background: var(--color-neutral-50, #212121);
 }
 
 [data-theme="dark"] .chart-card {
-  background: var(--color-neutral-0, #0f1419);
-  border-color: var(--color-neutral-200, #334155);
+  background: var(--color-neutral-0, #1A1A1A);
+  border-color: var(--color-neutral-200, #3A3A3A);
 }
 
 [data-theme="dark"] .chart-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .chart-card__header {
-  border-bottom-color: var(--color-neutral-200, #334155);
+  border-bottom-color: var(--color-neutral-200, #3A3A3A);
 }
 
 /* Filter Select */
@@ -214,11 +214,11 @@
 
 /* Dark mode filter select */
 [data-theme="dark"] .filter-select__input {
-  background: var(--color-neutral-100, #252b3b);
-  border-color: var(--color-neutral-200, #334155);
-  color: var(--color-neutral-800, #e2e8f0);
+  background: var(--color-neutral-100, #2A2A2A);
+  border-color: var(--color-neutral-200, #3A3A3A);
+  color: var(--color-neutral-800, #A8E6A8);
 }
 
 [data-theme="dark"] .filter-select__input:hover {
-  border-color: var(--color-neutral-400, #64748b);
+  border-color: var(--color-neutral-400, #6BBF6B);
 }
