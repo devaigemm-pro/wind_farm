@@ -262,9 +262,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   }, [selectedBlades, selectedFaces, categoryFilter, thumbnailAnnotations, thumbnails]);
 
   const groupedThumbnails = useMemo(() => {
-    // Order: fixed blade A→B→C, face LE→TE→PS→SS (matching Skyvisor original)
+    // Order: blade first (starting from verticalBlade), then CW (right, left)
     const faceOrder = ['LE', 'TE', 'PS', 'SS'];
-    const bladeOrder = ['A', 'B', 'C'];
+    const allBlades = ['A', 'B', 'C'];
+    const idx = Math.max(0, allBlades.indexOf(verticalBlade));
+    const bladeOrder = [
+      allBlades[idx]!,
+      allBlades[(idx + 1) % 3]!,  // right blade (CW)
+      allBlades[(idx + 2) % 3]!,  // left blade (CW)
+    ];
     
     const groups: Record<string, ThumbnailData[]> = {};
     
@@ -279,7 +285,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     }
     
     return groups;
-  }, [filteredThumbnails]);
+  }, [filteredThumbnails, verticalBlade]);
 
   // Auto-select: restore saved selection or pick first VISIBLE thumbnail (from grouped order)
   useEffect(() => {
