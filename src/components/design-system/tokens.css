@@ -1,10 +1,10 @@
 :root {
   /* Primary colors */
-  --color-primary-50: #E8F0F8;
-  --color-primary-100: #C5DAED;
-  --color-primary-500: #1B4B7A;
-  --color-primary-600: #0F3A63;
-  --color-primary-700: #0B2545;
+  --color-primary-50: #F5F5F5;
+  --color-primary-100: #E0E0E0;
+  --color-primary-500: #4A4A4A;
+  --color-primary-600: #383838;
+  --color-primary-700: #2C2C2C;
 
   /* Neutral colors */
   --color-neutral-0: #FFFFFF;
@@ -70,15 +70,22 @@
   --easing-in: cubic-bezier(0.4, 0, 1, 1);
   --easing-out: cubic-bezier(0, 0, 0.2, 1);
   --easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Breakpoints (reference only, use in media queries) */
+  /* --bp-sm: 640px */
+  /* --bp-md: 768px */
+  /* --bp-lg: 1024px */
+  /* --bp-xl: 1280px */
+  /* --bp-2xl: 1536px */
 }
 
 /* Dark mode tokens */
 [data-theme="dark"] {
-  --color-primary-50: #0D1F36;
-  --color-primary-100: #132D4F;
-  --color-primary-500: #4A90C4;
-  --color-primary-600: #2A6DB5;
-  --color-primary-700: #1B4B7A;
+  --color-primary-50: #1A1A1A;
+  --color-primary-100: #222222;
+  --color-primary-500: #8A8A8A;
+  --color-primary-600: #5A5A5A;
+  --color-primary-700: #2C2C2C;
 
   --color-neutral-0: #0F1419;
   --color-neutral-50: #1A1F2E;

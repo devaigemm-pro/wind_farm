@@ -10,13 +10,7 @@ export type UserRole = 'inspector' | 'supervisor' | 'admin';
 
 export type InspectionStatus = 'in_progress' | 'completed' | 'approved';
 
-export type InspectionStage =
-  | 'to_plan'
-  | 'planned'
-  | 'uploaded'
-  | 'annotated'
-  | 'analyzed'
-  | 'finalized';
+export type InspectionStage = 'planned' | 'inspect' | 'annotate' | 'analyze' | 'report';
 
 export type DefectType =
   | 'le_erosion'
@@ -44,12 +38,11 @@ export const INSPECTION_STATUSES: readonly InspectionStatus[] = [
 ] as const;
 
 export const INSPECTION_STAGES: readonly InspectionStage[] = [
-  'to_plan',
   'planned',
-  'uploaded',
-  'annotated',
-  'analyzed',
-  'finalized',
+  'inspect',
+  'annotate',
+  'analyze',
+  'report',
 ] as const;
 
 export const DEFECT_TYPES: readonly DefectType[] = [
@@ -283,12 +276,14 @@ export interface CampaignInspection {
   inspectionDate: string;
   subassetName: string;
   status: InspectionStatus;
+  stage: string;
   inspectionType: string;
   photosCount: number;
   viewedPercent: number;
   defectsCount: number;
   notes: string | null;
   reportUrl: string | null;
+  reportStoragePath: string | null;
   campaignId: string | null;
   turbineId?: string | null;
 }
@@ -343,7 +338,6 @@ export interface CreateCampaignInspectionInput {
   inspectionMethod: InspectionMethod;
   scheduledDate: string;
   notes: string;
-  subscribeNotifications: boolean;
   selectedTurbineIds: string[];
 }
 

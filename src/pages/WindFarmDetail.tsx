@@ -10,7 +10,7 @@ import { DefectsTable } from '@/components/organisms/DefectsTable';
 import { DefectDetailPanel } from '@/components/organisms/DefectDetailPanel';
 import { TurbineSerialNumbersModal } from '@/components/organisms/TurbineSerialNumbersModal';
 import { EditCampaignModal } from '@/components/organisms/EditCampaignModal';
-import { useWindFarmDetail, useSubassets, useCampaigns, useDeleteCampaign, useWindFarmDefects } from '@/hooks/useWindFarmDetail';
+import { useWindFarmDetail, useSubassets, useCampaigns, useDeleteCampaign, useWindFarmDefects, useDefectImages } from '@/hooks/useWindFarmDetail';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/store/toastStore';
 import type { TurbineSubassetRow, DefectSortField, DefectDashboardRow, Campaign } from '@/types';
@@ -31,6 +31,15 @@ export function WindFarmDetail() {
   const { data: campaigns, isLoading: campaignsLoading } = useCampaigns(windFarmId);
   const { data: windFarmDefects, isLoading: defectsLoading } = useWindFarmDefects(windFarmId);
   const deleteCampaign = useDeleteCampaign();
+
+  // Load defect images in background
+  const defectIdsForImages = useMemo(() => (windFarmDefects ?? []).map(d => d.id), [windFarmDefects]);
+  const { data: defectImageMap } = useDefectImages(defectIdsForImages);
+  const defectsWithImages = useMemo(() => {
+    if (!windFarmDefects) return [];
+    if (!defectImageMap) return windFarmDefects;
+    return windFarmDefects.map(d => ({ ...d, imageUrl: defectImageMap[d.id] ?? d.imageUrl }));
+  }, [windFarmDefects, defectImageMap]);
 
   const [activeTab, setActiveTab] = useState('general');
   const [sortField, setSortField] = useState('name');
@@ -78,7 +87,7 @@ export function WindFarmDetail() {
   const handleSubassetNameClick = (name: string) => {
     const turbine = subassets?.find((t) => t.name === name);
     if (turbine) {
-      navigate(`/assets-wind/${windFarmId}/turbine/${turbine.id}`);
+      navigate(`/assets-wind/${windFarmId}/subasset/${turbine.id}`);
     }
   };
 
@@ -116,9 +125,9 @@ export function WindFarmDetail() {
       <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'general' && (
-        <div style={contentStyle}>
+        <div style={contentStyle} className="wind-farm-detail-content">
           {/* Left Column */}
-          <div style={leftColStyle}>
+          <div style={leftColStyle} className="wind-farm-detail-left">
             <DetailsBlock detail={detail} isLoading={detailLoading} onPlanInspection={handlePlanInspection} />
             <SubassetsTable
               data={paginatedSubassets}
@@ -135,31 +144,28 @@ export function WindFarmDetail() {
               onRowClick={handleTurbineClick}
               selectedSubassetName={filterSubasset}
             />
-            <DocumentDropbox windFarmId={windFarmId!} />
+            {role !== 'supervisor' && <DocumentDropbox windFarmId={windFarmId!} />}
           </div>
           {/* Right Column */}
-          <div style={rightColStyle}>
+          <div style={rightColStyle} className="wind-farm-detail-right">
             <CampaignsPanel
               campaigns={campaigns ?? []}
               isLoading={campaignsLoading}
               onViewResults={handleViewResults}
               onSubassetClick={handleSubassetNameClick}
-              onInspectionClick={(inspectionId, status, campaignId, turbineId) => {
-                if (status === 'completed' || status === 'approved') {
-                  if (turbineId) {
-                    const params = new URLSearchParams();
-                    params.set('inspectionId', inspectionId);
-                    if (campaignId) params.set('campaignId', campaignId);
-                    navigate(`/assets-wind/${windFarmId}/turbine/${turbineId}?${params.toString()}`);
-                  } else {
-                    navigate(`/inspections/${inspectionId}/workflow`);
-                  }
+              onInspectionClick={(inspectionId, status, campaignId, turbineId, stage) => {
+                if (status === 'completed' || status === 'approved' || stage === 'report') {
+                  navigate(`/inspections/${inspectionId}/workflow?step=4`);
                 } else {
-                  navigate(`/inspections/${inspectionId}/workflow`);
+                  // Navigate to workflow at the step matching the stage
+                  let step = 1;
+                  if (stage === 'annotate') step = 2;
+                  else if (stage === 'analyze') step = 3;
+                  navigate(`/inspections/${inspectionId}/workflow?step=${step}`);
                 }
               }}
-              onEditCampaign={setEditingCampaign}
-              onDeleteCampaign={role === 'supervisor' || role === 'admin' ? handleDeleteCampaign : undefined}
+              onEditCampaign={role !== 'supervisor' ? setEditingCampaign : undefined}
+              onDeleteCampaign={role !== 'supervisor' ? handleDeleteCampaign : undefined}
               filterBySubasset={filterSubasset}
               onClearFilter={() => setFilterSubasset(null)}
             />
@@ -183,7 +189,7 @@ export function WindFarmDetail() {
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', flex: selectedDefectId ? '0 0 70%' : '1 1 100%', overflow: 'hidden', minHeight: 0 }}>
             <DefectsTable
-              data={windFarmDefects ?? []}
+              data={defectsWithImages}
               isLoading={defectsLoading}
               sortField={defectSortField}
               sortDirection={defectSortDirection}
@@ -200,7 +206,7 @@ export function WindFarmDetail() {
             />
             </div>
             {selectedDefectId && (() => {
-              const selectedDefect = (windFarmDefects ?? []).find((d: DefectDashboardRow) => d.id === selectedDefectId);
+              const selectedDefect = defectsWithImages.find((d: DefectDashboardRow) => d.id === selectedDefectId);
               return selectedDefect ? (
                 <div style={{ flex: '0 0 30%', overflow: 'auto', minHeight: 0 }}>
                   <DefectDetailPanel defect={selectedDefect} />

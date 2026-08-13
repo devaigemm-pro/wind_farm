@@ -28,25 +28,26 @@ export const reportsService = {
           )
         )
       `)
-      .eq('stage', 'finalized')
+      .eq('stage', 'report')
       .order('completed_at', { ascending: false });
 
     if (inspError) throw inspError;
     if (!inspections || inspections.length === 0) return [];
 
-    // Get defect counts per inspection in one query
+    // Get annotation counts per inspection (annotations are the source of truth for defects)
     const inspectionIds = inspections.map((i) => i.id);
-    const { data: defects, error: defError } = await supabase
-      .from('defect')
-      .select('inspection_id')
-      .in('inspection_id', inspectionIds);
+    let defectCounts: Record<string, number> = {};
+    if (inspectionIds.length > 0) {
+      const { data: annotations, error: annError } = await supabase
+        .from('annotation')
+        .select('inspection_id')
+        .in('inspection_id', inspectionIds);
 
-    if (defError) throw defError;
-
-    // Count defects per inspection
-    const defectCounts: Record<string, number> = {};
-    for (const d of defects || []) {
-      defectCounts[d.inspection_id] = (defectCounts[d.inspection_id] || 0) + 1;
+      if (!annError && annotations) {
+        for (const a of annotations) {
+          defectCounts[a.inspection_id] = (defectCounts[a.inspection_id] || 0) + 1;
+        }
+      }
     }
 
     // Get reports (PDFs) linked to these inspections

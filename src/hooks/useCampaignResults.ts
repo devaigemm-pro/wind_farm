@@ -4,6 +4,32 @@ import type { CampaignTurbineResult } from '@/types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+// Map annotation type labels (stored in DB) to chart keys
+const ANNOTATION_TYPE_TO_CHART_KEY: Record<string, string> = {
+  'LE EROSION': 'le_erosion',
+  'LONGITUDINAL CRACKS ON LE OR TE BOND LINES': 'crack',
+  'CRACK': 'crack',
+  'VORTEX (MISSING PANELS)': 'vortex',
+  'PAINT DAMAGES': 'paint_defect',
+  'BLADES WITH HYDRAULIC OIL': 'oil',
+  'OTHER ADD-ONS MISSING': 'other',
+  'DELAMINATION': 'delamination',
+  'LIGHTNING DAMAGE': 'lightning_damage',
+  // snake_case fallbacks (in case data was stored in this format)
+  'le_erosion': 'le_erosion',
+  'crack': 'crack',
+  'vortex': 'vortex',
+  'paint_defect': 'paint_defect',
+  'oil': 'oil',
+  'delamination': 'delamination',
+  'lightning_damage': 'lightning_damage',
+  'other': 'other',
+};
+
+function normalizeAnnotationType(raw: string): string {
+  return ANNOTATION_TYPE_TO_CHART_KEY[raw] ?? ANNOTATION_TYPE_TO_CHART_KEY[raw.toUpperCase()] ?? 'other';
+}
+
 interface CampaignData {
   id: string;
   name: string;
@@ -14,6 +40,7 @@ interface CampaignData {
 
 interface CampaignDefect {
   id: string;
+  inspectionId: string;
   turbineId: string;
   turbineName: string;
   bladePosition: number;
@@ -57,6 +84,7 @@ interface CampaignResultsData {
   categoryChart: CategoryChartItem[];
   typeChart: TypeChartItem[];
   defects: CampaignDefect[];
+  turbineInspectionMap: Record<string, string>;
 }
 
 // ─── Fetcher ────────────────────────────────────────────────────────────────
@@ -81,6 +109,7 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
       categoryChart: [],
       typeChart: [],
       defects: [],
+      turbineInspectionMap: {},
     };
   }
 
@@ -95,16 +124,18 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
     createdAt: cr.created_at as string,
   };
 
-  // 2. Fetch inspections for this campaign with blade/turbine/defect info
+  // 2. Fetch inspections for this campaign with blade/turbine info
   const { data: inspections, error: inspErr } = await db
     .from('inspection')
     .select(`
       id,
+      turbine_id,
       blade:blade!inspection_blade_id_fkey(
+        id,
         position,
         turbine:turbine!blade_turbine_id_fkey(id, name)
       ),
-      defects:defect(id, type, severity, distance_from_root, width_cm, height_cm, side, description, resolved, defect_image(evidence:evidence_id(storage_path)))
+      direct_turbine:turbine!inspection_turbine_id_fkey(id, name)
     `)
     .eq('campaign_id', campaignId);
 
@@ -118,10 +149,87 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
       categoryChart: [],
       typeChart: [],
       defects: [],
+      turbineInspectionMap: {},
     };
   }
 
-  // 3. Aggregate defects by turbine and blade
+  // 2b. Fetch annotations for all inspections in this campaign
+  const inspectionIds = (inspections as unknown[]).map((i) => (i as Record<string, unknown>).id as string);
+  const { data: annotations } = await db
+    .from('annotation')
+    .select('id, inspection_id, thumbnail_id, type, category, note, side, x, y, w, h')
+    .in('inspection_id', inspectionIds);
+
+  // 2c. Resolve photo URLs from thumbnail_ids
+  const thumbnailIds = ((annotations ?? []) as unknown[])
+    .map((a) => (a as Record<string, unknown>).thumbnail_id as string)
+    .filter((id) => id && id.includes('-')); // only UUIDs
+
+  // Build photo → blade position map
+  const photoBladePosMap = new Map<string, number>();
+  const photoUrlMap = new Map<string, string>();
+  if (thumbnailIds.length > 0) {
+    const { data: photos } = await db
+      .from('inspection_photo')
+      .select('id, storage_path, blade_id')
+      .in('id', thumbnailIds);
+
+    if (photos && (photos as unknown[]).length > 0) {
+      const paths = (photos as Record<string, unknown>[]).map((p) => p.storage_path as string);
+      const { data: signedData } = await supabase.storage
+        .from('asset-documents')
+        .createSignedUrls(paths, 3600);
+
+      if (signedData) {
+        for (let i = 0; i < signedData.length; i++) {
+          const url = signedData[i]?.signedUrl;
+          const photo = (photos as Record<string, unknown>[])[i];
+          if (url && photo) {
+            photoUrlMap.set(photo.id as string, url);
+          }
+        }
+      }
+
+      // Build blade position map from photos
+      const bladeIds = [...new Set((photos as Record<string, unknown>[]).map((p) => p.blade_id as string).filter(Boolean))];
+      if (bladeIds.length > 0) {
+        const { data: blades } = await db.from('blade').select('id, position').in('id', bladeIds);
+        const bladeIdToPos = new Map<string, number>();
+        if (blades) for (const b of blades as Array<{ id: string; position: number }>) bladeIdToPos.set(b.id, b.position);
+        for (const p of photos as Record<string, unknown>[]) {
+          const pos = bladeIdToPos.get(p.blade_id as string);
+          if (pos) photoBladePosMap.set(p.id as string, pos);
+        }
+      }
+    }
+  }
+
+  // Build inspection → blade/turbine lookup
+  const inspectionLookup = new Map<string, { bladePosition: number; turbineId: string; turbineName: string }>();
+  for (const insp of inspections as unknown[]) {
+    const row = insp as Record<string, unknown>;
+    const blade = row.blade as Record<string, unknown> | null;
+    const turbine = blade?.turbine as Record<string, unknown> | null;
+    const directTurbine = row.direct_turbine as Record<string, unknown> | null;
+    
+    if (turbine) {
+      // Blade-based inspection
+      inspectionLookup.set(row.id as string, {
+        bladePosition: Number(blade?.position) || 1,
+        turbineId: turbine.id as string,
+        turbineName: turbine.name as string,
+      });
+    } else if (directTurbine) {
+      // Turbine-based inspection (covers all blades) — default to blade A
+      inspectionLookup.set(row.id as string, {
+        bladePosition: 1,
+        turbineId: directTurbine.id as string,
+        turbineName: directTurbine.name as string,
+      });
+    }
+  }
+
+  // 3. Aggregate annotations by turbine and blade
   const turbineMap = new Map<string, {
     id: string;
     name: string;
@@ -129,19 +237,27 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
     allDefects: CampaignDefect[];
   }>();
 
-  for (const insp of inspections as unknown[]) {
-    const row = insp as Record<string, unknown>;
-    const blade = row.blade as Record<string, unknown> | null;
-    const turbine = blade?.turbine as Record<string, unknown> | null;
-    const defects = (row.defects as unknown[]) ?? [];
-    if (!turbine) continue;
+  for (const a of (annotations ?? []) as unknown[]) {
+    const ann = a as Record<string, unknown>;
+    const lookup = inspectionLookup.get(ann.inspection_id as string);
+    if (!lookup) continue;
 
-    const turbineId = turbine.id as string;
-    const turbineName = turbine.name as string;
-    const bladePosition = Number(blade?.position) || 1;
+    const { turbineId, turbineName } = lookup;
+    // Determine blade position: from photo (most accurate) → from side field → from inspection lookup
+    const photoBladePos = photoBladePosMap.get(ann.thumbnail_id as string);
+    const sideStr = (ann.side as string) ?? '';
+    const sideBladePos = sideStr === 'A' ? 1 : sideStr === 'B' ? 2 : sideStr === 'C' ? 3 : 0;
+    const bladePosition = photoBladePos || sideBladePos || lookup.bladePosition;
+    const severity = Number(ann.category) || 1;
+    const type = normalizeAnnotationType((ann.type as string) ?? 'other');
 
     if (!turbineMap.has(turbineId)) {
-      turbineMap.set(turbineId, { id: turbineId, name: turbineName, blades: new Map(), allDefects: [] });
+      const newTurbine = { id: turbineId, name: turbineName, blades: new Map<number, { defects: Array<{ severity: number; type: string; resolved: boolean }> }>(), allDefects: [] as CampaignDefect[] };
+      // Initialize all 3 blades
+      newTurbine.blades.set(1, { defects: [] });
+      newTurbine.blades.set(2, { defects: [] });
+      newTurbine.blades.set(3, { defects: [] });
+      turbineMap.set(turbineId, newTurbine);
     }
     const turbineData = turbineMap.get(turbineId)!;
 
@@ -150,39 +266,24 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
     }
     const bladeData = turbineData.blades.get(bladePosition)!;
 
-    for (const d of defects) {
-      const defect = d as Record<string, unknown>;
-      const severity = Number(defect.severity) || 1;
-      const type = (defect.type as string) ?? 'other';
-      const resolved = (defect.resolved as boolean) ?? false;
-
-      // Extract image storage paths from defect_image → evidence
-      const defectImages = (defect.defect_image as unknown[]) ?? [];
-      const imagePaths: string[] = [];
-      for (const di of defectImages) {
-        const diRow = di as Record<string, unknown>;
-        const evidence = diRow.evidence as Record<string, unknown> | null;
-        if (evidence?.storage_path) {
-          imagePaths.push(evidence.storage_path as string);
-        }
-      }
-
-      bladeData.defects.push({ severity, type, resolved });
-      turbineData.allDefects.push({
-        id: defect.id as string,
-        turbineId,
-        turbineName,
-        bladePosition,
-        type,
-        severity,
-        distanceFromRoot: Number(defect.distance_from_root) || 0,
-        widthCm: Number(defect.width_cm) || 0,
-        heightCm: Number(defect.height_cm) || 0,
-        side: (defect.side as string) ?? 'LE',
-        description: defect.description as string | null,
-        imagePaths,
-      });
-    }
+    bladeData.defects.push({ severity, type, resolved: false });
+    const thumbId = ann.thumbnail_id as string | null;
+    const photoUrl = thumbId ? photoUrlMap.get(thumbId) : undefined;
+    turbineData.allDefects.push({
+      id: ann.id as string,
+      inspectionId: ann.inspection_id as string,
+      turbineId,
+      turbineName,
+      bladePosition,
+      type,
+      severity,
+      distanceFromRoot: Number(ann.y) * 43,
+      widthCm: Math.round(Number(ann.w) || 0),
+      heightCm: Math.round(Number(ann.h) || 0),
+      side: (ann.side as string) || 'LE',
+      description: (ann.note as string) || null,
+      imagePaths: photoUrl ? [photoUrl] : [],
+    });
   }
 
   // 4. Build turbine results
@@ -276,6 +377,16 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
     };
   });
 
+  // Build turbineId → inspectionId map for navigation
+  const turbineInspectionMap: Record<string, string> = {};
+  for (const insp of inspections as unknown[]) {
+    const row = insp as Record<string, unknown>;
+    const lookup = inspectionLookup.get(row.id as string);
+    if (lookup) {
+      turbineInspectionMap[lookup.turbineId] = row.id as string;
+    }
+  }
+
   return {
     campaign,
     turbineResults,
@@ -285,6 +396,7 @@ async function fetchCampaignResults(campaignId: string): Promise<CampaignResults
     categoryChart,
     typeChart,
     defects: allDefects,
+    turbineInspectionMap,
   };
 }
 

@@ -10,7 +10,16 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:all": "playwright test",
+    "test:smoke": "playwright test --project=smoke",
+    "test:security": "pnpm audit --audit-level=high",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "release": "node scripts/release.mjs",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
@@ -29,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^24.13.2",
@@ -42,6 +52,7 @@
     "globals": "^17.7.0",
     "jsdom": "^25.0.0",
     "prettier": "^3.4.0",
+    "sharp": "^0.33.5",
     "supabase": "^2.109.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.62.0",

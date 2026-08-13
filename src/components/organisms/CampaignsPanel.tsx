@@ -8,7 +8,7 @@ export interface CampaignsPanelProps {
   isLoading: boolean;
   onViewResults: (campaignId: string) => void;
   onSubassetClick?: (subassetName: string) => void;
-  onInspectionClick?: (inspectionId: string, status: string, campaignId: string | null, turbineId?: string | null) => void;
+  onInspectionClick?: (inspectionId: string, status: string, campaignId: string | null, turbineId?: string | null, stage?: string) => void;
   onEditCampaign?: (campaign: Campaign) => void;
   onDeleteCampaign?: (campaignId: string) => void;
   filterBySubasset?: string | null;

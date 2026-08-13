@@ -42,7 +42,7 @@ export function SubassetsTable({
   return (
     <div style={containerStyle}>
       <h3 style={titleStyle}>Subassets</h3>
-      <div style={tableWrapperStyle}>
+      <div style={tableWrapperStyle} className="responsive-table-wrapper">
         <table style={tableStyle}>
           <thead>
             <tr>

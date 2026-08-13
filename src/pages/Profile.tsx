@@ -83,7 +83,7 @@ export function Profile() {
         <div style={headerStyle}>
           <Skeleton variant="text" width="160px" height="28px" />
         </div>
-        <div style={contentGrid}>
+        <div style={contentGrid} className="cards-grid">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <Skeleton variant="rect" width="100%" height="320px" />
             <Skeleton variant="rect" width="100%" height="120px" />
@@ -104,7 +104,7 @@ export function Profile() {
       </div>
 
       {/* Content - 2 columns */}
-      <div style={contentGrid}>
+      <div style={contentGrid} className="cards-grid">
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {/* Card 1: Account information */}

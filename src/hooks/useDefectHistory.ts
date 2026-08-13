@@ -21,16 +21,6 @@ export interface HistoricalDefect {
   imageUrl: string;
 }
 
-const TYPE_IMAGE_MAP: Record<string, string> = {
-  le_erosion: '/test-images/defect-erosion-close-prev.svg',
-  vortex: '/test-images/defect-vortex-close-prev.svg',
-  paint_defect: '/test-images/defect-paint-close-prev.svg',
-  crack: '/test-images/defect-crack-close-prev.svg',
-  delamination: '/test-images/defect-delamination-close-prev.svg',
-  lightning_damage: '/test-images/defect-crack-close-prev.svg',
-  other: '/test-images/defect-blade-close.svg',
-};
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
@@ -49,7 +39,7 @@ export function useDefectHistory(
         .from('inspection')
         .select('id, completed_at, scheduled_date')
         .eq('blade_id', bladeId)
-        .eq('stage', 'finalized')
+        .eq('stage', 'report')
         .neq('id', currentInspectionId || '')
         .order('completed_at', { ascending: false });
 
@@ -75,6 +65,47 @@ export function useDefectHistory(
           label: new Date(i.completed_at || i.scheduled_date).toLocaleString(),
         })
       );
+
+      // Fetch real photos for historical defects via annotation → inspection_photo
+      const imageMap: Record<string, string> = {};
+      const defectsWithDesc = (defects || []).filter((d: { id: string; description: string | null }) => d.description && d.description.length === 36);
+      if (defectsWithDesc.length > 0) {
+        const annotationIds = defectsWithDesc.map((d: { description: string }) => d.description);
+        const { data: annotations } = await supabase.from('annotation').select('id, thumbnail_id').in('id', annotationIds);
+        if (annotations && annotations.length > 0) {
+          const thumbnailIds = [...new Set(annotations.map((a) => a.thumbnail_id).filter(Boolean))];
+          const { data: photos } = await (supabase as any).from('inspection_photo').select('id, storage_path').in('id', thumbnailIds);
+          if (photos && photos.length > 0) {
+            const storagePaths = photos.filter((p: any) => p.storage_path).map((p: any) => p.storage_path);
+            const { data: signedResult } = await supabase.storage.from('asset-documents').createSignedUrls(storagePaths, 3600);
+            const pathToUrl: Record<string, string> = {};
+            if (signedResult) {
+              for (const item of signedResult) {
+                if (item.signedUrl && !item.error) {
+                  pathToUrl[item.path ?? ''] = item.signedUrl;
+                }
+              }
+            }
+            const photoUrlMap: Record<string, string> = {};
+            for (const photo of photos) {
+              if (photo.storage_path && pathToUrl[photo.storage_path]) {
+                photoUrlMap[photo.id] = pathToUrl[photo.storage_path]!;
+              }
+            }
+            const annPhotoMap: Record<string, string> = {};
+            for (const ann of annotations) {
+              if (ann.thumbnail_id && photoUrlMap[ann.thumbnail_id]) {
+                annPhotoMap[ann.id] = photoUrlMap[ann.thumbnail_id]!;
+              }
+            }
+            for (const d of defectsWithDesc) {
+              if (d.description && annPhotoMap[d.description]) {
+                imageMap[d.id] = annPhotoMap[d.description]!;
+              }
+            }
+          }
+        }
+      }
 
       const historicalDefects: HistoricalDefect[] = (defects || []).map(
         (d: {
@@ -103,7 +134,7 @@ export function useDefectHistory(
             description: d.description,
             inspectionId: d.inspection_id,
             inspectionDate: insp?.completed_at || insp?.scheduled_date || '',
-            imageUrl: TYPE_IMAGE_MAP[d.type] || '/test-images/defect-blade-close.svg',
+            imageUrl: imageMap[d.id] || '',
           };
         }
       );

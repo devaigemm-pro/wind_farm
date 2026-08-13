@@ -90,7 +90,7 @@ export const dashboardService = {
   async getInspectionPipeline(
     filters?: DashboardFilters,
   ): Promise<PipelineItem[]> {
-    const ALL_STAGES = ['to_plan', 'planned', 'upload', 'annotate', 'analyze', 'finalized'];
+    const ALL_STAGES = ['planned', 'inspect', 'annotate', 'analyze', 'report'];
 
     // If types filter excludes blades, return empty (all data is blade-based)
     if (filters?.types?.length && !typesFilterAllowsData(filters.types)) {
@@ -234,9 +234,7 @@ export const dashboardService = {
       }
       const entry = monthMap.get(monthKey)!;
 
-      if (insp.stage === 'to_plan') {
-        entry.toPlan += 1;
-      } else if (insp.stage === 'finalized') {
+      if (insp.stage === 'report') {
         entry.done += 1;
       } else if (insp.stage === 'planned') {
         entry.planned += 1;

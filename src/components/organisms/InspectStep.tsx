@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Skeleton } from '@/components/atoms';
 import { CheckCircle, Pencil, Check } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import type { Inspection } from '@/types';
 
 // OpenLayers imports
@@ -33,6 +34,7 @@ const TURBINE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="32" hei
 </svg>`;
 
 export function InspectStep({ inspection, isLoading }: InspectStepProps) {
+  const { role } = useAuth();
   const [notes, setNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [mapType, setMapType] = useState<'street' | 'satellite'>('satellite');
@@ -179,7 +181,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
               <tr>
                 <td style={cellLabel}>Notes</td>
                 <td style={{ ...cellValue, borderLeft: '1px solid #ddd' }}>
-                  {isEditingNotes ? (
+                  {role !== 'supervisor' && isEditingNotes ? (
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                       <textarea
                         value={notes}
@@ -195,9 +197,11 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                       <span style={{ textAlign: 'right' }}>{notes || '—'}</span>
-                      <button type="button" onClick={() => setIsEditingNotes(true)} style={editBtn} title="Edit notes">
-                        <Pencil size={13} />
-                      </button>
+                      {role !== 'supervisor' && (
+                        <button type="button" onClick={() => setIsEditingNotes(true)} style={editBtn} title="Edit notes">
+                          <Pencil size={13} />
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
@@ -211,7 +215,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
         <div style={card}>
           <div style={docHeaderRow}>
             <h6 style={docTitle}>Documents dropbox</h6>
-            <button style={addDocBtn}>Add document</button>
+            {role !== 'supervisor' && <button style={addDocBtn}>Add document</button>}
           </div>
           <div style={docBody}>
             <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 4px' }}>Have all your key documents at your disposal here.</p>

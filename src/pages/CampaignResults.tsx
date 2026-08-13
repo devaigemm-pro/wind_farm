@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { Search, Download, Share2, ChevronRight } from 'lucide-react';
+import { Download, Share2, ChevronRight } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { CategoryBadgesBar } from '@/components/molecules/CategoryBadgesBar';
 import { SharePopover } from '@/components/molecules/SharePopover';
@@ -10,20 +10,21 @@ import { CampaignMap } from '@/components/organisms/CampaignMap';
 import { useCampaignResults } from '@/hooks/useCampaignResults';
 import { useTurbineMarkers } from '@/hooks/useWindFarmDetail';
 import { Skeleton } from '@/components/atoms/Skeleton';
+import { generateAndDownloadReport } from '@/services/reportPdf.service';
+import { generateDefectsXLSX, downloadBlob } from '@/utils/csv-export';
+import { supabase } from '@/lib/supabase';
 
-// Defect image map by type
-const DEFECT_IMAGES: Record<string, string> = {
-  le_erosion: '/test-images/defect-erosion-wide.svg',
-  oil: '/test-images/defect-oil-wide.svg',
-  lightning_damage: '/test-images/defect-crack-wide.svg',
-  other: '/test-images/defect-blade-wide.svg',
-  crack: '/test-images/defect-crack-close.svg',
-  vortex: '/test-images/defect-vortex-wide.svg',
-  paint_defect: '/test-images/defect-paint-wide.svg',
-  delamination: '/test-images/defect-delamination-wide.svg',
-};
+// Defect images now come from evidence in the database
 
 const BLADE_LABELS: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
+
+const CATEGORY_COLORS: Record<number, string> = {
+  5: '#D32F2F',
+  4: '#FF5500',
+  3: '#FFA000',
+  2: '#1976D2',
+  1: '#388E3C',
+};
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -31,7 +32,6 @@ export function CampaignResults() {
   const { id: campaignId } = useParams<{ id: string }>();
   const { data, isLoading } = useCampaignResults(campaignId);
   const [selectedTurbines, setSelectedTurbines] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
   const [shareAnchor, setShareAnchor] = useState<HTMLElement | null>(null);
 
   const turbineResults = data?.turbineResults ?? [];
@@ -62,20 +62,15 @@ export function CampaignResults() {
     }
   };
 
-  // Filter data based on selected turbines and search query
-  const searchFilteredResults = useMemo(() => {
-    if (!searchQuery.trim()) return turbineResults;
-    const q = searchQuery.toLowerCase();
-    return turbineResults.filter((t) => t.turbineName.toLowerCase().includes(q));
-  }, [turbineResults, searchQuery]);
-
+  // Filter data based on selected turbines
   const filteredTurbineResults = hasSelection
-    ? searchFilteredResults.filter((t) => selectedTurbines.has(t.turbineId))
-    : searchFilteredResults;
+    ? turbineResults.filter((t) => selectedTurbines.has(t.turbineId))
+    : turbineResults;
 
   const categoryChart = data?.categoryChart ?? [];
   const typeChart = data?.typeChart ?? [];
   const allDefects = data?.defects ?? [];
+  const turbineInspectionMap = data?.turbineInspectionMap ?? {};
 
   const filteredCategoryChart = hasSelection
     ? categoryChart.filter((d) => {
@@ -91,64 +86,81 @@ export function CampaignResults() {
       })
     : typeChart;
 
-  // Build defect gallery items for cat 4
-  const defectGalleryItems = useMemo(() => {
-    const cat4Defects = allDefects.filter((d) => d.severity === 4);
-    const items = cat4Defects.map((d) => ({
-      id: d.id,
-      turbineId: d.turbineId,
-      turbine: d.turbineName,
-      blade: `Blade ${BLADE_LABELS[d.bladePosition] ?? d.bladePosition}`,
-      type: d.type,
-      dimensions: `${d.widthCm}cm x ${d.heightCm}cm`,
-      distance: `${d.distanceFromRoot.toFixed(1)}m from hub`,
-      imageUrl: DEFECT_IMAGES[d.type] ?? '/test-images/defect-blade-wide.svg',
-    }));
-    return items;
+  // Build defect gallery items grouped by category (5→1)
+  const defectsByCategory = useMemo(() => {
+    const grouped: Record<number, Array<{
+      id: string;
+      inspectionId: string;
+      turbineId: string;
+      turbine: string;
+      blade: string;
+      type: string;
+      dimensions: string;
+      distance: string;
+      imageUrl: string;
+    }>> = {};
+
+    for (const cat of [5, 4, 3, 2, 1]) {
+      const catDefects = allDefects.filter((d) => d.severity === cat);
+      if (catDefects.length > 0) {
+        grouped[cat] = catDefects.map((d) => ({
+          id: d.id,
+          inspectionId: d.inspectionId,
+          turbineId: d.turbineId,
+          turbine: d.turbineName,
+          blade: `Blade ${BLADE_LABELS[d.bladePosition] ?? d.bladePosition}`,
+          type: d.type.replace(/_/g, ' '),
+          dimensions: `${d.widthCm}cm x ${d.heightCm}cm`,
+          distance: `${d.distanceFromRoot.toFixed(1)}m from hub`,
+          imageUrl: d.imagePaths[0] ?? '',
+        }));
+      }
+    }
+    return grouped;
   }, [allDefects]);
 
-  const filteredDefects = hasSelection
-    ? defectGalleryItems.filter((d) => selectedTurbines.has(d.turbineId))
-    : defectGalleryItems;
+  const filteredDefectsByCategory = useMemo(() => {
+    if (!hasSelection) return defectsByCategory;
+    const filtered: Record<number, typeof defectsByCategory[number]> = {};
+    for (const [cat, items] of Object.entries(defectsByCategory)) {
+      const catNum = Number(cat);
+      const f = items.filter((d) => selectedTurbines.has(d.turbineId));
+      if (f.length > 0) filtered[catNum] = f;
+    }
+    return filtered;
+  }, [defectsByCategory, hasSelection, selectedTurbines]);
 
-  // Export CSV handler
-  const handleExportCsv = () => {
+  // Export XLSX handler
+  const handleExportCsv = async () => {
     const defectsToExport = hasSelection
       ? allDefects.filter((d) => selectedTurbines.has(d.turbineId))
       : allDefects;
     if (defectsToExport.length === 0) return;
 
-    const headers = ['ID', 'Type', 'Category', 'Blade', 'Side', 'Distance from Root (m)', 'Width (cm)', 'Height (cm)', 'Resolved', 'Description', 'Photo URL'];
-    const bladeCounters: Record<string, number> = {};
-    const rows = defectsToExport.map((d) => {
-      const bladeLabel = BLADE_LABELS[d.bladePosition] ?? String(d.bladePosition);
-      bladeCounters[bladeLabel] = (bladeCounters[bladeLabel] ?? 0) + 1;
-      const id = `${bladeLabel}${bladeCounters[bladeLabel]}`;
-      const imgPath = DEFECT_IMAGES[d.type] ?? '/test-images/defect-blade-wide.svg';
-      const photoUrl = `${window.location.origin}${imgPath}`;
-      return [
-        id,
-        d.type.toUpperCase().replace(/_/g, ' '),
-        d.severity,
-        bladeLabel,
-        d.side,
-        d.distanceFromRoot.toFixed(1),
-        d.widthCm,
-        d.heightCm,
-        'false',
-        d.description ?? '',
-        photoUrl,
-      ];
-    });
-
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Defects-${campaign?.windFarmName ?? 'export'}-${campaign?.name ?? 'campaign'}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const rows = defectsToExport.map((d) => ({
+      id: d.id,
+      assetName: campaign?.windFarmName || '',
+      turbineName: d.turbineName,
+      turbineModel: '',
+      type: d.type.toUpperCase().replace(/_/g, ' '),
+      defectWidth: d.widthCm,
+      defectHeight: d.heightCm,
+      category: d.severity,
+      actionText: '',
+      actionUrgency: 'medium' as const,
+      nextStep: d.description || '',
+      bladePosition: String(BLADE_LABELS[d.bladePosition] ?? d.bladePosition),
+      side: d.side,
+      rootDistance: d.distanceFromRoot,
+      rootCause: null,
+      notes: null,
+      imageUrl: null,
+      resolved: false,
+      inspectionId: '',
+      bladeId: '',
+    }));
+    const blob = await generateDefectsXLSX(rows);
+    downloadBlob(blob, `Defects-${campaign?.windFarmName ?? 'export'}-${campaign?.name ?? 'campaign'}.xlsx`);
   };
 
   // Compute filtered summary
@@ -214,19 +226,9 @@ export function CampaignResults() {
           <p style={subtitleStyle}>Campaign of {campaignDate}</p>
         </div>
         <div style={toolbarRight}>
-          <div style={searchBarStyle}>
-            <Search size={14} color="var(--color-neutral-400)" />
-            <input
-              type="text"
-              placeholder="Search all"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyle}
-            />
-          </div>
           <button style={primaryBtn} onClick={handleExportCsv}>
             <Download size={14} />
-            <span>Export CSV for all turbines</span>
+            <span>Export XLSX for all turbines</span>
           </button>
           <button style={shareBtn} onClick={(e) => setShareAnchor(e.currentTarget)}>
             <Share2 size={14} />
@@ -237,6 +239,9 @@ export function CampaignResults() {
             open={Boolean(shareAnchor)}
             onClose={() => setShareAnchor(null)}
             shareKey={`campaign-${campaignId}`}
+            windFarmId={campaign?.windFarmId}
+            turbineId={turbineResults[0]?.turbineId}
+            campaignId={campaignId}
           />
         </div>
       </div>
@@ -251,9 +256,9 @@ export function CampaignResults() {
         </div>
       ) : (
         /* ─── Main Content (2 columns) ────────────────────────────── */
-        <div style={mainContent}>
+        <div style={mainContent} className="wind-farm-detail-content">
           {/* LEFT COLUMN: Map + Charts */}
-          <div style={leftColumn}>
+          <div style={leftColumn} className="wind-farm-detail-left">
             {/* Map */}
             <div style={mapPanel}>
               <div style={mapToolbar}>
@@ -274,7 +279,7 @@ export function CampaignResults() {
             </div>
 
             {/* Charts side by side */}
-            <div style={chartsRow}>
+            <div style={chartsRow} className="cards-grid">
               <div style={chartPanel}>
                 <h4 style={chartTitle}>Turbine defect category repartition</h4>
                 <CampaignCategoryChart data={filteredCategoryChart} />
@@ -309,12 +314,73 @@ export function CampaignResults() {
                     result={result}
                     isSelected={selectedTurbines.has(result.turbineId)}
                     onCheckboxToggle={handleTurbineToggle}
+                    onOpenInspection={(turbineId) => {
+                      const inspId = turbineInspectionMap[turbineId];
+                      if (inspId) {
+                        window.open(`/inspections/${inspId}/workflow?step=4`, '_blank');
+                      }
+                    }}
+                    onDownloadPdf={async (turbineId) => {
+                      try {
+                        const { data: inspections } = await (supabase as any)
+                          .from('inspection')
+                          .select('id, scheduled_date')
+                          .eq('campaign_id', campaignId)
+                          .eq('turbine_id', turbineId)
+                          .order('completed_at', { ascending: false })
+                          .limit(1);
+                        const insp = inspections?.[0];
+                        if (insp) {
+                          const name = turbineResults.find(t => t.turbineId === turbineId)?.turbineName || '';
+                          await generateAndDownloadReport({
+                            inspectionId: insp.id,
+                            inspectionDate: insp.scheduled_date || new Date().toISOString(),
+                            asset: campaign?.windFarmName || '',
+                            subAsset: name,
+                          });
+                        } else {
+                          alert('No inspection found for this turbine.');
+                        }
+                      } catch (err: any) {
+                        alert(err?.message || 'Error generating PDF.');
+                      }
+                    }}
+                    onDownloadCsv={async (turbineId) => {
+                      const turbineDefects = allDefects.filter((d) => d.turbineId === turbineId);
+                      if (turbineDefects.length === 0) { alert('No defects for this turbine.'); return; }
+                      const name = turbineResults.find(t => t.turbineId === turbineId)?.turbineName || 'turbine';
+                      // Map to DefectDashboardRow format for generateDefectsXLSX
+                      const rows = turbineDefects.map((d) => ({
+                        id: d.id,
+                        assetName: campaign?.windFarmName || '',
+                        turbineName: name,
+                        turbineModel: '',
+                        type: d.type.toUpperCase().replace(/_/g, ' '),
+                        defectWidth: d.widthCm,
+                        defectHeight: d.heightCm,
+                        category: d.severity,
+                        actionText: '',
+                        actionUrgency: 'medium' as const,
+                        nextStep: d.description || '',
+                        bladePosition: String(BLADE_LABELS[d.bladePosition] ?? d.bladePosition),
+                        side: d.side,
+                        rootDistance: d.distanceFromRoot,
+                        rootCause: null,
+                        notes: null,
+                        imageUrl: null,
+                        resolved: false,
+                        inspectionId: '',
+                        bladeId: '',
+                      }));
+                      const blob = await generateDefectsXLSX(rows);
+                      downloadBlob(blob, `Defects_${campaign?.windFarmName}_${name}.xlsx`);
+                    }}
                   />
                 </div>
               ))}
             </div>
 
-            {/* Image Gallery */}
+            {/* Image Gallery — grouped by category 5→1 */}
             <div style={gallerySection}>
               {/* Info banner (shown when turbine selected) */}
               {hasSelection && (
@@ -326,43 +392,48 @@ export function CampaignResults() {
                 </div>
               )}
 
-              {filteredDefects.length > 0 && (
-                <>
-                  <div style={gallerySeparator}>
-                    <span style={gallerySepText}>Category 4</span>
-                    <div style={gallerySepLine} />
-                  </div>
-                  <div style={galleryGrid}>
-                    {filteredDefects.map((defect) => (
-                      <a
-                        key={defect.id}
-                        href={`/assets-wind/${campaign.windFarmId}/turbine/${defect.turbineId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={imageCard}
-                      >
-                        <img
-                          src={defect.imageUrl}
-                          alt={`[Defect] ${defect.turbine} ${defect.blade}`}
-                          style={imageImg}
-                        />
-                        <div style={imageOverlay}>
-                          <span style={imageTitle}>{defect.turbine} {defect.blade}</span>
-                          <div style={imageDescBlock}>
-                            <span style={imageDesc}>{defect.type} | {defect.dimensions}</span>
-                            <span style={imageDesc}>{defect.distance}</span>
+              {[5, 4, 3, 2, 1].map((cat) => {
+                const items = filteredDefectsByCategory[cat];
+                if (!items || items.length === 0) return null;
+                return (
+                  <div key={cat} style={{ marginBottom: '20px' }}>
+                    <div style={gallerySeparator}>
+                      <span style={{ ...gallerySepText, color: CATEGORY_COLORS[cat] }}>Category {cat}</span>
+                      <div style={gallerySepLine} />
+                      <span style={gallerySepCount}>{items.length}</span>
+                    </div>
+                    <div style={galleryGrid}>
+                      {items.map((defect) => (
+                        <a
+                          key={defect.id}
+                          href={`/inspections/${defect.inspectionId}/workflow?step=4&tab=details&defectId=${defect.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={imageCard}
+                        >
+                          <img
+                            src={defect.imageUrl}
+                            alt={`[Defect] ${defect.turbine} ${defect.blade}`}
+                            style={imageImg}
+                          />
+                          <div style={imageOverlay}>
+                            <span style={imageTitle}>{defect.turbine} {defect.blade}</span>
+                            <div style={imageDescBlock}>
+                              <span style={imageDesc}>{defect.type} | {defect.dimensions}</span>
+                              <span style={imageDesc}>{defect.distance}</span>
+                            </div>
+                            <div style={imageLinkIcon}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3z"/>
+                              </svg>
+                            </div>
                           </div>
-                          <div style={imageLinkIcon}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                              <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3z"/>
-                            </svg>
-                          </div>
-                        </div>
-                      </a>
-                    ))}
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                </>
-              )}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -418,27 +489,6 @@ const subtitleStyle: React.CSSProperties = {
 };
 
 const toolbarRight: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'center' };
-
-const searchBarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  backgroundColor: 'var(--color-neutral-0, #ffffff)',
-  border: '1px solid var(--color-neutral-200, #e2e8f0)',
-  borderRadius: 'var(--radius-lg, 12px)',
-  padding: '6px 12px',
-  width: '200px',
-};
-
-const searchInputStyle: React.CSSProperties = {
-  background: 'transparent',
-  border: 'none',
-  outline: 'none',
-  color: 'var(--color-neutral-800, #1e293b)',
-  fontSize: 'var(--text-sm, 0.875rem)',
-  width: '100%',
-  fontFamily: 'var(--font-family-sans)',
-};
 
 const outlinedBtn: React.CSSProperties = {
   border: '1px solid var(--color-primary-500)',
@@ -566,6 +616,13 @@ const gallerySepLine: React.CSSProperties = {
   flex: 1,
   height: '1px',
   backgroundColor: 'var(--color-neutral-200)',
+};
+
+const gallerySepCount: React.CSSProperties = {
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  color: 'var(--color-neutral-500)',
+  whiteSpace: 'nowrap',
 };
 
 const galleryGrid: React.CSSProperties = {

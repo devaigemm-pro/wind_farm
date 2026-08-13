@@ -11,10 +11,15 @@ interface RoleGuardProps {
 /**
  * RoleGuard conditionally renders content based on the user's role.
  * If the user's role is not in `allowedRoles`, shows the fallback or a default
- * access denied message.
+ * access denied message. Waits for auth to finish loading before deciding.
  */
 export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) {
-  const { role } = useAuth();
+  const { role, isLoading } = useAuth();
+
+  // While auth is loading, don't show access denied — wait for role to resolve
+  if (isLoading) {
+    return null;
+  }
 
   if (!role || !allowedRoles.includes(role)) {
     if (fallback) {

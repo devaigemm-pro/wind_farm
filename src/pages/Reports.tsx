@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Download, Search, ChevronUp, ChevronDown, Loader2, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/atoms/Skeleton';
 import { EmptyState } from '@/components/molecules';
+import { useAuth } from '@/hooks/useAuth';
 import { useFinalizedInspections } from '@/hooks/useReports';
 import { getPdfBlob, downloadBlob } from '@/utils/pdfStorage';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,7 @@ import type { InspectionReportRow, ReportSortField } from '@/types';
 type SortDir = 'asc' | 'desc';
 
 export function Reports() {
+  const { role } = useAuth();
   const { data: rows, isLoading } = useFinalizedInspections();
   const navigate = useNavigate();
 
@@ -89,7 +91,7 @@ export function Reports() {
   };
 
   const handleRowClick = (row: InspectionReportRow) => {
-    navigate(`/assets-wind/${row.assetId}/turbine/${row.subAssetId}`);
+    navigate(`/inspections/${row.id}/workflow?step=4`);
   };
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -117,7 +119,7 @@ export function Reports() {
     if (!confirm('¿Eliminar este reporte de la lista?')) return;
     try {
       await (supabase as any).from('inspection')
-        .update({ stage: 'analyzed', completed_at: null })
+        .update({ stage: 'annotate', completed_at: null })
         .eq('id', row.id);
       // Refresh the list
       window.location.reload();
@@ -258,6 +260,7 @@ export function Reports() {
                               <Download size={18} color="#4CAF50" />
                             )}
                           </button>
+                          {role !== 'supervisor' && (
                           <button
                             style={styles.downloadIcon}
                             onClick={(e) => handleRemove(e, row)}
@@ -265,6 +268,7 @@ export function Reports() {
                           >
                             <Trash2 size={16} color="#999" />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -79,7 +79,7 @@ serve(withCors(async (req) => {
       .from('inspection')
       .update({
         status: 'completed',
-        stage: 'finalized',
+        stage: 'report',
         completed_at: new Date().toISOString(),
       })
       .eq('id', inspectionId)

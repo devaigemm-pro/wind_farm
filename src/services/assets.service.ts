@@ -172,17 +172,20 @@ export const assetsService = {
   // Wind Farms Dashboard (aggregated data via client-side calculation)
 
   async getWindFarmsDashboard(): Promise<WindFarmDashboardRow[]> {
-    // Client-side aggregation using nested select
+    // Client-side aggregation using nested select — both inspection paths
     const { data: farms, error: farmError } = await supabase
       .from('wind_farm')
       .select(`
         id,
         name,
+        powering_date,
         turbines:turbine(
           id,
+          power_kw,
           blades:blade(
             inspections:inspection(id, created_at)
-          )
+          ),
+          direct_inspections:inspection!inspection_turbine_id_fkey(id, created_at)
         )
       `)
       .order('name');
@@ -192,28 +195,39 @@ export const assetsService = {
     return ((farms as unknown) as Array<{
       id: string;
       name: string;
+      powering_date: string | null;
       turbines: Array<{
         id: string;
+        power_kw: number | null;
         blades: Array<{
           inspections: Array<{ id: string; created_at: string }>;
         }>;
+        direct_inspections: Array<{ id: string; created_at: string }> | null;
       }> | null;
     }>).map((farm) => {
       const turbines = farm.turbines ?? [];
-      const allInspections = turbines.flatMap((t) =>
-        (t.blades ?? []).flatMap((b) => b.inspections ?? [])
-      );
+      // Collect from both paths and deduplicate by id
+      const inspMap = new Map<string, { id: string; created_at: string }>();
+      for (const t of turbines) {
+        for (const b of (t.blades ?? [])) {
+          for (const insp of (b.inspections ?? [])) inspMap.set(insp.id, insp);
+        }
+        for (const insp of (t.direct_inspections ?? [])) inspMap.set(insp.id, insp);
+      }
+      const allInspections = Array.from(inspMap.values());
       const oldestDate = allInspections.length > 0
         ? allInspections.reduce((min, i) => (i.created_at < min ? i.created_at : min), allInspections[0]!.created_at)
         : null;
+
+      const totalPower = turbines.reduce((sum, t) => sum + (t.power_kw ?? 0), 0);
 
       return {
         id: farm.id,
         name: farm.name,
         subAssetsCount: turbines.length,
         inspectionsCount: allInspections.length,
-        totalPower: 0,
-        poweringDate: null,
+        totalPower,
+        poweringDate: farm.powering_date,
         oldestInspection: oldestDate,
       };
     });

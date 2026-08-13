@@ -19,7 +19,8 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
   const uploadMutation = useUploadDocument();
   const deleteMutation = useDeleteDocument();
 
-  const canManage = role === 'supervisor' || role === 'admin';
+  const canUpload = role !== 'supervisor';
+  const canDelete = role !== 'supervisor';
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,7 +76,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
     <div style={containerStyle}>
       <div style={headerStyle}>
         <h4 style={titleStyle}>Documents dropbox</h4>
-        {canManage && (
+        {canUpload && (
           <Button
             variant="primary"
             size="sm"
@@ -111,7 +112,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
               >
                 <Download size={14} />
               </button>
-              {canManage && (
+              {canDelete && (
                 <button
                   style={iconBtnStyle}
                   onClick={() => handleDelete(doc)}

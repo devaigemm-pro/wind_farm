@@ -1,21 +1,25 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { BarChart2 } from 'lucide-react';
-import { useAnnotations, useUpdateAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
+import { useAuth } from '@/hooks/useAuth';
+import { useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
 import { useQueryClient } from '@tanstack/react-query';
 import { useInspectionPhotos, getFaceShort, getPhotoPublicUrl } from '@/hooks/useInspectionPhotos';
-import { BLADE_POSITION_LABELS } from '@/types';
-import type { Inspection } from '@/types';
+import { useDefects } from '@/hooks/useDefects';
+import { useCreateDefect } from '@/hooks/useDefectMutations';
+import type { Inspection, DefectType, Severity } from '@/types';
 
 export interface AnalyzeStepProps {
   inspectionId: string;
   inspection?: Inspection;
   campaignId?: string | null;
+  onOpenPhoto?: (photoId: string, blade: string) => void;
 }
 
 // ─── Local defect interface for this component ───────────────────────────────
 interface Defect {
   id: string;
   annotationId: string;
+  photoId: string;
   type: string;
   cat: number;
   blade: string;
@@ -25,6 +29,7 @@ interface Defect {
   note: string;
   rootCause: string;
   nextStep: string;
+  thumbnailUrl?: string;
   imageUrl?: string;
 }
 
@@ -53,7 +58,10 @@ function deriveBladeFaceLegacy(thumbnailId: string): { blade: string; face: stri
   return { blade: '?', face: '?' };
 }
 
-export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaignId }: AnalyzeStepProps) {
+export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaignId, onOpenPhoto }: AnalyzeStepProps) {
+  // Auth role for supervisor restrictions
+  const { role } = useAuth();
+
   // Fetch ALL inspections of the campaign
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
   const { data: campaignInspIds = [] } = useCampaignInspectionIds(campaignId);
@@ -66,7 +74,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
   const queryClient = useQueryClient();
 
   // Fetch photos (ALL blades of the campaign) to build blade/face lookup
-  const { data: photos = [] } = useInspectionPhotos(campaignId, null);
+  const { data: photos = [], isLoading: photosLoading } = useInspectionPhotos(campaignId, null);
 
   // Build bladeId → position letter mapping from photos (uses real blade.position)
   const bladePositionMap = useMemo<Record<string, string>>(() => {
@@ -91,9 +99,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
 
   // Derive blade/face from thumbnailId — supports both UUID (real photos) and legacy t1-t18 format
   function deriveBladeFace(thumbnailId: string): { blade: string; face: string } {
-    // If it's in our photo lookup (UUID-based), use that
     if (photoLookup[thumbnailId]) return photoLookup[thumbnailId];
-    // Legacy fallback for old t1-t18 style IDs
     return deriveBladeFaceLegacy(thumbnailId);
   }
 
@@ -104,12 +110,13 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     return dbAnnotations.map((a) => {
       const derived = deriveBladeFace(a.thumbnailId);
       const blade = derived.blade;
-      const face = a.side || derived.face; // Use saved side if available, else derive from photo
+      const face = a.side || derived.face;
       counters[blade] = (counters[blade] || 0) + 1;
       const id = `${blade}${counters[blade]}`;
       return {
         id,
         annotationId: a.id,
+        photoId: a.thumbnailId,
         type: a.type,
         cat: a.category,
         blade,
@@ -119,27 +126,37 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         note: a.note,
         rootCause: a.rootCause || '',
         nextStep: a.nextStep || '',
+        thumbnailUrl: photoLookup[a.thumbnailId]?.storagePath
+          ? getPhotoPublicUrl(photoLookup[a.thumbnailId]!.storagePath, 'thumbnail')
+          : undefined,
         imageUrl: photoLookup[a.thumbnailId]?.storagePath
-          ? getPhotoPublicUrl(photoLookup[a.thumbnailId]!.storagePath)
+          ? getPhotoPublicUrl(photoLookup[a.thumbnailId]!.storagePath, 'viewer')
           : undefined,
       };
     });
   }, [dbAnnotations, photoLookup]);
 
-  // Always use DB data — no fallback to mocks
   const defects = defectsFromDb;
+
+  // ─── Load confirmed defects from DB (persisted) ─────────────────────────
+  const { data: savedDefects = [] } = useDefects(inspectionId);
+  const createDefect = useCreateDefect();
+
+  // Derive confirmedIds from saved defects (description field stores annotationId)
+  const confirmedIds = useMemo<Set<string>>(() => {
+    const ids = new Set<string>();
+    for (const d of savedDefects) {
+      if (d.description) ids.add(d.description);
+    }
+    return ids;
+  }, [savedDefects]);
 
   const [selectedBlade, setSelectedBlade] = useState<string>('A');
   const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
   const [expandedBlades, setExpandedBlades] = useState<Set<string>>(new Set(['A', 'B', 'C']));
   const [bladeNotes, setBladeNotes] = useState<Record<string, string>>({ A: '', B: '', C: '' });
-  const [zoom, setZoom] = useState(1.0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [contrast, setContrast] = useState(1);
-  const [brightness, setBrightness] = useState(1);
-  const [saturation, setSaturation] = useState(1);
 
-  // Defect editor state — empty until a defect is selected
+  // Defect editor state
   const [defectType, setDefectType] = useState('');
   const [category, setCategory] = useState(0);
   const [rootDistance, setRootDistance] = useState('');
@@ -147,30 +164,197 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
   const [note, setNote] = useState('');
   const [rootCause, setRootCause] = useState('');
   const [nextStep, setNextStep] = useState('');
-
-  const bladeCounts = useMemo(() => ({
-    A: defects.filter(d => d.blade === 'A').length,
-    B: defects.filter(d => d.blade === 'B').length,
-    C: defects.filter(d => d.blade === 'C').length,
-  }), [defects]);
-
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [markingAnalyzed, setMarkingAnalyzed] = useState(false);
 
-  // Auto-select first defect when defects load
-  useEffect(() => {
-    if (defects.length > 0 && !selectedDefectId) {
-      const first = defects[0]!;
-      setSelectedDefectId(first.annotationId);
-      setSelectedBlade(first.blade);
-      setDefectType(first.type);
-      setCategory(first.cat);
-      setRootDistance(String(first.root));
-      setBladeFace(first.face);
-      setNote(first.note);
-      setRootCause(first.rootCause);
-      setNextStep(first.nextStep);
+  // ─── Derived: pending (left panel) vs confirmed (right panel) ────────────
+  const pendingDefects = useMemo(() => defects.filter(d => !confirmedIds.has(d.annotationId)), [defects, confirmedIds]);
+  const confirmedDefects = useMemo(() => defects.filter(d => confirmedIds.has(d.annotationId)), [defects, confirmedIds]);
+
+  const pendingBladeCounts = useMemo(() => ({
+    A: pendingDefects.filter(d => d.blade === 'A').length,
+    B: pendingDefects.filter(d => d.blade === 'B').length,
+    C: pendingDefects.filter(d => d.blade === 'C').length,
+  }), [pendingDefects]);
+
+  const confirmedBladeCounts = useMemo(() => ({
+    A: confirmedDefects.filter(d => d.blade === 'A').length,
+    B: confirmedDefects.filter(d => d.blade === 'B').length,
+    C: confirmedDefects.filter(d => d.blade === 'C').length,
+  }), [confirmedDefects]);
+
+  // Current blade's pending annotations for left panel
+  const currentBladePending = useMemo(
+    () => pendingDefects.filter(d => d.blade === selectedBlade),
+    [pendingDefects, selectedBlade]
+  );
+
+  const selectedDefect = defects.find(d => d.annotationId === selectedDefectId) || null;
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
+  const handleDefectSelect = useCallback((defect: Defect) => {
+    setSelectedDefectId(defect.annotationId);
+    setDefectType(defect.type);
+    setCategory(defect.cat);
+    setRootDistance(String(defect.root));
+    setBladeFace(defect.face);
+    setNote(defect.note);
+    setRootCause(defect.rootCause);
+    setNextStep(defect.nextStep);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setDefectType('');
+    setCategory(0);
+    setRootDistance('');
+    setBladeFace('');
+    setNote('');
+    setRootCause('');
+    setNextStep('');
+    setSelectedDefectId(null);
+  }, []);
+
+  const handleSaveDefect = async () => {
+    if (role === 'supervisor') return;
+    if (!selectedDefectId) return;
+    setSaveStatus('saving');
+    try {
+      const rootDistNum = parseFloat(rootDistance) || 0;
+      const yFromRoot = rootDistNum / 0.43;
+      // Update the annotation fields
+      await updateAnnotation.mutateAsync({
+        id: selectedDefectId,
+        type: defectType,
+        category: category,
+        y: yFromRoot,
+        note: note,
+        rootCause: rootCause,
+        nextStep: nextStep,
+        side: bladeFace,
+      });
+      // Create a defect record in DB to persist the confirmed status
+      // description stores the annotationId for the link
+      // Only create if not already confirmed (avoid duplicates on re-save)
+      if (!confirmedIds.has(selectedDefectId)) {
+        const defectTypeMap: Record<string, DefectType> = {
+          'LE EROSION': 'le_erosion',
+          'VORTEX (MISSING PANELS)': 'vortex',
+          'PAINT DAMAGES': 'paint_defect',
+          'CRACK': 'crack',
+          'BLADES WITH HYDRAULIC OIL': 'other',
+          'OTHER ADD-ONS MISSING': 'other',
+        };
+        await createDefect.mutateAsync({
+          inspection_id: inspectionId,
+          type: (defectTypeMap[defectType] || 'other') as DefectType,
+          severity: (category || 3) as Severity,
+          distance_from_root: rootDistNum,
+          description: selectedDefectId, // stores annotationId for persistence
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
+      await queryClient.invalidateQueries({ queryKey: ['annotations', inspectionId] });
+      await queryClient.invalidateQueries({ queryKey: ['campaign-annotations'] });
+      await queryClient.invalidateQueries({ queryKey: ['defects', inspectionId] });
+      handleClear();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch {
+      setSaveStatus('idle');
     }
-  }, [defects]);
+  };
+
+  // Bulk save all pending annotations for the selected blade
+  const handleBulkSave = async () => {
+    if (role === 'supervisor') return;
+    const pending = currentBladePending;
+    if (pending.length === 0) return;
+    setSaveStatus('saving');
+    try {
+      const defectTypeMap: Record<string, DefectType> = {
+        'LE EROSION': 'le_erosion',
+        'VORTEX (MISSING PANELS)': 'vortex',
+        'PAINT DAMAGES': 'paint_defect',
+        'CRACK': 'crack',
+        'BLADES WITH HYDRAULIC OIL': 'other',
+        'OTHER ADD-ONS MISSING': 'other',
+      };
+      for (const d of pending) {
+        await updateAnnotation.mutateAsync({
+          id: d.annotationId,
+          type: d.type,
+          category: d.cat,
+          note: d.note,
+          rootCause: d.rootCause,
+          nextStep: d.nextStep,
+          side: d.face,
+        });
+        await createDefect.mutateAsync({
+          inspection_id: inspectionId,
+          type: (defectTypeMap[d.type] || 'other') as DefectType,
+          severity: (d.cat || 3) as Severity,
+          distance_from_root: d.root,
+          description: d.annotationId,
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
+      await queryClient.invalidateQueries({ queryKey: ['annotations', inspectionId] });
+      await queryClient.invalidateQueries({ queryKey: ['campaign-annotations'] });
+      await queryClient.invalidateQueries({ queryKey: ['defects', inspectionId] });
+      handleClear();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch {
+      setSaveStatus('idle');
+    }
+  };
+
+  // Mark selected annotation as analyzed: removes it from left panel AND deletes it from DB
+  const deleteAnnotation = useDeleteAnnotation(inspectionId);
+  const handleMarkAsAnalyzed = async () => {
+    if (role === 'supervisor') return;
+    if (!selectedDefectId) return;
+    setMarkingAnalyzed(true);
+    try {
+      await deleteAnnotation.mutateAsync(selectedDefectId);
+      await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
+      await queryClient.invalidateQueries({ queryKey: ['annotations', inspectionId] });
+      await queryClient.invalidateQueries({ queryKey: ['campaign-annotations'] });
+      handleClear();
+    } catch (err) {
+      console.error('[AnalyzeStep] Failed to mark as analyzed:', err);
+    } finally {
+      setMarkingAnalyzed(false);
+    }
+  };
+
+  // ─── Drag & Drop ─────────────────────────────────────────────────────────
+  const handleDragStart = useCallback((e: React.DragEvent, annotationId: string) => {
+    e.dataTransfer.setData('text/plain', annotationId);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const annotationId = e.dataTransfer.getData('text/plain');
+    if (!annotationId) return;
+    const defect = defects.find(d => d.annotationId === annotationId);
+    if (defect) handleDefectSelect(defect);
+  }, [defects, handleDefectSelect]);
+
+  const toggleBladeExpand = (blade: string) => {
+    setExpandedBlades(prev => {
+      const next = new Set(prev);
+      if (next.has(blade)) next.delete(blade);
+      else next.add(blade);
+      return next;
+    });
+  };
 
   // Loading state
   if (annotationsLoading) {
@@ -185,7 +369,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     );
   }
 
-  // Empty state: no annotations in DB and no inspection data
+  // Empty state
   if (!annotationsLoading && (!dbAnnotations || dbAnnotations.length === 0) && !inspectionId) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, padding: 48 }}>
@@ -198,74 +382,23 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     );
   }
 
-  const selectedDefect = defects.find(d => d.annotationId === selectedDefectId) || null;
-
-  const handleDefectSelect = (defect: Defect) => {
-    setSelectedDefectId(defect.annotationId);
-    setDefectType(defect.type);
-    setCategory(defect.cat);
-    setRootDistance(String(defect.root));
-    setBladeFace(defect.face);
-    setNote(defect.note);
-    setRootCause(defect.rootCause);
-    setNextStep(defect.nextStep);
-    setZoom(1.0);
-  };
-
-  const handleClear = () => {
-    setDefectType('');
-    setCategory(0);
-    setRootDistance('');
-    setBladeFace('');
-    setNote('');
-    setRootCause('');
-    setNextStep('');
-    setSelectedDefectId(null);
-  };
-
-  const handleSaveDefect = async () => {
-    if (!selectedDefectId) return;
-    setSaveStatus('saving');
-    try {
-      const rootDistNum = parseFloat(rootDistance) || 0;
-      const yFromRoot = rootDistNum / 0.43; // Convert root distance (m) back to y percentage
-      await updateAnnotation.mutateAsync({
-        id: selectedDefectId,
-        type: defectType,
-        category: category,
-        y: yFromRoot,
-        note: note,
-        rootCause: rootCause,
-        nextStep: nextStep,
-        side: bladeFace,
-      });
-      // Force refetch to ensure UI updates
-      const keysToInvalidate = campaignInspIds.length > 0 ? campaignInspIds : [inspectionId];
-      await queryClient.invalidateQueries({ queryKey: ['annotations-multi', ...keysToInvalidate] });
-      await queryClient.invalidateQueries({ queryKey: ['annotations', inspectionId] });
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch {
-      setSaveStatus('idle');
-    }
-  };
-
-  const toggleBladeExpand = (blade: string) => {
-    setExpandedBlades(prev => {
-      const next = new Set(prev);
-      if (next.has(blade)) next.delete(blade);
-      else next.add(blade);
-      return next;
-    });
-  };
-
   return (
     <div style={containerStyle}>
-      {/* ═══ LEFT PANEL: Annotations ═══ */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {/* ═══ LEFT PANEL: Pending Annotations ═══ */}
       <div style={panelStyle}>
         <div style={panelInner}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h5 style={panelTitle}>Annotations</h5>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h5 style={{ ...panelTitle, margin: 0 }}>Annotations</h5>
+            {currentBladePending.length > 0 && (
+              <button
+                style={{ ...saveBtnStyle, fontSize: 11, padding: '5px 10px' }}
+                onClick={handleBulkSave}
+                disabled={role === 'supervisor'}
+              >
+                Save {currentBladePending.length} as defects
+              </button>
+            )}
           </div>
           {/* Blade tabs with badges */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -273,21 +406,60 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               <BladeTab
                 key={b}
                 blade={b}
-                count={bladeCounts[b]}
+                count={pendingBladeCounts[b]}
                 selected={selectedBlade === b}
-                onClick={() => { setSelectedBlade(b); setExpandedBlades(new Set([b])); setSelectedDefectId(null); setZoom(1.0); }}
+                onClick={() => { setSelectedBlade(b); setSelectedDefectId(null); }}
               />
             ))}
           </div>
-          {/* Annotations content */}
-          <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, padding: 12, marginBottom: 12 }}>
-            <p style={{ fontSize: 13, color: C.text, margin: 0 }}>All annotations have been processed</p>
-          </div>
 
-          {/* Preview area */}
-          {selectedDefect ? (
+          {/* Pending annotations thumbnails — draggable */}
+          {currentBladePending.length === 0 ? (
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, padding: 12, marginBottom: 12 }}>
+              <p style={{ fontSize: 13, color: C.muted, margin: 0, textAlign: 'center' }}>
+                All annotations for Blade {selectedBlade} have been confirmed
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12, maxHeight: 320, overflowY: 'auto' }}>
+              {currentBladePending.map((d) => (
+                <div
+                  key={d.annotationId}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, d.annotationId)}
+                  onClick={() => handleDefectSelect(d)}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 6,
+                    border: selectedDefectId === d.annotationId ? `2px solid ${C.selectedBorder}` : `1px solid ${C.border}`,
+                    background: selectedDefectId === d.annotationId ? C.selected : C.bgLight,
+                    overflow: 'hidden',
+                    cursor: 'grab',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {(d.thumbnailUrl || d.imageUrl) ? (
+                    <img src={d.thumbnailUrl || d.imageUrl} alt={d.type} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: 10, color: C.muted, textAlign: 'center', padding: 4 }}>{d.type}</span>
+                  )}
+                  <span style={{
+                    position: 'absolute', bottom: 2, left: 2,
+                    fontSize: 9, fontWeight: 700, color: '#fff',
+                    background: 'rgba(0,0,0,0.6)', borderRadius: 3, padding: '1px 4px',
+                  }}>{d.id}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Preview area for selected annotation */}
+          {selectedDefect && !confirmedIds.has(selectedDefect.annotationId) ? (
             <div style={previewAreaActiveStyle}>
-              {/* Header with defect info */}
               <div style={previewHeaderStyle}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{selectedDefect.type}</div>
@@ -298,58 +470,23 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                   <div style={{ fontSize: 13, color: C.muted }}>{selectedDefect.size}</div>
                 </div>
               </div>
-              {/* Image */}
               <div style={previewImageContainerStyle}>
                 {selectedDefect.imageUrl ? (
-                  <img src={selectedDefect.imageUrl} alt="defect preview" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${zoom})`, transition: 'transform 0.2s ease', filter: `contrast(${contrast}) brightness(${brightness}) saturate(${saturation})` }} />
+                  <img src={selectedDefect.imageUrl} alt="defect preview" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ color: '#888', fontSize: 12 }}>No image available</span>
                   </div>
                 )}
-                {/* Contrast/Brightness toggle button */}
-                <button
-                  onClick={() => setShowSettings(s => !s)}
-                  style={contrastToggleBtnStyle}
-                  title="Image settings"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><circle cx="12" cy="12" r="10" fill="none" stroke={C.primary} strokeWidth="2"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill={C.primary}/></svg>
-                </button>
-                {/* Settings panel */}
-                {showSettings && (
-                  <div style={settingsPanelStyle}>
-                    <button onClick={() => setShowSettings(false)} style={settingsCloseBtn}>&times;</button>
-                    <div style={sliderRowStyle}>
-                      <span style={sliderLabelStyle}>Contrast</span>
-                      <input type="range" min="0" max="2" step="0.1" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} style={sliderStyle} aria-label="Contrast" />
-                    </div>
-                    <div style={sliderRowStyle}>
-                      <span style={sliderLabelStyle}>Brightness</span>
-                      <input type="range" min="0" max="2" step="0.1" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} style={sliderStyle} aria-label="Brightness" />
-                    </div>
-                    <div style={sliderRowStyle}>
-                      <span style={sliderLabelStyle}>Saturation</span>
-                      <input type="range" min="0" max="10" step="0.5" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} style={sliderStyle} aria-label="Saturation" />
-                    </div>
-                    <button onClick={() => { setContrast(1); setBrightness(1); setSaturation(1); }} style={resetBtnStyle}>RESET</button>
-                  </div>
-                )}
-                {/* Zoom controls */}
-                <div style={zoomControlsStyle}>
-                  <button style={zoomBtnStyle} onClick={() => setZoom(z => Math.max(0.25, +(z - 0.25).toFixed(2)))}>-</button>
-                  <span style={{ fontSize: 12, color: C.text, padding: '0 8px' }}>x{zoom.toFixed(2)}</span>
-                  <button style={zoomBtnStyle} onClick={() => setZoom(z => Math.min(4, +(z + 0.25).toFixed(2)))}>+</button>
-                </div>
-                {/* Open button */}
                 <div style={openBtnContainerStyle}>
-                  <button style={openBtnStyle}>OPEN</button>
+                  <button style={openBtnStyle} onClick={() => { if (selectedDefect && onOpenPhoto) onOpenPhoto(selectedDefect.photoId, selectedDefect.blade); }}>OPEN</button>
                 </div>
               </div>
             </div>
           ) : (
             <div style={previewAreaStyle}>
               <p style={{ fontSize: 13, color: C.muted, margin: 0, textAlign: 'center' }}>
-                Select an annotation or a defect to view it here
+                Select or drag an annotation to view it
               </p>
             </div>
           )}
@@ -360,17 +497,23 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
       <div style={arrowStyle}>&#x203A;</div>
 
       {/* ═══ CENTER PANEL: Defect Editor ═══ */}
-      <div style={panelStyle}>
+      <div style={panelStyle} onDragOver={handleDragOver} onDrop={handleDrop}>
         <div style={panelInner}>
           <h5 style={panelTitle}>Defect Editor</h5>
 
           {/* Defect image */}
           <div style={imageContainerStyle}>
             {selectedDefect?.imageUrl ? (
-              <img src={selectedDefect.imageUrl} alt="defect" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+              <img src={selectedDefect.imageUrl} alt="defect" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+            ) : photosLoading ? (
+              <div style={{ width: '100%', height: '100%', background: '#2a2a2a', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 28, height: 28, border: '3px solid #555', borderTopColor: '#4CAF50', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              </div>
             ) : (
               <div style={{ width: '100%', height: '100%', background: '#2a2a2a', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: '#888', fontSize: 13 }}>No image</span>
+                <span style={{ color: '#888', fontSize: 13 }}>
+                  {selectedDefect ? 'No image' : 'Drop annotation here'}
+                </span>
               </div>
             )}
             {selectedDefect && (
@@ -387,6 +530,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             <div style={fieldGroup}>
               <label style={labelStyle}>Type</label>
               <select style={selectInputStyle} value={defectType} onChange={(e) => setDefectType(e.target.value)}>
+                <option value="">— Select —</option>
                 <option value="LE EROSION">LE EROSION</option>
                 <option value="VORTEX (MISSING PANELS)">VORTEX (MISSING PANELS)</option>
                 <option value="PAINT DAMAGES">PAINT DAMAGES</option>
@@ -421,6 +565,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               <div style={{ ...fieldGroup, flex: 1 }}>
                 <label style={labelStyle}>Blade face</label>
                 <select style={selectInputStyle} value={bladeFace} onChange={(e) => setBladeFace(e.target.value)}>
+                  <option value="">—</option>
                   <option value="LE">LE</option>
                   <option value="SS">SS</option>
                   <option value="TE">TE</option>
@@ -428,40 +573,6 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                 </select>
               </div>
             </div>
-
-            {/* AI Suggestions accordion */}
-            <details style={accordionStyle}>
-              <summary style={accordionSummary}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={C.primary}><path d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29a.996.996 0 0 0-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41z"/></svg>
-                  Automatic category suggestions
-                </span>
-              </summary>
-              <div style={{ padding: '8px 12px', fontSize: 12, color: C.text, lineHeight: 1.5 }}>
-                <p style={{ margin: '0 0 8px' }}>
-                  A <b>LE EROSION</b> annotation placed on the <b>LE</b> at <b>{rootDistance ? `${(43 - Number(rootDistance)).toFixed(2)} m from the tip` : '—'}</b> is usually categorized between <b>3 and 5</b>.
-                </p>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <tbody>
-                    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: '4px 0' }}>Down to laminate, protection damaged</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>3</td>
-                    </tr>
-                    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: '4px 0' }}>Through first layer of laminate</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>4</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '4px 0' }}>Through laminate</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>5</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p style={{ margin: '8px 0 0', fontSize: 11, color: C.muted, fontStyle: 'italic' }}>
-                  CORE Insight cannot be liable for this category suggestion, set it according to your experience.
-                </p>
-              </div>
-            </details>
 
             {/* Note */}
             <div style={fieldGroup}>
@@ -494,9 +605,9 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
               <button style={clearBtnStyle} onClick={handleClear}>CLEAR</button>
               <button
-                style={{ ...saveBtnStyle, opacity: selectedDefectId ? 1 : 0.5, cursor: selectedDefectId ? 'pointer' : 'not-allowed' }}
+                style={{ ...saveBtnStyle, opacity: selectedDefectId && role !== 'supervisor' ? 1 : 0.5, cursor: selectedDefectId && role !== 'supervisor' ? 'pointer' : 'not-allowed' }}
                 onClick={handleSaveDefect}
-                disabled={!selectedDefectId || saveStatus === 'saving'}
+                disabled={!selectedDefectId || saveStatus === 'saving' || role === 'supervisor'}
               >
                 {saveStatus === 'saving' ? 'SAVING...' : saveStatus === 'saved' ? '✓ SAVED' : 'SAVE AS DEFECT'}
               </button>
@@ -513,16 +624,16 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         <div style={panelInner}>
           <h5 style={panelTitle}>Summary and Reviews</h5>
 
-          {/* Blade accordions */}
+          {/* Blade accordions — show only CONFIRMED defects */}
           {(['A', 'B', 'C'] as const).map((blade) => {
-            const bladeDefects = defects.filter(d => d.blade === blade);
+            const bladeDefects = confirmedDefects.filter(d => d.blade === blade);
             const isExpanded = expandedBlades.has(blade);
             return (
               <div key={blade} style={{ borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
                 <button onClick={() => toggleBladeExpand(blade)} style={bladeAccordionBtn}>
-                  <span>Blade {blade} </span>
+                  <span>Blade {blade}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>{bladeDefects.length}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{confirmedBladeCounts[blade]}</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill={C.muted}
                       style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                       <path d="M7 10l5 5 5-5z" />
@@ -531,43 +642,41 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                 </button>
                 {isExpanded && (
                   <div style={{ paddingBottom: 8 }}>
-                    <table style={summaryTableStyle}>
-                      <thead>
-                        <tr>
-                          <th style={summaryThStyle}>#</th>
-                          <th style={summaryThStyle}>Type</th>
-                          <th style={summaryThStyle}>Face</th>
-                          <th style={summaryThStyle}>Category</th>
-                          <th style={summaryThStyle}>Root (m)</th>
-                          <th style={summaryThStyle}>Copy</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bladeDefects.map((d) => (
-                          <tr key={d.id}
-                            onClick={() => handleDefectSelect(d)}
-                            style={{
-                              cursor: 'pointer',
-                              backgroundColor: selectedDefectId === d.annotationId ? C.selected : undefined,
-                            }}>
-                            <td style={summaryTdStyle}>{d.id}</td>
-                            <td style={summaryTdStyle}>{d.type}</td>
-                            <td style={summaryTdStyle}>{d.face}</td>
-                            <td style={summaryTdStyle}>{d.cat}</td>
-                            <td style={summaryTdStyle}>{d.root}</td>
-                            <td style={summaryTdStyle}>
-                              <button style={copyIconBtn} title="Copy">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill={C.primary}><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm-1 4 6 6v10c0 1.1-.9 2-2 2H7.99C6.89 23 6 22.1 6 21l.01-14c0-1.1.89-2 1.99-2zm-1 7h5.5L14 6.5z"/></svg>
-                              </button>
-                            </td>
+                    {bladeDefects.length === 0 ? (
+                      <p style={{ fontSize: 12, color: C.muted, margin: '4px 0', paddingLeft: 4 }}>No confirmed defects yet</p>
+                    ) : (
+                      <table style={summaryTableStyle}>
+                        <thead>
+                          <tr>
+                            <th style={summaryThStyle}>#</th>
+                            <th style={summaryThStyle}>Type</th>
+                            <th style={summaryThStyle}>Face</th>
+                            <th style={summaryThStyle}>Category</th>
+                            <th style={summaryThStyle}>Root (m)</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {bladeDefects.map((d) => (
+                            <tr key={d.id}
+                              onClick={() => handleDefectSelect(d)}
+                              style={{
+                                cursor: 'pointer',
+                                backgroundColor: selectedDefectId === d.annotationId ? C.selected : undefined,
+                              }}>
+                              <td style={summaryTdStyle}>{d.id}</td>
+                              <td style={summaryTdStyle}>{d.type}</td>
+                              <td style={summaryTdStyle}>{d.face}</td>
+                              <td style={summaryTdStyle}>{d.cat}</td>
+                              <td style={summaryTdStyle}>{d.root}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                     {/* Blade notes */}
                     <div style={{ marginTop: 8 }}>
-                      <input
-                        style={{ ...textInputStyle, fontSize: 12 }}
+                      <textarea
+                        style={{ ...textInputStyle, fontSize: 12, minHeight: 48, resize: 'vertical' }}
                         placeholder={`Blade ${blade} notes`}
                         value={bladeNotes[blade]}
                         onChange={(e) => setBladeNotes(prev => ({ ...prev, [blade]: e.target.value }))}
@@ -582,15 +691,32 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
           {/* SubAsset section */}
           <div style={{ borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
             <div style={bladeAccordionBtn}>
-              <span>SubAsset </span>
-              <span>{defects.length}</span>
+              <span>SubAsset</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{confirmedDefects.length}</span>
             </div>
             <div style={{ padding: '4px 0 8px' }}>
-              <input
-                style={{ ...textInputStyle, fontSize: 12 }}
+              <textarea
+                style={{ ...textInputStyle, fontSize: 12, minHeight: 48, resize: 'vertical' }}
                 placeholder="SubAsset notes"
               />
             </div>
+          </div>
+
+          {/* Mark as analyzed button — deletes selected annotation */}
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              style={{
+                ...saveBtnStyle,
+                padding: '10px 24px',
+                fontSize: 13,
+                opacity: selectedDefectId && role !== 'supervisor' && !markingAnalyzed ? 1 : 0.5,
+                cursor: selectedDefectId && role !== 'supervisor' && !markingAnalyzed ? 'pointer' : 'not-allowed',
+              }}
+              onClick={handleMarkAsAnalyzed}
+              disabled={!selectedDefectId || role === 'supervisor' || markingAnalyzed}
+            >
+              {markingAnalyzed ? 'REMOVING...' : 'MARK AS ANALYZED'}
+            </button>
           </div>
         </div>
       </div>
@@ -673,7 +799,7 @@ const arrowStyle: React.CSSProperties = {
 
 const previewAreaStyle: React.CSSProperties = {
   flex: 1,
-  minHeight: 180,
+  minHeight: 140,
   border: `1px solid ${C.border}`,
   borderRadius: 6,
   display: 'flex',
@@ -684,7 +810,7 @@ const previewAreaStyle: React.CSSProperties = {
 
 const previewAreaActiveStyle: React.CSSProperties = {
   flex: 1,
-  minHeight: 180,
+  minHeight: 140,
   border: `1px solid ${C.border}`,
   borderRadius: 8,
   display: 'flex',
@@ -705,33 +831,9 @@ const previewHeaderStyle: React.CSSProperties = {
 const previewImageContainerStyle: React.CSSProperties = {
   position: 'relative',
   flex: 1,
-  minHeight: 160,
+  minHeight: 120,
   background: '#222',
   overflow: 'hidden',
-};
-
-const zoomControlsStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 10,
-  right: 10,
-  display: 'flex',
-  alignItems: 'center',
-  background: 'rgba(255,255,255,0.92)',
-  borderRadius: 4,
-  border: `1px solid ${C.border}`,
-  padding: '2px 4px',
-};
-
-const zoomBtnStyle: React.CSSProperties = {
-  width: 26,
-  height: 26,
-  border: `1px solid ${C.border}`,
-  background: C.bg,
-  fontSize: 14,
-  fontWeight: 700,
-  cursor: 'pointer',
-  borderRadius: 3,
-  color: C.text,
 };
 
 const openBtnContainerStyle: React.CSSProperties = {
@@ -873,21 +975,6 @@ const saveBtnStyle: React.CSSProperties = {
   letterSpacing: 0.3,
 };
 
-const accordionStyle: React.CSSProperties = {
-  border: `1px solid ${C.border}`,
-  borderRadius: 4,
-  overflow: 'hidden',
-};
-
-const accordionSummary: React.CSSProperties = {
-  padding: '8px 12px',
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
-  color: C.text,
-  listStyle: 'none',
-};
-
 const bladeAccordionBtn: React.CSSProperties = {
   width: '100%',
   display: 'flex',
@@ -924,88 +1011,4 @@ const summaryTdStyle: React.CSSProperties = {
   fontSize: 11,
   color: C.text,
   whiteSpace: 'nowrap',
-};
-
-const copyIconBtn: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  padding: 2,
-  display: 'flex',
-  alignItems: 'center',
-};
-
-const contrastToggleBtnStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 10,
-  right: 10,
-  width: 36,
-  height: 36,
-  borderRadius: 6,
-  border: `1.5px solid ${C.primary}`,
-  background: 'rgba(255,255,255,0.92)',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 5,
-};
-
-const settingsPanelStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 8,
-  right: 8,
-  width: 220,
-  background: 'rgba(255,255,255,0.95)',
-  borderRadius: 8,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-  padding: '28px 16px 12px',
-  zIndex: 10,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-};
-
-const settingsCloseBtn: React.CSSProperties = {
-  position: 'absolute',
-  top: 8,
-  right: 8,
-  background: 'none',
-  border: 'none',
-  fontSize: 18,
-  color: C.primary,
-  cursor: 'pointer',
-  fontWeight: 700,
-};
-
-const sliderRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-};
-
-const sliderLabelStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 500,
-  color: C.text,
-  minWidth: 70,
-};
-
-const sliderStyle: React.CSSProperties = {
-  flex: 1,
-  accentColor: C.primary,
-  cursor: 'pointer',
-};
-
-const resetBtnStyle: React.CSSProperties = {
-  padding: '6px 16px',
-  background: '#E0E0E0',
-  color: C.text,
-  border: 'none',
-  borderRadius: 4,
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-  alignSelf: 'center',
-  marginTop: 4,
 };

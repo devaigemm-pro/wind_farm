@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assetDetailService } from '@/services/asset-detail.service';
-import { defectsService } from '@/services/defects.service';
+import { defectsService, fetchDefectImageMap } from '@/services/defects.service';
 import type {
   WindFarmDetail,
   TurbineSubassetRow,
@@ -164,6 +164,19 @@ export function useTurbineDefects(turbineId: string | undefined) {
     queryKey: ['turbine-defects', turbineId],
     queryFn: () => defectsService.listDefectsByTurbine(turbineId!),
     enabled: !!turbineId,
+  });
+}
+
+/**
+ * Load defect images in background (non-blocking).
+ * Returns a map of defectId → imageUrl that updates once loaded.
+ */
+export function useDefectImages(defectIds: string[]) {
+  return useQuery<Record<string, string>>({
+    queryKey: ['defect-images', ...defectIds.slice(0, 5)],
+    queryFn: () => fetchDefectImageMap(defectIds),
+    enabled: defectIds.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 min cache
   });
 }
 

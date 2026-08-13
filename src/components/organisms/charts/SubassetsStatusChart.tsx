@@ -9,7 +9,7 @@ export interface SubassetsStatusChartProps {
   data: SubassetStatusItem[];
 }
 
-const COLORS = ['green', '#4CAF50', 'darkblue'];
+const COLORS = ['#5a9e5a', '#5a9e5a', '#2c3e6b'];
 const LABELS_MAP: Record<string, string> = {
   recent: '< 3 months',
   moderate: '6 to 3 months',

@@ -16,7 +16,6 @@ import {
   SubassetsStatusChart,
 } from '@/components/organisms/charts';
 import { FilterSelect } from '@/components/atoms/FilterSelect';
-import { Search } from 'lucide-react';
 
 // Asset type options — "Type(s)" refers to sub-asset types in Skyvisor
 const TYPE_OPTIONS = [
@@ -36,7 +35,6 @@ const SEVERITY_OPTIONS = [
 ];
 
 export default function Dashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
   const { data: filterOptions } = useDashboardFilters();
 
   const FARM_OPTIONS = filterOptions?.farmOptions ?? [{ label: 'All Farms', value: '' }];
@@ -157,16 +155,6 @@ export default function Dashboard() {
       {/* Header row */}
       <div className="dashboard-header">
         <h1 className="dashboard-title">Dashboard</h1>
-        <div className="dashboard-search-wrapper">
-          <Search size={16} className="dashboard-search-icon" />
-          <input
-            type="text"
-            placeholder="Search all"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="dashboard-search-input"
-          />
-        </div>
       </div>
 
       {/* Top row: pipeline (smaller) + defects spread (larger) */}

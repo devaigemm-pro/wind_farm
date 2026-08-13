@@ -10,12 +10,12 @@ export interface InspectionPipelineChartProps {
 }
 
 const STAGE_COLORS = [
-  'darkblue',  // To plan
-  '#E8833A',   // Planned - orange
-  '#F7C325',   // Upload - yellow
-  '#4CAF50',   // Annotate - green
-  '#ADD8E6',   // Analyze - light blue
-  '#207868',   // Finalized - teal green
+  '#2c3e6b',   // To plan - matte navy
+  '#c97a3a',   // Planned - matte orange
+  '#d4a832',   // Upload - matte gold
+  '#5a9e5a',   // Annotate - matte green
+  '#7fafc4',   // Analyze - matte light blue
+  '#2e7065',   // Finalized - matte teal
 ];
 
 export function InspectionPipelineChart({ data }: InspectionPipelineChartProps) {

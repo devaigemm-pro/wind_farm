@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MoreHorizontal, Download } from 'lucide-react';
+import { ChevronDown, ChevronRight, MoreHorizontal, Download, Loader2 } from 'lucide-react';
 import { Button, Badge } from '@/components/atoms';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
+import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
 export interface CampaignAccordionProps {
   campaign: Campaign;
   onViewResults: (campaignId: string) => void;
   onSubassetClick?: (subassetName: string) => void;
-  onInspectionClick?: (inspectionId: string, status: string, campaignId: string | null, turbineId?: string | null) => void;
+  onInspectionClick?: (inspectionId: string, status: string, campaignId: string | null, turbineId?: string | null, stage?: string) => void;
   onEdit?: (campaign: Campaign) => void;
   onDelete?: (campaignId: string) => void;
   filterBySubasset?: string | null;
@@ -25,6 +26,7 @@ export function CampaignAccordion({
 }: CampaignAccordionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // When a filter is active, always load inspections to show filtered results
   const shouldLoadInspections = isExpanded || !!filterBySubasset;
@@ -43,16 +45,18 @@ export function CampaignAccordion({
   // Auto-expand when filter is active and there are matching inspections
   const effectiveExpanded = isExpanded || (!!filterBySubasset && inspectionCount > 0);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'approved':
-        return <Badge variant="success">Report</Badge>;
-      case 'in_progress':
-        return <Badge variant="info">Inspect</Badge>;
-      default:
-        return <Badge variant="neutral">Pending</Badge>;
-    }
+  const getStatusBadge = (status: string, stage?: string) => {
+    const s = stage || (status === 'completed' || status === 'approved' ? 'report' : 'planned');
+    const label = s.charAt(0).toUpperCase() + s.slice(1);
+    const colorMap: Record<string, { bg: string; color: string }> = {
+      report: { bg: '#DEF7EC', color: '#03543F' },
+      analyze: { bg: '#FEE2E2', color: '#991B1B' },
+      annotate: { bg: '#EDE9FE', color: '#5B21B6' },
+      inspect: { bg: '#DBEAFE', color: '#1E40AF' },
+      planned: { bg: '#FEF9C3', color: '#854D0E' },
+    };
+    const colors = colorMap[s] || colorMap.planned!;
+    return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: colors.bg, color: colors.color }}>{label}</span>;
   };
 
   const formatDate = (date: string) => {
@@ -78,40 +82,42 @@ export function CampaignAccordion({
           >
             View Results
           </Button>
-          <div style={{ position: 'relative' }}>
-            <button
-              style={menuBtnStyle}
-              onClick={() => setShowMenu(!showMenu)}
-            >
-              <MoreHorizontal size={16} />
-            </button>
-            {showMenu && (
-              <div style={menuDropdownStyle}>
-                {onEdit && (
-                  <button
-                    style={menuItemStyle}
-                    onClick={() => {
-                      onEdit(campaign);
-                      setShowMenu(false);
-                    }}
-                  >
-                    Edit campaign
-                  </button>
-                )}
-                {onDelete && (
-                  <button
-                    style={{ ...menuItemStyle, color: 'var(--color-danger-500)' }}
-                    onClick={() => {
-                      onDelete(campaign.id);
-                      setShowMenu(false);
-                    }}
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {(onEdit || onDelete) && (
+            <div style={{ position: 'relative' }}>
+              <button
+                style={menuBtnStyle}
+                onClick={() => setShowMenu(!showMenu)}
+              >
+                <MoreHorizontal size={16} />
+              </button>
+              {showMenu && (
+                <div style={menuDropdownStyle}>
+                  {onEdit && (
+                    <button
+                      style={menuItemStyle}
+                      onClick={() => {
+                        onEdit(campaign);
+                        setShowMenu(false);
+                      }}
+                    >
+                      Edit campaign
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      style={{ ...menuItemStyle, color: 'var(--color-danger-500)' }}
+                      onClick={() => {
+                        onDelete(campaign.id);
+                        setShowMenu(false);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -137,12 +143,12 @@ export function CampaignAccordion({
               </thead>
               <tbody>
                 {filteredInspections.map((insp: CampaignInspection) => (
-                  <tr key={insp.id} style={{ ...trStyle, cursor: 'pointer' }} onClick={() => onInspectionClick?.(insp.id, insp.status, insp.campaignId, insp.turbineId)}>
+                  <tr key={insp.id} style={{ ...trStyle, cursor: 'pointer' }} onClick={() => onInspectionClick?.(insp.id, insp.status, insp.campaignId, insp.turbineId, insp.stage)}>
                     <td style={tdStyle}>{formatDate(insp.inspectionDate)}</td>
                     <td style={tdStyle}>
                       {insp.subassetName}
                     </td>
-                    <td style={tdStyle}>{getStatusBadge(insp.status)}</td>
+                    <td style={tdStyle}>{getStatusBadge(insp.status, insp.stage)}</td>
                     <td style={tdStyle}>
                       {insp.inspectionType.charAt(0).toUpperCase() + insp.inspectionType.slice(1)}
                     </td>
@@ -153,9 +159,33 @@ export function CampaignAccordion({
                       {insp.notes ?? ''}
                     </td>
                     <td style={tdStyle}>
-                      {(insp.status === 'completed' || insp.status === 'approved') && (
-                        <button style={pdfBtnStyle} title="Download PDF">
-                          <Download size={14} color="var(--color-primary-500)" />
+                      {(insp.stage === 'report' || insp.status === 'completed' || insp.status === 'approved' || insp.reportStoragePath) && (
+                        <button
+                          style={pdfBtnStyle}
+                          title="Download PDF"
+                          disabled={downloadingId === insp.id}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setDownloadingId(insp.id);
+                            try {
+                              await generateAndDownloadReport({
+                                inspectionId: insp.id,
+                                inspectionDate: insp.inspectionDate,
+                                asset: campaign.name,
+                                subAsset: insp.subassetName,
+                              });
+                            } catch (err: any) {
+                              alert(err?.message || 'Error generating PDF.');
+                            } finally {
+                              setDownloadingId(null);
+                            }
+                          }}
+                        >
+                          {downloadingId === insp.id ? (
+                            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} color="var(--color-primary-500)" />
+                          ) : (
+                            <Download size={14} color="var(--color-primary-500)" />
+                          )}
                         </button>
                       )}
                     </td>

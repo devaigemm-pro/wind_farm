@@ -9,7 +9,8 @@ import { DefectDetailPanel } from '@/components/organisms/DefectDetailPanel';
 import { Badge } from '@/components/atoms';
 import { Skeleton } from '@/components/atoms';
 import { Button } from '@/components/atoms';
-import { useTurbineDetail, useTurbineInspections, useTurbineDefects } from '@/hooks/useWindFarmDetail';
+import { useTurbineDetail, useTurbineInspections, useTurbineDefects, useDefectImages } from '@/hooks/useWindFarmDetail';
+import { useAuth } from '@/hooks/useAuth';
 import type { CampaignInspection, DefectSortField, DefectDashboardRow } from '@/types';
 
 const TABS = [
@@ -32,10 +33,25 @@ const COLUMNS: { key: string; label: string }[] = [
 export function SubassetDetail() {
   const { windFarmId, turbineId } = useParams<{ windFarmId: string; turbineId: string }>();
   const navigate = useNavigate();
+  const { role } = useAuth();
 
   const { data: detail, isLoading: detailLoading } = useTurbineDetail(turbineId);
   const { data: inspections, isLoading: inspectionsLoading } = useTurbineInspections(turbineId);
   const { data: defects, isLoading: defectsLoading } = useTurbineDefects(turbineId);
+
+  // Load defect images in background (non-blocking)
+  const defectIds = useMemo(() => (defects ?? []).map(d => d.id), [defects]);
+  const { data: defectImageMap } = useDefectImages(defectIds);
+
+  // Merge images into defects when available
+  const defectsWithImages = useMemo(() => {
+    if (!defects) return [];
+    if (!defectImageMap) return defects;
+    return defects.map(d => ({
+      ...d,
+      imageUrl: defectImageMap[d.id] ?? d.imageUrl,
+    }));
+  }, [defects, defectImageMap]);
 
   const [activeTab, setActiveTab] = useState('general');
   const [sortField, setSortField] = useState('inspectionDate');
@@ -75,16 +91,18 @@ export function SubassetDetail() {
 
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '—';
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'approved':
-        return <Badge variant="success">Report</Badge>;
-      case 'in_progress':
-        return <Badge variant="info">Inspect</Badge>;
-      default:
-        return <Badge variant="neutral">Pending</Badge>;
-    }
+  const getStatusBadge = (status: string, stage?: string) => {
+    const s = stage || (status === 'completed' || status === 'approved' ? 'report' : 'planned');
+    const label = s.charAt(0).toUpperCase() + s.slice(1);
+    const colorMap: Record<string, { bg: string; color: string }> = {
+      report: { bg: '#DEF7EC', color: '#03543F' },
+      analyze: { bg: '#FEF3C7', color: '#92400E' },
+      annotate: { bg: '#EDE9FE', color: '#5B21B6' },
+      inspect: { bg: '#DBEAFE', color: '#1E40AF' },
+      planned: { bg: '#FEF9C3', color: '#854D0E' },
+    };
+    const colors = colorMap[s] || colorMap.planned!;
+    return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: colors.bg, color: colors.color }}>{label}</span>;
   };
 
   const SortIcon = ({ field }: { field: string }) => {
@@ -109,9 +127,9 @@ export function SubassetDetail() {
       <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'general' && (
-        <div style={contentStyle}>
+        <div style={contentStyle} className="wind-farm-detail-content">
           {/* Left column: Details + Documents */}
-          <div style={leftColStyle}>
+          <div style={leftColStyle} className="wind-farm-detail-left">
             {/* Details Card */}
             <div style={cardStyle}>
               <h3 style={cardTitleStyle}>Details</h3>
@@ -145,14 +163,16 @@ export function SubassetDetail() {
                   </div>
                 </div>
               )}
-              <Button
-                variant="primary"
-                icon={Plus}
-                onClick={handlePlanInspection}
-                style={{ width: '100%', marginTop: 'var(--space-4)' }}
-              >
-                Plan a new inspection
-              </Button>
+              {role !== 'supervisor' && (
+                <Button
+                  variant="primary"
+                  icon={Plus}
+                  onClick={handlePlanInspection}
+                  style={{ width: '100%', marginTop: 'var(--space-4)' }}
+                >
+                  Plan a new inspection
+                </Button>
+              )}
             </div>
 
             {/* Documents Dropbox */}
@@ -160,10 +180,10 @@ export function SubassetDetail() {
           </div>
 
           {/* Right column: Inspections table */}
-          <div style={rightColStyle}>
+          <div style={rightColStyle} className="wind-farm-detail-right">
             <div style={inspectionsPanelStyle}>
               <h3 style={cardTitleStyle}>Inspections</h3>
-              <div style={tableWrapperStyle}>
+              <div style={tableWrapperStyle} className="subasset-inspections-table">
                 <table style={tableStyle}>
                   <thead>
                     <tr>
@@ -204,23 +224,21 @@ export function SubassetDetail() {
                             onClick={() => {
                               // Navigate based on inspection status/stage
                               if (insp.status === 'completed' || insp.status === 'approved') {
-                                // Report → go to TurbineDetail results view with inspectionId + campaignId
-                                const params = new URLSearchParams();
-                                params.set('inspectionId', insp.id);
-                                if (insp.campaignId) params.set('campaignId', insp.campaignId);
-                                navigate(`/assets-wind/${windFarmId}/turbine/${turbineId}?${params.toString()}`);
+                                // Report → go to workflow step 4
+                                navigate(`/inspections/${insp.id}/workflow?step=4`);
                               } else {
                                 // In-progress → go to workflow at correct step
                                 let step = 1;
-                                if (insp.inspectionType === 'annotate') step = 2;
-                                else if (insp.inspectionType === 'analyze') step = 3;
+                                if (insp.stage === 'annotate') step = 2;
+                                else if (insp.stage === 'analyze') step = 3;
+                                else if (insp.stage === 'report') step = 4;
                                 navigate(`/inspections/${insp.id}/workflow?step=${step}`);
                               }
                             }}
                           >
                             <td style={tdStyle}>{formatDate(insp.inspectionDate)}</td>
                             <td style={tdStyle}>{insp.subassetName}</td>
-                            <td style={tdStyle}>{getStatusBadge(insp.status)}</td>
+                            <td style={tdStyle}>{getStatusBadge(insp.status, insp.stage)}</td>
                             <td style={tdStyle}>{insp.inspectionType}</td>
                             <td style={tdStyle}>{insp.photosCount}</td>
                             <td style={tdStyle}>{insp.viewedPercent} %</td>
@@ -254,10 +272,10 @@ export function SubassetDetail() {
       )}
 
       {activeTab === 'defects' && (
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', flex: selectedDefectId ? '0 0 70%' : '1 1 100%', overflow: 'hidden', minHeight: 0 }}>
+        <div className="defects-split-container" style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+          <div className="defects-split-table" style={{ display: 'flex', flexDirection: 'column', flex: selectedDefectId ? '0 0 70%' : '1 1 100%', overflow: 'hidden', minHeight: 0 }}>
             <DefectsTable
-              data={defects ?? []}
+              data={defectsWithImages}
               isLoading={defectsLoading}
               sortField={defectSortField}
               sortDirection={defectSortDirection}
@@ -274,9 +292,9 @@ export function SubassetDetail() {
             />
           </div>
           {selectedDefectId && (() => {
-            const selectedDefect = (defects ?? []).find((d: DefectDashboardRow) => d.id === selectedDefectId);
+            const selectedDefect = defectsWithImages.find((d: DefectDashboardRow) => d.id === selectedDefectId);
             return selectedDefect ? (
-              <div style={{ flex: '0 0 30%', overflow: 'auto', minHeight: 0 }}>
+              <div className="defects-split-detail" style={{ flex: '0 0 30%', overflow: 'auto', minHeight: 0 }}>
                 <DefectDetailPanel defect={selectedDefect} />
               </div>
             ) : null;

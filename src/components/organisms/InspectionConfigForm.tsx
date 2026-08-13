@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react';
 import { AssetSelector } from '@/components/molecules/AssetSelector';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { DatePickerField } from '@/components/molecules/DatePickerField';
-import { NotificationToggle } from '@/components/atoms/NotificationToggle';
 import type { InspectionType, InspectionMethod } from '@/types';
 
 export interface InspectionConfigFormProps {
@@ -13,7 +12,6 @@ export interface InspectionConfigFormProps {
   scheduledDate: string;
   campaignName: string;
   notes: string;
-  subscribeNotifications: boolean;
   errors: Record<string, string>;
   isLoadingFarms: boolean;
   onWindFarmChange: (id: string) => void;
@@ -22,7 +20,6 @@ export interface InspectionConfigFormProps {
   onDateChange: (date: string) => void;
   onCampaignNameChange: (name: string) => void;
   onNotesChange: (notes: string) => void;
-  onNotificationsChange: (value: boolean) => void;
 }
 
 export function InspectionConfigForm({
@@ -33,7 +30,6 @@ export function InspectionConfigForm({
   scheduledDate,
   campaignName,
   notes,
-  subscribeNotifications,
   errors,
   isLoadingFarms,
   onWindFarmChange,
@@ -42,7 +38,6 @@ export function InspectionConfigForm({
   onDateChange,
   onCampaignNameChange,
   onNotesChange,
-  onNotificationsChange,
 }: InspectionConfigFormProps) {
   const containerStyle: CSSProperties = {
     display: 'flex',
@@ -172,11 +167,6 @@ export function InspectionConfigForm({
         />
       </div>
 
-      {/* Notification Toggle */}
-      <NotificationToggle
-        checked={subscribeNotifications}
-        onChange={onNotificationsChange}
-      />
     </div>
   );
 }

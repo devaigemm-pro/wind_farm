@@ -113,16 +113,18 @@ export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: Edi
     return found?.name ?? 'Other';
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'approved':
-        return <Badge variant="success">Report</Badge>;
-      case 'in_progress':
-        return <Badge variant="info">Inspect</Badge>;
-      default:
-        return <Badge variant="neutral">Pending</Badge>;
-    }
+  const getStatusBadge = (status: string, stage?: string) => {
+    const s = stage || (status === 'completed' || status === 'approved' ? 'report' : 'planned');
+    const label = s.charAt(0).toUpperCase() + s.slice(1);
+    const colorMap: Record<string, { bg: string; color: string }> = {
+      report: { bg: '#DEF7EC', color: '#03543F' },
+      analyze: { bg: '#FEF3C7', color: '#92400E' },
+      annotate: { bg: '#EDE9FE', color: '#5B21B6' },
+      inspect: { bg: '#DBEAFE', color: '#1E40AF' },
+      planned: { bg: '#FEF9C3', color: '#854D0E' },
+    };
+    const colors = colorMap[s] || colorMap.planned!;
+    return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: colors.bg, color: colors.color }}>{label}</span>;
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString();
@@ -181,7 +183,7 @@ export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: Edi
                     </td>
                     <td style={tdStyle}>{formatDate(insp.inspectionDate)}</td>
                     <td style={tdStyle}>{insp.subassetName}</td>
-                    <td style={tdStyle}>{getStatusBadge(insp.status)}</td>
+                    <td style={tdStyle}>{getStatusBadge(insp.status, insp.stage)}</td>
                     <td style={{ ...tdStyle, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {insp.notes ?? ''}
                     </td>

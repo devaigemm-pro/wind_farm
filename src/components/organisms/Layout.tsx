@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
 import { Breadcrumbs } from './Breadcrumbs';
 import type { BreadcrumbItem } from './Breadcrumbs';
 import type { Profile } from '@/types';
@@ -17,6 +18,32 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Close mobile menu when resizing to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
 
   // Remove tabindex from Recharts sectors to prevent focus ring on click
   useEffect(() => {
@@ -48,27 +75,6 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
     overflow: 'hidden',
   };
 
-  const sidebarDesktopStyle: React.CSSProperties = {
-    display: 'block',
-  };
-
-  const overlayStyle: React.CSSProperties = {
-    display: mobileMenuOpen ? 'block' : 'none',
-    position: 'fixed',
-    inset: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    zIndex: 40,
-  };
-
-  const mobileSidebarStyle: React.CSSProperties = {
-    display: mobileMenuOpen ? 'block' : 'none',
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    zIndex: 50,
-  };
-
   const mainAreaStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
@@ -89,8 +95,8 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
 
   return (
     <div style={wrapperStyle}>
-      {/* Desktop sidebar */}
-      <div style={sidebarDesktopStyle} className="sidebar-desktop">
+      {/* Desktop sidebar — controlled by responsive.css .sidebar-desktop */}
+      <div className="sidebar-desktop">
         <Sidebar
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -99,15 +105,15 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
         />
       </div>
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay — controlled by responsive.css .sidebar-overlay */}
       <div
-        style={overlayStyle}
+        className={`sidebar-overlay ${mobileMenuOpen ? 'sidebar-overlay--visible' : ''}`}
         onClick={() => setMobileMenuOpen(false)}
         aria-hidden="true"
       />
 
-      {/* Mobile sidebar */}
-      <div style={mobileSidebarStyle} className="sidebar-mobile">
+      {/* Mobile sidebar — controlled by responsive.css .sidebar-mobile */}
+      <div className={`sidebar-mobile ${mobileMenuOpen ? 'sidebar-mobile--open' : ''}`}>
         <Sidebar
           isCollapsed={false}
           onToggleCollapse={() => setMobileMenuOpen(false)}
@@ -118,13 +124,20 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
 
       {/* Main content area */}
       <div style={mainAreaStyle}>
+        <TopBar
+          onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+          user={user}
+          onLogout={onLogout}
+          onSearch={() => {}}
+        />
+
         {breadcrumbs.length > 0 && (
-          <div style={breadcrumbContainerStyle}>
+          <div style={breadcrumbContainerStyle} className="layout-breadcrumb-container">
             <Breadcrumbs items={breadcrumbs} />
           </div>
         )}
 
-        <main style={contentStyle} tabIndex={-1}>{children}</main>
+        <main style={contentStyle} className="layout-content" tabIndex={-1}>{children}</main>
       </div>
     </div>
   );

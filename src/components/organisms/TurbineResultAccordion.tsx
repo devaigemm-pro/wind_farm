@@ -95,7 +95,7 @@ export function TurbineResultAccordion({
             <IconBtn title="Download PDF" onClick={() => onDownloadPdf?.(result.turbineId)}>
               <Download size={14} />
             </IconBtn>
-            <IconBtn title="Download CSV" onClick={() => onDownloadCsv?.(result.turbineId)}>
+            <IconBtn title="Download XLSX" onClick={() => onDownloadCsv?.(result.turbineId)}>
               <FileText size={14} />
             </IconBtn>
             <IconBtn title="Open inspection" onClick={() => onOpenInspection?.(result.turbineId)}>

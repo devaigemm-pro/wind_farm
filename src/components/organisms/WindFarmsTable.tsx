@@ -98,7 +98,7 @@ export function WindFarmsTable({
   }
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div style={{ overflowX: 'auto' }} className="responsive-table-wrapper">
       <table style={tableStyle}>
         <thead>
           <tr>

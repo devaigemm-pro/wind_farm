@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Info, CheckCircle, BarChart3, ListFilter, Pencil, Search, Plus, FileDown, Share2 } from 'lucide-react';
+import { Info, CheckCircle, BarChart3, ListFilter, Pencil, Plus, FileDown, Share2, ArrowLeft, Check } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
@@ -9,8 +9,11 @@ import { BladesDiagram } from '@/components/organisms/BladesDiagram';
 import { ExportPanel } from '@/components/organisms/ExportPanel';
 import { SharePopover } from '@/components/molecules/SharePopover';
 import { useTurbineInspection, type TurbineDefect } from '@/hooks/useTurbineInspection';
-import { useMultiAnnotations, useCampaignInspectionIds } from '@/hooks/useAnnotations';
+import { useMultiAnnotations, useCampaignInspectionIds, usePhotoBladeMap } from '@/hooks/useAnnotations';
 import { useAnnotationComments, useAddAnnotationComment } from '@/hooks/useAnnotationComments';
+import { useAuth } from '@/hooks/useAuth';
+import { useInspectionPhotos, getPhotoPublicUrl } from '@/hooks/useInspectionPhotos';
+import { useDefects } from '@/hooks/useDefects';
 import type { ResultsDefect } from '@/types';
 
 // ─── Palette (matches reference) ─────────────────────────────────────────────
@@ -49,12 +52,22 @@ function imageForType(_type: string): string {
   return '';
 }
 
-export function TurbineDetail({ shared = false }: { shared?: boolean }) {
-  const { windFarmId, turbineId } = useParams<{ windFarmId: string; turbineId: string }>();
+export interface TurbineDetailProps {
+  shared?: boolean;
+  embedded?: boolean;
+  embeddedTurbineId?: string;
+  embeddedInspectionId?: string;
+  embeddedCampaignId?: string | null;
+}
+
+export function TurbineDetail({ shared = false, embedded = false, embeddedTurbineId, embeddedInspectionId, embeddedCampaignId }: TurbineDetailProps) {
+  const { windFarmId, turbineId: urlTurbineId } = useParams<{ windFarmId: string; turbineId: string }>();
   const [searchParams] = useSearchParams();
-  const filterInspectionId = searchParams.get('inspectionId');
-  const filterCampaignId = searchParams.get('campaignId');
+  const turbineId = embeddedTurbineId || urlTurbineId;
+  const filterInspectionId = embeddedInspectionId || searchParams.get('inspectionId');
+  const filterCampaignId = embeddedCampaignId !== undefined ? embeddedCampaignId : searchParams.get('campaignId');
   const navigate = useNavigate();
+  const { role } = useAuth();
   const isSharedView = shared;
   const { data: inspectionData, isLoading } = useTurbineInspection(turbineId ?? '');
 
@@ -77,14 +90,55 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
 
   const { data: dbAnnotations = [] } = useMultiAnnotations(annotationInspectionIds);
 
+  // Load photo → blade_id (fast, no signed URLs — unblocks blade diagram)
+  const { data: photoBladeRawMap = {}, isLoading: photoMapsLoading } = usePhotoBladeMap(filterCampaignId);
+
+  // Load inspection photos for viewer-quality URLs (same source as ANNOTATE step)
+  const { data: inspectionPhotos = [] } = useInspectionPhotos(filterCampaignId, null);
+
+  // Build photo.id → full resolution URL map from loaded inspection photos
+  const photoPathMap = useMemo<Record<string, string>>(() => {
+    if (inspectionPhotos.length === 0) return {};
+    const map: Record<string, string> = {};
+    for (const photo of inspectionPhotos) {
+      // Use full resolution (no transform) for RESULTS - maximum quality
+      map[photo.id] = getPhotoPublicUrl(photo.storagePath, 'full');
+    }
+    return map;
+  }, [inspectionPhotos]);
+
   // Map DB annotations to TurbineDefect format
+  // Wait for photoBladeMap when campaignId is present to avoid flash of all defects on blade A
   const annotationDefects = useMemo<TurbineDefect[]>(() => {
     if (!dbAnnotations || dbAnnotations.length === 0) return [];
+    if (filterCampaignId && photoMapsLoading) return [];
     const inspToBladeMap = inspectionData?.inspectionToBladePosition ?? {};
+
+    // Build blade_id (UUID) → position letter lookup from inspectionData.blades
+    const bladeIdToLetter: Record<string, string> = {};
+    if (inspectionData?.blades) {
+      for (const b of inspectionData.blades) {
+        bladeIdToLetter[b.id] = b.position; // position is already 'A', 'B', 'C'
+      }
+    }
+
+    // Fallback: if inspectionData is null but we have photoBladeRawMap with blade_ids,
+    // try to derive position from the order of unique blade_ids (1=A, 2=B, 3=C)
+    if (Object.keys(bladeIdToLetter).length === 0 && Object.keys(photoBladeRawMap).length > 0) {
+      const uniqueBladeIds = [...new Set(Object.values(photoBladeRawMap))];
+      const posLetters = ['A', 'B', 'C'];
+      uniqueBladeIds.forEach((bid, idx) => {
+        if (idx < 3) bladeIdToLetter[bid] = posLetters[idx]!;
+      });
+    }
+
     const counters: Record<string, number> = {};
     return dbAnnotations.map((a) => {
-      // Use inspectionId to determine blade position (reliable for real data)
-      const blade = inspToBladeMap[a.inspectionId] || deriveBladeFace(a.thumbnailId).blade;
+      // Derive blade: photo blade_id → letter (most reliable for multi-blade inspections)
+      const photoBladeId = photoBladeRawMap[a.thumbnailId];
+      const bladeFromPhoto = photoBladeId ? bladeIdToLetter[photoBladeId] : undefined;
+      const rawBlade = bladeFromPhoto || inspToBladeMap[a.inspectionId] || deriveBladeFace(a.thumbnailId).blade;
+      const blade = rawBlade === '?' ? 'A' : rawBlade;
       // Use saved side field (from annotation), with fallback
       const face = a.side || (deriveBladeFace(a.thumbnailId).face !== '?' ? deriveBladeFace(a.thumbnailId).face : 'LE');
       counters[blade] = (counters[blade] || 0) + 1;
@@ -100,17 +154,21 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
         size: `${Math.round(a.w)} x ${Math.round(a.h)}`,
         description: a.note,
         resolved: false,
-        images: [],
+        images: photoPathMap[a.thumbnailId] ? [photoPathMap[a.thumbnailId]!] : [],
         notes: a.note,
         rootCause: a.rootCause,
         nextStep: a.nextStep,
         comments: [],
       };
     });
-  }, [dbAnnotations, inspectionData]);
+  }, [dbAnnotations, inspectionData, photoBladeRawMap, photoPathMap, filterCampaignId, photoMapsLoading]);
 
-  const [tab, setTab] = useState<'statistics' | 'details'>('statistics');
-  const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'statistics' | 'details'>(() => {
+    return searchParams.get('tab') === 'details' ? 'details' : 'statistics';
+  });
+  const [selectedDefectId, setSelectedDefectId] = useState<string | null>(() => {
+    return searchParams.get('defectId') || null;
+  });
   const [resolvedMap, setResolvedMap] = useState<Record<string, boolean>>({});
   const [filterType, setFilterType] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('');
@@ -121,14 +179,26 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
   const [shareAnchor, setShareAnchor] = useState<HTMLElement | null>(null);
 
   // Use defects source:
-  // - When coming from workflow (campaignId present), use ONLY annotations
-  //   (same source as steps 2/3, guarantees consistency)
+  // - When coming from workflow (campaignId present), use ONLY annotations that are confirmed as defects
+  //   (have a matching record in the defect table with description = annotationId)
   // - Otherwise, use defects table (for general turbine view)
-  const defects: TurbineDefect[] = (filterCampaignId || filterInspectionId)
-    ? annotationDefects
-    : ((inspectionData?.defects && inspectionData.defects.length > 0)
-        ? inspectionData.defects
-        : annotationDefects);
+  const { data: confirmedDefectRecords = [] } = useDefects(filterInspectionId ?? '');
+  const confirmedAnnotationIds = useMemo<Set<string>>(() => {
+    const ids = new Set<string>();
+    for (const d of confirmedDefectRecords) {
+      if (d.description) ids.add(d.description);
+    }
+    return ids;
+  }, [confirmedDefectRecords]);
+
+  const defects: TurbineDefect[] = useMemo(() => {
+    if (filterCampaignId || filterInspectionId) {
+      return annotationDefects.filter(d => confirmedAnnotationIds.size === 0 ? true : confirmedAnnotationIds.has(d.id));
+    }
+    return (inspectionData?.defects && inspectionData.defects.length > 0)
+      ? inspectionData.defects
+      : annotationDefects;
+  }, [filterCampaignId, filterInspectionId, annotationDefects, confirmedAnnotationIds, inspectionData]);
   const windFarmName = inspectionData?.windFarmName ?? '';
   const turbineName = inspectionData?.turbineName ?? '';
   const inspectionDate = inspectionData?.inspectionDate
@@ -218,6 +288,22 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
   const uniqueBlades = useMemo(() => [...new Set(defects.map((d) => d.blade))].sort(), [defects]);
   const uniqueSides = useMemo(() => [...new Set(defects.map((d) => d.side))].sort(), [defects]);
 
+  // Map defectId (from URL) to displayId when defects load
+  const urlDefectId = searchParams.get('defectId');
+  const urlTab = searchParams.get('tab');
+  useEffect(() => {
+    if (defects.length === 0) return;
+    if (urlDefectId) {
+      const match = defects.find((d) => d.id === urlDefectId);
+      if (match && selectedDefectId !== match.displayId) {
+        setSelectedDefectId(match.displayId);
+        setTab('details');
+      }
+    } else if (urlTab === 'details') {
+      setSelectedDefectId(defects[0]!.displayId);
+    }
+  }, [defects, urlDefectId, urlTab]);
+
   // Scroll to selected defect row when switching to details
   useEffect(() => {
     if (tab === 'details' && selectedDefectId) {
@@ -258,16 +344,24 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
 
   return (
     <div style={page}>
-      {/* Toolbar: breadcrumb + phases + actions (hidden in shared view) */}
-      {!isSharedView && (
+      {/* Toolbar: breadcrumb + phases + actions (hidden in shared/embedded view) */}
+      {!isSharedView && !embedded && (
         <div style={toolbarRow}>
-          <div style={toolbarLeftSt}>
+          <div style={{ ...toolbarLeftSt, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              aria-label="Go back"
+              onClick={() => navigate(-1)}
+              style={{ width: 32, height: 32, border: '1px solid #E5E7EB', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+            >
+              <ArrowLeft size={16} />
+            </button>
             <div style={breadcrumbSt}>
               <Link to={`/assets-wind/${windFarmId}`} style={bcLinkSt}>{windFarmName}</Link>
               <span style={bcSepSt}>&gt;</span>
-              <Link to={`/assets-wind/${windFarmId}/subasset/${turbineId}`} style={bcLinkSt}>Turbine {turbineName}</Link>
+              <a onClick={() => { if (windFarmId && turbineId) navigate(`/assets-wind/${windFarmId}/subasset/${turbineId}`); }} style={bcLinkSt}>{turbineName}</a>
               <span style={bcSepSt}>&gt;</span>
-              <span style={{ ...bcLinkSt, color: C.muted }}>{inspectionDate}</span>
+              <span style={{ ...bcLinkSt, color: '#555', cursor: 'default' }}>{inspectionDate}</span>
             </div>
           </div>
           <div style={toolbarCenterSt}>
@@ -282,23 +376,21 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
                 type="button"
                 style={step.num === 4 ? phaseBtnActive : phaseBtnNormal}
                 onClick={() => {
-                  if (inspectionData?.inspectionId) {
-                    navigate(`/inspections/${inspectionData.inspectionId}/workflow?step=${step.num}`);
+                  if (step.num === 4) return; // Already on results
+                  const targetInspId = filterInspectionId || inspectionData?.inspectionId;
+                  if (targetInspId) {
+                    navigate(`/inspections/${targetInspId}/workflow?step=${step.num}`);
                   }
                 }}
               >
-                <span style={step.num === 4 ? phaseLabelActive : phaseLabelNormal}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, ...(step.num === 4 ? phaseLabelActive : phaseLabelNormal) }}>
+                  {step.num < 4 && <Check size={14} strokeWidth={2.5} />}
                   {step.label}
                 </span>
               </button>
             ))}
           </div>
-          <div style={toolbarRightSt}>
-            <div style={searchBarSt}>
-              <Search size={14} style={{ color: '#94a3b8' }} />
-              <input type="text" placeholder="Search all" style={searchInputSt} aria-label="Search" />
-            </div>
-          </div>
+          <div style={toolbarRightSt} />
         </div>
       )}
 
@@ -346,7 +438,7 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
       />
 
       <ExportPanel
-        inspectionId={inspectionData?.inspectionId ?? ''}
+        inspectionId={filterInspectionId || inspectionData?.inspectionId || ''}
         defects={defects.map((d): ResultsDefect => ({
           id: d.id,
           displayId: d.displayId,
@@ -376,6 +468,7 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
         windFarmCoords={inspectionData?.windFarmCoords}
         windFarmId={windFarmId}
         turbineId={turbineId}
+        campaignId={filterCampaignId ?? undefined}
       />
 
       <div style={body}>
@@ -400,7 +493,7 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {!isSharedView && (
+            {!isSharedView && role !== 'supervisor' && (
               <button style={planBtn} onClick={() => navigate(`/inspections/new?windFarm=${windFarmId}`)}>
                 PLAN NEXT INSPECTION
               </button>
@@ -493,7 +586,7 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
                     </select>
                   </div>
                 </div>
-                <DetailsTable defects={filteredDefects} selectedId={selectedDefectId} onSelect={setSelectedDefectId} onEdit={(id) => navigate(`/inspections/${inspectionData?.inspectionId ?? id}/workflow?step=3`)} resolvedMap={resolvedMap} onResolvedToggle={handleResolvedToggle} readonly={isSharedView} />
+                <DetailsTable defects={filteredDefects} selectedId={selectedDefectId} onSelect={setSelectedDefectId} onEdit={(id) => navigate(`/inspections/${inspectionData?.inspectionId ?? id}/workflow?step=3`)} resolvedMap={resolvedMap} onResolvedToggle={handleResolvedToggle} readonly={isSharedView || role === 'supervisor'} />
               </div>
             </div>
             {selectedDefectId && (
@@ -510,6 +603,8 @@ export function TurbineDetail({ shared = false }: { shared?: boolean }) {
 
 // ─── Defect Detail Panel (Note/Root Cause/Next Step, Comments, Images) ───────
 function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
+  const { role } = useAuth();
+  const isSupervisor = role === 'supervisor';
   const [zoomLevels, setZoomLevels] = useState<Record<number, number>>({});
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -628,6 +723,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
       <div style={{ ...panelCard, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 13, color: '#333' }}>Comments:</span>
+          {!isSupervisor && (
           <div
             onClick={() => setShowCommentPopover(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: C.blue, fontSize: 12 }}
@@ -635,6 +731,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
             <Plus size={14} />
             <span>Add</span>
           </div>
+          )}
         </div>
         {dbComments.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -735,9 +832,9 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
 
       {/* Images */}
       {defect.images && defect.images.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', maxHeight: 500 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', maxHeight: 700 }}>
           {defect.images.map((img, idx) => (
-            <div key={idx} style={{ position: 'relative', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', background: '#f5f5f5' }}>
+            <div key={idx} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden' }}>
               {/* Top-left: Fullscreen + Download */}
               <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, display: 'flex', gap: 6 }}>
                 <button
@@ -762,14 +859,14 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
                 </button>
               </div>
               {/* Image */}
-              <div style={{ overflow: 'hidden', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={img}
                   alt={`Defect ${defect.displayId} image ${idx + 1}`}
                   style={{
                     width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
+                    height: 'auto',
+                    display: 'block',
                     transform: `scale(${zoomLevels[idx] ?? 1})`,
                     transition: 'transform 0.2s',
                   }}
@@ -797,11 +894,11 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
           onClick={() => setLightboxImg(null)}
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '90vw', height: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img
               src={lightboxImg}
               alt="Defect fullscreen"
-              style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', transform: `scale(${lightboxZoom})`, transition: 'transform 0.2s' }}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${lightboxZoom})`, transition: 'transform 0.2s' }}
             />
             <div style={{ position: 'absolute', bottom: 16, right: 16, display: 'flex', gap: 8 }}>
               <button onClick={() => setLightboxZoom((z) => Math.max(z - 0.25, 0.5))} style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #fff', background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 18, cursor: 'pointer' }}>-</button>
@@ -1064,9 +1161,8 @@ const toolbarLeftSt: React.CSSProperties = { flex: '0 0 25%', minWidth: 0 };
 const toolbarCenterSt: React.CSSProperties = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 };
 const toolbarRightSt: React.CSSProperties = { flex: '0 0 25%', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' };
 const breadcrumbSt: React.CSSProperties = { fontSize: 13, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
-const bcLinkSt: React.CSSProperties = { color: '#4CAF50', textDecoration: 'none', fontWeight: 500 };
+const bcLinkSt: React.CSSProperties = { color: '#00A6FF', textDecoration: 'none', fontWeight: 500 };
 const bcSepSt: React.CSSProperties = { margin: '0 6px', color: '#999' };
-const searchBtnSt: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1px solid #ccc', borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#555' };
 const phaseBtnNormal: React.CSSProperties = { padding: '6px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 500, color: '#666', borderRadius: 4, transition: 'all 0.2s ease' };
 const phaseBtnActive: React.CSSProperties = { padding: '6px 16px', border: '2px solid #222', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 700, color: '#222', borderRadius: 20, transition: 'all 0.2s ease' };
 const phaseLabelNormal: React.CSSProperties = {};
@@ -1086,8 +1182,7 @@ const counters: React.CSSProperties = { display: 'flex', gap: 20, padding: '12px
 const counterItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text };
 const conclText: React.CSSProperties = { fontSize: 12.5, color: '#555', margin: '0 0 8px', lineHeight: 1.45 };
 const planBtn: React.CSSProperties = { flex: 1, padding: '12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer' };
-const searchBarSt: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 20, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', minWidth: 180 };
-const searchInputSt: React.CSSProperties = { border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', flex: 1, color: '#1e293b', backgroundColor: 'transparent' };
+
 const filterSelect: React.CSSProperties = { padding: '4px 8px', fontSize: 11, border: `1px solid ${C.border}`, borderRadius: 4, fontFamily: 'inherit', backgroundColor: '#fff', color: C.text, cursor: 'pointer' };
 const donutCenter: React.CSSProperties = { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2, pointerEvents: 'none' };
 const catRow: React.CSSProperties = { display: 'flex', gap: 12, justifyContent: 'space-between' };

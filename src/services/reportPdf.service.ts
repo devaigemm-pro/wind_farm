@@ -168,7 +168,7 @@ async function fetchReportData(inspectionId: string) {
     .from('inspection')
     .select('id, blade_id, scheduled_date, completed_at, stage, inspector_id')
     .in('blade_id', bladeIds)
-    .eq('stage', 'finalized');
+    .eq('stage', 'report');
 
   if (allInspErr) throw allInspErr;
 
@@ -753,6 +753,14 @@ function renderTurbineInfo(
     ? `${turbineInfo.windFarm.location} (${lat.toFixed(4)}, ${lng.toFixed(4)})`
     : turbineInfo.windFarm.location;
   doc.text(locationText, MARGIN, y2 + 2);
+
+  // Clickable link to Google Maps over the location text
+  if (lat && lng) {
+    const googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+    const textWidth = doc.getTextWidth(locationText);
+    doc.link(MARGIN, y2 - 2, textWidth, 8, { url: googleMapsUrl });
+  }
+
   y2 += 10;
 
   // 4.3 Detalles de las palas
@@ -1024,4 +1032,15 @@ export async function generateAndDownloadReport(data: ReportPdfData): Promise<vo
   // Download
   const filename = `Informe_${windFarmName}_${turbineName}_${dateFormatted.replace(/\//g, '-')}.pdf`;
   doc.save(filename.replace(/\s+/g, '_'));
+
+  // Transition inspection stage to 'report' after successful PDF generation
+  try {
+    await supabase
+      .from('inspection')
+      .update({ stage: 'report' })
+      .eq('id', data.inspectionId)
+      .neq('stage', 'report');
+  } catch (stageError) {
+    console.error('[reportPdf.service] Failed to update inspection stage:', stageError);
+  }
 }

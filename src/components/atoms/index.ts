@@ -21,6 +21,3 @@ export type { TooltipProps, TooltipPlacement } from './Tooltip';
 
 export { ExportButton } from './ExportButton';
 export type { ExportButtonProps } from './ExportButton';
-
-export { NotificationToggle } from './NotificationToggle';
-export type { NotificationToggleProps } from './NotificationToggle';

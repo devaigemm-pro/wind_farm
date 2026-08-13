@@ -56,6 +56,25 @@ export const droneUploadService = {
       throw new DroneUploadServiceError(`DB insert failed: ${error.message}`, error.code);
     }
 
+    // Transition inspection stage to 'inspect' if this is the first photo
+    try {
+      const { data: insp } = await db
+        .from('inspection')
+        .select('id, stage')
+        .eq('campaign_id', payload.campaignId)
+        .single();
+
+      if (insp && insp.stage === 'planned') {
+        await db
+          .from('inspection')
+          .update({ stage: 'inspect' })
+          .eq('id', insp.id)
+          .eq('stage', 'planned');
+      }
+    } catch (stageError) {
+      console.error('[drone-upload.service] Failed to update inspection stage:', stageError);
+    }
+
     return mapPhotoRow(data);
   },
 
@@ -203,10 +222,15 @@ export const droneUploadService = {
 
   /**
    * Get signed URL for a photo.
+   * Uses 'asset-documents' bucket for imported photos, 'inspection-photos' for native uploads.
    */
   async getPhotoUrl(storagePath: string): Promise<string> {
+    const bucket = storagePath.startsWith('inspection-imports/')
+      ? 'asset-documents'
+      : 'inspection-photos';
+
     const { data, error } = await supabase.storage
-      .from('inspection-photos')
+      .from(bucket)
       .createSignedUrl(storagePath, 3600); // 1 hour
 
     if (error) {

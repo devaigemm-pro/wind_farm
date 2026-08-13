@@ -1,0 +1,332 @@
+/* ==========================================================================
+   Responsive Utilities & Layout Media Queries
+   Design System — Wind Blade Inspection
+   Breakpoints: sm 640px | md 768px | lg 1024px | xl 1280px | 2xl 1536px
+   ========================================================================== */
+
+/* ==========================================================================
+   MOBILE SIDEBAR / DESKTOP SIDEBAR
+   ========================================================================== */
+
+/* Mobile: hide desktop sidebar, show mobile sidebar when active */
+@media (max-width: 767px) {
+  .sidebar-desktop {
+    display: none !important;
+  }
+
+  .sidebar-mobile {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform var(--duration-slow, 300ms) var(--easing-default, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .sidebar-mobile.sidebar-mobile--open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-slow, 300ms) var(--easing-default, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .sidebar-overlay--visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Desktop: always show sidebar, never show mobile sidebar/overlay */
+@media (min-width: 768px) {
+  .sidebar-desktop {
+    display: block !important;
+  }
+
+  .sidebar-mobile {
+    display: none !important;
+  }
+
+  .sidebar-overlay {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   TOPBAR HAMBURGER
+   ========================================================================== */
+
+/* Hide hamburger on desktop */
+@media (min-width: 768px) {
+  .topbar-hamburger {
+    display: none !important;
+  }
+}
+
+/* Show hamburger on mobile */
+@media (max-width: 767px) {
+  .topbar-hamburger {
+    display: flex;
+  }
+}
+
+/* ==========================================================================
+   CONTENT PADDING
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .layout-content {
+    padding: var(--space-3, 0.75rem) !important;
+  }
+
+  .layout-breadcrumb-container {
+    padding: 0 var(--space-3, 0.75rem) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .layout-content {
+    padding: var(--space-4, 1rem) !important;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE UTILITY CLASSES
+   ========================================================================== */
+
+/* Hide on mobile (< 768px) */
+@media (max-width: 767px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+}
+
+/* Show only on mobile (< 768px) */
+.show-on-mobile {
+  display: none !important;
+}
+
+@media (max-width: 767px) {
+  .show-on-mobile {
+    display: block !important;
+  }
+}
+
+/* Hide on tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hide-on-tablet {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   DASHBOARD RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .dashboard-page {
+    padding: var(--space-3, 0.75rem);
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2, 0.5rem);
+  }
+
+  .dashboard-title {
+    font-size: var(--text-xl, 1.25rem);
+  }
+
+  .chart-card {
+    min-height: 280px;
+    padding: var(--space-3, 0.75rem);
+  }
+
+  .chart-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2, 0.5rem);
+  }
+
+  .chart-card__filters {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 639px) {
+  .dashboard-grid--top,
+  .dashboard-grid--bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   TABLES — HORIZONTAL SCROLL ON MOBILE
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .responsive-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 calc(-1 * var(--space-3, 0.75rem));
+    padding: 0 var(--space-3, 0.75rem);
+  }
+
+  .responsive-table-wrapper table {
+    min-width: 600px;
+  }
+}
+
+/* ==========================================================================
+   CARDS & STATS GRIDS — COLLAPSE TO 1 COLUMN ON MOBILE
+   ========================================================================== */
+
+@media (max-width: 639px) {
+  .stats-grid,
+  .cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  .stats-grid,
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ==========================================================================
+   FORMS — FULL WIDTH ON MOBILE
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .form-row {
+    flex-direction: column !important;
+    gap: var(--space-3, 0.75rem);
+  }
+
+  .form-row > * {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: var(--space-2, 0.5rem);
+  }
+
+  .form-actions > button,
+  .form-actions > a {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   MODALS — FULL SCREEN ON MOBILE
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+}
+
+/* ==========================================================================
+   WIND FARM DETAIL — RESPONSIVE COLUMNS
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .wind-farm-detail-content {
+    flex-direction: column !important;
+  }
+
+  .wind-farm-detail-left {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-neutral-200, #e2e8f0);
+    max-height: none;
+  }
+
+  .wind-farm-detail-right {
+    width: 100% !important;
+  }
+}
+
+/* ==========================================================================
+   GENERAL FIX-UPS
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  /* Prevent fixed-width items from overflowing */
+  .share-popover {
+    left: var(--space-3) !important;
+    right: var(--space-3) !important;
+    width: auto !important;
+  }
+}
+
+/* ==========================================================================
+   SUBASSET DETAIL — DEFECTS TAB SPLIT PANEL
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .defects-split-container {
+    flex-direction: column !important;
+  }
+
+  .defects-split-table {
+    flex: 1 1 auto !important;
+    max-height: 60vh;
+  }
+
+  .defects-split-detail {
+    flex: 1 1 auto !important;
+    max-height: 40vh;
+    border-top: 1px solid var(--color-neutral-200, #e2e8f0);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .defects-split-table {
+    flex: 0 0 60% !important;
+  }
+
+  .defects-split-detail {
+    flex: 0 0 40% !important;
+  }
+}
+
+/* ==========================================================================
+   SUBASSET DETAIL — INSPECTIONS TABLE RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .subasset-inspections-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .subasset-inspections-table table {
+    min-width: 700px;
+  }
+}

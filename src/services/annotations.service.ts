@@ -117,7 +117,7 @@ export const annotationsService = {
 
     if (error) throw new Error(error.message);
 
-    // Transition inspection stage to 'annotated' if this is the first annotation
+    // Transition inspection stage to 'annotate' if this is the first annotation
     try {
       const { count } = await supabase
         .from('annotation')
@@ -127,9 +127,9 @@ export const annotationsService = {
       if (count === 1) {
         await supabase
           .from('inspection')
-          .update({ stage: 'annotated' })
+          .update({ stage: 'annotate' })
           .eq('id', input.inspectionId)
-          .in('stage', ['to_plan', 'planned', 'uploaded']);
+          .in('stage', ['planned', 'inspect']);
       }
     } catch (stageError) {
       console.error('[annotations.service] Failed to update inspection stage:', stageError);

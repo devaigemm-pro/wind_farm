@@ -41,7 +41,6 @@ export function NewInspection() {
   const [scheduledDate, setScheduledDate] = useState(getTodayISO());
   const [campaignName, setCampaignName] = useState(getDefaultCampaignName());
   const [notes, setNotes] = useState('');
-  const [subscribeNotifications, setSubscribeNotifications] = useState(true);
   const [selectedTurbineIds, setSelectedTurbineIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -82,7 +81,6 @@ export function NewInspection() {
       inspectionMethod,
       scheduledDate,
       notes,
-      subscribeNotifications,
       selectedTurbineIds,
     };
 
@@ -183,7 +181,6 @@ export function NewInspection() {
             scheduledDate={scheduledDate}
             campaignName={campaignName}
             notes={notes}
-            subscribeNotifications={subscribeNotifications}
             errors={errors}
             isLoadingFarms={isLoadingFarms}
             onWindFarmChange={handleWindFarmChange}
@@ -192,7 +189,6 @@ export function NewInspection() {
             onDateChange={setScheduledDate}
             onCampaignNameChange={setCampaignName}
             onNotesChange={setNotes}
-            onNotificationsChange={setSubscribeNotifications}
           />
         </div>
 

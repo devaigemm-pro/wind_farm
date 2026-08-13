@@ -4,19 +4,89 @@ const db = supabase as any;
 import type { Defect, DefectType, Severity, DefectDashboardRow, DefectComment } from '@/types';
 import { BLADE_POSITION_LABELS, DEFECT_TYPE_DISPLAY_LABELS } from '@/types';
 
-// ─── Defect type → test image mapping ───────────────────────────────────────
+// ─── Fetch real photos for defects via annotation → inspection_photo ─────────
 
-function getDefectImageByType(type: string): string {
-  const map: Record<string, string> = {
-    le_erosion: '/test-images/defect-erosion-close.svg',
-    vortex: '/test-images/defect-vortex-close.svg',
-    paint_defect: '/test-images/defect-paint-close.svg',
-    crack: '/test-images/defect-crack-close.svg',
-    delamination: '/test-images/defect-delamination-close.svg',
-    lightning_damage: '/test-images/defect-crack-close.svg',
-    other: '/test-images/defect-blade-close.svg',
-  };
-  return map[type] || '/test-images/defect-blade-close.svg';
+export async function fetchDefectImageMap(defectIds: string[]): Promise<Record<string, string>> {
+  if (defectIds.length === 0) return {};
+
+  // Get defects with their description (annotation ID)
+  const { data: defects } = await supabase
+    .from('defect')
+    .select('id, description')
+    .in('id', defectIds);
+
+  if (!defects || defects.length === 0) return {};
+
+  // Filter defects that have an annotation ID in description
+  const annotationIds = defects
+    .map((d) => d.description)
+    .filter((desc): desc is string => !!desc && desc.length === 36);
+
+  if (annotationIds.length === 0) return {};
+
+  // Get annotations with their thumbnail_id
+  const { data: annotations } = await supabase
+    .from('annotation')
+    .select('id, thumbnail_id')
+    .in('id', annotationIds);
+
+  if (!annotations || annotations.length === 0) return {};
+
+  // Get inspection_photos for the thumbnail IDs
+  const thumbnailIds = [...new Set(annotations.map((a) => a.thumbnail_id).filter(Boolean))];
+  if (thumbnailIds.length === 0) return {};
+
+  const { data: photos } = await db
+    .from('inspection_photo')
+    .select('id, storage_path')
+    .in('id', thumbnailIds);
+
+  if (!photos || photos.length === 0) return {};
+
+  // Generate signed URLs for the photos (bucket is private)
+  const storagePaths = (photos as Array<{ id: string; storage_path: string }>)
+    .filter((p) => p.storage_path)
+    .map((p) => p.storage_path);
+
+  const { data: signedResult } = await supabase.storage
+    .from('asset-documents')
+    .createSignedUrls(storagePaths, 3600);
+
+  // Build storage_path → signed URL map
+  const pathToUrl: Record<string, string> = {};
+  if (signedResult) {
+    for (const item of signedResult) {
+      if (item.signedUrl && !item.error) {
+        pathToUrl[item.path ?? ''] = item.signedUrl;
+      }
+    }
+  }
+
+  // Build thumbnail_id → signed URL map
+  const photoUrlMap: Record<string, string> = {};
+  for (const photo of (photos as Array<{ id: string; storage_path: string }>)) {
+    if (photo.storage_path && pathToUrl[photo.storage_path]) {
+      photoUrlMap[photo.id] = pathToUrl[photo.storage_path]!;
+    }
+  }
+
+  // Build annotation_id → photo URL map
+  const annotationPhotoMap: Record<string, string> = {};
+  for (const ann of annotations) {
+    if (ann.thumbnail_id && photoUrlMap[ann.thumbnail_id]) {
+      annotationPhotoMap[ann.id] = photoUrlMap[ann.thumbnail_id]!;
+    }
+  }
+
+  // Build defect_id → photo URL map
+  const result: Record<string, string> = {};
+  for (const d of defects) {
+    if (d.description && annotationPhotoMap[d.description]) {
+      result[d.id] = annotationPhotoMap[d.description]!;
+    }
+  }
+
+  return result;
 }
 
 // ─── Custom Error ───────────────────────────────────────────────────────────
@@ -78,6 +148,9 @@ export const defectsService = {
     severity: Severity;
     distance_from_root: number;
     description?: string;
+    width_cm?: number;
+    height_cm?: number;
+    next_step?: string;
   }): Promise<Defect> {
     const { data, error } = await supabase
       .from('defect')
@@ -87,11 +160,33 @@ export const defectsService = {
         severity: input.severity,
         distance_from_root: input.distance_from_root,
         description: input.description ?? null,
+        width_cm: input.width_cm ?? 0,
+        height_cm: input.height_cm ?? 0,
+        next_step: input.next_step ?? null,
       })
       .select()
       .single();
 
     if (error) throw new DefectServiceError(error.message, error.code);
+
+    // Transition inspection stage to 'analyze' if this is the first defect
+    try {
+      const { count } = await supabase
+        .from('defect')
+        .select('id', { count: 'exact', head: true })
+        .eq('inspection_id', input.inspection_id);
+
+      if (count === 1) {
+        await supabase
+          .from('inspection')
+          .update({ stage: 'analyze' })
+          .eq('id', input.inspection_id)
+          .in('stage', ['planned', 'inspect', 'annotate']);
+      }
+    } catch (stageError) {
+      console.error('[defects.service] Failed to update inspection stage:', stageError);
+    }
+
     return data as unknown as Defect;
   },
 
@@ -105,11 +200,23 @@ export const defectsService = {
       severity: Severity;
       distance_from_root: number;
       description: string | null;
+      width_cm: number;
+      height_cm: number;
+      next_step: string;
     }>,
   ): Promise<Defect> {
+    const updatePayload: Record<string, unknown> = {};
+    if (input.type !== undefined) updatePayload.type = input.type;
+    if (input.severity !== undefined) updatePayload.severity = input.severity;
+    if (input.distance_from_root !== undefined) updatePayload.distance_from_root = input.distance_from_root;
+    if (input.description !== undefined) updatePayload.description = input.description;
+    if (input.width_cm !== undefined) updatePayload.width_cm = input.width_cm;
+    if (input.height_cm !== undefined) updatePayload.height_cm = input.height_cm;
+    if (input.next_step !== undefined) updatePayload.next_step = input.next_step;
+
     const { data, error } = await supabase
       .from('defect')
-      .update(input)
+      .update(updatePayload as never)
       .eq('id', id)
       .select()
       .single();
@@ -188,8 +295,12 @@ export const defectsService = {
 
     const totalCount = rows.length;
 
+    // Fetch real evidence images for these defects
+    const defectIds = rows.map((r) => r.id as string);
+    const imageMap = await fetchDefectImageMap(defectIds);
+
     return {
-      data: rows.map(mapToDefectDashboardRow),
+      data: rows.map((row) => mapToDefectDashboardRow(row, imageMap[row.id as string] ?? null)),
       totalCount,
     };
   },
@@ -411,7 +522,7 @@ export const defectsService = {
         rootDistance: Number(r.distance_from_root) || 0,
         rootCause: (r.root_cause as string) ?? null,
         notes: (r.notes as string) ?? null,
-        imageUrl: getDefectImageByType((r.type as string) ?? "other"),
+        imageUrl: null,
         resolved: Boolean(r.resolved),
         inspectionId: r.inspection_id as string,
         bladeId: (inspection?.blade_id as string) ?? '',
@@ -432,25 +543,33 @@ export const defectsService = {
 
     const turbineIds = turbines.map((t: { id: string }) => t.id);
 
-    // Get all blades for these turbines
+    // Get inspections via both paths: blade_id and turbine_id
     const { data: blades, error: bladeErr } = await supabase
       .from('blade')
       .select('id')
       .in('turbine_id', turbineIds);
-    if (bladeErr || !blades || blades.length === 0) return [];
 
-    const bladeIds = blades.map((b: { id: string }) => b.id);
+    const bladeIds = (!bladeErr && blades) ? blades.map((b: { id: string }) => b.id) : [];
 
-    // Get inspections for these blades
-    const { data: inspections, error: inspErr } = await supabase
+    // Path 1: inspections via blade_id
+    const { data: bladeInspections } = bladeIds.length > 0
+      ? await supabase.from('inspection').select('id').in('blade_id', bladeIds)
+      : { data: [] };
+
+    // Path 2: inspections via turbine_id directly
+    const { data: turbineInspections } = await supabase
       .from('inspection')
       .select('id')
-      .in('blade_id', bladeIds);
-    if (inspErr || !inspections || inspections.length === 0) return [];
+      .in('turbine_id', turbineIds);
 
-    const inspectionIds = inspections.map((i: { id: string }) => i.id);
+    // Deduplicate inspection IDs
+    const inspIdSet = new Set<string>();
+    for (const i of (bladeInspections ?? [])) inspIdSet.add((i as { id: string }).id);
+    for (const i of (turbineInspections ?? [])) inspIdSet.add((i as { id: string }).id);
+    const inspectionIds = Array.from(inspIdSet);
+    if (inspectionIds.length === 0) return [];
 
-    // Get defects for these inspections
+    // Get defects for these inspections (join blade optionally, turbine via both paths)
     const { data: defects, error: defErr } = await supabase
       .from('defect')
       .select(`
@@ -469,13 +588,19 @@ export const defectsService = {
         inspection_id,
         inspection:inspection!inner(
           blade_id,
-          blade:blade!inner(
+          turbine_id,
+          blade:blade(
             position,
-            turbine:turbine!inner(
+            turbine:turbine!blade_turbine_id_fkey(
               name,
               model,
-              wind_farm:wind_farm!inner(name)
+              wind_farm:wind_farm!turbine_wind_farm_id_fkey(name)
             )
+          ),
+          direct_turbine:turbine!inspection_turbine_id_fkey(
+            name,
+            model,
+            wind_farm:wind_farm!turbine_wind_farm_id_fkey(name)
           )
         )
       `)
@@ -487,8 +612,10 @@ export const defectsService = {
       const r = row as Record<string, unknown>;
       const inspection = r.inspection as Record<string, unknown> | null;
       const blade = inspection?.blade as Record<string, unknown> | null;
-      const turbine = blade?.turbine as Record<string, unknown> | null;
-      const windFarm = turbine?.wind_farm as Record<string, unknown> | null;
+      const turbineViaBlade = blade?.turbine as Record<string, unknown> | null;
+      const directTurbine = inspection?.direct_turbine as Record<string, unknown> | null;
+      const turbine = turbineViaBlade ?? directTurbine;
+      const windFarm = (turbine?.wind_farm as Record<string, unknown>) ?? null;
       const bladePos = Number(blade?.position) || 1;
 
       const severity = Number(r.severity) || 3;
@@ -514,7 +641,7 @@ export const defectsService = {
         rootDistance: Number(r.distance_from_root) || 0,
         rootCause: (r.root_cause as string) ?? null,
         notes: (r.notes as string) ?? null,
-        imageUrl: getDefectImageByType((r.type as string) ?? "other"),
+        imageUrl: null,
         resolved: Boolean(r.resolved),
         inspectionId: r.inspection_id as string,
         bladeId: (inspection?.blade_id as string) ?? '',
@@ -525,7 +652,7 @@ export const defectsService = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapToDefectDashboardRow(row: Record<string, unknown>): DefectDashboardRow {
+function mapToDefectDashboardRow(row: Record<string, unknown>, imageUrl: string | null): DefectDashboardRow {
   const bladePos = Number(row.blade_position) || 1;
   return {
     id: row.id as string,
@@ -544,7 +671,7 @@ function mapToDefectDashboardRow(row: Record<string, unknown>): DefectDashboardR
     rootDistance: Number(row.root_distance) || 0,
     rootCause: (row.root_cause as string) ?? null,
     notes: (row.notes as string) ?? null,
-    imageUrl: getDefectImageByType((row.defect_type as string) ?? 'other'),
+    imageUrl: imageUrl ?? null,
     resolved: Boolean(row.resolved),
     inspectionId: (row.inspection_id as string) ?? '',
     bladeId: (row.blade_id as string) ?? '',

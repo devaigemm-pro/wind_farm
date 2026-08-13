@@ -10,11 +10,11 @@ export interface DefectsSpreadChartProps {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  sev1: 'lightgrey', // Severity 1
-  sev2: 'grey',      // Severity 2
-  sev3: '#4CAF50',   // Severity 3 - green
-  sev4: 'navy',      // Severity 4
-  sev5: 'red',       // Severity 5
+  sev1: '#b8b8b8',   // Severity 1 - matte light grey
+  sev2: '#8a8a8a',   // Severity 2 - matte grey
+  sev3: '#5a9e5a',   // Severity 3 - matte green
+  sev4: '#2c3e6b',   // Severity 4 - matte navy
+  sev5: '#b84a4a',   // Severity 5 - matte red
 };
 
 const SEVERITY_LABELS: Record<string, string> = {

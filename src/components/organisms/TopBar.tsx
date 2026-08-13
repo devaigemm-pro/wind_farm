@@ -161,6 +161,7 @@ export function TopBar({
       <button
         type="button"
         style={hamburgerStyle}
+        className="topbar-hamburger"
         onClick={onMenuToggle}
         aria-label="Toggle navigation menu"
       >

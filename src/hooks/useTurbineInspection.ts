@@ -67,26 +67,74 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
     .from('inspection')
     .select('id, completed_at, scheduled_date, stage')
     .in('blade_id', bladeIds)
-    .eq('stage', 'finalized')
+    .eq('stage', 'report')
     .order('completed_at', { ascending: false })
     .limit(1);
 
-  if (inspErr || !inspections || inspections.length === 0) return null;
+  if (inspErr) return null;
+
+  // If no finalized inspection exists, return basic turbine/blade data
+  // so the Results view can still render annotations from the workflow
+  if (!inspections || inspections.length === 0) {
+    const positionToLetter: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
+    const bladeIdToPosition: Record<string, string> = {};
+    for (const b of blades) {
+      bladeIdToPosition[b.id] = positionToLetter[b.position] || String(b.position);
+    }
+
+    // Try to get ANY inspection for the blade position mapping
+    const { data: anyInspections } = await supabase
+      .from('inspection')
+      .select('id, blade_id')
+      .in('blade_id', bladeIds);
+
+    const inspectionToBladePosition: Record<string, string> = {};
+    const inspectionIds: string[] = [];
+    for (const insp of anyInspections || []) {
+      inspectionToBladePosition[insp.id] = bladeIdToPosition[insp.blade_id] || '?';
+      inspectionIds.push(insp.id);
+    }
+
+    const wf = turbine.wind_farm as any;
+    const maxBladeLength = blades.reduce((max, b) => Math.max(max, b.length_meters || 43), 0);
+
+    return {
+      inspectionId: inspectionIds[0] || '',
+      inspectionIds,
+      inspectionToBladePosition,
+      inspectionDate: new Date().toISOString(),
+      windFarmName: wf?.name || 'Unknown',
+      windFarmId: wf?.id || '',
+      turbineName: turbine.name,
+      turbineId: turbine.id,
+      blades: blades.map((b) => ({
+        position: positionToLetter[b.position] || String(b.position),
+        serialNumber: b.serial_number || 'N/A',
+        id: b.id,
+      })),
+      defects: [],
+      bladeLength: maxBladeLength,
+      windFarmCoords: wf?.latitude && wf?.longitude ? { lat: wf.latitude, lon: wf.longitude } : null,
+    };
+  }
 
   const inspection = inspections[0]!;
 
-  // Get ALL finalized inspections for this turbine's blades to get all defects
+  // Get ALL inspections for this turbine's blades (not just finalized)
+  // to build the inspection→blade position map (needed for annotation display)
   const { data: allInspections, error: allInspErr } = await supabase
     .from('inspection')
-    .select('id, blade_id')
-    .in('blade_id', bladeIds)
-    .eq('stage', 'finalized');
+    .select('id, blade_id, stage')
+    .in('blade_id', bladeIds);
 
   if (allInspErr || !allInspections) return null;
 
-  const inspectionIds = allInspections.map((i) => i.id);
+  // For defects, only use finalized inspections
+  const finalizedInspections = allInspections.filter(i => i.stage === 'report');
+  const inspectionIds = finalizedInspections.map((i) => i.id);
 
-  // Map inspection_id to blade_id
+  // Map ALL inspection_ids to blade_id (so annotations from non-finalized
+  // inspections can still be mapped to the correct blade)
   const inspToBlade: Record<string, string> = {};
   for (const insp of allInspections) {
     inspToBlade[insp.id] = insp.blade_id;

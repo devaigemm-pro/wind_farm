@@ -2,12 +2,21 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Learn from Session on Stop",
+      "name": "Update User Profile on Stop",
       "trigger": "Stop",
-      "description": "Al finalizar una sesión, ejecuta el script de análisis que instruye al agente a observar patrones de interacción y actualizar el perfil de usuario.",
+      "description": "Instrucción directa al agente para actualizar el perfil de usuario con lo aprendido en la sesión.",
+      "action": {
+        "type": "agent",
+        "prompt": "OBLIGATORIO ANTES DE CERRAR: Actualiza .kiro/agents/user-profile.md con lo observado en esta sesión.\n\n1. Lee el archivo .kiro/agents/user-profile.md\n2. Incrementa 'Sesiones analizadas' en Metadata\n3. Cambia 'Última actualización' a la fecha de hoy\n4. Agrega al final de '## 8. Historial de Observaciones por Sesión' una entrada:\n   ### Sesión [N] - [FECHA]\n   - **Tarea principal**: [qué pidió el usuario]\n   - **Observaciones nuevas**: [patrones, preferencias, correcciones]\n   - **Patrones confirmados**: [los que se repitieron]\n5. Si hubo correcciones, agrégalas a sección 7\n6. Si un patrón aparece en 3+ sesiones, sube confianza a 'alta'\n\nUsa str_replace. No reescribas todo. Si existe .kiro/agents/session-logs/current-session.md, úsalo como referencia."
+      }
+    },
+    {
+      "name": "Archive Session Log on Stop",
+      "trigger": "Stop",
+      "description": "Archiva el log de interacciones de la sesión actual.",
       "action": {
         "type": "command",
-        "command": "bash .kiro/agents/analyze-session.sh"
+        "command": "bash -c 'LOG=\".kiro/agents/session-logs/current-session.md\"; if [ -f \"$LOG\" ]; then cp \"$LOG\" \".kiro/agents/session-logs/session-$(date +%Y%m%d-%H%M%S).md\"; rm \"$LOG\"; fi'"
       }
     }
   ]

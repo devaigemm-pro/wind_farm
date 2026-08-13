@@ -37,8 +37,8 @@ export type OngoingByStage = Record<string, OngoingGroupedByFarm[]>;
 
 export const ongoingService = {
   /**
-   * Fetch all in_progress inspections in the ongoing stages (planned → analyzed).
-   * Groups them by stage and wind farm.
+   * Fetch all in_progress inspections grouped by stage (planned → analyze).
+   * Mirrors Skyvisor's original logic: columns are workflow stages.
    */
   async getOngoingInspections(): Promise<OngoingByStage> {
     const { data, error } = await supabase
@@ -55,7 +55,7 @@ export const ongoingService = {
         defects:defect(id)
       `,
       )
-      .in('stage', ['planned', 'uploaded', 'annotated', 'analyzed'])
+      .in('stage', ['planned', 'inspect', 'annotate', 'analyze', 'report'])
       .eq('status', 'in_progress');
 
     if (error) throw new Error(error.message);
@@ -63,7 +63,7 @@ export const ongoingService = {
     const inspections = (data ?? []) as unknown as OngoingInspectionItem[];
 
     // Group by stage → wind farm
-    const stages: InspectionStage[] = ['planned', 'uploaded', 'annotated', 'analyzed'];
+    const stages: InspectionStage[] = ['planned', 'inspect', 'annotate', 'analyze', 'report'];
     const result: OngoingByStage = {};
 
     for (const stage of stages) {

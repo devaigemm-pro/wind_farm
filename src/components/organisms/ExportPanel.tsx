@@ -1,7 +1,6 @@
-import { useState, useMemo, type CSSProperties } from 'react';
+import { useState, useMemo, useEffect, type CSSProperties } from 'react';
 import { FileDown, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
-import ExcelJS from 'exceljs';
 import { supabase } from '@/lib/supabase';
 import { savePdfBlob } from '@/utils/pdfStorage';
 import type { ResultsDefect } from '@/types';
@@ -14,6 +13,7 @@ export interface ExportPanelProps {
   anchorEl: HTMLElement | null;
   open: boolean;
   onClose: () => void;
+  inline?: boolean;
   existingReport?: { storagePath: string; generatedAt?: string; generatedBy?: string } | null;
   blades?: { position: string; serialNumber: string; id: string }[];
   bladeLength?: number;
@@ -21,6 +21,7 @@ export interface ExportPanelProps {
   windFarmCoords?: { lat: number; lon: number } | null;
   windFarmId?: string;
   turbineId?: string;
+  campaignId?: string;
 }
 
 // ─── PDF Color constants ─────────────────────────────────────────────────────
@@ -329,6 +330,12 @@ function drawMapPlaceholder(
     doc.setTextColor(...PDF_COLORS.mutedText);
     doc.text(`${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`, x + width / 2, y + height - 8, { align: 'center' });
   }
+
+  // Clickable link to Google Maps over the entire map area
+  if (coords) {
+    const googleMapsUrl = `https://www.google.com/maps?q=${coords.lat},${coords.lon}`;
+    doc.link(x, y, width, height, { url: googleMapsUrl });
+  }
 }
 
 // ─── drawBladeProfile ────────────────────────────────────────────────────────
@@ -542,20 +549,7 @@ function generateCSV(defects: ResultsDefect[], windFarmName: string, turbineName
   URL.revokeObjectURL(url);
 }
 
-// Defect type → test image path mapping
-const DEFECT_TYPE_IMAGES: Record<string, string> = {
-  'LE EROSION': '/test-images/defect-erosion-wide.svg',
-  'OIL': '/test-images/defect-oil-wide.svg',
-  'LIGHTNING DAMAGE': '/test-images/defect-crack-wide.svg',
-  'OTHER': '/test-images/defect-blade-wide.svg',
-  'OTHER ADD-ONS MISSING': '/test-images/defect-blade-wide.svg',
-  'CRACK': '/test-images/defect-crack-close.svg',
-  'VORTEX': '/test-images/defect-vortex-wide.svg',
-  'VORTEX (MISSING PANELS)': '/test-images/defect-vortex-wide.svg',
-  'PAINT DEFECT': '/test-images/defect-paint-wide.svg',
-  'PAINT DAMAGES': '/test-images/defect-paint-wide.svg',
-  'DELAMINATION': '/test-images/defect-delamination-wide.svg',
-};
+// (Defect images now come from the real evidence in the database)
 
 /** Fetch an image URL and convert to base64 ArrayBuffer for ExcelJS */
 async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; extension: 'png' | 'jpeg' } | null> {
@@ -696,6 +690,7 @@ async function renderLogoPng(): Promise<ArrayBuffer | null> {
 
 /** Generate XLSX with embedded images */
 async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turbineName: string) {
+  const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Defects');
 
@@ -781,8 +776,8 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
     row.eachCell((cell) => { cell.border = {}; });
 
     // Fetch and embed defect image
-    const imgPath = DEFECT_TYPE_IMAGES[d.type.toUpperCase()] ?? DEFECT_TYPE_IMAGES[d.type] ?? '/test-images/defect-blade-wide.svg';
-    const imgData = await fetchImageAsBuffer(`${origin}${imgPath}`);
+    const imgPath = d.images?.[0] ?? null;
+    const imgData = imgPath ? await fetchImageAsBuffer(imgPath) : null;
     if (imgData) {
       const imageId = workbook.addImage({ buffer: imgData.buffer, extension: imgData.extension });
       const rowIdx = dataStartRow + i - 1;
@@ -814,20 +809,52 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   a.download = `Defects_${windFarmName}_${turbineName}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
+  return blob;
 }
 
 /** Try to load an image from URL as base64 data URI */
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
-    const resp = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!resp.ok) return null;
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.startsWith('image/')) return null;
     const blob = await resp.blob();
+    if (blob.size < 1000) return null;
+
+    // Resize image via canvas to avoid jsPDF rendering issues with large images
     return new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(null), 8000);
-      const reader = new FileReader();
-      reader.onloadend = () => { clearTimeout(timeout); resolve(reader.result as string); };
-      reader.onerror = () => { clearTimeout(timeout); resolve(null); };
-      reader.readAsDataURL(blob);
+      const timeout = setTimeout(() => resolve(null), 6000);
+      const img = new Image();
+      const blobUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        clearTimeout(timeout);
+        try {
+          const MAX_W = 1200;
+          const MAX_H = 900;
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          if (w > MAX_W) { h = Math.round(h * (MAX_W / w)); w = MAX_W; }
+          if (h > MAX_H) { w = Math.round(w * (MAX_H / h)); h = MAX_H; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          URL.revokeObjectURL(blobUrl);
+          resolve(dataUrl);
+        } catch {
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        }
+      };
+      img.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(blobUrl); resolve(null); };
+      img.src = blobUrl;
     });
   } catch {
     return null;
@@ -841,12 +868,14 @@ export function ExportPanel({
   windFarmName,
   open,
   onClose,
+  inline,
   blades,
   bladeLength,
   inspectionDate,
   windFarmCoords,
   windFarmId,
   turbineId,
+  campaignId,
 }: ExportPanelProps) {
   const [language, setLanguage] = useState<'en' | 'es'>('en');
   const [includeDetails, setIncludeDetails] = useState(true);
@@ -860,6 +889,13 @@ export function ExportPanel({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
+
+  // Cleanup blob URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+    };
+  }, [pdfBlobUrl]);
 
   // Sections collapsed state
   const [resolvedOpen, setResolvedOpen] = useState(true);
@@ -904,6 +940,26 @@ export function ExportPanel({
   const handleGeneratePDF = async () => {
     setIsGenerating(true);
     setGenerateError(null);
+
+    // Transition inspection stage to 'report' immediately
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (userId) {
+        // Insert report record — DB trigger will change stage to 'report'
+        await (supabase as any).from('report').insert({
+          reference_id: inspectionId,
+          type: 'inspection',
+          generated_by: userId,
+          generated_at: new Date().toISOString(),
+          filename: `report_${inspectionId}.pdf`,
+          storage_path: `reports/${inspectionId}/${Date.now()}.pdf`,
+        });
+      }
+    } catch (e) {
+      console.error('[ExportPanel] report insert error:', e);
+    }
+
     try {
       // Filter defects based on current selections
       let filtered = [...defects];
@@ -1471,7 +1527,7 @@ export function ExportPanel({
 
       // Clickable link to app Results view
       if (windFarmId && turbineId) {
-        const resultsUrl = `${appBaseUrl}/assets-wind/${windFarmId}/turbine/${turbineId}?inspectionId=${inspectionId}`;
+        const resultsUrl = `${appBaseUrl}/inspections/${inspectionId}/workflow?step=4`;
         const linkText = language === 'es' ? 'Ver todos los defectos en CORE Insight' : 'View all defects in CORE Insight';
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
@@ -1571,6 +1627,80 @@ export function ExportPanel({
       // Defect Details (if includeDetails is ON)
       // ═══════════════════════════════════════════════════════════════════════
       if (includeDetails) {
+        // Pre-load defect images: fetch signed URLs from DB in batch, then download in parallel
+        const imageCache: Record<string, string> = {};
+        try {
+          const annotIds = filtered.map(d => d.id).filter(Boolean);
+          if (annotIds.length > 0) {
+            // Step 1: Get thumbnail_ids for all annotations
+            const { data: annots } = await supabase
+              .from('annotation')
+              .select('id, thumbnail_id')
+              .in('id', annotIds);
+
+            if (annots && annots.length > 0) {
+              const thumbIds = annots.map(a => a.thumbnail_id).filter(Boolean) as string[];
+              if (thumbIds.length > 0) {
+                // Step 2: Get storage paths for all photos
+                const { data: photos } = await (supabase as any)
+                  .from('inspection_photo')
+                  .select('id, storage_path')
+                  .in('id', thumbIds);
+
+                if (photos && photos.length > 0) {
+                  const photoMap: Record<string, string> = {};
+                  for (const p of photos) if (p.storage_path) photoMap[p.id] = p.storage_path;
+
+                  // Step 3: Generate signed URLs in batch
+                  const assetPaths = Object.values(photoMap).filter((p: string) => p.startsWith('inspection-imports/'));
+                  const inspPaths = Object.values(photoMap).filter((p: string) => !p.startsWith('inspection-imports/'));
+                  const signedMap: Record<string, string> = {};
+
+                  const [aRes, iRes] = await Promise.all([
+                    assetPaths.length > 0 ? supabase.storage.from('asset-documents').createSignedUrls(assetPaths, 600) : { data: null },
+                    inspPaths.length > 0 ? supabase.storage.from('inspection-photos').createSignedUrls(inspPaths, 600) : { data: null },
+                  ]);
+                  if (aRes.data) aRes.data.forEach((item: any, i: number) => { if (item?.signedUrl && !item.error) signedMap[assetPaths[i]!] = item.signedUrl; });
+                  if (iRes.data) iRes.data.forEach((item: any, i: number) => { if (item?.signedUrl && !item.error) signedMap[inspPaths[i]!] = item.signedUrl; });
+
+                  // Step 4: Map annotation_id → signed URL
+                  const annotUrlMap: Record<string, string> = {};
+                  for (const a of annots) {
+                    if (a.thumbnail_id && photoMap[a.thumbnail_id]) {
+                      const url = signedMap[photoMap[a.thumbnail_id]!];
+                      if (url) annotUrlMap[a.id] = url;
+                    }
+                  }
+
+                  // Step 5: Download all images in parallel with 15s global timeout
+                  const entries = Object.entries(annotUrlMap);
+                  if (entries.length > 0) {
+                    await Promise.race([
+                      Promise.allSettled(entries.map(async ([annotId, url]) => {
+                        const base64 = await loadImageAsBase64(url);
+                        if (base64) imageCache[annotId] = base64;
+                      })),
+                      new Promise(resolve => setTimeout(resolve, 30000)),
+                    ]);
+                  }
+                }
+              }
+            }
+          }
+        } catch {
+          // Continue without images if anything fails
+        }
+
+        // Also try d.images as fallback (for when photoPathMap had valid URLs)
+        for (const d of filtered) {
+          if (!imageCache[d.id] && d.images && d.images.length > 0 && d.images[0]!.startsWith('http')) {
+            try {
+              const base64 = await loadImageAsBase64(d.images[0]!);
+              if (base64) imageCache[d.id] = base64;
+            } catch { /* skip */ }
+          }
+        }
+
         for (const d of filtered) {
           // Ensure enough space for defect info + image together (~150mm needed)
           if (y > pageH - 150) { newPage(); y = 28; }
@@ -1640,7 +1770,7 @@ export function ExportPanel({
 
           // Clickable link per defect
           if (windFarmId && turbineId) {
-            const defectUrl = `${appBaseUrl}/assets-wind/${windFarmId}/turbine/${turbineId}?inspectionId=${inspectionId}`;
+            const defectUrl = `${appBaseUrl}/inspections/${inspectionId}/workflow?step=4&tab=details&defectId=${d.displayId}`;
             const defectLinkText = language === 'es'
               ? 'Ver más información sobre este defecto en CORE Insight'
               : 'View more information about this defect in CORE Insight';
@@ -1655,159 +1785,21 @@ export function ExportPanel({
             y += 7;
           }
 
-          // Try to include images — two per row side by side
-          // Build imagesToShow: try d.images first, then defect_image table, then annotation.thumbnail_id
-          const imagesToShow: string[] = [];
-
-          if (d.images && d.images.length > 0) {
-            // Use pre-loaded storage paths
-            for (const imgPath of d.images) {
-              try {
-                const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(imgPath);
-                if (urlData?.publicUrl) {
-                  const base64 = await loadImageAsBase64(urlData.publicUrl);
-                  if (base64) imagesToShow.push(base64);
-                }
-              } catch {
-                // Skip image on error
-              }
-            }
+          // Use pre-loaded image from cache
+          const cachedImg = imageCache[d.id];
+          if (cachedImg) {
+            // Use landscape aspect ratio matching drone photos (4:3)
+            const imgW = contentW * 0.7;
+            const imgH = imgW * 0.56; // ~16:9 aspect from drone
+            const imgX = margin + (contentW - imgW) / 2;
+            if (y + imgH > pageH - 20) { newPage(); y = 28; }
+            doc.setDrawColor(200, 200, 200);
+            doc.roundedRect(imgX - 1, y - 1, imgW + 2, imgH + 2, 2, 2, 'S');
+            doc.addImage(cachedImg, 'JPEG', imgX, y, imgW, imgH);
+            y += imgH + 5;
           }
 
-          // Fallback: try defect_image table
-          if (imagesToShow.length === 0 && d.id) {
-            try {
-              const { data: defectImages } = await supabase
-                .from('defect_image')
-                .select('evidence_id')
-                .eq('defect_id', d.id);
-
-              if (defectImages && defectImages.length > 0) {
-                const evidenceIds = defectImages.map((di: any) => di.evidence_id);
-                const { data: evidenceRows } = await supabase
-                  .from('evidence')
-                  .select('id, storage_path')
-                  .in('id', evidenceIds);
-
-                for (const ev of evidenceRows || []) {
-                  if (ev.storage_path) {
-                    try {
-                      const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(ev.storage_path);
-                      if (urlData?.publicUrl) {
-                        const base64 = await loadImageAsBase64(urlData.publicUrl);
-                        if (base64) imagesToShow.push(base64);
-                      }
-                    } catch {
-                      // Skip
-                    }
-                  }
-                }
-              }
-            } catch {
-              // Skip on error
-            }
-          }
-
-          // Fallback: try annotation thumbnail_id → inspection_photo bucket
-          // NOTE: Currently inspection-photos bucket is empty, skip this to avoid 400 errors
-          // When real photos are uploaded, uncomment this block
-          /*
-          if (imagesToShow.length === 0 && d.id) {
-            try {
-              const { data: annot } = await supabase
-                .from('annotation')
-                .select('thumbnail_id')
-                .eq('id', d.id)
-                .single();
-
-              if (annot?.thumbnail_id) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const { data: inspPhoto } = await (supabase as any)
-                  .from('inspection_photo')
-                  .select('storage_path')
-                  .eq('id', annot.thumbnail_id)
-                  .single();
-
-                if (inspPhoto?.storage_path) {
-                  try {
-                    const { data: urlData } = supabase.storage.from('inspection-photos').getPublicUrl(inspPhoto.storage_path);
-                    if (urlData?.publicUrl) {
-                      const base64 = await loadImageAsBase64(urlData.publicUrl);
-                      if (base64) imagesToShow.push(base64);
-                    }
-                  } catch {
-                    // Skip
-                  }
-                }
-              }
-            } catch {
-              // Skip on error
-            }
-          }
-          */
-
-          // Fallback: use test images based on defect type
-          if (imagesToShow.length === 0) {
-            const DEFECT_TYPE_IMG: Record<string, string> = {
-              'LE EROSION': '/test-images/defect-erosion-wide.svg',
-              'VORTEX (MISSING PANELS)': '/test-images/defect-vortex-wide.svg',
-              'PAINT DAMAGES': '/test-images/defect-paint-wide.svg',
-              'CRACK': '/test-images/defect-crack-close.svg',
-              'OTHER ADD-ONS MISSING': '/test-images/defect-blade-wide.svg',
-              'DELAMINATION': '/test-images/defect-delamination-wide.svg',
-              'OIL': '/test-images/defect-oil-wide.svg',
-              'LIGHTNING DAMAGE': '/test-images/defect-crack-wide.svg',
-            };
-            const imgPath = DEFECT_TYPE_IMG[d.type] ?? '/test-images/defect-blade-wide.svg';
-            try {
-              const svgResp = await fetch(imgPath);
-              if (svgResp.ok) {
-                const svgText = await svgResp.text();
-                const base64 = await svgToBase64Png(svgText, 1200, 900);
-                if (base64) imagesToShow.push(base64);
-              }
-            } catch {
-              // Skip on error
-            }
-          }
-
-          if (imagesToShow.length > 0) {
-            const imgWidth = contentW / 2 - 3;
-            const imgHeight = imgWidth * 0.7;
-
-            if (y + imgHeight > pageH - 20) { newPage(); y = 28; }
-
-            if (imagesToShow.length >= 2) {
-              // 2 photos side by side
-              const img1 = imagesToShow[0]!;
-              const img2 = imagesToShow[1]!;
-              doc.setDrawColor(200, 200, 200);
-              doc.roundedRect(margin - 1, y - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S');
-              doc.roundedRect(margin + imgWidth + 6 - 1, y - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S');
-              doc.addImage(img1, 'PNG', margin, y, imgWidth, imgHeight);
-              doc.addImage(img2, 'PNG', margin + imgWidth + 6, y, imgWidth, imgHeight);
-              y += imgHeight + 5;
-            } else {
-              // 1 photo centered
-              const singleW = contentW * 0.8;
-              const singleH = singleW * 0.7;
-              const singleX = margin + contentW * 0.1;
-              if (y + singleH > pageH - 20) { newPage(); y = 28; }
-              doc.setDrawColor(200, 200, 200);
-              doc.roundedRect(singleX - 1, y - 1, singleW + 2, singleH + 2, 2, 2, 'S');
-              doc.addImage(imagesToShow[0]!, 'PNG', singleX, y, singleW, singleH);
-              y += singleH + 5;
-            }
-
-            // Remaining images (3rd+) stacked normally
-            for (let imgIdx = 2; imgIdx < imagesToShow.length; imgIdx++) {
-              if (y + imgHeight > pageH - 20) { newPage(); y = 28; }
-              doc.setDrawColor(200, 200, 200);
-              doc.roundedRect(margin - 1, y - 1, imgWidth + 2, imgHeight + 2, 2, 2, 'S');
-              doc.addImage(imagesToShow[imgIdx]!, 'JPEG', margin, y, imgWidth, imgHeight);
-              y += imgHeight + 5;
-            }
-          }
+          y += 5;
           y += 5;
         }
       }
@@ -1834,8 +1826,9 @@ export function ExportPanel({
         try { await savePdfBlob(inspectionId, blob); } catch { /* ignore */ }
         try {
           await (supabase as any).from('inspection')
-            .update({ stage: 'finalized', status: 'completed', completed_at: new Date().toISOString() })
-            .eq('id', inspectionId);
+            .update({ stage: 'report' })
+            .eq('id', inspectionId)
+            .neq('stage', 'report');
 
           const { data: userData } = await supabase.auth.getUser();
           const userId = userData.user?.id;
@@ -1868,26 +1861,28 @@ export function ExportPanel({
 
   const handleDownloadPDF = () => {
     if (pdfBlobUrl) {
-      const a = document.createElement('a');
-      a.href = pdfBlobUrl;
-      a.download = `Inspection_${windFarmName}_${turbineName}.pdf`;
-      a.click();
+      // Open PDF in a new browser tab so clicks on links inside (e.g. Google Maps)
+      // navigate that tab — not the main app tab
+      window.open(pdfBlobUrl, '_blank');
     }
   };
 
   const handleDownloadCSV = async () => {
-    await generateXLSX(defects, windFarmName, turbineName);
+    const blob = await generateXLSX(defects, windFarmName, turbineName);
+    // Save XLSX to IndexedDB for retrieval from CampaignResults
+    if (blob) {
+      try { await savePdfBlob(`xlsx-${inspectionId}`, blob); } catch { /* ignore */ }
+    }
   };
 
   if (!open) return null;
 
-  return (
-    <>
-      {/* Overlay */}
-      <div style={overlayStyle} onClick={onClose} />
-      {/* Panel */}
-      <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+  const wrapperContent = (
+    <div style={inline ? { padding: 20 } : panelStyle} onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={panelTitleStyle}>Filter defects and export to PDF &amp; XLSX</h3>
+        {!inline && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#666', padding: 4 }}>&times;</button>}
+      </div>
 
         {/* Language select */}
         <div style={fieldRowStyle}>
@@ -2065,6 +2060,13 @@ export function ExportPanel({
         </div>
         <p style={csvNoteStyle}>Filters do not apply to XLSX</p>
       </div>
+  );
+  
+  if (inline) return wrapperContent;
+
+  return (
+    <>
+      {wrapperContent}
     </>
   );
 }
@@ -2076,6 +2078,7 @@ const overlayStyle: CSSProperties = {
   inset: 0,
   background: 'transparent',
   zIndex: 999,
+  pointerEvents: 'none',
 };
 
 const panelStyle: CSSProperties = {

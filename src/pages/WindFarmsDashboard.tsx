@@ -9,6 +9,7 @@ import { GlobalMap } from '@/components/organisms/GlobalMap';
 import { ExportButton } from '@/components/atoms/ExportButton';
 import { useWindFarmsDashboard } from '@/hooks/useWindFarmsDashboard';
 import { useWindFarms } from '@/hooks/useWindFarms';
+import { useAuth } from '@/hooks/useAuth';
 import { defectsService } from '@/services/defects.service';
 import { generateDefectsXLSX, downloadBlob } from '@/utils/csv-export';
 import { Wind } from 'lucide-react';
@@ -22,6 +23,10 @@ const TABS = [
 
 export function WindFarmsDashboard() {
   const navigate = useNavigate();
+  const { role } = useAuth();
+
+  // Supervisor can only see specific wind farm(s)
+  const SUPERVISOR_ALLOWED_FARMS = ['f0000000-0001-4000-8000-000000000001'];
 
   // Tab state
   const [activeTab, setActiveTab] = useState('assets');
@@ -44,13 +49,17 @@ export function WindFarmsDashboard() {
   const { data: rawData, isLoading } = useWindFarmsDashboard();
   const { data: windFarmsForMap, isLoading: isLoadingMap } = useWindFarms();
 
-  // Filter by search query
+  // Filter by search query and role
   const filteredData = useMemo(() => {
     if (!rawData) return [];
-    if (!searchQuery.trim()) return rawData;
+    let data = rawData;
+    if (role === 'supervisor') {
+      data = data.filter((row) => SUPERVISOR_ALLOWED_FARMS.includes(row.id));
+    }
+    if (!searchQuery.trim()) return data;
     const query = searchQuery.toLowerCase();
-    return rawData.filter((row) => row.name.toLowerCase().includes(query));
-  }, [rawData, searchQuery]);
+    return data.filter((row) => row.name.toLowerCase().includes(query));
+  }, [rawData, searchQuery, role]);
 
   // Sort
   const sortedData = useMemo(() => {
@@ -259,7 +268,7 @@ export function WindFarmsDashboard() {
             aria-labelledby="tab-globalMap"
           >
             <GlobalMap
-              windFarms={windFarmsForMap ?? []}
+              windFarms={(windFarmsForMap ?? []).filter((wf) => role !== 'supervisor' || SUPERVISOR_ALLOWED_FARMS.includes(wf.id))}
               isLoading={isLoadingMap}
               onWindFarmClick={(id) => navigate(`/assets-wind/${id}`)}
             />

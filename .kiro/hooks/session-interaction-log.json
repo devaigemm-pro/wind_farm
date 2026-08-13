@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Log Each User Interaction",
+      "trigger": "UserPromptSubmit",
+      "description": "Registra cada interacción del usuario en current-session.md para tener referencia al momento del Stop",
+      "action": {
+        "type": "command",
+        "command": "bash .kiro/agents/log-interaction.sh"
+      }
+    }
+  ]
+}

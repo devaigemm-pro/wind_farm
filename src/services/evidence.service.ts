@@ -57,6 +57,25 @@ export const evidenceService = {
       .single();
 
     if (error) throw new EvidenceServiceError(error.message);
+
+    // Transition inspection stage to 'inspect' if this is the first evidence
+    try {
+      const { count } = await supabase
+        .from('evidence')
+        .select('id', { count: 'exact', head: true })
+        .eq('inspection_id', inspectionId);
+
+      if (count === 1) {
+        await supabase
+          .from('inspection')
+          .update({ stage: 'inspect' })
+          .eq('id', inspectionId)
+          .in('stage', ['planned']);
+      }
+    } catch (stageError) {
+      console.error('[evidence.service] Failed to update inspection stage:', stageError);
+    }
+
     return data as Evidence;
   },
 

@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Upload, FileText, Wind, ExternalLink, ChevronDown, ChevronRight, Info, List, Columns3 } from 'lucide-react';
+import { Plus, Upload, FileText, Wind, ExternalLink, ChevronDown, ChevronRight, Info, List, Columns3 } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
 import { useOngoingInspections } from '@/hooks/useOngoingInspections';
-import type { OngoingGroupedByFarm, OngoingInspectionItem } from '@/services/ongoing.service';
+import type { OngoingInspectionItem } from '@/services/ongoing.service';
 
 // ─── Column Config ──────────────────────────────────────────────────────────
 
@@ -17,9 +17,10 @@ interface ColumnConfig {
 
 const COLUMNS: ColumnConfig[] = [
   { stage: 'planned', title: 'Planned', actionIcon: <Plus size={14} />, actionLabel: 'New' },
-  { stage: 'uploaded', title: 'Upload', actionIcon: <Upload size={14} />, actionLabel: 'Upload' },
-  { stage: 'annotated', title: 'Annotate' },
-  { stage: 'analyzed', title: 'Analyze', actionIcon: <FileText size={14} />, actionLabel: 'Reports', actionRoute: '/inspections/reports' },
+  { stage: 'inspect', title: 'Upload', actionIcon: <Upload size={14} />, actionLabel: 'Upload' },
+  { stage: 'annotate', title: 'Annotate' },
+  { stage: 'analyze', title: 'Analyze' },
+  { stage: 'report', title: 'Report', actionIcon: <FileText size={14} />, actionLabel: 'Reports', actionRoute: '/inspections/reports' },
 ];
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -27,40 +28,17 @@ const COLUMNS: ColumnConfig[] = [
 export function OngoingInspections() {
   const navigate = useNavigate();
   const { data, isLoading } = useOngoingInspections();
-  const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'status' | 'list'>('status');
-  const [expandedFarms, setExpandedFarms] = useState<Set<string>>(new Set());
+  const [collapsedFarms, setCollapsedFarms] = useState<Set<string>>(new Set());
 
-  // Filter data by search
-  const filteredData = useMemo(() => {
-    if (!data) return null;
-    if (!searchTerm.trim()) return data;
-
-    const term = searchTerm.toLowerCase();
-    const result: Record<string, OngoingGroupedByFarm[]> = {};
-
-    for (const [stage, groups] of Object.entries(data)) {
-      const filteredGroups: OngoingGroupedByFarm[] = [];
-      for (const group of groups) {
-        const filteredItems = group.items.filter(
-          (item) =>
-            item.turbine?.name.toLowerCase().includes(term) ||
-            group.windFarmName.toLowerCase().includes(term),
-        );
-        if (filteredItems.length > 0) {
-          filteredGroups.push({ ...group, items: filteredItems });
-        }
-      }
-      result[stage] = filteredGroups;
-    }
-    return result;
-  }, [data, searchTerm]);
+  // Auto-expand all farms when data loads (Skyvisor behavior: expanded by default)
+  // We track collapsed instead of expanded, so by default everything is expanded.
 
   // Flatten for list view
   const listItems = useMemo(() => {
-    if (!filteredData) return [];
+    if (!data) return [];
     const items: (OngoingInspectionItem & { windFarmName: string })[] = [];
-    for (const groups of Object.values(filteredData)) {
+    for (const groups of Object.values(data)) {
       for (const group of groups) {
         for (const item of group.items) {
           items.push({ ...item, windFarmName: group.windFarmName });
@@ -68,10 +46,10 @@ export function OngoingInspections() {
       }
     }
     return items;
-  }, [filteredData]);
+  }, [data]);
 
   const toggleFarm = (key: string) => {
-    setExpandedFarms((prev) => {
+    setCollapsedFarms((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -79,14 +57,35 @@ export function OngoingInspections() {
     });
   };
 
+  const isFarmExpanded = (key: string) => !collapsedFarms.has(key);
+
+  // Navigate to the correct page based on inspection stage
+  const navigateToInspection = (item: OngoingInspectionItem) => {
+    if (item.stage === 'report') {
+      // Report stage → workflow step 4
+      navigate(`/inspections/${item.id}/workflow?step=4`);
+    } else {
+      // Other stages → workflow
+      navigate(`/inspections/${item.id}/workflow`);
+    }
+  };
+
   const handleColumnAction = (col: ColumnConfig) => {
     if (col.actionRoute) {
       navigate(col.actionRoute);
     } else if (col.stage === 'planned') {
       navigate('/inspections/new');
-    } else if (col.stage === 'uploaded') {
-      navigate('/inspections/upload');
+    } else if (col.stage === 'inspect') {
+      navigate('/uploader');
     }
+  };
+
+  // Get summary for farm card header (like Skyvisor: "X% viewed")
+  const getFarmSummary = (items: OngoingInspectionItem[]): string => {
+    const viewedItems = items.filter((i) => i.viewed_percent != null && i.viewed_percent > 0);
+    if (viewedItems.length === 0) return '';
+    const avgViewed = viewedItems.reduce((sum, i) => sum + (i.viewed_percent ?? 0), 0) / viewedItems.length;
+    return `${Math.round(avgViewed)}% viewed`;
   };
 
   // Loading
@@ -98,7 +97,7 @@ export function OngoingInspections() {
           <Skeleton variant="rect" width="240px" height="32px" />
         </div>
         <div style={columnsContainer}>
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} style={columnStyle}>
               <Skeleton variant="rect" width="100%" height="40px" />
               <Skeleton variant="rect" width="100%" height="120px" />
@@ -116,22 +115,11 @@ export function OngoingInspections() {
       <div style={toolbarStyle}>
         <h1 style={titleStyle}>Ongoing Inspections</h1>
 
-        <div style={searchContainer}>
-          <Search size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
-          <input
-            type="text"
-            placeholder="Search by turbine or wind farm..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={searchInput}
-          />
-        </div>
-
         <div style={toggleContainer}>
           <button
             style={viewMode === 'status' ? toggleBtnActive : toggleBtn}
             onClick={() => setViewMode('status')}
-            title="Kanban view"
+            title="Status view"
           >
             <Columns3 size={14} />
             <span>Status</span>
@@ -147,11 +135,11 @@ export function OngoingInspections() {
         </div>
       </div>
 
-      {/* ─── Kanban View ─────────────────────────────────────────── */}
+      {/* ─── Kanban View (by Stage) ──────────────────────────────── */}
       {viewMode === 'status' && (
         <div style={columnsContainer}>
           {COLUMNS.map((col) => {
-            const groups = filteredData?.[col.stage] ?? [];
+            const groups = data?.[col.stage] ?? [];
             const totalItems = groups.reduce((sum, g) => sum + g.items.length, 0);
 
             return (
@@ -160,7 +148,9 @@ export function OngoingInspections() {
                 <div style={columnHeader}>
                   <div style={columnHeaderLeft}>
                     <span style={columnTitle}>{col.title}</span>
-                    <span style={columnCount}>{totalItems}</span>
+                    <span style={columnCount}>
+                      {totalItems > 0 ? `${totalItems} items` : ''}
+                    </span>
                   </div>
                   {col.actionIcon && (
                     <button
@@ -169,7 +159,6 @@ export function OngoingInspections() {
                       title={col.actionLabel}
                     >
                       {col.actionIcon}
-                      {col.actionLabel && <span style={columnActionLabel}>{col.actionLabel}</span>}
                     </button>
                   )}
                 </div>
@@ -177,18 +166,16 @@ export function OngoingInspections() {
                 {/* Column Content */}
                 <div style={columnContent}>
                   {groups.length === 0 ? (
-                    <div style={emptyColumn}>
-                      <span style={emptyText}>No inspections</span>
-                    </div>
+                    <div style={emptyColumn} />
                   ) : (
                     groups.map((group) => {
                       const key = `${col.stage}-${group.windFarmId}`;
-                      const isExpanded = expandedFarms.has(key);
-                      const summaryText = getSummaryText(col.stage, group.items);
+                      const isExpanded = isFarmExpanded(key);
+                      const summaryText = getFarmSummary(group.items);
 
                       return (
                         <div key={key} style={farmCard}>
-                          {/* Farm Header (accordion) */}
+                          {/* Farm Header (accordion) — like Skyvisor */}
                           <div
                             style={farmHeader}
                             onClick={() => toggleFarm(key)}
@@ -196,47 +183,54 @@ export function OngoingInspections() {
                             tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleFarm(key); }}
                           >
-                            <div style={farmHeaderLeft}>
-                              {isExpanded ? <ChevronDown size={14} color="#94a3b8" /> : <ChevronRight size={14} color="#94a3b8" />}
-                              <span style={farmName}>{group.windFarmName}</span>
-                              <a
-                                href={`/assets-wind/${group.windFarmId}`}
-                                onClick={(e) => e.stopPropagation()}
-                                style={farmLink}
-                                title="Go to wind farm"
-                              >
-                                <ExternalLink size={12} />
-                              </a>
+                            <div style={farmHeaderTop}>
+                              <div style={farmTitleRow}>
+                                <span style={farmName}>{group.windFarmName}</span>
+                                <a
+                                  href={`/assets-wind/${group.windFarmId}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={farmLink}
+                                  title="Go to wind farm"
+                                >
+                                  <ExternalLink size={12} />
+                                </a>
+                              </div>
+                              {summaryText && <div style={farmViewedText}>{summaryText}</div>}
                             </div>
-                            <div style={farmHeaderRight}>
-                              <span style={farmSummary}>{summaryText}</span>
-                              <span style={farmItemCount}>{group.items.length} items</span>
+                            <div style={farmHeaderMeta}>
+                              <span style={farmItemCount}>{group.items.length} item{group.items.length !== 1 ? 's' : ''}</span>
+                              {isExpanded
+                                ? <ChevronDown size={16} color="#64748b" />
+                                : <ChevronRight size={16} color="#64748b" />
+                              }
                             </div>
                           </div>
 
-                          {/* Expanded content */}
+                          {/* Expanded content — item rows */}
                           {isExpanded && (
                             <div style={farmContent}>
                               {group.items.map((item) => (
-                                <div key={item.id} style={turbineRow}>
-                                  <Wind size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
-                                  <span style={turbineName}>
-                                    {item.turbine?.name ?? 'Unknown'}
-                                  </span>
+                                <div key={item.id} style={inspectionRow}>
+                                  <div style={inspectionLeft}>
+                                    <Wind size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                                    <span style={turbineName}>
+                                      {item.turbine?.name ?? 'Unknown'}
+                                    </span>
+                                  </div>
                                   <button
                                     style={infoBtn}
-                                    onClick={() => navigate(`/inspections/${item.id}`)}
+                                    onClick={() => navigateToInspection(item)}
                                     title="Inspection details"
                                   >
-                                    <Info size={12} />
+                                    <Info size={13} />
                                   </button>
-                                  <span style={turbineDate}>
+                                  <span style={inspectionDate}>
                                     {item.scheduled_date
-                                      ? new Date(item.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                      ? new Date(item.scheduled_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
                                       : '—'}
                                   </span>
-                                  <span style={turbineStat}>
-                                    {getItemStat(col.stage, item)}
+                                  <span style={inspectionStat}>
+                                    {item.viewed_percent != null ? `${item.viewed_percent}%` : ''}
                                   </span>
                                 </div>
                               ))}
@@ -276,16 +270,16 @@ export function OngoingInspections() {
                   <tr
                     key={item.id}
                     style={trStyle}
-                    onClick={() => navigate(`/inspections/${item.id}`)}
+                    onClick={() => navigateToInspection(item)}
                   >
                     <td style={tdStyle}>{item.windFarmName}</td>
                     <td style={tdStyle}>{item.turbine?.name ?? '—'}</td>
                     <td style={tdStyle}>
-                      <span style={stageBadge(item.stage)}>{item.stage}</span>
+                      <span style={stageBadgeStyle(item.stage)}>{item.stage}</span>
                     </td>
                     <td style={tdStyle}>
                       {item.scheduled_date
-                        ? new Date(item.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        ? new Date(item.scheduled_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
                         : '—'}
                     </td>
                     <td style={tdStyle}>
@@ -306,36 +300,13 @@ export function OngoingInspections() {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function getSummaryText(stage: string, items: OngoingInspectionItem[]): string {
-  if (stage === 'planned') return '';
-  if (stage === 'uploaded' || stage === 'annotated') {
-    const totalViewed = items.reduce((s, i) => s + (i.viewed_percent ?? 0), 0);
-    const avg = items.length > 0 ? Math.round(totalViewed / items.length) : 0;
-    return `${avg}% viewed`;
-  }
-  if (stage === 'analyzed') {
-    const totalDefects = items.reduce((s, i) => s + (i.defects?.length ?? 0), 0);
-    return `${totalDefects} defect${totalDefects !== 1 ? 's' : ''}`;
-  }
-  return '';
-}
-
-function getItemStat(stage: string, item: OngoingInspectionItem): string {
-  if (stage === 'uploaded' || stage === 'annotated') {
-    return `${item.viewed_percent ?? 0}%`;
-  }
-  if (stage === 'analyzed') {
-    return `${item.defects?.length ?? 0} def.`;
-  }
-  return '';
-}
-
-function stageBadge(stage: string): React.CSSProperties {
+function stageBadgeStyle(stage: string): React.CSSProperties {
   const colors: Record<string, { bg: string; fg: string }> = {
     planned: { bg: 'rgba(99, 102, 241, 0.1)', fg: '#6366f1' },
-    uploaded: { bg: 'rgba(59, 130, 246, 0.1)', fg: '#1B4B7A' },
-    annotated: { bg: 'rgba(245, 158, 11, 0.1)', fg: '#d97706' },
-    analyzed: { bg: 'rgba(16, 185, 129, 0.1)', fg: '#059669' },
+    inspect: { bg: 'rgba(59, 130, 246, 0.1)', fg: '#1B4B7A' },
+    annotate: { bg: 'rgba(245, 158, 11, 0.1)', fg: '#d97706' },
+    analyze: { bg: 'rgba(16, 185, 129, 0.1)', fg: '#059669' },
+    report: { bg: 'rgba(139, 92, 246, 0.1)', fg: '#7c3aed' },
   };
   const c = colors[stage] ?? { bg: 'rgba(148,163,184,0.1)', fg: '#64748b' };
   return {
@@ -343,9 +314,10 @@ function stageBadge(stage: string): React.CSSProperties {
     color: c.fg,
     padding: '2px 8px',
     borderRadius: '9999px',
-    fontSize: '0.7rem',
+    fontSize: '0.65rem',
     fontWeight: 600,
     textTransform: 'capitalize',
+    whiteSpace: 'nowrap',
   };
 }
 
@@ -378,28 +350,6 @@ const titleStyle: React.CSSProperties = {
   color: 'var(--color-neutral-900, #0f172a)',
   whiteSpace: 'nowrap',
   letterSpacing: '-0.02em',
-};
-
-const searchContainer: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  backgroundColor: 'var(--color-neutral-0, #ffffff)',
-  border: '1px solid var(--color-neutral-200, #e2e8f0)',
-  borderRadius: 'var(--radius-lg, 12px)',
-  padding: '6px 12px',
-  flex: 1,
-  maxWidth: '320px',
-};
-
-const searchInput: React.CSSProperties = {
-  background: 'transparent',
-  border: 'none',
-  outline: 'none',
-  color: 'var(--color-neutral-800, #1e293b)',
-  fontSize: 'var(--text-sm, 0.875rem)',
-  width: '100%',
-  fontFamily: 'var(--font-family-sans)',
 };
 
 const toggleContainer: React.CSSProperties = {
@@ -436,7 +386,7 @@ const toggleBtnActive: React.CSSProperties = {
 
 const columnsContainer: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
+  gridTemplateColumns: 'repeat(5, 1fr)',
   flex: 1,
   overflow: 'hidden',
   gap: '1px',
@@ -475,27 +425,18 @@ const columnTitle: React.CSSProperties = {
 const columnCount: React.CSSProperties = {
   fontSize: '0.7rem',
   color: 'var(--color-neutral-500, #64748b)',
-  backgroundColor: 'var(--color-neutral-100, #f1f5f9)',
-  padding: '1px 6px',
-  borderRadius: '9999px',
 };
 
 const columnActionBtn: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '4px',
-  padding: '4px 8px',
-  border: '1px solid var(--color-primary-200, #bfdbfe)',
-  borderRadius: 'var(--radius-sm, 6px)',
+  justifyContent: 'center',
+  padding: '4px',
+  border: 'none',
+  borderRadius: '4px',
   background: 'transparent',
   color: 'var(--color-primary-500, #1B4B7A)',
-  fontSize: '0.7rem',
   cursor: 'pointer',
-  fontFamily: 'var(--font-family-sans)',
-};
-
-const columnActionLabel: React.CSSProperties = {
-  fontSize: '0.7rem',
 };
 
 const columnContent: React.CSSProperties = {
@@ -504,51 +445,51 @@ const columnContent: React.CSSProperties = {
   padding: '8px',
   display: 'flex',
   flexDirection: 'column',
-  gap: '6px',
+  gap: '8px',
 };
 
 const emptyColumn: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '24px 12px',
+  flex: 1,
 };
 
-const emptyText: React.CSSProperties = {
-  fontSize: '0.75rem',
-  color: 'var(--color-neutral-400, #94a3b8)',
-};
-
-// ─── Farm Cards (Accordion) ─────────────────────────────────────────────────
+// ─── Farm Cards (Accordion — Skyvisor style) ────────────────────────────────
 
 const farmCard: React.CSSProperties = {
   backgroundColor: 'var(--color-neutral-0, #ffffff)',
   border: '1px solid var(--color-neutral-200, #e2e8f0)',
   borderRadius: 'var(--radius-md, 8px)',
   overflow: 'hidden',
-  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  boxShadow: '0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12)',
 };
 
 const farmHeader: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '8px 10px',
+  alignItems: 'flex-start',
+  padding: '10px 12px',
   cursor: 'pointer',
   userSelect: 'none',
+  gap: '8px',
 };
 
-const farmHeaderLeft: React.CSSProperties = {
+const farmHeaderTop: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+  minWidth: 0,
+  flex: 1,
+};
+
+const farmTitleRow: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '6px',
-  minWidth: 0,
 };
 
 const farmName: React.CSSProperties = {
-  fontSize: '0.75rem',
-  fontWeight: 500,
-  color: 'var(--color-neutral-800, #1e293b)',
+  fontSize: '0.82rem',
+  fontWeight: 600,
+  color: 'var(--color-neutral-900, #0f172a)',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -561,49 +502,55 @@ const farmLink: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const farmHeaderRight: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  flexShrink: 0,
-};
-
-const farmSummary: React.CSSProperties = {
-  fontSize: '0.65rem',
+const farmViewedText: React.CSSProperties = {
+  fontSize: '0.7rem',
   color: 'var(--color-neutral-500, #64748b)',
+  marginTop: '2px',
 };
 
-const farmItemCount: React.CSSProperties = {
-  fontSize: '0.65rem',
-  color: 'var(--color-neutral-500, #64748b)',
-  backgroundColor: 'var(--color-neutral-100, #f1f5f9)',
-  padding: '1px 5px',
-  borderRadius: '9999px',
-};
-
-const farmContent: React.CSSProperties = {
-  borderTop: '1px solid var(--color-neutral-100, #f1f5f9)',
-  padding: '4px 8px 8px',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '4px',
-};
-
-const turbineRow: React.CSSProperties = {
+const farmHeaderMeta: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '6px',
-  padding: '4px 6px',
+  flexShrink: 0,
+};
+
+const farmItemCount: React.CSSProperties = {
+  fontSize: '0.7rem',
+  color: 'var(--color-neutral-500, #64748b)',
+  whiteSpace: 'nowrap',
+};
+
+const farmContent: React.CSSProperties = {
+  borderTop: '1px solid var(--color-neutral-200, #e2e8f0)',
+  padding: '6px 10px 10px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+};
+
+// ─── Inspection Row (inside farm card) ──────────────────────────────────────
+
+const inspectionRow: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '5fr auto 3fr 2fr',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '5px 4px',
   borderRadius: '4px',
-  backgroundColor: 'var(--color-neutral-50, #f8fafc)',
+};
+
+const inspectionLeft: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  minWidth: 0,
 };
 
 const turbineName: React.CSSProperties = {
-  fontSize: '0.72rem',
+  fontSize: '0.78rem',
   fontWeight: 500,
   color: 'var(--color-neutral-800, #1e293b)',
-  flex: 1,
-  minWidth: 0,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
@@ -621,19 +568,17 @@ const infoBtn: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const turbineDate: React.CSSProperties = {
-  fontSize: '0.65rem',
-  color: 'var(--color-neutral-500, #64748b)',
+const inspectionDate: React.CSSProperties = {
+  fontSize: '0.75rem',
+  color: 'var(--color-neutral-700, #334155)',
   whiteSpace: 'nowrap',
-  flexShrink: 0,
+  textAlign: 'center',
 };
 
-const turbineStat: React.CSSProperties = {
-  fontSize: '0.65rem',
-  color: 'var(--color-primary-500, #1B4B7A)',
+const inspectionStat: React.CSSProperties = {
+  fontSize: '0.75rem',
+  color: 'var(--color-neutral-700, #334155)',
   whiteSpace: 'nowrap',
-  flexShrink: 0,
-  minWidth: '36px',
   textAlign: 'right',
 };
 

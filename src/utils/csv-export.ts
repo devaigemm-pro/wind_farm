@@ -1,21 +1,7 @@
 import ExcelJS from 'exceljs';
 import type { DefectDashboardRow } from '@/types';
 
-// Defect type → test image path mapping
-const DEFECT_TYPE_IMAGES: Record<string, string> = {
-  'LE EROSION': '/test-images/defect-erosion-wide.svg',
-  'OIL': '/test-images/defect-oil-wide.svg',
-  'BLADES WITH HYDRAULIC OIL': '/test-images/defect-oil-wide.svg',
-  'LIGHTNING DAMAGE': '/test-images/defect-crack-wide.svg',
-  'CRACK': '/test-images/defect-crack-close.svg',
-  'OTHER': '/test-images/defect-blade-wide.svg',
-  'OTHER ADD-ONS MISSING': '/test-images/defect-blade-wide.svg',
-  'VORTEX': '/test-images/defect-vortex-wide.svg',
-  'VORTEX (MISSING PANELS)': '/test-images/defect-vortex-wide.svg',
-  'PAINT DEFECT': '/test-images/defect-paint-wide.svg',
-  'PAINT DAMAGES': '/test-images/defect-paint-wide.svg',
-  'DELAMINATION': '/test-images/defect-delamination-wide.svg',
-};
+// Defect images now come from evidence in the database
 
 /** Fetch an image URL and convert to ArrayBuffer for ExcelJS (with SVG→PNG conversion) */
 async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; extension: 'png' | 'jpeg' } | null> {
@@ -204,17 +190,16 @@ export async function generateDefectsXLSX(data: DefectDashboardRow[]): Promise<B
     cell.border = {};
   });
 
-  // Pre-load all unique defect type images in parallel (much faster than sequential)
+  // Pre-load all unique defect images in parallel (from real evidence URLs)
   const uniqueImgPaths = new Set<string>();
   for (const d of data) {
-    const p = DEFECT_TYPE_IMAGES[d.type.toUpperCase()] ?? DEFECT_TYPE_IMAGES[d.type] ?? '/test-images/defect-blade-wide.svg';
-    uniqueImgPaths.add(p);
+    if (d.imageUrl) uniqueImgPaths.add(d.imageUrl);
   }
   const imageCache = new Map<string, { buffer: ArrayBuffer; extension: 'png' | 'jpeg' } | null>();
   await Promise.all(
-    [...uniqueImgPaths].map(async (imgPath) => {
-      const result = await fetchImageAsBuffer(`${origin}${imgPath}`);
-      imageCache.set(imgPath, result);
+    [...uniqueImgPaths].map(async (imgUrl) => {
+      const result = await fetchImageAsBuffer(imgUrl);
+      imageCache.set(imgUrl, result);
     })
   );
 
@@ -241,8 +226,8 @@ export async function generateDefectsXLSX(data: DefectDashboardRow[]): Promise<B
     row.eachCell((cell) => { cell.border = {}; });
 
     // Embed cached image
-    const imgPath = DEFECT_TYPE_IMAGES[d.type.toUpperCase()] ?? DEFECT_TYPE_IMAGES[d.type] ?? '/test-images/defect-blade-wide.svg';
-    const imgData = imageCache.get(imgPath);
+    const imgUrl = d.imageUrl;
+    const imgData = imgUrl ? imageCache.get(imgUrl) : null;
     if (imgData) {
       const imageId = workbook.addImage({ buffer: imgData.buffer, extension: imgData.extension });
       const rowIdx = dataStartRow + i - 1;

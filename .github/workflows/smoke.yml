@@ -1,0 +1,48 @@
+name: Smoke Tests
+
+on:
+  deployment_status:
+
+jobs:
+  smoke:
+    name: Production Smoke Tests
+    runs-on: ubuntu-latest
+    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment == 'Production'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run smoke tests against production
+        run: pnpm exec playwright test --project=smoke
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Smoke tests failed on production deployment!"
+          echo "Production URL: ${{ github.event.deployment_status.target_url }}"
+
+      - name: Upload smoke results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

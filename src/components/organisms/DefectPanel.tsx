@@ -23,6 +23,9 @@ interface DefectFormState {
   severity: Severity;
   distance_from_root: string;
   description: string;
+  width_cm: string;
+  height_cm: string;
+  next_step: string;
 }
 
 const INITIAL_FORM: DefectFormState = {
@@ -30,6 +33,9 @@ const INITIAL_FORM: DefectFormState = {
   severity: 1,
   distance_from_root: '',
   description: '',
+  width_cm: '',
+  height_cm: '',
+  next_step: '',
 };
 
 const DEFECT_TYPE_LABELS: Record<DefectType, string> = {
@@ -75,6 +81,9 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
       severity: defect.severity,
       distance_from_root: String(defect.distance_from_root),
       description: defect.description ?? '',
+      width_cm: String(defect.width_cm ?? ''),
+      height_cm: String(defect.height_cm ?? ''),
+      next_step: defect.next_step ?? '',
     });
     setErrors({});
     setShowForm(true);
@@ -108,6 +117,9 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
             severity: parsed.data.severity as Severity,
             distance_from_root: parsed.data.distance_from_root,
             description: parsed.data.description ?? null,
+            width_cm: form.width_cm ? Number(form.width_cm) : undefined,
+            height_cm: form.height_cm ? Number(form.height_cm) : undefined,
+            next_step: form.next_step || undefined,
           },
         },
         { onSuccess: resetForm },
@@ -120,6 +132,9 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
           severity: parsed.data.severity as Severity,
           distance_from_root: parsed.data.distance_from_root,
           description: parsed.data.description,
+          width_cm: form.width_cm ? Number(form.width_cm) : undefined,
+          height_cm: form.height_cm ? Number(form.height_cm) : undefined,
+          next_step: form.next_step || undefined,
         },
         { onSuccess: resetForm },
       );
@@ -333,6 +348,35 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
               aria-label="Description"
             />
             {errors.description && <p style={errorStyle}>{errors.description}</p>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+            <div>
+              <Input
+                label="Width (cm)"
+                type="number"
+                min={0}
+                step="0.1"
+                value={form.width_cm}
+                onChange={(e) => setForm((f) => ({ ...f, width_cm: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Input
+                label="Height (cm)"
+                type="number"
+                min={0}
+                step="0.1"
+                value={form.height_cm}
+                onChange={(e) => setForm((f) => ({ ...f, height_cm: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <Input
+              label="Next Step"
+              value={form.next_step}
+              onChange={(e) => setForm((f) => ({ ...f, next_step: e.target.value }))}
+            />
           </div>
           <div style={formActionsStyle}>
             <Button variant="secondary" size="sm" onClick={resetForm}>

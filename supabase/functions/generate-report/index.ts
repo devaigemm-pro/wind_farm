@@ -176,7 +176,7 @@ serve(withCors(async (req) => {
       })
     }
 
-    // Transition inspection stage to 'finalized' if this is the first report
+    // Transition inspection stage to 'report' if this is the first report
     try {
       const { count } = await supabaseAdmin
         .from('report')
@@ -186,9 +186,9 @@ serve(withCors(async (req) => {
       if (count === 1) {
         await supabaseAdmin
           .from('inspection')
-          .update({ stage: 'finalized' })
+          .update({ stage: 'report' })
           .eq('id', inspectionId)
-          .neq('stage', 'finalized')
+          .neq('stage', 'report')
       }
     } catch (stageError) {
       console.error('[generate-report] Failed to update inspection stage:', stageError)

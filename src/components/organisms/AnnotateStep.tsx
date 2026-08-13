@@ -193,16 +193,40 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [viewerLoaded, setViewerLoaded] = useState(false);
   const prevThumbRef = useRef<string>('');
 
+  // ─── Image zoom & pan ───────────────────────────────────────────────────────
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev + 0.5, 6.0));
+  }, []);
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => {
+      const next = Math.max(prev - 0.5, 1.0);
+      if (next === 1.0) setPanOffset({ x: 0, y: 0 });
+      return next;
+    });
+  }, []);
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1.0);
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
   // ─── Image adjustment controls (Contrast, Brightness, Saturation) ──────────
   const [imgContrast, setImgContrast] = useState(1);
   const [imgBrightness, setImgBrightness] = useState(1);
   const [imgSaturation, setImgSaturation] = useState(1);
   const [showImageAdjust, setShowImageAdjust] = useState(false);
+  const [showBladeOverlay, setShowBladeOverlay] = useState(false);
 
   // Reset loaded state when thumbnail changes
   useEffect(() => {
     if (selectedThumbnail && selectedThumbnail !== prevThumbRef.current) {
       setViewerLoaded(false);
+      setZoomLevel(1.0);
+      setPanOffset({ x: 0, y: 0 });
       prevThumbRef.current = selectedThumbnail;
     }
   }, [selectedThumbnail]);
@@ -678,12 +702,41 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
           </div>
 
-          {/* Right: adjustments + download + delete */}
+          {/* Right: zoom + adjustments + download + delete */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* Zoom controls */}
+            <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${C.primary}`, borderRadius: 4, overflow: 'hidden', marginRight: 4 }}>
+              <button onClick={handleZoomOut} style={{ padding: '4px 8px', background: 'transparent', border: 'none', borderRight: `1px solid ${C.primary}`, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.primary, lineHeight: 1 }} title="Zoom out">−</button>
+              <button onClick={handleZoomReset} style={{ padding: '4px 8px', background: 'transparent', border: 'none', borderRight: `1px solid ${C.primary}`, cursor: 'pointer', fontSize: 11, color: C.primary, lineHeight: 1, minWidth: 40, textAlign: 'center' }} title="Reset zoom">x{zoomLevel.toFixed(1)}</button>
+              <button onClick={handleZoomIn} style={{ padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.primary, lineHeight: 1 }} title="Zoom in">+</button>
+            </div>
+            <button style={{ ...actionBtnStyle, borderColor: showBladeOverlay ? C.primary : undefined, background: showBladeOverlay ? C.primaryLight : undefined }} title="Blade face view" onClick={() => setShowBladeOverlay(v => !v)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={showBladeOverlay ? C.primary : '#555'}><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+            </button>
             <button style={{ ...actionBtnStyle, borderColor: showImageAdjust ? C.primary : undefined, background: showImageAdjust ? C.primaryLight : undefined }} title="Image adjustments" onClick={() => setShowImageAdjust(v => !v)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={showImageAdjust ? C.primary : '#555'}><path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-14v4h2V6h-2zm0 6v6h2v-6h-2z"/></svg>
             </button>
-            <button style={actionBtnStyle} title="Download photo">
+            <button style={actionBtnStyle} title="Download photo" onClick={() => {
+              if (!currentThumb) return;
+              const url = currentThumb.viewerSrc;
+              const filename = currentThumb.id + '.jpg';
+              // Fetch and download as blob to bypass CORS/signed URL issues
+              fetch(url)
+                .then(res => res.blob())
+                .then(blob => {
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(a.href);
+                })
+                .catch(() => {
+                  // Fallback: open in new tab
+                  window.open(url, '_blank');
+                });
+            }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96M17 13l-5 5-5-5h3V9h4v4z"/></svg>
             </button>
             {role !== 'supervisor' && (
@@ -694,35 +747,81 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           </div>
         </div>
 
-        {/* Image viewer with drag-to-draw annotation */}
+        {/* Image viewer with click-to-mark annotation (2 points define rectangle) */}
         <div
-          style={{ ...mainViewerStyle, cursor: isDrawing ? 'crosshair' : 'crosshair', position: 'relative' }}
+          style={{ ...mainViewerStyle, cursor: drawStart && !drawEnd ? 'crosshair' : 'crosshair', position: 'relative' }}
+          onWheel={(e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+              setZoomLevel(prev => Math.min(prev + 0.25, 6.0));
+            } else {
+              setZoomLevel(prev => {
+                const next = Math.max(prev - 0.25, 1.0);
+                if (next === 1.0) setPanOffset({ x: 0, y: 0 });
+                return next;
+              });
+            }
+          }}
+          onContextMenu={(e) => { if (zoomLevel > 1) e.preventDefault(); }}
           onMouseDown={(e) => {
-            if (role === 'supervisor') return;
             if (showAnnotationPopover) return;
+            if (showBladeOverlay) return;
+            // Middle mouse or right click = pan when zoomed
+            if ((e.button === 1 || e.button === 2) && zoomLevel > 1) {
+              e.preventDefault();
+              setIsPanning(true);
+              panStartRef.current = { x: e.clientX, y: e.clientY, ox: panOffset.x, oy: panOffset.y };
+              return;
+            }
+            if (e.button !== 0) return;
+            if (role === 'supervisor') return;
             const rect = e.currentTarget.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 100;
-            const y = ((e.clientY - rect.top) / rect.height) * 100;
-            setDrawStart({ x, y });
-            setDrawEnd({ x, y });
-            setIsDrawing(true);
-            setShowEditPopover(false);
-          }}
-          onMouseMove={(e) => {
-            if (!isDrawing || !drawStart) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 100;
-            const y = ((e.clientY - rect.top) / rect.height) * 100;
-            setDrawEnd({ x, y });
-          }}
-          onMouseUp={() => {
-            if (!isDrawing || !drawStart || !drawEnd) return;
-            const w = Math.abs(drawEnd.x - drawStart.x);
-            const h = Math.abs(drawEnd.y - drawStart.y);
-            if (w > 2 && h > 2) {
+            const rawX = e.clientX - rect.left;
+            const rawY = e.clientY - rect.top;
+            const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
+            const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
+
+            if (!drawStart || drawEnd) {
+              // First click: set start point
+              setDrawStart({ x: imgX, y: imgY });
+              setDrawEnd(null);
+              setShowEditPopover(false);
+            } else {
+              // Second click: set end point and open popover
+              setDrawEnd({ x: imgX, y: imgY });
               setShowAnnotationPopover(true);
             }
-            setIsDrawing(false);
+          }}
+          onMouseMove={(e) => {
+            // Pan mode
+            if (isPanning && panStartRef.current) {
+              const dx = e.clientX - panStartRef.current.x;
+              const dy = e.clientY - panStartRef.current.y;
+              setPanOffset({ x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy });
+              return;
+            }
+            // Live preview: update drawEnd position while moving after first click
+            if (drawStart && !drawEnd) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const rawX = e.clientX - rect.left;
+              const rawY = e.clientY - rect.top;
+              const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
+              const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
+              setDrawEnd({ x: imgX, y: imgY });
+            }
+          }}
+          onMouseUp={() => {
+            if (isPanning) {
+              setIsPanning(false);
+              panStartRef.current = null;
+              return;
+            }
+          }}
+          onMouseLeave={() => {
+            if (isPanning) {
+              setIsPanning(false);
+              panStartRef.current = null;
+            }
           }}
         >
           {currentThumb ? (
@@ -743,6 +842,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   filter: `blur(2px) contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
                   opacity: viewerLoaded ? 0 : 1,
                   transition: 'opacity 0.15s ease-out',
+                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                  transformOrigin: 'center',
                 }}
                 draggable={false}
               />
@@ -762,6 +863,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   filter: `contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
                   opacity: viewerLoaded ? 1 : 0,
                   transition: 'opacity 0.2s ease-in',
+                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                  transformOrigin: 'center',
                 }}
                 draggable={false}
               />
@@ -771,8 +874,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               <span style={{ color: '#888', fontSize: 14 }}>Select an image to view</span>
             </div>
           )}
-
-          {/* Saved annotations for current thumbnail */}
 
           {/* ─── Image Adjustment Panel (floating, top-right) ─────────────── */}
           {showImageAdjust && (
@@ -804,8 +905,85 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
           )}
 
+          {/* ─── Blade Face Overlay (floating, top-left) ─────────────── */}
+          {showBladeOverlay && (
+            <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 25, pointerEvents: 'auto' }}>
+              <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '12px 16px', width: 240, position: 'relative' }}>
+                {/* Header with close button */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                  <button onClick={() => setShowBladeOverlay(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 352 512" fill="#888"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"/></svg>
+                  </button>
+                </div>
+                {/* Blade cross-section (horizontal / lying down) with face labels */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  {/* SS button - top */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const blade = currentThumb?.blade || 'A';
+                      const target = thumbnails.find(t => t.face === 'SS' && t.blade === blade)
+                        || thumbnails.find(t => t.face === 'SS');
+                      if (target) setSelectedThumbnail(target.id);
+                    }}
+                    style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'SS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'SS' ? '#fff' : '#00A6FF' }}
+                  >SS</button>
+                  {/* Blade shape SVG - horizontal (lying down) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const blade = currentThumb?.blade || 'A';
+                        const target = thumbnails.find(t => t.face === 'LE' && t.blade === blade)
+                          || thumbnails.find(t => t.face === 'LE');
+                        if (target) setSelectedThumbnail(target.id);
+                      }}
+                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#00A6FF' }}
+                    >LE</button>
+                    <svg width="140" height="56" viewBox="0 0 244 108" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ pointerEvents: 'none' }}>
+                      <path d="M8 54C8 54 12 8 56 8C100 8 160 20 200 32C240 44 242 54 242 54" stroke="#222" strokeWidth="4" strokeLinecap="round" fill="#f0f0f0"/>
+                      <path d="M8 54C8 54 12 100 56 100C100 100 160 82 200 68C240 54 242 54 242 54" stroke="#222" strokeWidth="4" strokeLinecap="round" fill="#f0f0f0"/>
+                    </svg>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const blade = currentThumb?.blade || 'A';
+                        const target = thumbnails.find(t => t.face === 'TE' && t.blade === blade)
+                          || thumbnails.find(t => t.face === 'TE');
+                        if (target) setSelectedThumbnail(target.id);
+                      }}
+                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'TE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'TE' ? '#fff' : '#00A6FF' }}
+                    >TE</button>
+                  </div>
+                  {/* PS button - bottom */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const blade = currentThumb?.blade || 'A';
+                      const target = thumbnails.find(t => t.face === 'PS' && t.blade === blade)
+                        || thumbnails.find(t => t.face === 'PS');
+                      if (target) setSelectedThumbnail(target.id);
+                    }}
+                    style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'PS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'PS' ? '#fff' : '#00A6FF' }}
+                  >PS</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Annotation Layer (syncs with image zoom/pan) ─────────────── */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+            transformOrigin: 'center',
+            pointerEvents: 'none',
+            zIndex: 5,
+          }}>
           {(savedAnnotations[selectedThumbnail] || []).map((ann, idx) => (
-            <div key={idx} style={{ position: 'absolute', left: `${ann.x}%`, top: `${ann.y}%`, width: `${ann.w}%`, height: `${ann.h}%`, pointerEvents: 'none' }}>
+            <div key={idx} style={{ position: 'absolute', left: `${ann.x}%`, top: `${ann.y}%`, width: `${ann.w}%`, height: `${ann.h}%`, transform: `translate(-50%, -50%) rotate(${ann.angle}deg)`, transformOrigin: 'center', pointerEvents: 'none' }}>
               {/* Label with type + edit button */}
               <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto' }}>
                 <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 4, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
@@ -816,8 +994,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     setAnnotationType(ann.type);
                     setAnnotationCategory(ann.category);
                     setAnnotationNote(ann.note);
-                    setDrawStart({ x: ann.x, y: ann.y });
-                    setDrawEnd({ x: ann.x + ann.w, y: ann.y + ann.h });
+                    // Reconstruct drawStart/drawEnd from center + angle + width
+                    const rad = (ann.angle || 0) * (Math.PI / 180);
+                    const halfW = ann.w / 2;
+                    setDrawStart({ x: ann.x - halfW * Math.cos(rad), y: ann.y - halfW * Math.sin(rad) });
+                    setDrawEnd({ x: ann.x + halfW * Math.cos(rad), y: ann.y + halfW * Math.sin(rad) });
                     setEditingAnnotationId(ann.id);
                     setShowAnnotationPopover(true);
                     // Also load into right panel
@@ -844,23 +1025,51 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
           ))}
 
-          {/* Current drawing rectangle */}
-          {drawStart && drawEnd && (drawStart.x !== drawEnd.x || drawStart.y !== drawEnd.y) && (
-            <div style={{
-              position: 'absolute',
-              left: `${Math.min(drawStart.x, drawEnd.x)}%`,
-              top: `${Math.min(drawStart.y, drawEnd.y)}%`,
-              width: `${Math.abs(drawEnd.x - drawStart.x)}%`,
-              height: `${Math.abs(drawEnd.y - drawStart.y)}%`,
-              border: '2.5px solid #FFA500',
-              background: 'rgba(255, 165, 0, 0.1)',
-              pointerEvents: 'none',
-            }}>
-              <span style={{ position: 'absolute', bottom: -18, left: 0, fontSize: 11, color: '#FFA500', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
-                {Math.round(Math.abs(drawEnd.x - drawStart.x) * 1.5)} x {Math.round(Math.abs(drawEnd.y - drawStart.y) * 1.3)} cm
-              </span>
-            </div>
-          )}
+          {/* Current drawing rectangle + point markers */}
+          {drawStart && (() => {
+            // Show first point marker
+            if (!drawEnd) {
+              return (
+                <div style={{ position: 'absolute', left: `${drawStart.x}%`, top: `${drawStart.y}%`, width: 10, height: 10, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
+              );
+            }
+            const dx = drawEnd.x - drawStart.x;
+            const dy = drawEnd.y - drawStart.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 1) return (
+              <div style={{ position: 'absolute', left: `${drawStart.x}%`, top: `${drawStart.y}%`, width: 10, height: 10, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
+            );
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            const cx = (drawStart.x + drawEnd.x) / 2;
+            const cy = (drawStart.y + drawEnd.y) / 2;
+            const w = dist;
+            const h = Math.max(w * 0.25, 3);
+            return (
+              <>
+                {/* Point markers */}
+                <div style={{ position: 'absolute', left: `${drawStart.x}%`, top: `${drawStart.y}%`, width: 8, height: 8, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10, boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
+                <div style={{ position: 'absolute', left: `${drawEnd.x}%`, top: `${drawEnd.y}%`, width: 8, height: 8, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10, boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
+                {/* Rectangle */}
+                <div style={{
+                  position: 'absolute',
+                  left: `${cx}%`,
+                  top: `${cy}%`,
+                  width: `${w}%`,
+                  height: `${h}%`,
+                  transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+                  transformOrigin: 'center',
+                  border: '2.5px solid #FFA500',
+                  background: 'rgba(255, 165, 0, 0.1)',
+                  pointerEvents: 'none',
+                }}>
+                  <span style={{ position: 'absolute', bottom: -18, left: 0, fontSize: 11, color: '#FFA500', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+                    {Math.round(w * 1.5)} x {Math.round(h * 1.3)} cm
+                  </span>
+                </div>
+              </>
+            );
+          })()}
+          </div>{/* end annotation layer */}
         </div>
 
         {/* Create/Edit annotation popover */}
@@ -962,24 +1171,31 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 if (editingAnnotationId !== null) {
                   // Update existing annotation in DB
                   if (drawStart && drawEnd) {
-                    const x = Math.min(drawStart.x, drawEnd.x);
-                    const y = Math.min(drawStart.y, drawEnd.y);
-                    const w = Math.abs(drawEnd.x - drawStart.x);
-                    const h = Math.abs(drawEnd.y - drawStart.y);
-                    updateAnnotation.mutate({ id: editingAnnotationId, x, y, w, h, angle: 0, type: annotationType, category: annotationCategory, note: annotationNote });
+                    const dx = drawEnd.x - drawStart.x;
+                    const dy = drawEnd.y - drawStart.y;
+                    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                    const cx = (drawStart.x + drawEnd.x) / 2;
+                    const cy = (drawStart.y + drawEnd.y) / 2;
+                    const w = Math.sqrt(dx * dx + dy * dy);
+                    const h = Math.max(w * 0.25, 3);
+                    // Store x,y as center point, w/h as rotated dimensions
+                    updateAnnotation.mutate({ id: editingAnnotationId, x: cx, y: cy, w, h, angle, type: annotationType, category: annotationCategory, note: annotationNote });
                   }
                 } else {
                   // Create new annotation in DB
                   if (drawStart && drawEnd) {
-                    const x = Math.min(drawStart.x, drawEnd.x);
-                    const y = Math.min(drawStart.y, drawEnd.y);
-                    const w = Math.abs(drawEnd.x - drawStart.x);
-                    const h = Math.abs(drawEnd.y - drawStart.y);
+                    const dx = drawEnd.x - drawStart.x;
+                    const dy = drawEnd.y - drawStart.y;
+                    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                    const cx = (drawStart.x + drawEnd.x) / 2;
+                    const cy = (drawStart.y + drawEnd.y) / 2;
+                    const w = Math.sqrt(dx * dx + dy * dy);
+                    const h = Math.max(w * 0.25, 3);
                     createAnnotation.mutate({
                       inspectionId,
                       thumbnailId: selectedThumbnail,
-                      x, y, w, h,
-                      angle: 0,
+                      x: cx, y: cy, w, h,
+                      angle,
                       type: annotationType,
                       category: annotationCategory,
                       note: annotationNote,
@@ -1063,16 +1279,19 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           <button style={{ ...saveBtnStyle, cursor: 'pointer', background: C.primary }} onClick={() => {
             
             if (drawStart && drawEnd) {
-              const x = Math.min(drawStart.x, drawEnd.x);
-              const y = Math.min(drawStart.y, drawEnd.y);
-              const w = Math.abs(drawEnd.x - drawStart.x);
-              const h = Math.abs(drawEnd.y - drawStart.y);
-              if (w > 0 && h > 0) {
+              const dx = drawEnd.x - drawStart.x;
+              const dy = drawEnd.y - drawStart.y;
+              const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+              const cx = (drawStart.x + drawEnd.x) / 2;
+              const cy = (drawStart.y + drawEnd.y) / 2;
+              const w = Math.sqrt(dx * dx + dy * dy);
+              const h = Math.max(w * 0.25, 3);
+              if (w > 0) {
                 createAnnotation.mutate({
                   inspectionId,
                   thumbnailId: selectedThumbnail,
-                  x, y, w, h,
-                  angle: 0,
+                  x: cx, y: cy, w, h,
+                  angle,
                   type: rightPanelType,
                   category: rightPanelCategory,
                   note: '',

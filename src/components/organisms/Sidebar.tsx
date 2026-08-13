@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NavItem } from '@/components/molecules';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NavSection {
   title: string;
@@ -65,12 +66,42 @@ export function Sidebar({
   currentPath,
   onNavigate,
 }: SidebarProps) {
+  const { role } = useAuth();
+
+  const visibleSections: NavSection[] =
+    !role
+      ? [] // Don't show nav while role is loading to prevent flash
+      : role === 'supervisor'
+        ? [
+            {
+              title: 'Overview',
+              items: [
+                { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+              ],
+            },
+            {
+              title: 'Assets',
+              items: [{ icon: Wind, label: 'Wind Farms', path: '/assets-wind' }],
+            },
+            {
+              title: 'Reports',
+              items: [{ icon: FileText, label: 'Reports', path: '/reports' }],
+            },
+            {
+              title: 'Account',
+              items: [
+                { icon: User, label: 'Profile', path: '/profile' },
+                { icon: LogOut, label: 'Logout', path: '/logout' },
+              ],
+            },
+          ]
+        : navSections;
   const sidebarStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     width: isCollapsed ? '64px' : '256px',
     height: '100vh',
-    backgroundColor: '#0B2545',
+    backgroundColor: '#2C2C2C',
     borderRight: 'none',
     transition: `width var(--duration-slow) var(--easing-default)`,
     overflow: 'hidden',
@@ -149,7 +180,7 @@ export function Sidebar({
       </div>
 
       <nav style={navStyle}>
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title}>
             {!isCollapsed && (
               <div style={sectionTitleStyle}>{section.title}</div>

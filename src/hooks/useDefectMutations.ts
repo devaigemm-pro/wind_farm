@@ -11,6 +11,9 @@ export function useCreateDefect() {
       severity: Severity;
       distance_from_root: number;
       description?: string;
+      width_cm?: number;
+      height_cm?: number;
+      next_step?: string;
     }) => defectsService.createDefect(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['defects', variables.inspection_id] });
@@ -31,6 +34,9 @@ export function useUpdateDefect() {
         severity: Severity;
         distance_from_root: number;
         description: string | null;
+        width_cm: number;
+        height_cm: number;
+        next_step: string;
       }>;
     }) => defectsService.updateDefect(id, input),
     onSuccess: () => {

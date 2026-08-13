@@ -105,7 +105,7 @@ async function getInspectionPipeline(
   supabase: ReturnType<typeof createClient>,
   filters?: RequestBody['filters']
 ) {
-  const stages = ['to_plan', 'planned', 'uploaded', 'annotated', 'analyzed', 'finalized']
+  const stages = ['planned', 'inspect', 'annotate', 'report']
 
   let query = supabase.from('inspection').select('stage, blade_id')
 
@@ -266,8 +266,8 @@ async function getInspectionOperations(
 
     if (insp.status === 'completed' || insp.status === 'approved') {
       months[monthName].done++
-    } else if (insp.stage === 'to_plan') {
-      months[monthName].toPlan++
+    } else if (insp.stage === 'report') {
+      months[monthName].done++
     } else {
       months[monthName].planned++
     }

@@ -1,7 +1,8 @@
 /**
  * Creates a complete inspection for ADD-T02 with 3 blades, 60 photos, 15 annotations, 15 defects.
  */
-const TOKEN = 'REDACTED';
+const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+if (!TOKEN) { console.error('Set SUPABASE_ACCESS_TOKEN env var'); process.exit(1); }
 const PROJECT = 'esphlzrzwmzeozjmyvqm';
 
 async function query(sql) {

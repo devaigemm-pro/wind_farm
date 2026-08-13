@@ -60,17 +60,17 @@ export function InspectionOperationsChart({ data }: InspectionOperationsChartPro
         {nowIndex >= 0 && (
           <ReferenceLine
             x={data[nowIndex]?.month}
-            stroke="green"
-            label={{ value: 'Now', position: 'top', fill: 'green', fontSize: 11, fontWeight: 600 }}
+            stroke="#5a9e5a"
+            label={{ value: 'Now', position: 'top', fill: '#5a9e5a', fontSize: 11, fontWeight: 600 }}
           />
         )}
-        <Bar dataKey="toPlan" fill="darkblue" radius={[4, 4, 0, 0]} maxBarSize={32}>
+        <Bar dataKey="toPlan" fill="#2c3e6b" radius={[4, 4, 0, 0]} maxBarSize={32}>
           <LabelList dataKey="toPlan" position="top" fontSize={10} fill="var(--color-neutral-500, #64748b)" />
         </Bar>
-        <Bar dataKey="planned" fill="grey" radius={[4, 4, 0, 0]} maxBarSize={32}>
+        <Bar dataKey="planned" fill="#8a8a8a" radius={[4, 4, 0, 0]} maxBarSize={32}>
           <LabelList dataKey="planned" position="top" fontSize={10} fill="var(--color-neutral-500, #64748b)" />
         </Bar>
-        <Bar dataKey="done" fill="#4CAF50" radius={[4, 4, 0, 0]} maxBarSize={32}>
+        <Bar dataKey="done" fill="#5a9e5a" radius={[4, 4, 0, 0]} maxBarSize={32}>
           <LabelList dataKey="done" position="top" fontSize={10} fill="var(--color-neutral-500, #64748b)" />
         </Bar>
       </BarChart>

@@ -33,3 +33,11 @@ dist-ssr
 
 # Vercel
 .vercel
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
+# Coverage
+coverage/

@@ -64,7 +64,6 @@ export const newCampaignInspectionSchema = z.object({
   inspectionMethod: z.enum(['skyvisor', 'external']),
   scheduledDate: z.string().min(1, 'Inspection date is required'),
   notes: z.string().optional().default(''),
-  subscribeNotifications: z.boolean().default(true),
   selectedTurbineIds: z
     .array(z.string().uuid())
     .min(1, 'At least one turbine must be selected'),

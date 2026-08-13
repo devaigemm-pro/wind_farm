@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import { Button, Skeleton } from '@/components/atoms';
+import { useAuth } from '@/hooks/useAuth';
 import type { WindFarmDetail } from '@/types';
 
 export interface DetailsBlockProps {
@@ -9,6 +10,7 @@ export interface DetailsBlockProps {
 }
 
 export function DetailsBlock({ detail, isLoading, onPlanInspection }: DetailsBlockProps) {
+  const { role } = useAuth();
   const formatDate = (date: string | null) => {
     if (!date) return '—';
     return new Date(date).toLocaleDateString();
@@ -48,9 +50,11 @@ export function DetailsBlock({ detail, isLoading, onPlanInspection }: DetailsBlo
           <span style={valueStyle}>{detail?.subAssetsCount ?? 0}</span>
         </div>
       </div>
-      <Button variant="primary" icon={Plus} onClick={onPlanInspection} style={{ width: '100%', marginTop: 'var(--space-4)' }}>
-        Plan a New Inspection
-      </Button>
+      {role !== 'supervisor' && (
+        <Button variant="primary" icon={Plus} onClick={onPlanInspection} style={{ width: '100%', marginTop: 'var(--space-4)' }}>
+          Plan a New Inspection
+        </Button>
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ SELECT
   '2025-12-15',
   '2025-12-15T14:00:00Z',
   'approved',
-  'finalized',
+  'report',
   '2025-12-15T14:00:00Z'
 FROM blade b
 JOIN turbine t ON t.id = b.turbine_id
@@ -28,7 +28,7 @@ SELECT
   '2025-06-20',
   '2025-06-20T10:00:00Z',
   'approved',
-  'finalized',
+  'report',
   '2025-06-20T10:00:00Z'
 FROM blade b
 JOIN turbine t ON t.id = b.turbine_id

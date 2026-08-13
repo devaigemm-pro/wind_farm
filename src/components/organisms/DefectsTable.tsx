@@ -161,7 +161,7 @@ export function DefectsTable({
   }
 
   return (
-    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, backgroundColor: '#FFFFFF' }}>
+    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, backgroundColor: '#FFFFFF' }} className="responsive-table-wrapper">
       <table style={tableStyle}>
         <thead>
           <tr>
@@ -210,7 +210,7 @@ export function DefectsTable({
                 <td style={tdStyle}>{row.turbineName}</td>
                 <td style={tdStyle}>{row.turbineModel}</td>
                 <td style={tdStyle}>{row.type}</td>
-                <td style={tdStyle}>{row.defectWidth} x {row.defectHeight}</td>
+                <td style={tdStyle}>{(row.defectWidth || row.defectHeight) ? `${row.defectWidth} x ${row.defectHeight}` : '—'}</td>
                 <td style={tdStyle}>
                   <span style={getCategoryBadgeStyle(row.category)}>{row.category}</span>
                 </td>
