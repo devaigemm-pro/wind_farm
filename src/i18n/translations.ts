@@ -477,4 +477,30 @@ export const translations: TranslationMap = {
   // ─── Upload Status (additional) ────────────────────────────────────────────
   'uploadStatus.closeViewer': { en: 'Close viewer', es: 'Cerrar visor' },
   'uploadStatus.photos': { en: 'photos', es: 'fotos' },
+
+  // ─── Annotate Step (additional) ─────────────────────────────────────────────
+  'annotate.blade': { en: 'Blade: ', es: 'Pala: ' },
+  'annotate.side': { en: 'Side: ', es: 'Cara: ' },
+  'annotate.bladeRootDistance': { en: 'Blade root distance: ', es: 'Distancia a raíz de pala: ' },
+  'annotate.distanceToBlade': { en: 'Distance to blade: ', es: 'Distancia a pala: ' },
+  'annotate.confirmVerticalBlade': { en: 'Do you confirm setting the vertical blade to', es: '¿Confirmas configurar la pala vertical como' },
+
+  // ─── Assets (additional keys) ──────────────────────────────────────────────
+  'assets.noSelected': { en: 'No asset selected', es: 'Ningún activo seleccionado' },
+  'assets.coordinates': { en: 'Coordinates', es: 'Coordenadas' },
+  'assets.totalBlades': { en: 'Total Blades', es: 'Total de Palas' },
+  'assets.bladePositions': { en: 'Blade Positions', es: 'Posiciones de Pala' },
+  'assets.serialNumber': { en: 'Serial Number', es: 'Número de Serie' },
+  'assets.length': { en: 'Length', es: 'Largo' },
+
+  // ─── Blades Diagram ─────────────────────────────────────────────────────────
+  'blades.defectCategories': { en: 'Defect Categories', es: 'Categorías de Defectos' },
+  'blades.showCategories': { en: 'Show defect categories', es: 'Mostrar categorías de defectos' },
+
+  // ─── Map ────────────────────────────────────────────────────────────────────
+  'map.changeLayer': { en: 'Change map layer', es: 'Cambiar capa del mapa' },
+
+  // ─── Compare Viewer ─────────────────────────────────────────────────────────
+  'compare.selectInspection': { en: 'Select inspection', es: 'Seleccionar inspección' },
+  'compare.compareMore': { en: 'Compare more', es: 'Comparar más' },
 };

@@ -163,7 +163,7 @@ export function SharePopover({ anchorEl, open, onClose, shareKey, windFarmId, tu
 }
 
 const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 };
-const popoverStyle: React.CSSProperties = { position: 'fixed', top: '56px', right: '16px', zIndex: 1000, backgroundColor: '#ffffff', borderRadius: '8px', padding: '16px', width: '380px', boxShadow: '0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12)' };
+const popoverStyle: React.CSSProperties = { position: 'fixed', top: '56px', right: '16px', zIndex: 1000, backgroundColor: 'var(--color-neutral-0)', borderRadius: '8px', padding: '16px', width: '380px', boxShadow: '0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12)' };
 const titleStyle: React.CSSProperties = { fontSize: '14px', fontWeight: 600, margin: '0 0 4px', color: '#1e293b' };
 const subtitleStyle: React.CSSProperties = { fontSize: '12px', color: '#64748b', margin: '0 0 12px' };
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', maxHeight: '180px', overflowY: 'auto' };

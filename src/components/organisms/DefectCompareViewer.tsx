@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 import { useDefectHistory } from '@/hooks/useDefectHistory';
 import type { HistoricalDefect } from '@/hooks/useDefectHistory';
 
@@ -29,6 +30,7 @@ export function DefectCompareViewer({
   inspectionId,
 }: DefectCompareViewerProps) {
   const [selectedInspectionId, setSelectedInspectionId] = useState<string>('');
+  const { t } = useLanguage();
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [compareMore, setCompareMore] = useState(false);
 
@@ -297,9 +299,9 @@ export function DefectCompareViewer({
               style={selectStyle}
               value={selectedInspectionId}
               onChange={(e) => setSelectedInspectionId(e.target.value)}
-              aria-label="Select inspection to compare"
+              aria-label={t('compare.selectInspection')}
             >
-              <option value="">Select inspection</option>
+              <option value="">{t('compare.selectInspection')}</option>
               {inspections.map((insp) => (
                 <option key={insp.id} value={insp.id}>
                   {insp.label}
@@ -336,12 +338,12 @@ export function DefectCompareViewer({
           {defectType.replace(/_/g, ' ').toUpperCase()}
         </span>
         <div style={toggleContainerStyle}>
-          <span>Compare more</span>
+          <span>{t('compare.compareMore')}</span>
           <button
             type="button"
             style={toggleTrackStyle}
             onClick={() => setCompareMore((prev) => !prev)}
-            aria-label="Toggle compare more"
+            aria-label={t('compare.compareMore')}
             aria-pressed={compareMore}
           >
             <span style={toggleKnobStyle} />

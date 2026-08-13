@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge, Button, Input, Skeleton } from '@/components/atoms';
 import { EmptyState } from '@/components/molecules';
+import { useLanguage } from '@/components/design-system';
 import { useDefects } from '@/hooks/useDefects';
 import {
   useCreateDefect,
@@ -57,6 +58,7 @@ const SEVERITY_VARIANT: Record<Severity, BadgeVariant> = {
 };
 
 export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
+  const { t } = useLanguage();
   const { data: defects, isLoading } = useDefects(inspectionId);
   const createDefect = useCreateDefect();
   const updateDefect = useUpdateDefect();
@@ -312,7 +314,7 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, severity: Number(e.target.value) as Severity }))
                 }
-                aria-label="Severity level"
+                aria-label={t('table.severity')}
               >
                 {SEVERITIES.map((s) => (
                   <option key={s} value={s}>
@@ -345,14 +347,14 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
               }}
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              aria-label="Description"
+              aria-label={t('defects.description')}
             />
             {errors.description && <p style={errorStyle}>{errors.description}</p>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <div>
               <Input
-                label="Width (cm)"
+                label={t('defects.widthCm')}
                 type="number"
                 min={0}
                 step="0.1"
@@ -362,7 +364,7 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
             </div>
             <div>
               <Input
-                label="Height (cm)"
+                label={t('defects.heightCm')}
                 type="number"
                 min={0}
                 step="0.1"
@@ -373,7 +375,7 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
           </div>
           <div>
             <Input
-              label="Next Step"
+              label={t('table.nextStep')}
               value={form.next_step}
               onChange={(e) => setForm((f) => ({ ...f, next_step: e.target.value }))}
             />
@@ -397,8 +399,8 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
       {(!defects || defects.length === 0) && !showForm ? (
         <EmptyState
           icon={AlertTriangle}
-          title="No defects recorded"
-          description="Add defects found during the blade inspection."
+          title={t('defects.noRecorded')}
+          description={t('defects.noRecordedDesc')}
           action={
             canEdit
               ? {

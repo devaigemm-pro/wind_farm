@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '@/components/design-system';
 import type { DefectDashboardRow } from '@/types';
 
 export interface DefectDetailPanelProps {
@@ -28,6 +29,7 @@ function getCategoryBadgeStyle(category: number): React.CSSProperties {
 }
 
 export function DefectDetailPanel({ defect, onResolvedToggle }: DefectDetailPanelProps) {
+  const { t } = useLanguage();
   const [comment, setComment] = useState('');
 
   const handleToggle = () => {
@@ -69,7 +71,7 @@ export function DefectDetailPanel({ defect, onResolvedToggle }: DefectDetailPane
                 <td style={valueCellStyle}>
                   <button
                     type="button"
-                    aria-label="Mark as resolved"
+                    aria-label={t('defects.markResolved')}
                     aria-pressed={defect.resolved}
                     onClick={handleToggle}
                     style={{
@@ -121,8 +123,8 @@ export function DefectDetailPanel({ defect, onResolvedToggle }: DefectDetailPane
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', border: '1px solid var(--color-neutral-200)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2) var(--space-3)' }}>
                 <input
-                  placeholder="New comment"
-                  aria-label="New comment"
+                  placeholder={t('comments.new')}
+                  aria-label={t('comments.new')}
                   type="text"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}

@@ -1080,7 +1080,7 @@ function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onRe
         <thead>
           <tr>
             {[t('table.id'), t('table.type'), t('table.category'), t('table.blade'), t('table.side'), 'Root (m)', 'Size (cm)', t('table.resolved'), ...(readonly ? [] : [t('button.edit')])].map((h) => (
-              <th key={h} style={{ ...th, background: '#F3F4F6', color: C.muted }}>{h}</th>
+              <th key={h} style={{ ...th, background: 'var(--color-neutral-100)', color: C.muted }}>{h}</th>
             ))}
           </tr>
         </thead>

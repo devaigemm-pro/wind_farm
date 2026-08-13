@@ -30,7 +30,7 @@ export function DefectImageViewer({
     height: '250px',
     overflow: 'hidden',
     borderRadius: '4px',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'var(--color-neutral-100)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

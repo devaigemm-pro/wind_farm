@@ -618,13 +618,13 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           {/* Center: metadata info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center' }}>
             <span style={metaTextStyle}>
-              <span>Blade: </span><strong>{metaBlade}-{bladeSerials[metaBlade]}</strong>
+              <span>{t('annotate.blade')}</span><strong>{metaBlade}-{bladeSerials[metaBlade]}</strong>
               <span style={metaSep}>|</span>
-              <span>Side: </span><strong>{metaSide}</strong>
+              <span>{t('annotate.side')}</span><strong>{metaSide}</strong>
               <span style={metaSep}>|</span>
-              <span>Blade root distance: </span><strong>{metaRootDist} m</strong>
+              <span>{t('annotate.bladeRootDistance')}</span><strong>{metaRootDist} m</strong>
               <span style={metaSep}>|</span>
-              <span>Distance to blade: </span><strong>{metaDistBlade} m</strong>
+              <span>{t('annotate.distanceToBlade')}</span><strong>{metaDistBlade} m</strong>
             </span>
             <div style={{ position: 'relative' }}>
               {role !== 'supervisor' && <button style={editBtnStyle} onClick={() => setShowEditPopover(!showEditPopover)}>Edit</button>}
@@ -695,14 +695,14 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
                   {/* Buttons */}
                   <div style={{ display: 'flex', gap: 12 }}>
-                    <button style={cancelBtnStyle} onClick={() => setShowEditPopover(false)}>Cancel</button>
+                    <button style={cancelBtnStyle} onClick={() => setShowEditPopover(false)}>{t('button.cancel')}</button>
                     <button style={{ ...confirmBtnStyle, background: C.primary }} onClick={() => {
                       setMetaBlade(editBlade);
                       setMetaSide(editSide);
                       setMetaRootDist(editRootDistance);
                       setMetaDistBlade(editDistanceToBlade);
                       setShowEditPopover(false);
-                    }}>Save</button>
+                    }}>{t('button.save')}</button>
                   </div>
                 </div>
               )}
@@ -1082,32 +1082,58 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const cx = (drawStart.x + drawEnd.x) / 2;
             const cy = (drawStart.y + drawEnd.y) / 2;
             const w = dist;
-            // In phase 'drawing-line', show just the line; in 'expanding' or confirmed, show rect with drawWidth
-            const h = drawPhase === 'drawing-line' ? 1.5 : drawWidth;
+            const h = drawWidth;
             const isLine = drawPhase === 'drawing-line';
+
+            if (isLine) {
+              // Phase 1: SVG line
+              return (
+                <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line
+                    x1={drawStart.x} y1={drawStart.y}
+                    x2={drawEnd.x} y2={drawEnd.y}
+                    stroke="#FFA500" strokeWidth="0.3" strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+              );
+            }
+
+            // Phase 2 (expanding) or confirmed: SVG polygon for the rectangle
+            // Calculate 4 corners of the rotated rectangle using the line as center axis
+            const rad = Math.atan2(dy, dx);
+            // Normal vector (perpendicular to line direction)
+            const nx = -Math.sin(rad); // perpendicular x
+            const ny = Math.cos(rad);  // perpendicular y
+            const halfH = h / 2;
+            // 4 corners: start ± halfH along normal, end ± halfH along normal
+            const p1x = drawStart.x + nx * halfH;
+            const p1y = drawStart.y + ny * halfH;
+            const p2x = drawEnd.x + nx * halfH;
+            const p2y = drawEnd.y + ny * halfH;
+            const p3x = drawEnd.x - nx * halfH;
+            const p3y = drawEnd.y - ny * halfH;
+            const p4x = drawStart.x - nx * halfH;
+            const p4y = drawStart.y - ny * halfH;
+
             return (
-              <>
-                {/* Line or Rectangle */}
-                <div style={{
-                  position: 'absolute',
-                  left: `${cx}%`,
-                  top: `${cy}%`,
-                  width: `${w}%`,
-                  height: isLine ? '2px' : `${h}%`,
-                  transform: `translate(-50%, -50%) rotate(${angle}deg)`,
-                  transformOrigin: 'center',
-                  border: isLine ? 'none' : '2.5px solid #FFA500',
-                  background: isLine ? '#FFA500' : 'rgba(255, 165, 0, 0.1)',
-                  pointerEvents: 'none',
-                  borderRadius: isLine ? '2px' : 0,
-                }}>
-                  {!isLine && (
-                    <span style={{ position: 'absolute', bottom: -18, left: 0, fontSize: 11, color: '#FFA500', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
-                      {Math.round(w * 1.5)} x {Math.round(h * 1.3)} cm
-                    </span>
-                  )}
-                </div>
-              </>
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                {/* Center line */}
+                <line
+                  x1={drawStart.x} y1={drawStart.y}
+                  x2={drawEnd.x} y2={drawEnd.y}
+                  stroke="#FFA500" strokeWidth="0.15" strokeDasharray="0.5 0.3" opacity="0.6"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {/* Rectangle as polygon */}
+                <polygon
+                  points={`${p1x},${p1y} ${p2x},${p2y} ${p3x},${p3y} ${p4x},${p4y}`}
+                  fill="rgba(255, 165, 0, 0.1)"
+                  stroke="#FFA500"
+                  strokeWidth="0.3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
             );
           })()}
           </div>{/* end annotation layer */}
@@ -1161,7 +1187,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             {/* Category */}
             <div style={{ marginBottom: 12 }}>
-              <p style={{ fontSize: 13, color: C.text, margin: '0 0 6px' }}>Category</p>
+              <p style={{ fontSize: 13, color: C.text, margin: '0 0 6px' }}>{t('annotate.category')}</p>
               <div style={{ display: 'flex' }}>
                 {[1, 2, 3, 4, 5].map((c, idx) => (
                   <button key={c} onClick={() => setAnnotationCategory(c)} style={{
@@ -1194,7 +1220,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setDrawPhase('idle'); setDrawWidth(3); setEditingAnnotationId(null); setSaveError(null); }}>Cancel</button>
+              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setDrawPhase('idle'); setDrawWidth(3); setEditingAnnotationId(null); setSaveError(null); }}>{t('button.cancel')}</button>
               {editingAnnotationId !== null && (
                 <button style={{ ...confirmBtnStyle, background: '#F15959' }} onClick={() => {
                   
@@ -1208,7 +1234,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   setEditingAnnotationId(null);
                   setShowAnnotationPopover(false);
                   setAnnotationNote('');
-                }}>Delete</button>
+                }}>{t('button.delete')}</button>
               )}
               <button style={{ ...confirmBtnStyle, background: C.primary }} onClick={() => {
                 
@@ -1259,7 +1285,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 setShowAnnotationPopover(false);
                 setAnnotationNote('');
                 setSaveError(null);
-              }}>Save</button>
+              }}>{t('button.save')}</button>
             </div>
           </div>
         )}
@@ -1284,7 +1310,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
           {/* Category */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Category</label>
+            <label style={labelStyle}>{t('annotate.category')}</label>
             <div style={{ display: 'flex', gap: 0 }}>
               {[1, 2, 3, 4, 5].map((c) => (
                 <button key={c} onClick={() => setRightPanelCategory(c)} style={{ ...catBtn, ...(c === rightPanelCategory ? catBtnActive : {}), borderRadius: c === 1 ? '4px 0 0 4px' : c === 5 ? '0 4px 4px 0' : 0 }}>
@@ -1296,7 +1322,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
           {/* Root distance */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Root distance (m)</label>
+            <label style={labelStyle}>{t('annotate.rootDistance')}</label>
             <input type="number" style={inputStyle} value={rightPanelRootDistance} onChange={e => setRightPanelRootDistance(Number(e.target.value))} step="0.1" min="0" />
           </div>
 
@@ -1350,7 +1376,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             setDrawConfirmed(false);
             setDrawPhase('idle');
             setDrawWidth(3);
-          }}>Save</button>
+          }}>{t('button.save')}</button>
           )}
         </div>
 
@@ -1369,7 +1395,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   <option value="B">B - 82517</option>
                   <option value="C">C - 82509</option>
                 </select>
-                <button style={saveVerticalBtnStyle} onClick={() => setShowBladeConfirm(true)}>Save</button>
+                <button style={saveVerticalBtnStyle} onClick={() => setShowBladeConfirm(true)}>{t('button.save')}</button>
               </div>
               <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
                 Blade order from the outside is set to<b> clockwise</b>
@@ -1414,11 +1440,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             <div style={popoverTitle}>Update vertical blade</div>
             <div style={popoverQuestion}>
               <p style={{ margin: '0 0 12px' }}>You are about to change the vertical blade, this action will change the blade picture distribution according to the specified blade ordering (CW or CCW).</p>
-              <b>Do you confirm setting the vertical blade to &ldquo;{selectedBladeLabel}&rdquo;?</b>
+              <b>{t('annotate.confirmVerticalBlade')} &ldquo;{selectedBladeLabel}&rdquo;?</b>
             </div>
             <div style={popoverBtnGroup}>
-              <button style={cancelBtnStyle} onClick={() => setShowBladeConfirm(false)}>Cancel</button>
-              <button style={confirmBtnStyle} onClick={() => { setVerticalBlade(pendingVerticalBlade); localStorage.setItem(storageKey, pendingVerticalBlade); updateVerticalBladeMutation.mutate(pendingVerticalBlade); setShowBladeConfirm(false); }}>Confirm</button>
+              <button style={cancelBtnStyle} onClick={() => setShowBladeConfirm(false)}>{t('button.cancel')}</button>
+              <button style={confirmBtnStyle} onClick={() => { setVerticalBlade(pendingVerticalBlade); localStorage.setItem(storageKey, pendingVerticalBlade); updateVerticalBladeMutation.mutate(pendingVerticalBlade); setShowBladeConfirm(false); }}>{t('general.confirm')}</button>
             </div>
           </div>
         </div>

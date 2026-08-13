@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 52
+- **Sesiones analizadas**: 53
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -90,6 +90,7 @@
 - **"la inspección asociada" ≠ step 4 del workflow** — cuando dice "redirigir a la inspección asociada" o "la página de la inspección", se refiere a la página de SubassetDetail (`/assets-wind/{windFarmId}/subasset/{turbineId}`) donde se muestra la turbina con su tabla de inspecciones. NO es el step 4 del workflow. La "inspección asociada" es la PÁGINA que muestra la inspección, no un step dentro del workflow.
 - **"no pedir permiso para user-profile.md"** — NUNCA pedir confirmación para editar `.kiro/agents/user-profile.md`. Editarlo directamente sin preguntar. Es un archivo propio del sistema de aprendizaje, no código del proyecto.
 - **"sobrio" ≠ cambiar identidad cromática** — cuando dice "más sobrio" o "tonos suaves" para colores, significa MANTENER los mismos colores pero desaturarlos/suavizarlos. No cambiar la paleta por completo. "Mate" = misma familia cromática sin brillo.
+- **"cambio de color no funciona" = buscar HARDCODED primero** — cuando un cambio de color via variables CSS "no se aplica", la causa más probable es que los componentes tienen valores HEX hardcodeados (#fff, #FFFFFF, etc.) que ignoran las variables. SIEMPRE hacer `grep -r "#fff" src/` ANTES de tocar tokens. Es lo más básico.
 
 ---
 
@@ -564,3 +565,21 @@
   - Iteración estética confirmada: primera sesión definió verde+gris, esta sesión corrige que el gris no era suficientemente puro (tenía tono azulado). Necesita verlo en producción para validar.
   - El root cause era `color-scheme: light` que forzaba rendering azulado + fallbacks CSS con tonos slate (#1e293b, #f8fafc). La corrección fue sistémica.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, "se riguroso" = búsqueda exhaustiva, iteración estética rápida, corrección directa sin drama
+
+### Sesión 50 - 2026-08-13
+- **Tarea principal**: Corregir fondos blancos en dark mode — la pantalla /assets-wind seguía con fondo blanco porque había ~30 archivos con `#fff` / `#FFFFFF` hardcodeado que no respondían a las variables CSS
+- **Observaciones nuevas**:
+  - "no estas siendo eficiente, es muy basico cambiar el color" — frustración con el agente por no encontrar la causa real al primer intento. El problema era OBVIO (fondos hardcodeados) y no debería haber tomado múltiples intentos.
+  - "sigue con fondo blanco" — cuando da la URL exacta y dice qué ve, confía en que el agente vaya DIRECTO a resolver sin excusas ni explicaciones técnicas de por qué no funcionó antes.
+  - **CORRECCIÓN AL AGENTE**: Cuando un cambio de color "no funciona", la causa más probable es que los colores están HARDCODEADOS en los componentes y no usan variables CSS. SIEMPRE buscar hardcoded values PRIMERO antes de tocar solo los tokens/variables. Un `grep -r "#fff" src/` hubiera revelado el problema en 2 segundos.
+  - El fix fue simple pero masivo: sed global en 30 archivos cambiando `#fff`/`#FFFFFF` → `var(--color-neutral-0)`. Esto debió ser el PRIMER approach.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente no resuelve algo básico, URL exacta como referencia, corrección directa sin drama
+
+### Sesión 51 - 2026-08-13
+- **Tarea principal**: (1) Seguimiento del fondo blanco en /assets-wind (aún no se desplegaba). (2) Botón "cambiar contraseña" en /profile debe tener letras verdes en dark mode.
+- **Observaciones nuevas**:
+  - Sesión multi-fix continuada: primero reporta que /assets-wind sigue igual (era deploy en progreso), luego pasa a otro detalle en /profile — barrido de calidad confirmado
+  - "el boton cambiar contraseña debe tener las letras verdes" — instrucción ultra-precisa: componente exacto + propiedad visual + valor esperado. Una sola frase.
+  - Pasa de un problema no resuelto a otro sin drama — no se queda pegado esperando confirmación del primero, avanza al siguiente
+  - El botón usaba `color: var(--color-neutral-700)` que no tenía valor en dark mode tokens → cambió a `var(--color-neutral-800)` que resuelve a verde (#A8E6A8)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL exacta como referencia, barrido de calidad por pantalla, instrucción precisa (componente + propiedad + valor)

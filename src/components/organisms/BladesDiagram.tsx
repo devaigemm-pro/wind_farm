@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useLanguage } from '@/components/design-system';
 
 interface Defect {
   id: string;
@@ -45,6 +46,7 @@ export function BladesDiagram({
   selectedDefectId,
   onDefectClick,
 }: BladesDiagramProps) {
+  const { t } = useLanguage();
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);
@@ -109,8 +111,8 @@ export function BladesDiagram({
         type="button"
         onClick={() => setShowCategories(true)}
         style={infoBtnStyle}
-        title="Defect Categories"
-        aria-label="Show defect categories"
+        title={t('blades.defectCategories')}
+        aria-label={t('blades.showCategories')}
       >
         <svg focusable="false" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="#fff">
           <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8" />
@@ -126,13 +128,13 @@ export function BladesDiagram({
                 <svg focusable="false" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="#333">
                   <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8" />
                 </svg>
-                <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#333' }}>Defect Categories</h3>
+                <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#333' }}>{t('blades.defectCategories')}</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCategories(false)}
                 style={closeBtn}
-                aria-label="Close"
+                aria-label={t('general.close')}
               >
                 ✕
               </button>

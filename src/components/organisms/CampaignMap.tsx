@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/components/design-system';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -104,6 +105,7 @@ export function CampaignMap({
   selectedTurbineIds,
   onTurbineClick,
 }: CampaignMapProps) {
+  const { t } = useLanguage();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<Map | null>(null);
   const vectorSourceRef = useRef<VectorSource | null>(null);
@@ -207,7 +209,7 @@ export function CampaignMap({
         <button
           style={layerBtn}
           onClick={() => setShowLayerMenu(!showLayerMenu)}
-          title="Change map layer"
+          title={t('map.changeLayer')}
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="m20.5 3-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5M15 19l-6-2.11V5l6 2.11z" />

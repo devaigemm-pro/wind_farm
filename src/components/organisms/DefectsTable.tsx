@@ -128,7 +128,7 @@ export function DefectsTable({
     fontWeight: 600,
     fontSize: '10px',
     color: '#4B5563',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: 'var(--color-neutral-50)',
     borderBottom: '1px solid #E5E7EB',
     cursor: 'pointer',
     userSelect: 'none',

@@ -633,7 +633,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             return (
               <div key={blade} style={{ borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
                 <button onClick={() => toggleBladeExpand(blade)} style={bladeAccordionBtn}>
-                  <span>Blade {blade}</span>
+                  <span>{t('turbineDetail.filterBlade')} {blade}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{confirmedBladeCounts[blade]}</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill={C.muted}
@@ -693,7 +693,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
           {/* SubAsset section */}
           <div style={{ borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
             <div style={bladeAccordionBtn}>
-              <span>SubAsset</span>
+              <span>{t('subassets.title')}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{confirmedDefects.length}</span>
             </div>
             <div style={{ padding: '4px 0 8px' }}>
@@ -728,6 +728,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
 
 // ─── BladeTab sub-component ──────────────────────────────────────────────────
 function BladeTab({ blade, count, selected, onClick }: { blade: string; count: number; selected: boolean; onClick: () => void }) {
+  const { t } = useLanguage();
   return (
     <div style={{ position: 'relative' }}>
       <button onClick={onClick} style={{
@@ -741,7 +742,7 @@ function BladeTab({ blade, count, selected, onClick }: { blade: string; count: n
         cursor: 'pointer',
         transition: 'all 0.15s',
       }}>
-        Blade {blade}
+        {t('turbineDetail.filterBlade')} {blade}
       </button>
       <span style={{
         position: 'absolute', top: -6, right: -6,
@@ -761,7 +762,7 @@ const containerStyle: React.CSSProperties = {
   gap: 0,
   height: '100%',
   overflow: 'hidden',
-  background: '#F5F5F5',
+  background: 'var(--color-neutral-100)',
   alignItems: 'stretch',
 };
 

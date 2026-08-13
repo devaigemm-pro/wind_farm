@@ -2174,7 +2174,7 @@ const accordionHeaderStyle: CSSProperties = {
   justifyContent: 'space-between',
   padding: '8px 12px',
   cursor: 'pointer',
-  backgroundColor: '#F9FAFB',
+  backgroundColor: 'var(--color-neutral-50)',
   userSelect: 'none',
 };
 

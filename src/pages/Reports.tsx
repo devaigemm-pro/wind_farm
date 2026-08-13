@@ -177,7 +177,7 @@ export function Reports() {
       <div style={styles.toolbar}>
         <h5 style={styles.title}>{t('page.reports')}</h5>
         <div style={styles.searchContainer}>
-          <Search size={16} style={{ color: 'rgba(0, 0, 0, 0.4)' }} />
+          <Search size={16} style={{ color: 'var(--color-neutral-400)' }} />
           <input
             type="text"
             placeholder={t('reports.searchPlaceholder')}
@@ -334,14 +334,14 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     height: '100%',
     fontFamily: 'Calibri, "Gill Sans", Arial, sans-serif',
-    backgroundColor: '#F4F6F8',
+    backgroundColor: 'var(--color-neutral-50)',
   },
   toolbar: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 20px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+    borderBottom: '1px solid var(--color-neutral-200)',
     backgroundColor: 'var(--color-neutral-0)',
     flexShrink: 0,
   },
@@ -357,7 +357,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     padding: '8px 16px',
     borderRadius: '20px',
-    border: '1px solid rgba(0, 0, 0, 0.2)',
+    border: '1px solid var(--color-neutral-200)',
     backgroundColor: 'var(--color-neutral-0)',
     minWidth: '250px',
   },
@@ -367,7 +367,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontFamily: 'inherit',
     flex: 1,
-    color: 'rgba(0, 0, 0, 0.87)',
+    color: 'var(--color-neutral-800)',
     backgroundColor: 'transparent',
   },
   content: {
@@ -388,9 +388,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px 16px',
     fontSize: '11px',
     fontWeight: 700,
-    color: 'rgba(0, 0, 0, 0.87)',
-    backgroundColor: '#FAFAFA',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+    color: 'var(--color-neutral-800)',
+    backgroundColor: 'var(--color-neutral-100)',
+    borderBottom: '1px solid var(--color-neutral-200)',
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
@@ -408,7 +408,7 @@ const styles: Record<string, React.CSSProperties> = {
   td: {
     padding: '16px',
     fontSize: '12px',
-    color: 'rgba(0, 0, 0, 0.87)',
+    color: 'var(--color-neutral-800)',
     whiteSpace: 'nowrap',
   },
   downloadIcon: {
@@ -429,14 +429,14 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'flex-end',
     gap: '12px',
     padding: '10px 16px',
-    borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+    borderTop: '1px solid var(--color-neutral-200)',
     backgroundColor: 'var(--color-neutral-0)',
     fontSize: '12px',
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: 'var(--color-neutral-500)',
   },
   rowsPerPageLabel: {
     fontSize: '12px',
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: 'var(--color-neutral-500)',
     padding: '4px 8px',
     border: '1px solid #4CAF50',
     borderRadius: '4px',
@@ -450,15 +450,15 @@ const styles: Record<string, React.CSSProperties> = {
   select: {
     padding: '4px 8px',
     fontSize: '12px',
-    border: '1px solid rgba(0, 0, 0, 0.2)',
+    border: '1px solid var(--color-neutral-200)',
     borderRadius: '4px',
     fontFamily: 'inherit',
     backgroundColor: 'var(--color-neutral-0)',
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: 'var(--color-neutral-500)',
   },
   pageInfo: {
     fontSize: '12px',
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: 'var(--color-neutral-500)',
   },
   pageBtn: {
     width: '28px',
@@ -466,11 +466,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '1px solid rgba(0, 0, 0, 0.12)',
+    border: '1px solid var(--color-neutral-200)',
     borderRadius: '4px',
     backgroundColor: 'var(--color-neutral-0)',
     cursor: 'pointer',
     fontSize: '16px',
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: 'var(--color-neutral-500)',
   },
 };

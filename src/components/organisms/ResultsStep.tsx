@@ -185,7 +185,7 @@ const containerStyle: React.CSSProperties = {
   flexDirection: 'column',
   height: '100%',
   overflow: 'hidden',
-  background: '#F5F5F5',
+  background: 'var(--color-neutral-100)',
   padding: 16,
   gap: 16,
 };

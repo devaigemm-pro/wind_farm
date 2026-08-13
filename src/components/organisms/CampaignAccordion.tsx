@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, MoreHorizontal, Download, Loader2 } from 'lucide-react';
 import { Button, Badge } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
@@ -24,6 +25,7 @@ export function CampaignAccordion({
   onDelete,
   filterBySubasset,
 }: CampaignAccordionProps) {
+  const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -162,7 +164,7 @@ export function CampaignAccordion({
                       {(insp.stage === 'report' || insp.status === 'completed' || insp.status === 'approved' || insp.reportStoragePath) && (
                         <button
                           style={pdfBtnStyle}
-                          title="Download PDF"
+                          title={t('reports.downloadReport')}
                           disabled={downloadingId === insp.id}
                           onClick={async (e) => {
                             e.stopPropagation();

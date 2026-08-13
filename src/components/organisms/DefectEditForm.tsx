@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 import type { DefectDashboardRow } from '@/types';
 import { DEFECT_TYPE_DISPLAY_LABELS } from '@/types';
 
@@ -24,6 +25,7 @@ const DEFECT_TYPES = Object.values(DEFECT_TYPE_DISPLAY_LABELS);
 const BLADE_FACES = ['LE', 'TE', 'SS', 'PS'];
 
 export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEditFormProps) {
+  const { t } = useLanguage();
   // Initialize directly from defect props
   const initialType = defect.type || '';
   const initialCategory = defect.category || 3;
@@ -141,7 +143,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
             style={textareaStyle}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Visual description of the defect"
+            placeholder={t('defects.descriptionPlaceholder')}
             rows={2}
           />
           {notes && (
@@ -160,7 +162,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
             style={textareaStyle}
             value={rootCause}
             onChange={(e) => setRootCause(e.target.value)}
-            placeholder="Probable cause of the defect"
+            placeholder={t('defects.causePlaceholder')}
             rows={2}
           />
           {rootCause && (
@@ -179,7 +181,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
             style={textareaStyle}
             value={nextStep}
             onChange={(e) => setNextStep(e.target.value)}
-            placeholder="Recommended action and urgency"
+            placeholder={t('defects.actionPlaceholder')}
             rows={2}
           />
           {nextStep && (
@@ -238,7 +240,7 @@ const selectStyle: React.CSSProperties = {
   fontFamily: 'var(--font-family-sans)',
   border: '1px solid #BDBDBD',
   borderRadius: '4px',
-  backgroundColor: '#FFF',
+  backgroundColor: 'var(--color-neutral-0)',
   color: '#212121',
   appearance: 'auto',
   cursor: 'pointer',
@@ -251,7 +253,7 @@ const smallSelectStyle: React.CSSProperties = {
   fontFamily: 'var(--font-family-sans)',
   border: '1px solid #BDBDBD',
   borderRadius: '4px',
-  backgroundColor: '#FFF',
+  backgroundColor: 'var(--color-neutral-0)',
   color: '#212121',
   appearance: 'auto',
   cursor: 'pointer',
@@ -264,7 +266,7 @@ const numberInputStyle: React.CSSProperties = {
   fontFamily: 'var(--font-family-sans)',
   border: '1px solid #BDBDBD',
   borderRadius: '4px',
-  backgroundColor: '#FFF',
+  backgroundColor: 'var(--color-neutral-0)',
   color: '#212121',
 };
 
@@ -280,7 +282,7 @@ const categoryBtnStyle: React.CSSProperties = {
   fontSize: '13px',
   fontWeight: 600,
   fontFamily: 'var(--font-family-sans)',
-  backgroundColor: '#FFF',
+  backgroundColor: 'var(--color-neutral-0)',
   color: '#1976D2',
   border: 'none',
   borderRight: '1px solid #1976D2',
@@ -306,7 +308,7 @@ const textareaStyle: React.CSSProperties = {
   fontFamily: 'var(--font-family-sans)',
   border: '1px solid #BDBDBD',
   borderRadius: '4px',
-  backgroundColor: '#FFF',
+  backgroundColor: 'var(--color-neutral-0)',
   color: '#212121',
   resize: 'vertical',
   minHeight: '50px',

@@ -306,7 +306,7 @@ const mapContainer: React.CSSProperties = { flex: 1, minHeight: 260, position: '
 const mapEl: React.CSSProperties = { width: '100%', height: '100%', minHeight: 260, borderRadius: 8, overflow: 'hidden' };
 const mapTypeBtn: React.CSSProperties = { position: 'absolute', top: 12, left: 12, zIndex: 10, background: 'var(--color-neutral-0)', border: '1px solid #ccc', borderRadius: 4, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', color: '#555' };
 
-const stepperContainer: React.CSSProperties = { background: '#F4F6F8', borderRadius: 8, padding: '20px 32px' };
+const stepperContainer: React.CSSProperties = { background: 'var(--color-neutral-50)', borderRadius: 8, padding: '20px 32px' };
 const stepperBar: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const stepItem: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 };
 const stepLine: React.CSSProperties = { flex: 1, height: 4, background: '#4caf50', margin: '0 12px', borderRadius: 2, minWidth: 80, maxWidth: 300, alignSelf: 'flex-start', marginTop: 10 };

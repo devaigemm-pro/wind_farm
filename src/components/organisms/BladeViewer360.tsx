@@ -5,6 +5,7 @@ import { droneUploadService } from '@/services/drone-upload.service';
 import { BLADE_FACE_LABELS, BLADE_FACE_SHORT } from '@/types';
 import type { BladeFace, InspectionPhoto } from '@/types';
 import { Skeleton } from '@/components/atoms/Skeleton';
+import { useLanguage } from '@/components/design-system';
 
 export interface BladeViewer360Props {
   campaignId: string;
@@ -14,6 +15,7 @@ export interface BladeViewer360Props {
 const FACES: BladeFace[] = ['leading_edge', 'trailing_edge', 'suction_side', 'pressure_side'];
 
 export function BladeViewer360({ campaignId, bladeId }: BladeViewer360Props) {
+  const { t } = useLanguage();
   const [selectedFace, setSelectedFace] = useState<BladeFace>('leading_edge');
   const [lightboxPhoto, setLightboxPhoto] = useState<InspectionPhoto | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
@@ -171,7 +173,7 @@ export function BladeViewer360({ campaignId, bladeId }: BladeViewer360Props) {
             <button
               onClick={() => setLightboxPhoto(null)}
               style={styles.lightboxClose}
-              aria-label="Close"
+              aria-label={t('general.close')}
               type="button"
             >
               <X size={20} />
@@ -182,7 +184,7 @@ export function BladeViewer360({ campaignId, bladeId }: BladeViewer360Props) {
               <button
                 onClick={() => navigateLightbox('prev')}
                 style={{ ...styles.lightboxNav, left: '8px' }}
-                aria-label="Previous photo"
+                aria-label={t('general.previous')}
                 type="button"
               >
                 <ChevronLeft size={24} />
@@ -192,7 +194,7 @@ export function BladeViewer360({ campaignId, bladeId }: BladeViewer360Props) {
               <button
                 onClick={() => navigateLightbox('next')}
                 style={{ ...styles.lightboxNav, right: '8px' }}
-                aria-label="Next photo"
+                aria-label={t('general.next')}
                 type="button"
               >
                 <ChevronRight size={24} />

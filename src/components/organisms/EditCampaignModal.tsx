@@ -220,7 +220,7 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const modalStyle: React.CSSProperties = {
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--color-neutral-0)',
   borderRadius: 'var(--radius-lg)',
   padding: 'var(--space-6)',
   width: '90%',
@@ -285,7 +285,7 @@ const thStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--color-neutral-200)',
   position: 'sticky',
   top: 0,
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--color-neutral-0)',
   color: 'var(--color-neutral-600)',
 };
 

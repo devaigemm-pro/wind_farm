@@ -1,6 +1,7 @@
 import { Wind, Cog, Fan } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
 import { EmptyState } from '@/components/molecules';
+import { useLanguage } from '@/components/design-system';
 import type { WindFarm, Turbine, Blade } from '@/types';
 
 export interface AssetDetailPanelProps {
@@ -10,6 +11,7 @@ export interface AssetDetailPanelProps {
 }
 
 export function AssetDetailPanel({ type, data, loading }: AssetDetailPanelProps) {
+  const { t } = useLanguage();
   const containerStyle: React.CSSProperties = {
     fontFamily: 'var(--font-family-sans)',
     padding: 'var(--space-4)',
@@ -38,7 +40,7 @@ export function AssetDetailPanel({ type, data, loading }: AssetDetailPanelProps)
       <div style={containerStyle}>
         <EmptyState
           icon={Wind}
-          title="No asset selected"
+          title={t('assets.noSelected')}
           description="Select a wind farm, turbine, or blade from the tree to view its details."
         />
       </div>
@@ -59,22 +61,23 @@ export function AssetDetailPanel({ type, data, loading }: AssetDetailPanelProps)
 // ─── Wind Farm Detail ───────────────────────────────────────────────────────
 
 function WindFarmDetail({ farm }: { farm: WindFarm }) {
+  const { t } = useLanguage();
   const turbineCount = farm.turbines?.length ?? 0;
-  const bladeCount = farm.turbines?.reduce((acc, t) => acc + (t.blades?.length ?? 0), 0) ?? 0;
+  const bladeCount = farm.turbines?.reduce((acc, turb) => acc + (turb.blades?.length ?? 0), 0) ?? 0;
 
   return (
     <DetailContainer>
-      <DetailHeader icon={<Wind size={20} />} title={farm.name} subtitle="Wind Farm" />
+      <DetailHeader icon={<Wind size={20} />} title={farm.name} subtitle={t('sidebar.windFarms')} />
       <DetailGrid>
-        <DetailItem label="Location" value={farm.location} />
+        <DetailItem label={t('windFarmForm.location')} value={farm.location} />
         {farm.latitude != null && farm.longitude != null && (
           <DetailItem
-            label="Coordinates"
+            label={t('assets.coordinates')}
             value={`${farm.latitude.toFixed(4)}, ${farm.longitude.toFixed(4)}`}
           />
         )}
-        <DetailItem label="Turbines" value={String(turbineCount)} />
-        <DetailItem label="Total Blades" value={String(bladeCount)} />
+        <DetailItem label={t('page.turbines')} value={String(turbineCount)} />
+        <DetailItem label={t('assets.totalBlades')} value={String(bladeCount)} />
       </DetailGrid>
     </DetailContainer>
   );
@@ -83,18 +86,19 @@ function WindFarmDetail({ farm }: { farm: WindFarm }) {
 // ─── Turbine Detail ─────────────────────────────────────────────────────────
 
 function TurbineDetail({ turbine }: { turbine: Turbine }) {
+  const { t } = useLanguage();
   const bladeCount = turbine.blades?.length ?? 0;
 
   return (
     <DetailContainer>
-      <DetailHeader icon={<Cog size={20} />} title={turbine.name} subtitle="Turbine" />
+      <DetailHeader icon={<Cog size={20} />} title={turbine.name} subtitle={t('table.turbine')} />
       <DetailGrid>
-        {turbine.model && <DetailItem label="Model" value={turbine.model} />}
-        {turbine.wind_farm && <DetailItem label="Wind Farm" value={turbine.wind_farm.name} />}
-        <DetailItem label="Blades" value={String(bladeCount)} />
+        {turbine.model && <DetailItem label={t('table.model')} value={turbine.model} />}
+        {turbine.wind_farm && <DetailItem label={t('sidebar.windFarms')} value={turbine.wind_farm.name} />}
+        <DetailItem label={t('turbineDetail.blades')} value={String(bladeCount)} />
         {turbine.blades && turbine.blades.length > 0 && (
           <DetailItem
-            label="Blade Positions"
+            label={t('assets.bladePositions')}
             value={turbine.blades.map((b) => `#${b.position}`).join(', ')}
           />
         )}
@@ -106,20 +110,21 @@ function TurbineDetail({ turbine }: { turbine: Turbine }) {
 // ─── Blade Detail ───────────────────────────────────────────────────────────
 
 function BladeDetail({ blade }: { blade: Blade }) {
+  const { t } = useLanguage();
   return (
     <DetailContainer>
       <DetailHeader
         icon={<Fan size={20} />}
         title={blade.serial_number ?? `Blade #${blade.position}`}
-        subtitle="Blade"
+        subtitle={t('table.blade')}
       />
       <DetailGrid>
         <DetailItem label="Position" value={String(blade.position)} />
-        {blade.serial_number && <DetailItem label="Serial Number" value={blade.serial_number} />}
+        {blade.serial_number && <DetailItem label={t('assets.serialNumber')} value={blade.serial_number} />}
         {blade.length_meters != null && (
-          <DetailItem label="Length" value={`${blade.length_meters} m`} />
+          <DetailItem label={t('assets.length')} value={`${blade.length_meters} m`} />
         )}
-        {blade.turbine && <DetailItem label="Turbine" value={blade.turbine.name} />}
+        {blade.turbine && <DetailItem label={t('table.turbine')} value={blade.turbine.name} />}
       </DetailGrid>
     </DetailContainer>
   );
