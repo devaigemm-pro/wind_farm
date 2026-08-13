@@ -356,7 +356,7 @@ const zoomContainerStyle: React.CSSProperties = {
   border: '1px solid #999',
   borderRadius: 6,
   overflow: 'hidden',
-  background: '#fff',
+  background: 'var(--color-neutral-0)',
   boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
   alignSelf: 'flex-end',
   marginLeft: 6,
@@ -370,7 +370,7 @@ const zoomBtnStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: '#fff',
+  background: 'var(--color-neutral-0)',
   border: 'none',
   borderBottom: '1px solid #ccc',
   cursor: 'pointer',
@@ -410,7 +410,7 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const modalStyle: React.CSSProperties = {
-  background: '#fff',
+  background: 'var(--color-neutral-0)',
   borderRadius: 12,
   padding: 24,
   maxWidth: 640,

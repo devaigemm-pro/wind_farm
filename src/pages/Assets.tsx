@@ -311,7 +311,7 @@ export function Assets() {
       <div style={pageStyle}>
         <div style={headerStyle}>
           {mobileShowDetail && (
-            <Button variant="ghost" size="sm" onClick={handleMobileBack} aria-label="Back to asset tree">
+            <Button variant="ghost" size="sm" onClick={handleMobileBack} aria-label={t('assets.backToTree')}>
               <ArrowLeft size={16} />
             </Button>
           )}

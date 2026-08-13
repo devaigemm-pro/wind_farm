@@ -16,7 +16,7 @@ const styles = {
   card: {
     width: '100%',
     maxWidth: '400px',
-    background: '#ffffff',
+    background: 'var(--color-neutral-0)',
     borderRadius: '12px',
     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
     padding: '2.5rem 2rem',

@@ -11,15 +11,9 @@ import type { BladeFace, BladeUploadProgress, CampaignStatus } from '@/types';
 import { BladeViewer360 } from '@/components/organisms/BladeViewer360';
 import { Skeleton } from '@/components/atoms/Skeleton';
 import { Button } from '@/components/atoms/Button';
+import { useLanguage } from '@/components/design-system';
 
 const FACES: BladeFace[] = ['leading_edge', 'trailing_edge', 'suction_side', 'pressure_side'];
-
-const STATUS_LABELS: Record<CampaignStatus, string> = {
-  awaiting_photos: 'Awaiting Photos',
-  photos_uploaded: 'Photos Uploaded',
-  annotating: 'Annotating',
-  completed: 'Completed',
-};
 
 const STATUS_COLORS: Record<CampaignStatus, { bg: string; text: string }> = {
   awaiting_photos: { bg: '#FFF3E0', text: '#E65100' },
@@ -33,6 +27,7 @@ const STATUS_COLORS: Record<CampaignStatus, { bg: string; text: string }> = {
 export function CampaignUploadStatus() {
   const { id: campaignId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerBladeId, setViewerBladeId] = useState<string | null>(null);
@@ -139,8 +134,8 @@ export function CampaignUploadStatus() {
     return (
       <div style={pageStyles.container}>
         <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-neutral-500)' }}>
-          <p>Campaign not found.</p>
-          <Link to="/dashboard" style={{ color: 'var(--color-primary-500)' }}>Back to dashboard</Link>
+          <p>{t('uploadStatus.campaignNotFound')}</p>
+          <Link to="/dashboard" style={{ color: 'var(--color-primary-500)' }}>{t('general.back')}</Link>
         </div>
       </div>
     );
@@ -155,13 +150,13 @@ export function CampaignUploadStatus() {
         <div style={pageStyles.headerLeft}>
           <div style={pageStyles.breadcrumb}>
             <Link to={`/assets-wind/${campaign.windFarmId}`} style={pageStyles.breadcrumbLink}>
-              Wind Farm
+              {t('sidebar.windFarms')}
             </Link>
             <ChevronRight size={14} color="var(--color-neutral-400)" />
             <span style={pageStyles.breadcrumbCurrent}>{campaign.name}</span>
           </div>
           <div style={pageStyles.titleRow}>
-            <h1 style={pageStyles.title}>Upload Status</h1>
+            <h1 style={pageStyles.title}>{t('page.uploadStatus')}</h1>
             <span
               style={{
                 ...pageStyles.statusBadge,
@@ -169,7 +164,7 @@ export function CampaignUploadStatus() {
                 color: statusColors.text,
               }}
             >
-              {STATUS_LABELS[campaign.status]}
+              {t(`status.${campaign.status === 'awaiting_photos' ? 'awaitingPhotos' : campaign.status === 'photos_uploaded' ? 'photosUploaded' : campaign.status === 'annotating' ? 'annotating' : 'completed'}`)}
             </span>
           </div>
         </div>
@@ -183,7 +178,7 @@ export function CampaignUploadStatus() {
               onClick={() => updateStatus.mutate('annotating')}
               disabled={updateStatus.isPending}
             >
-              Start Analysis
+              {t('button.startAnalysis')}
             </Button>
           )}
         </div>
@@ -196,9 +191,9 @@ export function CampaignUploadStatus() {
             <Radio size={20} color="#E65100" style={{ animation: 'pulse 2s infinite' }} />
           </div>
           <div>
-            <p style={pageStyles.awaitingTitle}>Waiting for drone upload</p>
+            <p style={pageStyles.awaitingTitle}>{t('uploadStatus.waitingDrone')}</p>
             <p style={pageStyles.awaitingSubtitle}>
-              The system is polling every 10 seconds for incoming photos.
+              {t('uploadStatus.waitingDroneDesc')}
             </p>
           </div>
         </div>
@@ -210,14 +205,14 @@ export function CampaignUploadStatus() {
           <div style={pageStyles.statCard}>
             <Camera size={16} color="var(--color-primary-500)" />
             <span style={pageStyles.statValue}>{totalPhotos}</span>
-            <span style={pageStyles.statLabel}>Total Photos</span>
+            <span style={pageStyles.statLabel}>{t('uploadStatus.totalPhotos')}</span>
           </div>
           <div style={pageStyles.statCard}>
             <Eye size={16} color="#2E7D32" />
             <span style={pageStyles.statValue}>
               {(progress ?? []).reduce((s, p) => s + p.analyzedCount, 0)}
             </span>
-            <span style={pageStyles.statLabel}>Analyzed</span>
+            <span style={pageStyles.statLabel}>{t('uploadStatus.analyzed')}</span>
           </div>
         </div>
       )}
@@ -232,7 +227,7 @@ export function CampaignUploadStatus() {
             <div key={blade.id} style={pageStyles.bladeCard}>
               <div style={pageStyles.bladeCardHeader}>
                 <h3 style={pageStyles.bladeCardTitle}>
-                  Blade {bladeLabel}
+                  {t('table.blade')} {bladeLabel}
                 </h3>
                 <span style={pageStyles.bladeCardSub}>{blade.turbineName}</span>
               </div>
@@ -249,7 +244,7 @@ export function CampaignUploadStatus() {
                     <div key={face} style={pageStyles.faceRow}>
                       <span style={pageStyles.faceIcon}>{BLADE_FACE_SHORT[face]}</span>
                       <span style={pageStyles.faceName}>{BLADE_FACE_LABELS[face]}</span>
-                      <span style={pageStyles.faceCount}>{count} photos</span>
+                      <span style={pageStyles.faceCount}>{count} {t('uploadStatus.photos')}</span>
                       <div style={pageStyles.progressTrack}>
                         <div
                           style={{
@@ -271,7 +266,7 @@ export function CampaignUploadStatus() {
                 style={pageStyles.viewButton}
               >
                 <Eye size={14} />
-                View 360°
+                {t('button.view360')}
               </button>
             </div>
           );
@@ -285,16 +280,16 @@ export function CampaignUploadStatus() {
           onClick={() => setViewerOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label="Blade 360 Viewer"
+          aria-label={t('uploadStatus.blade360Viewer')}
         >
           <div style={pageStyles.dialogContent} onClick={(e) => e.stopPropagation()}>
             <div style={pageStyles.dialogHeader}>
-              <h2 style={pageStyles.dialogTitle}>Blade 360° Viewer</h2>
+              <h2 style={pageStyles.dialogTitle}>{t('uploadStatus.blade360Viewer')}</h2>
               <button
                 type="button"
                 onClick={() => setViewerOpen(false)}
                 style={pageStyles.dialogClose}
-                aria-label="Close viewer"
+                aria-label={t('uploadStatus.closeViewer')}
               >
                 ×
               </button>

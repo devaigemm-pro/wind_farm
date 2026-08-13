@@ -2152,7 +2152,7 @@ const switchThumbStyle: CSSProperties = {
   width: '16px',
   height: '16px',
   borderRadius: '50%',
-  backgroundColor: '#FFFFFF',
+  backgroundColor: 'var(--color-neutral-0)',
   boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
   transition: 'left 200ms ease',
 };

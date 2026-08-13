@@ -178,7 +178,7 @@ export function WindFarmDetail() {
           <div style={exportBarStyle}>
             <button
               type="button"
-              aria-label="Export defects list"
+              aria-label={t('button.exportList')}
               style={exportBtnStyle}
               onClick={handleExportDefects}
             >

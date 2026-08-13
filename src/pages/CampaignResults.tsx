@@ -10,6 +10,7 @@ import { CampaignMap } from '@/components/organisms/CampaignMap';
 import { useCampaignResults } from '@/hooks/useCampaignResults';
 import { useTurbineMarkers } from '@/hooks/useWindFarmDetail';
 import { Skeleton } from '@/components/atoms/Skeleton';
+import { useLanguage } from '@/components/design-system';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import { generateDefectsXLSX, downloadBlob } from '@/utils/csv-export';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +32,7 @@ const CATEGORY_COLORS: Record<number, string> = {
 export function CampaignResults() {
   const { id: campaignId } = useParams<{ id: string }>();
   const { data, isLoading } = useCampaignResults(campaignId);
+  const { t } = useLanguage();
   const [selectedTurbines, setSelectedTurbines] = useState<Set<string>>(new Set());
   const [shareAnchor, setShareAnchor] = useState<HTMLElement | null>(null);
 
@@ -198,8 +200,8 @@ export function CampaignResults() {
     return (
       <div style={pageContainer}>
         <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-neutral-500)' }}>
-          <p>Campaign not found or has no inspection data yet.</p>
-          <Link to="/" style={{ color: 'var(--color-primary-500)' }}>Back to dashboard</Link>
+          <p>{t('campaign.notFound')}</p>
+          <Link to="/" style={{ color: 'var(--color-primary-500)' }}>{t('general.back')}</Link>
         </div>
       </div>
     );
@@ -223,16 +225,16 @@ export function CampaignResults() {
             <ChevronRight size={14} color="var(--color-neutral-400)" />
             <span style={breadcrumbCurrent}>{campaign.name}</span>
           </div>
-          <p style={subtitleStyle}>Campaign of {campaignDate}</p>
+          <p style={subtitleStyle}>{t('campaign.campaignOf')} {campaignDate}</p>
         </div>
         <div style={toolbarRight}>
           <button style={primaryBtn} onClick={handleExportCsv}>
             <Download size={14} />
-            <span>Export XLSX for all turbines</span>
+            <span>{t('button.exportXlsx')}</span>
           </button>
           <button style={shareBtn} onClick={(e) => setShareAnchor(e.currentTarget)}>
             <Share2 size={14} />
-            <span>Share</span>
+            <span>{t('button.share')}</span>
           </button>
           <SharePopover
             anchorEl={shareAnchor}
@@ -249,9 +251,9 @@ export function CampaignResults() {
       {/* Empty results state */}
       {turbineResults.length === 0 ? (
         <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-neutral-500)' }}>
-          <p>No inspections assigned to this campaign yet.</p>
+          <p>{t('campaign.noInspections')}</p>
           <Link to={`/assets-wind/${campaign.windFarmId}`} style={{ color: 'var(--color-primary-500)' }}>
-            Go to wind farm detail to assign inspections
+            {t('campaign.goToWindFarm')}
           </Link>
         </div>
       ) : (
@@ -268,7 +270,7 @@ export function CampaignResults() {
                     checked={selectAll}
                     onChange={(e) => handleSelectAll(e.target.checked)}
                   />
-                  <span>Select all</span>
+                  <span>{t('button.selectAll')}</span>
                 </label>
               </div>
               <CampaignMap
@@ -281,11 +283,11 @@ export function CampaignResults() {
             {/* Charts side by side */}
             <div style={chartsRow} className="cards-grid">
               <div style={chartPanel}>
-                <h4 style={chartTitle}>Turbine defect category repartition</h4>
+                <h4 style={chartTitle}>{t('campaign.categoryRepartition')}</h4>
                 <CampaignCategoryChart data={filteredCategoryChart} />
               </div>
               <div style={chartPanel}>
-                <h4 style={chartTitle}>Turbine defect type repartition</h4>
+                <h4 style={chartTitle}>{t('campaign.typeRepartition')}</h4>
                 <CampaignTypeChart data={filteredTypeChart as unknown as Array<{ turbine: string; [key: string]: string | number }>} />
               </div>
             </div>
@@ -388,7 +390,7 @@ export function CampaignResults() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="#0288D1">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
                   </svg>
-                  <span style={infoBannerText}>Only the defects of the selected turbines are displayed</span>
+                  <span style={infoBannerText}>{t('campaign.selectedTurbinesInfo')}</span>
                 </div>
               )}
 
@@ -398,7 +400,7 @@ export function CampaignResults() {
                 return (
                   <div key={cat} style={{ marginBottom: '20px' }}>
                     <div style={gallerySeparator}>
-                      <span style={{ ...gallerySepText, color: CATEGORY_COLORS[cat] }}>Category {cat}</span>
+                      <span style={{ ...gallerySepText, color: CATEGORY_COLORS[cat] }}>{t('table.category')} {cat}</span>
                       <div style={gallerySepLine} />
                       <span style={gallerySepCount}>{items.length}</span>
                     </div>

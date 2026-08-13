@@ -17,11 +17,11 @@ interface ColumnConfig {
 }
 
 const COLUMNS: ColumnConfig[] = [
-  { stage: 'planned', title: 'Planned', actionIcon: <Plus size={14} />, actionLabel: 'New' },
-  { stage: 'inspect', title: 'Upload', actionIcon: <Upload size={14} />, actionLabel: 'Upload' },
-  { stage: 'annotate', title: 'Annotate' },
-  { stage: 'analyze', title: 'Analyze' },
-  { stage: 'report', title: 'Report', actionIcon: <FileText size={14} />, actionLabel: 'Reports', actionRoute: '/inspections/reports' },
+  { stage: 'planned', title: 'ongoing.colPlanned', actionIcon: <Plus size={14} />, actionLabel: 'ongoing.actionNew' },
+  { stage: 'inspect', title: 'ongoing.colUpload', actionIcon: <Upload size={14} />, actionLabel: 'ongoing.actionUpload' },
+  { stage: 'annotate', title: 'ongoing.colAnnotate' },
+  { stage: 'analyze', title: 'ongoing.colAnalyze' },
+  { stage: 'report', title: 'ongoing.colReport', actionIcon: <FileText size={14} />, actionLabel: 'ongoing.actionReports', actionRoute: '/inspections/reports' },
 ];
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ export function OngoingInspections() {
     const viewedItems = items.filter((i) => i.viewed_percent != null && i.viewed_percent > 0);
     if (viewedItems.length === 0) return '';
     const avgViewed = viewedItems.reduce((sum, i) => sum + (i.viewed_percent ?? 0), 0) / viewedItems.length;
-    return `${Math.round(avgViewed)}% viewed`;
+    return `${Math.round(avgViewed)}% ${t('ongoing.viewed')}`;
   };
 
   // Loading
@@ -121,7 +121,7 @@ export function OngoingInspections() {
           <button
             style={viewMode === 'status' ? toggleBtnActive : toggleBtn}
             onClick={() => setViewMode('status')}
-            title="Status view"
+            title={t('ongoing.viewStatus')}
           >
             <Columns3 size={14} />
             <span>{t('ongoing.viewStatus')}</span>
@@ -129,7 +129,7 @@ export function OngoingInspections() {
           <button
             style={viewMode === 'list' ? toggleBtnActive : toggleBtn}
             onClick={() => setViewMode('list')}
-            title="List view"
+            title={t('ongoing.viewList')}
           >
             <List size={14} />
             <span>{t('ongoing.viewList')}</span>
@@ -149,16 +149,16 @@ export function OngoingInspections() {
                 {/* Column Header */}
                 <div style={columnHeader}>
                   <div style={columnHeaderLeft}>
-                    <span style={columnTitle}>{col.title}</span>
+                    <span style={columnTitle}>{t(col.title)}</span>
                     <span style={columnCount}>
-                      {totalItems > 0 ? `${totalItems} items` : ''}
+                      {totalItems > 0 ? `${totalItems} ${totalItems === 1 ? t('general.item') : t('general.items')}` : ''}
                     </span>
                   </div>
                   {col.actionIcon && (
                     <button
                       style={columnActionBtn}
                       onClick={() => handleColumnAction(col)}
-                      title={col.actionLabel}
+                      title={col.actionLabel ? t(col.actionLabel) : undefined}
                     >
                       {col.actionIcon}
                     </button>
@@ -192,7 +192,7 @@ export function OngoingInspections() {
                                   href={`/assets-wind/${group.windFarmId}`}
                                   onClick={(e) => e.stopPropagation()}
                                   style={farmLink}
-                                  title="Go to wind farm"
+                                  title={t('ongoing.goToWindFarm')}
                                 >
                                   <ExternalLink size={12} />
                                 </a>
@@ -200,7 +200,7 @@ export function OngoingInspections() {
                               {summaryText && <div style={farmViewedText}>{summaryText}</div>}
                             </div>
                             <div style={farmHeaderMeta}>
-                              <span style={farmItemCount}>{group.items.length} item{group.items.length !== 1 ? 's' : ''}</span>
+                              <span style={farmItemCount}>{group.items.length} {group.items.length !== 1 ? t('general.items') : t('general.item')}</span>
                               {isExpanded
                                 ? <ChevronDown size={16} color="#64748b" />
                                 : <ChevronRight size={16} color="#64748b" />
@@ -216,13 +216,13 @@ export function OngoingInspections() {
                                   <div style={inspectionLeft}>
                                     <Wind size={16} color="#64748b" style={{ flexShrink: 0 }} />
                                     <span style={turbineName}>
-                                      {item.turbine?.name ?? 'Unknown'}
+                                      {item.turbine?.name ?? t('general.unknown')}
                                     </span>
                                   </div>
                                   <button
                                     style={infoBtn}
                                     onClick={() => navigateToInspection(item)}
-                                    title="Inspection details"
+                                    title={t('ongoing.inspectionDetails')}
                                   >
                                     <Info size={13} />
                                   </button>
@@ -286,8 +286,8 @@ export function OngoingInspections() {
                     </td>
                     <td style={tdStyle}>
                       {item.viewed_percent != null
-                        ? `${item.viewed_percent}% viewed`
-                        : `${item.defects?.length ?? 0} defects`}
+                        ? `${item.viewed_percent}% ${t('ongoing.viewed')}`
+                        : `${item.defects?.length ?? 0} ${t('turbineDetail.defects')}`}
                     </td>
                   </tr>
                 ))

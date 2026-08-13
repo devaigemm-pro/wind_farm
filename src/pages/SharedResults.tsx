@@ -99,8 +99,8 @@ export function SharedResults() {
   );
 }
 
-const shell: React.CSSProperties = { height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff' };
-const toolbar: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid #E5E7EB', background: '#fff', flexShrink: 0 };
+const shell: React.CSSProperties = { height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-neutral-0)' };
+const toolbar: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid #E5E7EB', background: 'var(--color-neutral-0)', flexShrink: 0 };
 const content: React.CSSProperties = { flex: 1, overflow: 'auto' };
-const center: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#fff' };
+const center: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--color-neutral-0)' };
 const txt: React.CSSProperties = { fontSize: 16, color: '#555' };

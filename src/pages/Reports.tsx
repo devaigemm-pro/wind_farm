@@ -187,7 +187,7 @@ export function Reports() {
               setPage(0);
             }}
             style={styles.searchInput}
-            aria-label="Search reports"
+            aria-label={t('reports.searchReports')}
           />
         </div>
         <div style={{ width: '100px' }} />
@@ -290,7 +290,7 @@ export function Reports() {
                     setPage(0);
                   }}
                   style={styles.select}
-                  aria-label="Rows per page"
+                  aria-label={t('pagination.rowsPerPage')}
                 >
                   <option value={5}>5</option>
                   <option value={10}>10</option>
@@ -299,14 +299,14 @@ export function Reports() {
                 </select>
               </div>
               <div style={styles.pageInfo}>
-                {page * rowsPerPage + 1}–{Math.min((page + 1) * rowsPerPage, sorted.length)} of{' '}
+                {page * rowsPerPage + 1}–{Math.min((page + 1) * rowsPerPage, sorted.length)} {t('general.of')}{' '}
                 {sorted.length}
               </div>
               <button
                 style={styles.pageBtn}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                aria-label="Go to previous page"
+                aria-label={t('general.previous')}
               >
                 ‹
               </button>
@@ -314,7 +314,7 @@ export function Reports() {
                 style={styles.pageBtn}
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                aria-label="Go to next page"
+                aria-label={t('general.next')}
               >
                 ›
               </button>
@@ -342,7 +342,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     padding: '12px 20px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--color-neutral-0)',
     flexShrink: 0,
   },
   title: {
@@ -358,7 +358,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 16px',
     borderRadius: '20px',
     border: '1px solid rgba(0, 0, 0, 0.2)',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'var(--color-neutral-0)',
     minWidth: '250px',
   },
   searchInput: {
@@ -381,7 +381,7 @@ const styles: Record<string, React.CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--color-neutral-0)',
   },
   th: {
     textAlign: 'left',
@@ -430,7 +430,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
     padding: '10px 16px',
     borderTop: '1px solid rgba(0, 0, 0, 0.12)',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--color-neutral-0)',
     fontSize: '12px',
     color: 'rgba(0, 0, 0, 0.6)',
   },
@@ -453,7 +453,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(0, 0, 0, 0.2)',
     borderRadius: '4px',
     fontFamily: 'inherit',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--color-neutral-0)',
     color: 'rgba(0, 0, 0, 0.6)',
   },
   pageInfo: {
@@ -468,7 +468,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     border: '1px solid rgba(0, 0, 0, 0.12)',
     borderRadius: '4px',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--color-neutral-0)',
     cursor: 'pointer',
     fontSize: '16px',
     color: 'rgba(0, 0, 0, 0.6)',

@@ -179,7 +179,7 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
           skeletonRows={rowsPerPage}
         />
         {!isLoading && (
-          <div style={{ backgroundColor: '#FFFFFF', borderTop: '1px solid #E5E7EB' }}>
+          <div style={{ backgroundColor: 'var(--color-neutral-0)', borderTop: '1px solid #E5E7EB' }}>
             <TablePagination
               page={page}
               rowsPerPage={rowsPerPage}

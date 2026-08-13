@@ -248,7 +248,7 @@ export function SubassetDetail() {
                             </td>
                             <td style={tdStyle}>
                               {(insp.status === 'completed' || insp.status === 'approved') && (
-                                <button style={pdfBtnStyle} title="Download report" aria-label="Download report">
+                                <button style={pdfBtnStyle} title={t('reports.downloadReport')} aria-label={t('reports.downloadReport')}>
                                   <Download size={16} color="var(--color-primary-500)" />
                                 </button>
                               )}

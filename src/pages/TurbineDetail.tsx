@@ -5,6 +5,7 @@ import {
   ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
 } from 'recharts';
+import { useLanguage } from '@/components/design-system';
 import { BladesDiagram } from '@/components/organisms/BladesDiagram';
 import { ExportPanel } from '@/components/organisms/ExportPanel';
 import { SharePopover } from '@/components/molecules/SharePopover';
@@ -68,6 +69,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   const filterCampaignId = embeddedCampaignId !== undefined ? embeddedCampaignId : searchParams.get('campaignId');
   const navigate = useNavigate();
   const { role } = useAuth();
+  const { t } = useLanguage();
   const isSharedView = shared;
   const { data: inspectionData, isLoading } = useTurbineInspection(turbineId ?? '');
 
@@ -325,7 +327,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   })), [defects]);
 
   if (isLoading) {
-    return <div style={page}><div style={{ padding: 40, textAlign: 'center', color: C.muted }}>Loading inspection data...</div></div>;
+    return <div style={page}><div style={{ padding: 40, textAlign: 'center', color: C.muted }}>{t('turbineDetail.loadingData')}</div></div>;
   }
 
   if (!inspectionData) {
@@ -333,9 +335,9 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
       <div style={page}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16, padding: 48 }}>
           <Info size={48} color="#ccc" />
-          <h3 style={{ fontSize: 18, fontWeight: 600, color: '#555', margin: 0 }}>No finalized inspections for this turbine</h3>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: '#555', margin: 0 }}>{t('turbineDetail.noInspections')}</h3>
           <p style={{ fontSize: 14, color: '#888', margin: 0, textAlign: 'center', maxWidth: 400 }}>
-            Complete the inspection workflow to view results. The inspection must be finalized before data appears here.
+            {t('turbineDetail.noInspectionsDesc')}
           </p>
         </div>
       </div>
@@ -350,9 +352,9 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           <div style={{ ...toolbarLeftSt, display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
-              aria-label="Go back"
+              aria-label={t('general.back')}
               onClick={() => navigate(-1)}
-              style={{ width: 32, height: 32, border: '1px solid #E5E7EB', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+              style={{ width: 32, height: 32, border: '1px solid #E5E7EB', borderRadius: 6, background: 'var(--color-neutral-0)', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
             >
               <ArrowLeft size={16} />
             </button>
@@ -366,10 +368,10 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           </div>
           <div style={toolbarCenterSt}>
             {[
-              { num: 1, label: '1. INSPECT' },
-              { num: 2, label: '2. ANNOTATE' },
-              { num: 3, label: '3. ANALYZE' },
-              { num: 4, label: '4. RESULTS' },
+              { num: 1, label: t('turbineDetail.phase1') },
+              { num: 2, label: t('turbineDetail.phase2') },
+              { num: 3, label: t('turbineDetail.phase3') },
+              { num: 4, label: t('turbineDetail.phase4') },
             ].map((step) => (
               <button
                 key={step.num}
@@ -397,15 +399,15 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
       {/* Top bar */}
       <div style={topBar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h2 style={{ color: C.blue, fontSize: 20, fontWeight: 700, margin: 0 }}>Blades</h2>
+          <h2 style={{ color: C.blue, fontSize: 20, fontWeight: 700, margin: 0 }}>{t('turbineDetail.blades')}</h2>
           <span style={infoDot}><Info size={16} color="#fff" /></span>
         </div>
         <div style={tabRow}>
           <button style={{ ...tabBtn, ...(tab === 'statistics' ? tabActive : {}) }} onClick={() => setTab('statistics')}>
-            <BarChart3 size={15} /> Statistics
+            <BarChart3 size={15} /> {t('turbineDetail.statistics')}
           </button>
           <button style={{ ...tabBtn, ...(tab === 'details' ? tabActive : {}) }} onClick={() => setTab('details')}>
-            <ListFilter size={15} /> Details
+            <ListFilter size={15} /> {t('turbineDetail.details')}
           </button>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -414,7 +416,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             onClick={(e) => setExportAnchorEl(e.currentTarget)}
           >
             <FileDown size={14} />
-            Export
+            {t('button.export')}
           </button>
           {!isSharedView && (
             <button
@@ -422,7 +424,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
               onClick={(e) => setShareAnchor(e.currentTarget)}
             >
               <Share2 size={14} />
-              Share
+              {t('button.share')}
             </button>
           )}
         </div>
@@ -482,12 +484,12 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             onDefectClick={handleDefectClick}
           />
           <div style={counters}>
-            <span style={counterItem}><Info size={15} color={C.blue} /> <b>{defects.length}</b> defects</span>
-            <span style={counterItem}><CheckCircle size={15} color={C.cat1} /> <b>{resolvedCount}</b> resolved</span>
+            <span style={counterItem}><Info size={15} color={C.blue} /> <b>{defects.length}</b> {t('turbineDetail.defects')}</span>
+            <span style={counterItem}><CheckCircle size={15} color={C.cat1} /> <b>{resolvedCount}</b> {t('turbineDetail.resolved')}</span>
           </div>
           <div style={{ padding: '8px 0' }}>
-            <h3 style={{ color: C.blue, fontSize: 17, margin: '0 0 10px' }}>Conclusion</h3>
-            <p style={conclText}><b>Turbine ({turbineName}):</b><br /><i>No conclusion.</i></p>
+            <h3 style={{ color: C.blue, fontSize: 17, margin: '0 0 10px' }}>{t('turbineDetail.conclusion')}</h3>
+            <p style={conclText}><b>Turbine ({turbineName}):</b><br /><i>{t('turbineDetail.noConclusion')}</i></p>
             {Object.entries(bladeSerials).map(([pos, serial]) => (
               <p key={pos} style={conclText}><b>Blade {pos} ({serial}):</b><br /><i>No conclusion for this blade.</i></p>
             ))}
@@ -495,7 +497,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           <div style={{ display: 'flex', gap: 8 }}>
             {!isSharedView && role !== 'supervisor' && (
               <button style={planBtn} onClick={() => navigate(`/inspections/new?windFarm=${windFarmId}`)}>
-                PLAN NEXT INSPECTION
+                {t('button.planNextInspection')}
               </button>
             )}
           </div>
@@ -505,7 +507,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           <>
             {/* ── Column 2: Breakdown by blade ── */}
             <div style={col2}>
-              <h3 style={cardTitle}>Breakdown by blade</h3>
+              <h3 style={cardTitle}>{t('turbineDetail.breakdownByBlade')}</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'center' }}>
                 {donutData.map((d) => (
                   <Donut key={d.label} label={d.label} orange={d.orange} />
@@ -516,7 +518,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             {/* ── Column 3: Category + Type + Table ── */}
             <div style={col3}>
               <div style={card}>
-                <h3 style={cardTitle}>Breakdown by category</h3>
+                <h3 style={cardTitle}>{t('turbineDetail.breakdownByCategory')}</h3>
                 <div style={catRow}>
                   {[
                     { n: 5, v: catCounts[5], c: C.cat5 },
@@ -528,14 +530,14 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
                     <div key={c.n} style={catCell}>
                       <span style={{ fontSize: 26, fontWeight: 700, color: C.text }}>{c.v}</span>
                       <div style={{ height: 3, width: '100%', background: c.c, borderRadius: 2, margin: '6px 0' }} />
-                      <span style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Cat {c.n}</span>
+                      <span style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{`${t('turbineDetail.cat')} ${c.n}`}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div style={card}>
-                <h3 style={cardTitle}>Breakdown by type</h3>
+                <h3 style={cardTitle}>{t('turbineDetail.breakdownByType')}</h3>
                 <div style={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={typeBreakdown} margin={{ top: 10, right: 10, left: -20, bottom: 30 }}>
@@ -543,7 +545,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
                       <XAxis dataKey="short" tick={{ fontSize: 9, fill: C.muted }} interval={0} angle={0} />
                       <YAxis tick={{ fontSize: 10, fill: C.muted }} />
                       <RTooltip
-                        formatter={(val: number, name: string) => [val, name === 'cat4' ? 'Category 4' : name === 'cat5' ? 'Category 5' : 'Category 3']}
+                        formatter={(val: number, name: string) => [val, name === 'cat4' ? `${t('turbineDetail.cat')} 4` : name === 'cat5' ? `${t('turbineDetail.cat')} 5` : `${t('turbineDetail.cat')} 3`]}
                         contentStyle={{ fontSize: 11, borderRadius: 6 }}
                       />
                       <Bar dataKey="cat3" stackId="a" fill={C.cat3} />
@@ -555,7 +557,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
               </div>
 
               <div style={card}>
-                <h3 style={cardTitle}>Defect overview table</h3>
+                <h3 style={cardTitle}>{t('turbineDetail.defectOverview')}</h3>
                 <OverviewTable typeBreakdown={typeBreakdown} catCounts={catCounts} totalDefects={defects.length} />
               </div>
             </div>
@@ -566,22 +568,22 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             <div style={{ flex: '1 1 60%', minWidth: 0 }}>
               <div style={card}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <h3 style={cardTitle}>Defects Detail</h3>
+                  <h3 style={cardTitle}>{t('turbineDetail.defectsDetail')}</h3>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <select style={filterSelect} value={filterType} onChange={(e) => setFilterType(e.target.value)} aria-label="Filter by type">
-                      <option value="">Type</option>
-                      {uniqueTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                      <option value="">{t('turbineDetail.filterType')}</option>
+                      {uniqueTypes.map((t2) => <option key={t2} value={t2}>{t2}</option>)}
                     </select>
                     <select style={filterSelect} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} aria-label="Filter by category">
-                      <option value="">Category</option>
-                      {[5, 4, 3, 2, 1].map((c) => <option key={c} value={c}>Cat {c}</option>)}
+                      <option value="">{t('turbineDetail.filterCategory')}</option>
+                      {[5, 4, 3, 2, 1].map((c) => <option key={c} value={c}>{`${t('turbineDetail.cat')} ${c}`}</option>)}
                     </select>
                     <select style={filterSelect} value={filterBlade} onChange={(e) => setFilterBlade(e.target.value)} aria-label="Filter by blade">
-                      <option value="">Blade</option>
+                      <option value="">{t('turbineDetail.filterBlade')}</option>
                       {uniqueBlades.map((b) => <option key={b} value={b}>{b}</option>)}
                     </select>
                     <select style={filterSelect} value={filterSide} onChange={(e) => setFilterSide(e.target.value)} aria-label="Filter by side">
-                      <option value="">Side</option>
+                      <option value="">{t('turbineDetail.filterSide')}</option>
                       {uniqueSides.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
@@ -604,6 +606,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
 // ─── Defect Detail Panel (Note/Root Cause/Next Step, Comments, Images) ───────
 function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
   const { role } = useAuth();
+  const { t } = useLanguage();
   const isSupervisor = role === 'supervisor';
   const [zoomLevels, setZoomLevels] = useState<Record<number, number>>({});
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
@@ -668,7 +671,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
   };
 
   const panelCard: React.CSSProperties = {
-    background: '#fff',
+    background: 'var(--color-neutral-0)',
     border: `1px solid ${C.border}`,
     borderRadius: 10,
     padding: 14,
@@ -722,14 +725,14 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
       {/* Comments */}
       <div style={{ ...panelCard, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#333' }}>Comments:</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#333' }}>{t('comments.title')}:</span>
           {!isSupervisor && (
           <div
             onClick={() => setShowCommentPopover(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: C.blue, fontSize: 12 }}
           >
             <Plus size={14} />
-            <span>Add</span>
+            <span>{t('button.add')}</span>
           </div>
           )}
         </div>
@@ -754,7 +757,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
             ))}
           </div>
         ) : (
-          <span style={{ fontSize: 12, color: C.muted }}>No comments yet</span>
+          <span style={{ fontSize: 12, color: C.muted }}>{t('general.noData')}</span>
         )}
 
         {/* Add Comment Popover */}
@@ -766,19 +769,19 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
               top: 40,
               right: 0,
               zIndex: 100,
-              background: '#fff',
+              background: 'var(--color-neutral-0)',
               borderRadius: 8,
               boxShadow: '0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12)',
               padding: 16,
               minWidth: 300,
             }}
           >
-            <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 13, color: '#333' }}>New comment</p>
+            <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 13, color: '#333' }}>{t('comments.new')}</p>
             <textarea
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               maxLength={400}
-              placeholder="Write your comment..."
+              placeholder={t('comments.placeholder')}
               style={{
                 width: '100%',
                 minHeight: 80,
@@ -806,7 +809,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
                   cursor: 'pointer',
                 }}
               >
-                Exit
+                {t('general.close')}
               </button>
               <button
                 onClick={handleSaveComment}
@@ -823,7 +826,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
                   opacity: addComment.isPending ? 0.6 : 1,
                 }}
               >
-                {addComment.isPending ? 'Saving...' : 'Save'}
+                {addComment.isPending ? t('general.loading') : t('button.save')}
               </button>
             </div>
           </div>
@@ -838,7 +841,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
               {/* Top-left: Fullscreen + Download */}
               <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, display: 'flex', gap: 6 }}>
                 <button
-                  title="Fullscreen"
+                  title={t('turbineDetail.fullscreen')}
                   onClick={() => openLightbox(img)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >
@@ -847,7 +850,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
                   </svg>
                 </button>
                 <button
-                  title="Download JPEG"
+                  title={t('button.download')}
                   onClick={() => handleDownloadJpeg(img, idx)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >
@@ -876,11 +879,11 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
               <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', zIndex: 2 }}>
                 <button
                   onClick={() => handleZoom(idx, 'out')}
-                  style={{ width: 28, height: 24, background: '#fff', border: `1px solid ${C.blue}`, borderRadius: '4px 0 0 4px', borderRight: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 28, height: 24, background: 'var(--color-neutral-0)', border: `1px solid ${C.blue}`, borderRadius: '4px 0 0 4px', borderRight: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >-</button>
                 <button
                   onClick={() => handleZoom(idx, 'in')}
-                  style={{ width: 28, height: 24, background: '#fff', border: `1px solid ${C.blue}`, borderRadius: '0 4px 4px 0', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 28, height: 24, background: 'var(--color-neutral-0)', border: `1px solid ${C.blue}`, borderRadius: '0 4px 4px 0', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >+</button>
               </div>
             </div>
@@ -1024,9 +1027,10 @@ function Donut({ label, orange }: { label: string; orange: number }) {
 
 // ─── Overview table ──────────────────────────────────────────────────────────
 function OverviewTable({ typeBreakdown, catCounts, totalDefects }: { typeBreakdown: { type: string; total: number; cat5: number; cat4: number; cat3: number; cat2: number; cat1: number }[]; catCounts: Record<number, number>; totalDefects: number }) {
+  const { t } = useLanguage();
   const hdr = [
-    { l: 'Category 5', c: C.cat5 }, { l: 'Category 4', c: C.cat4 },
-    { l: 'Category 3', c: C.cat3 }, { l: 'Category 2', c: C.cat2 }, { l: 'Category 1', c: C.cat1 },
+    { l: `${t('turbineDetail.cat')} 5`, c: C.cat5 }, { l: `${t('turbineDetail.cat')} 4`, c: C.cat4 },
+    { l: `${t('turbineDetail.cat')} 3`, c: C.cat3 }, { l: `${t('turbineDetail.cat')} 2`, c: C.cat2 }, { l: `${t('turbineDetail.cat')} 1`, c: C.cat1 },
   ];
   const tint = ['#FDECEC', '#FDF0E6', '#FEF6E6', '#E9F6F5', '#E6F5F3'];
   return (
@@ -1034,8 +1038,8 @@ function OverviewTable({ typeBreakdown, catCounts, totalDefects }: { typeBreakdo
       <table style={table}>
         <thead>
           <tr>
-            <th style={{ ...th, background: C.muted, color: '#fff' }}>Defects</th>
-            <th style={{ ...th, background: C.muted, color: '#fff' }}>Total/Type</th>
+            <th style={{ ...th, background: C.muted, color: '#fff' }}>{t('page.defects')}</th>
+            <th style={{ ...th, background: C.muted, color: '#fff' }}>Total/{t('table.type')}</th>
             {hdr.map((h) => <th key={h.l} style={{ ...th, background: h.c, color: '#fff' }}>{h.l}</th>)}
           </tr>
         </thead>
@@ -1052,7 +1056,7 @@ function OverviewTable({ typeBreakdown, catCounts, totalDefects }: { typeBreakdo
             </tr>
           ))}
           <tr>
-            <td style={{ ...td, fontWeight: 700, color: C.blue, background: '#F0FBFA' }}>Total/Category</td>
+            <td style={{ ...td, fontWeight: 700, color: C.blue, background: '#F0FBFA' }}>Total/{t('table.category')}</td>
             <td style={{ ...td, fontWeight: 700, color: C.blue, background: '#F0FBFA' }}>{totalDefects}</td>
             <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat5, color: '#fff' }}>{catCounts[5]}</td>
             <td style={{ ...td, fontWeight: 700, textAlign: 'center', background: C.cat4, color: '#fff' }}>{catCounts[4]}</td>
@@ -1068,13 +1072,14 @@ function OverviewTable({ typeBreakdown, catCounts, totalDefects }: { typeBreakdo
 
 // ─── Details table ───────────────────────────────────────────────────────────
 function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onResolvedToggle, readonly = false }: { defects: TurbineDefect[]; selectedId: string | null; onSelect: (id: string) => void; onEdit: (id: string) => void; resolvedMap: Record<string, boolean>; onResolvedToggle: (id: string) => void; readonly?: boolean }) {
+  const { t } = useLanguage();
   const catColor = (c: number) => c === 5 ? C.cat5 : c === 4 ? C.cat4 : c === 3 ? C.cat3 : c === 2 ? C.cat2 : C.cat1;
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={table}>
         <thead>
           <tr>
-            {['Id', 'Type', 'Category', 'Blade', 'Side', 'Root (m)', 'Size (cm)', 'Resolved', ...(readonly ? [] : ['Edit'])].map((h) => (
+            {[t('table.id'), t('table.type'), t('table.category'), t('table.blade'), t('table.side'), 'Root (m)', 'Size (cm)', t('table.resolved'), ...(readonly ? [] : [t('button.edit')])].map((h) => (
               <th key={h} style={{ ...th, background: '#F3F4F6', color: C.muted }}>{h}</th>
             ))}
           </tr>
@@ -1129,7 +1134,7 @@ function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onRe
                     width: '16px',
                     height: '16px',
                     borderRadius: '50%',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: 'var(--color-neutral-0)',
                     transition: 'left 0.2s',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                   }} />
@@ -1140,7 +1145,7 @@ function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onRe
                   <button
                     onClick={(e) => { e.stopPropagation(); onEdit(d.id); }}
                     style={editBtnStyle}
-                    title="Edit defect"
+                    title={t('button.edit')}
                   >
                     <Pencil size={14} color={C.blue} />
                   </button>
@@ -1155,8 +1160,8 @@ function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onRe
 }
 
 // ─── Styles (forced light theme) ─────────────────────────────────────────────
-const page: React.CSSProperties = { minHeight: '100%', background: '#fff', color: C.text, fontFamily: 'var(--font-family-sans)' };
-const toolbarRow: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: '#fff', gap: 12, minHeight: 48 };
+const page: React.CSSProperties = { minHeight: '100%', background: 'var(--color-neutral-0)', color: C.text, fontFamily: 'var(--font-family-sans)' };
+const toolbarRow: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: 'var(--color-neutral-0)', gap: 12, minHeight: 48 };
 const toolbarLeftSt: React.CSSProperties = { flex: '0 0 25%', minWidth: 0 };
 const toolbarCenterSt: React.CSSProperties = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 };
 const toolbarRightSt: React.CSSProperties = { flex: '0 0 25%', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' };
@@ -1174,16 +1179,16 @@ const tabBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap
 const tabActive: React.CSSProperties = { color: C.blue, borderBottom: `2px solid ${C.blue}` };
 const body: React.CSSProperties = { display: 'flex', gap: 16, padding: 16, alignItems: 'flex-start' };
 const col1: React.CSSProperties = { width: 480, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 };
-const col2: React.CSSProperties = { width: 220, flexShrink: 0, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, outline: 'none', overflow: 'hidden' };
+const col2: React.CSSProperties = { width: 220, flexShrink: 0, background: 'var(--color-neutral-0)', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, outline: 'none', overflow: 'hidden' };
 const col3: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 };
-const card: React.CSSProperties = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 };
+const card: React.CSSProperties = { background: 'var(--color-neutral-0)', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 };
 const cardTitle: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: C.text, margin: '0 0 14px' };
 const counters: React.CSSProperties = { display: 'flex', gap: 20, padding: '12px 0', borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` };
 const counterItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text };
 const conclText: React.CSSProperties = { fontSize: 12.5, color: '#555', margin: '0 0 8px', lineHeight: 1.45 };
 const planBtn: React.CSSProperties = { flex: 1, padding: '12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer' };
 
-const filterSelect: React.CSSProperties = { padding: '4px 8px', fontSize: 11, border: `1px solid ${C.border}`, borderRadius: 4, fontFamily: 'inherit', backgroundColor: '#fff', color: C.text, cursor: 'pointer' };
+const filterSelect: React.CSSProperties = { padding: '4px 8px', fontSize: 11, border: `1px solid ${C.border}`, borderRadius: 4, fontFamily: 'inherit', backgroundColor: 'var(--color-neutral-0)', color: C.text, cursor: 'pointer' };
 const donutCenter: React.CSSProperties = { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2, pointerEvents: 'none' };
 const catRow: React.CSSProperties = { display: 'flex', gap: 12, justifyContent: 'space-between' };
 const catCell: React.CSSProperties = { flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' };

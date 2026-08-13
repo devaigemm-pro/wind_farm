@@ -154,7 +154,7 @@ export function DefectsTable({
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '16px', backgroundColor: '#FFFFFF' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '16px', backgroundColor: 'var(--color-neutral-0)' }}>
         {Array.from({ length: skeletonRows }).map((_, i) => (
           <Skeleton key={i} variant="rect" height="36px" />
         ))}
@@ -163,7 +163,7 @@ export function DefectsTable({
   }
 
   return (
-    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, backgroundColor: '#FFFFFF' }} className="responsive-table-wrapper">
+    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, backgroundColor: 'var(--color-neutral-0)' }} className="responsive-table-wrapper">
       <table style={tableStyle}>
         <thead>
           <tr>

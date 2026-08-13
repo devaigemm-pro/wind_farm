@@ -288,7 +288,7 @@ const containerStyle: React.CSSProperties = { display: 'flex', gap: 16, padding:
 const leftCol: React.CSSProperties = { flex: '0 0 33%', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minWidth: 0 };
 const rightCol: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', minWidth: 0 };
 
-const card: React.CSSProperties = { background: '#fff', borderRadius: 8, boxShadow: '0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12)', padding: 16 };
+const card: React.CSSProperties = { background: 'var(--color-neutral-0)', borderRadius: 8, boxShadow: '0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12)', padding: 16 };
 const cardHeader: React.CSSProperties = { fontSize: 16, fontWeight: 700, margin: '0 0 8px', color: '#333' };
 const cardHeaderCenter: React.CSSProperties = { fontSize: 16, fontWeight: 700, margin: '0 0 8px', color: '#333', textAlign: 'center' };
 const divider: React.CSSProperties = { height: 1, background: '#e0e0e0', margin: '0 -16px 12px' };
@@ -304,7 +304,7 @@ const docBody: React.CSSProperties = { textAlign: 'center', padding: '16px 0' };
 
 const mapContainer: React.CSSProperties = { flex: 1, minHeight: 260, position: 'relative' };
 const mapEl: React.CSSProperties = { width: '100%', height: '100%', minHeight: 260, borderRadius: 8, overflow: 'hidden' };
-const mapTypeBtn: React.CSSProperties = { position: 'absolute', top: 12, left: 12, zIndex: 10, background: '#fff', border: '1px solid #ccc', borderRadius: 4, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', color: '#555' };
+const mapTypeBtn: React.CSSProperties = { position: 'absolute', top: 12, left: 12, zIndex: 10, background: 'var(--color-neutral-0)', border: '1px solid #ccc', borderRadius: 4, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', color: '#555' };
 
 const stepperContainer: React.CSSProperties = { background: '#F4F6F8', borderRadius: 8, padding: '20px 32px' };
 const stepperBar: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center' };

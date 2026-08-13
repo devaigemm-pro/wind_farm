@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 48
+- **Sesiones analizadas**: 52
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -534,3 +534,33 @@
   - E2E tests se skipearon correctamente (solo para previews, no producción) — la lógica de filtrado funciona
   - Primer release oficial del proyecto: v0.1.0
 - **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima ("continua" = sigue con el siguiente paso lógico), confía en decisiones del agente, no necesita explicaciones de progreso
+
+### Sesión 47 - 2026-08-12
+- **Tarea principal**: Agregar selector de idioma (español/inglés) en el TopBar junto al dark mode, y luego aplicar las traducciones a TODO el sitio (todos los componentes, no solo sidebar/topbar)
+- **Observaciones nuevas**:
+  - "el idioma debe estar aplicado en todo el sitio, en todos sus componentes" — cuando implementas algo parcial, corrige inmediatamente pidiendo la implementación COMPLETA. No acepta soluciones parciales para features transversales.
+  - Instrucción en una sola frase para un feature complejo (i18n site-wide): "agregar opcion de lenguaje en español arriba a la derecha donde se selecciona el dark mode" — confía en que el agente entienda el alcance total.
+  - Modo compañero activado con "compañero" al inicio — patrón consistente.
+  - No dio spec técnica (no mencionó i18next, react-intl, etc.) — confía en que el agente elija la mejor solución técnica (en este caso, sistema propio ligero con Context + localStorage).
+  - Corrección fue directa y sin drama: "el idioma debe estar aplicado en todo el sitio" — no explicó qué faltaba, asumió que el agente entendería que "todo" significa TODO.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, corrección directa sin drama, exige implementación completa (no parcial), confía en decisiones técnicas del agente
+
+### Sesión 48 - 2026-08-13
+- **Tarea principal**: Cambiar dark mode para textos verdes y fondos en gris mate elegante — "para que se vea toda la información y nada quede escondido"
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio — patrón consistente
+  - Describe el cambio estético en una frase con resultado esperado incluido: colores + razón ("para que se vea toda la información")
+  - No da hex codes ni valores exactos — confía en la interpretación de "verde" + "gris mate elegante"
+  - "nada quede escondido" = prioridad de legibilidad/contraste. El verde no es decorativo, es funcional (alta legibilidad sobre gris oscuro)
+  - Sesión ultra-corta: una sola instrucción, cero correcciones, aceptada al primer intento (no respondió nada negativo)
+  - Cambio visual para dark mode específicamente, no para light mode — sabe exactamente qué scope quiere modificar
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, confía en decisiones estéticas del agente, describe feeling/resultado no valores exactos
+
+### Sesión 49 - 2026-08-13
+- **Tarea principal**: Corrección del dark mode — fondos seguían viéndose azules, los quiere grises puros. Textos verdes.
+- **Observaciones nuevas**:
+  - "se riguroso con el cambio" — cuando corrige algo que ya se intentó, exige que se haga completo y sin dejar cabos sueltos. "Riguroso" = buscar TODOS los lugares donde pueda haber residuos del problema, no solo el caso obvio.
+  - Corrección directa sin drama: "los fondos están azules, los quiero grises" — dice exactamente qué está mal y qué espera. No pregunta por qué, solo pide la corrección.
+  - Iteración estética confirmada: primera sesión definió verde+gris, esta sesión corrige que el gris no era suficientemente puro (tenía tono azulado). Necesita verlo en producción para validar.
+  - El root cause era `color-scheme: light` que forzaba rendering azulado + fallbacks CSS con tonos slate (#1e293b, #f8fafc). La corrección fue sistémica.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, "se riguroso" = búsqueda exhaustiva, iteración estética rápida, corrección directa sin drama

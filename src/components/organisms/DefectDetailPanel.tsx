@@ -81,7 +81,7 @@ export function DefectDetailPanel({ defect, onResolvedToggle }: DefectDetailPane
                   >
                     <span style={{
                       position: 'absolute', top: '2px', left: defect.resolved ? '20px' : '2px',
-                      width: '18px', height: '18px', borderRadius: '50%', backgroundColor: '#FFFFFF',
+                      width: '18px', height: '18px', borderRadius: '50%', backgroundColor: 'var(--color-neutral-0)',
                       transition: 'left 0.2s', boxShadow: '0px 1px 3px rgba(0,0,0,0.3)',
                     }} />
                   </button>

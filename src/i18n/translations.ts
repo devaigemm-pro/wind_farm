@@ -411,4 +411,70 @@ export const translations: TranslationMap = {
 
   // ─── Export Button ──────────────────────────────────────────────────────────
   'export.list': { en: 'Export List', es: 'Exportar Lista' },
+
+  // ─── Buttons (additional) ───────────────────────────────────────────────────
+  'button.add': { en: 'Add', es: 'Agregar' },
+
+  // ─── Comments ───────────────────────────────────────────────────────────────
+  'comments.placeholder': { en: 'Write your comment...', es: 'Escribe tu comentario...' },
+
+  // ─── Turbine Detail (additional) ────────────────────────────────────────────
+  'turbineDetail.fullscreen': { en: 'Fullscreen', es: 'Pantalla completa' },
+
+  // ─── Defect Types (visible labels — values stay in English for DB) ─────────
+  'defect.leErosion': { en: 'LE EROSION', es: 'Erosión del borde de ataque (LE)' },
+  'defect.vortex': { en: 'VORTEX (MISSING PANELS)', es: 'Vórtex (paneles faltantes)' },
+  'defect.paintDamages': { en: 'PAINT DAMAGES', es: 'Daños de pintura' },
+  'defect.addOnsMissing': { en: 'OTHER ADD-ONS MISSING', es: 'Accesorios faltantes' },
+  'defect.hydraulicOil': { en: 'BLADES WITH HYDRAULIC OIL', es: 'Palas con aceite hidráulico' },
+  'defect.crack': { en: 'CRACK', es: 'Fisura' },
+  'defect.longitudinalCracks': { en: 'LONGITUDINAL CRACKS ON LE OR TE BOND LINES', es: 'Fisuras longitudinales en líneas de unión LE/TE' },
+
+  // ─── Annotate Step ──────────────────────────────────────────────────────────
+  'annotate.unseen': { en: 'UNSEEN', es: 'SIN VER' },
+  'annotate.tagged': { en: 'TAGGED', es: 'MARCADO' },
+  'annotate.annots': { en: 'ANNOTS', es: 'ANOT.' },
+  'annotate.notePlaceholder': { en: 'Note', es: 'Nota' },
+  'annotate.editAnnotation': { en: 'Edit annotation', es: 'Editar anotación' },
+  'annotate.createAnnotation': { en: 'Create annotation', es: 'Crear anotación' },
+  'annotate.downloadPhoto': { en: 'Download photo', es: 'Descargar foto' },
+  'annotate.saveFailed': { en: 'Failed to save annotation', es: 'Error al guardar la anotación' },
+  'annotate.defectType': { en: 'Defect type', es: 'Tipo de defecto' },
+  'annotate.type': { en: 'Type', es: 'Tipo' },
+  'annotate.category': { en: 'Category', es: 'Categoría' },
+  'annotate.note': { en: 'Note', es: 'Nota' },
+  'annotate.rootDistance': { en: 'Root distance (m)', es: 'Distancia a raíz (m)' },
+
+  // ─── Analyze Step ───────────────────────────────────────────────────────────
+  'analyze.subassetNotes': { en: 'SubAsset notes', es: 'Notas del sub-activo' },
+  'analyze.bladeNotes': { en: 'Blade {blade} notes', es: 'Notas de pala {blade}' },
+  'analyze.select': { en: '— Select —', es: '— Seleccionar —' },
+
+  // ─── Campaign Results ───────────────────────────────────────────────────────
+  'campaign.notFound': { en: 'Campaign not found or has no inspection data yet.', es: 'Campaña no encontrada o sin datos de inspección aún.' },
+  'campaign.noInspections': { en: 'No inspections assigned to this campaign yet.', es: 'Aún no hay inspecciones asignadas a esta campaña.' },
+  'campaign.goToWindFarm': { en: 'Go to wind farm detail to assign inspections', es: 'Ir al detalle del parque eólico para asignar inspecciones' },
+  'campaign.campaignOf': { en: 'Campaign of', es: 'Campaña del' },
+
+  // ─── Ongoing Inspections (additional) ───────────────────────────────────────
+  'ongoing.goToWindFarm': { en: 'Go to wind farm', es: 'Ir al parque eólico' },
+  'ongoing.inspectionDetails': { en: 'Inspection details', es: 'Detalles de la inspección' },
+
+  // ─── Inspections (additional) ───────────────────────────────────────────────
+  'inspections.from': { en: 'From', es: 'Desde' },
+  'inspections.to': { en: 'To', es: 'Hasta' },
+  'inspections.filterByStatus': { en: 'Filter by status', es: 'Filtrar por estado' },
+  'inspections.filterFromDate': { en: 'Filter from date', es: 'Filtrar desde fecha' },
+  'inspections.filterToDate': { en: 'Filter to date', es: 'Filtrar hasta fecha' },
+
+  // ─── Reports (additional) ──────────────────────────────────────────────────
+  'reports.searchReports': { en: 'Search reports', es: 'Buscar reportes' },
+  'reports.downloadReport': { en: 'Download report', es: 'Descargar reporte' },
+
+  // ─── Assets (additional) ───────────────────────────────────────────────────
+  'assets.backToTree': { en: 'Back to asset tree', es: 'Volver al árbol de activos' },
+
+  // ─── Upload Status (additional) ────────────────────────────────────────────
+  'uploadStatus.closeViewer': { en: 'Close viewer', es: 'Cerrar visor' },
+  'uploadStatus.photos': { en: 'photos', es: 'fotos' },
 };

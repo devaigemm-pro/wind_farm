@@ -209,13 +209,13 @@ const pageStyle: React.CSSProperties = {
   height: 'calc(100vh - 64px)', // 64px = TopBar height
   fontFamily: 'var(--font-family-sans)',
   overflow: 'hidden',
-  background: '#fff',
+  background: 'var(--color-neutral-0)',
 };
 
 const toolbarRow: React.CSSProperties = {
   padding: '8px 16px',
   borderBottom: '1px solid #E5E7EB',
-  background: '#fff',
+  background: 'var(--color-neutral-0)',
   minHeight: 48,
 };
 

@@ -312,7 +312,7 @@ export function Inspections() {
           style={selectStyle}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          aria-label="Filter by status"
+          aria-label={t('inspections.filterByStatus')}
         >
           <option value="">{t('inspections.allStatuses')}</option>
           {INSPECTION_STATUSES.map((status) => (
@@ -327,8 +327,8 @@ export function Inspections() {
           style={filterInputStyle}
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
-          aria-label="Filter from date"
-          placeholder="From"
+          aria-label={t('inspections.filterFromDate')}
+          placeholder={t('inspections.from')}
         />
 
         <input
@@ -336,8 +336,8 @@ export function Inspections() {
           style={filterInputStyle}
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
-          aria-label="Filter to date"
-          placeholder="To"
+          aria-label={t('inspections.filterToDate')}
+          placeholder={t('inspections.to')}
         />
 
         <Button variant="secondary" size="sm" onClick={handleApplyFilters}>
@@ -484,7 +484,7 @@ export function Inspections() {
               icon={ChevronLeft}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              aria-label="Previous page"
+              aria-label={t('general.previous')}
             />
             <span style={pageIndicatorStyle}>
               {t('inspections.page')} {page} {t('general.of')} {totalPages || 1}
@@ -495,7 +495,7 @@ export function Inspections() {
               icon={ChevronRight}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              aria-label="Next page"
+              aria-label={t('general.next')}
             />
           </div>
         </>

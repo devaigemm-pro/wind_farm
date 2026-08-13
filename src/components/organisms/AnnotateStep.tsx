@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
 import { useInspectionPhotos, getPhotoPublicUrl, getFaceShort } from '@/hooks/useInspectionPhotos';
 import { useUpdateVerticalBlade } from '@/hooks/useInspectionMutations';
@@ -45,6 +46,7 @@ const C = {
 
 export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaignId, savedThumbId, savedBlade, onSelectionChange }: AnnotateStepProps) {
   const { role } = useAuth();
+  const { t } = useLanguage();
   // ─── Fetch ALL inspections of the campaign ─────────────────────────────────
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
   const { data: campaignInspIds = [] } = useCampaignInspectionIds(campaignId);
@@ -183,6 +185,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   // drawPhase: 'idle' → 'drawing-line' (mousedown+drag) → 'expanding' (after mouseup, move to set width) → 'idle' (click confirms)
   const [drawPhase, setDrawPhase] = useState<'idle' | 'drawing-line' | 'expanding'>('idle');
   const [drawWidth, setDrawWidth] = useState(3); // perpendicular width in % units
+  const isMouseDownRef = useRef(false);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
   const [editSide, setEditSide] = useState('LE');
@@ -543,10 +546,10 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             {/* Category filter buttons - SkyVisor style */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
               <div style={{ display: 'flex', gap: 6 }}>
-                <CategoryBtn label="UNSEEN" count={unseenCount} color="#9E9E9E" active={categoryFilter === 'unseen'} onClick={() => setCategoryFilter(categoryFilter === 'unseen' ? null : 'unseen')} />
-                <CategoryBtn label="TAGGED" count={taggedCount} color="#FFEB3B" active={categoryFilter === 'tagged'} onClick={() => setCategoryFilter(categoryFilter === 'tagged' ? null : 'tagged')} />
+                <CategoryBtn label={t('annotate.unseen')} count={unseenCount} color="#9E9E9E" active={categoryFilter === 'unseen'} onClick={() => setCategoryFilter(categoryFilter === 'unseen' ? null : 'unseen')} />
+                <CategoryBtn label={t('annotate.tagged')} count={taggedCount} color="#FFEB3B" active={categoryFilter === 'tagged'} onClick={() => setCategoryFilter(categoryFilter === 'tagged' ? null : 'tagged')} />
               </div>
-              <CategoryBtn label="ANNOTS" count={annotsCount} color="#F44336" active={categoryFilter === 'annots'} onClick={() => setCategoryFilter(categoryFilter === 'annots' ? null : 'annots')} />
+              <CategoryBtn label={t('annotate.annots')} count={annotsCount} color="#F44336" active={categoryFilter === 'annots'} onClick={() => setCategoryFilter(categoryFilter === 'annots' ? null : 'annots')} />
             </div>
           </div>
 
@@ -720,7 +723,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             <button style={{ ...actionBtnStyle, borderColor: showImageAdjust ? C.primary : undefined, background: showImageAdjust ? C.primaryLight : undefined }} title="Image adjustments" onClick={() => setShowImageAdjust(v => !v)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={showImageAdjust ? C.primary : '#555'}><path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-14v4h2V6h-2zm0 6v6h2v-6h-2z"/></svg>
             </button>
-            <button style={actionBtnStyle} title="Download photo" onClick={() => {
+            <button style={actionBtnStyle} title={t('annotate.downloadPhoto')} onClick={() => {
               if (!currentThumb) return;
               const url = currentThumb.viewerSrc;
               const filename = currentThumb.id + '.jpg';
@@ -792,6 +795,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setShowAnnotationPopover(true);
             } else {
               // Start drawing a new line (Phase 1)
+              isMouseDownRef.current = true;
               setDrawStart({ x: imgX, y: imgY });
               setDrawEnd(null);
               setDrawConfirmed(false);
@@ -814,8 +818,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
             const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
 
-            if (drawPhase === 'drawing-line' && drawStart) {
-              // Phase 1: update line endpoint as user drags
+            if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current) {
+              // Phase 1: update line endpoint as user drags (only while button held)
               setDrawEnd({ x: imgX, y: imgY });
             } else if (drawPhase === 'expanding' && drawStart && drawEnd) {
               // Phase 2: compute perpendicular distance from mouse to the line
@@ -836,6 +840,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             }
           }}
           onMouseUp={(e) => {
+            isMouseDownRef.current = false;
             if (isPanning) {
               setIsPanning(false);
               panStartRef.current = null;
@@ -916,7 +921,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
           {/* ─── Image Adjustment Panel (floating, top-right) ─────────────── */}
           {showImageAdjust && (
-            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: '#fff', borderRadius: 8, padding: '16px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', minWidth: 220, pointerEvents: 'auto' }}>
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: 'var(--color-neutral-0)', borderRadius: 8, padding: '16px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', minWidth: 220, pointerEvents: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Image Adjustments</span>
                 <button onClick={() => setShowImageAdjust(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
@@ -947,7 +952,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           {/* ─── Blade Face Overlay (floating, top-left) ─────────────── */}
           {showBladeOverlay && (
             <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 25, pointerEvents: 'auto' }}>
-              <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '12px 16px', width: 240, position: 'relative' }}>
+              <div style={{ background: 'var(--color-neutral-0)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '12px 16px', width: 240, position: 'relative' }}>
                 {/* Header with close button */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
                   <button onClick={() => setShowBladeOverlay(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
@@ -1088,7 +1093,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   left: `${cx}%`,
                   top: `${cy}%`,
                   width: `${w}%`,
-                  height: isLine ? '3px' : `${h}%`,
+                  height: isLine ? '2px' : `${h}%`,
                   transform: `translate(-50%, -50%) rotate(${angle}deg)`,
                   transformOrigin: 'center',
                   border: isLine ? 'none' : '2.5px solid #FFA500',
@@ -1112,20 +1117,20 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
         {showAnnotationPopover && (
           <div style={annotationPopoverStyle}>
             <h5 style={{ fontSize: 18, fontWeight: 600, color: C.text, margin: '0 0 16px' }}>
-              {editingAnnotationId !== null ? 'Edit annotation' : 'Create annotation'}
+              {editingAnnotationId !== null ? t('annotate.editAnnotation') : t('annotate.createAnnotation')}
             </h5>
 
             {/* Type selector */}
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: C.muted, marginBottom: 4, display: 'block' }}>Type</label>
-              <select style={{ ...selectStyle, background: '#FFFFFF' }} value={annotationType} onChange={e => setAnnotationType(e.target.value)}>
-                <option value="LONGITUDINAL CRACKS ON LE OR TE BOND LINES">LONGITUDINAL CRACKS ON LE OR TE BOND LINES</option>
-                <option value="LE EROSION">LE EROSION</option>
-                <option value="VORTEX (MISSING PANELS)">VORTEX (MISSING PANELS)</option>
-                <option value="PAINT DAMAGES">PAINT DAMAGES</option>
-                <option value="OTHER ADD-ONS MISSING">OTHER ADD-ONS MISSING</option>
-                <option value="BLADES WITH HYDRAULIC OIL">BLADES WITH HYDRAULIC OIL</option>
-                <option value="CRACK">CRACK</option>
+              <label style={{ fontSize: 12, color: C.muted, marginBottom: 4, display: 'block' }}>{t('annotate.type')}</label>
+              <select style={{ ...selectStyle, background: 'var(--color-neutral-0)' }} value={annotationType} onChange={e => setAnnotationType(e.target.value)}>
+                <option value="LONGITUDINAL CRACKS ON LE OR TE BOND LINES">{t('defect.longitudinalCracks')}</option>
+                <option value="LE EROSION">{t('defect.leErosion')}</option>
+                <option value="VORTEX (MISSING PANELS)">{t('defect.vortex')}</option>
+                <option value="PAINT DAMAGES">{t('defect.paintDamages')}</option>
+                <option value="OTHER ADD-ONS MISSING">{t('defect.addOnsMissing')}</option>
+                <option value="BLADES WITH HYDRAULIC OIL">{t('defect.hydraulicOil')}</option>
+                <option value="CRACK">{t('defect.crack')}</option>
               </select>
             </div>
 
@@ -1171,12 +1176,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             {/* Note */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12, color: C.muted, marginBottom: 4, display: 'block' }}>Note</label>
+              <label style={{ fontSize: 12, color: C.muted, marginBottom: 4, display: 'block' }}>{t('annotate.note')}</label>
               <textarea
                 value={annotationNote}
                 onChange={e => setAnnotationNote(e.target.value)}
-                placeholder="Note"
-                style={{ ...selectStyle, background: '#FFFFFF', minHeight: 40, resize: 'vertical', fontFamily: 'inherit' }}
+                placeholder={t('annotate.notePlaceholder')}
+                style={{ ...selectStyle, background: 'var(--color-neutral-0)', minHeight: 40, resize: 'vertical', fontFamily: 'inherit' }}
               />
             </div>
 
@@ -1240,7 +1245,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       note: annotationNote,
                     }, {
                       onError: (err) => {
-                        setSaveError(err instanceof Error ? err.message : 'Failed to save annotation');
+                        setSaveError(err instanceof Error ? err.message : t('annotate.saveFailed'));
                       },
                     });
                   }
@@ -1265,15 +1270,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
         <div style={rightPanelInner}>
           {/* Defect type selector */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Defect type</label>
+            <label style={labelStyle}>{t('annotate.defectType')}</label>
             <select style={selectStyle} value={rightPanelType} onChange={e => setRightPanelType(e.target.value)}>
-              <option value="LE EROSION">LE EROSION</option>
-              <option value="VORTEX (MISSING PANELS)">VORTEX (MISSING PANELS)</option>
-              <option value="PAINT DAMAGES">PAINT DAMAGES</option>
-              <option value="OTHER ADD-ONS MISSING">OTHER ADD-ONS MISSING</option>
-              <option value="BLADES WITH HYDRAULIC OIL">BLADES WITH HYDRAULIC OIL</option>
-              <option value="CRACK">CRACK</option>
-              <option value="LONGITUDINAL CRACKS ON LE OR TE BOND LINES">LONGITUDINAL CRACKS ON LE OR TE BOND LINES</option>
+              <option value="LE EROSION">{t('defect.leErosion')}</option>
+              <option value="VORTEX (MISSING PANELS)">{t('defect.vortex')}</option>
+              <option value="PAINT DAMAGES">{t('defect.paintDamages')}</option>
+              <option value="OTHER ADD-ONS MISSING">{t('defect.addOnsMissing')}</option>
+              <option value="BLADES WITH HYDRAULIC OIL">{t('defect.hydraulicOil')}</option>
+              <option value="CRACK">{t('defect.crack')}</option>
+              <option value="LONGITUDINAL CRACKS ON LE OR TE BOND LINES">{t('defect.longitudinalCracks')}</option>
             </select>
           </div>
 
@@ -1428,7 +1433,7 @@ function CategoryBtn({ label, count, color, active, onClick }: { label: string; 
     <button onClick={onClick} style={{
       ...categoryBtnStyle,
       borderColor: active ? C.primary : C.borderLight,
-      background: active ? C.primaryLight : '#FFFFFF',
+      background: active ? C.primaryLight : 'var(--color-neutral-0)',
     }}>
       <div style={{ ...categoryAvatar, background: color }}>{count}</div>
       <span style={{ fontSize: 12, fontWeight: 600, color: active ? C.primary : C.text, textTransform: 'uppercase' as const }}>{label}</span>
@@ -1510,7 +1515,7 @@ const categoryBtnStyle: React.CSSProperties = {
   padding: '8px 12px',
   border: `1px solid ${C.primary}`,
   borderRadius: 4,
-  background: '#FFFFFF',
+  background: 'var(--color-neutral-0)',
   cursor: 'pointer',
   outline: 'none',
 };
@@ -1813,7 +1818,7 @@ const editPopoverStyle: React.CSSProperties = {
   left: '50%',
   transform: 'translateX(-50%)',
   zIndex: 50,
-  background: '#FFFFFF',
+  background: 'var(--color-neutral-0)',
   borderRadius: 8,
   padding: 24,
   minWidth: 300,
@@ -1854,7 +1859,7 @@ const editNumberInput: React.CSSProperties = {
   color: C.text,
   outline: 'none',
   textAlign: 'center',
-  background: '#FFFFFF',
+  background: 'var(--color-neutral-0)',
 };
 
 const annotationPopoverStyle: React.CSSProperties = {
@@ -1863,7 +1868,7 @@ const annotationPopoverStyle: React.CSSProperties = {
   left: '50%',
   transform: 'translate(-50%, -50%)',
   zIndex: 60,
-  background: '#FFFFFF',
+  background: 'var(--color-neutral-0)',
   borderRadius: 8,
   padding: 24,
   minWidth: 360,

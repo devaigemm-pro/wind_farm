@@ -135,7 +135,7 @@ export function DefectDetailSidebar({
     width: '18px',
     height: '18px',
     borderRadius: '50%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'var(--color-neutral-0)',
     transition: 'left 0.2s',
     boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
   };
@@ -276,7 +276,7 @@ const containerStyle: React.CSSProperties = {
   overflowX: 'hidden',
   padding: '16px',
   boxSizing: 'border-box',
-  backgroundColor: '#FFFFFF',
+  backgroundColor: 'var(--color-neutral-0)',
   borderLeft: '1px solid #E0E0E0',
   fontFamily: 'var(--font-family-sans)',
   boxShadow: '0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12)',

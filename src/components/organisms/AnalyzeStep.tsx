@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { BarChart2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import { useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
 import { useQueryClient } from '@tanstack/react-query';
 import { useInspectionPhotos, getFaceShort, getPhotoPublicUrl } from '@/hooks/useInspectionPhotos';
@@ -61,6 +62,7 @@ function deriveBladeFaceLegacy(thumbnailId: string): { blade: string; face: stri
 export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaignId, onOpenPhoto }: AnalyzeStepProps) {
   // Auth role for supervisor restrictions
   const { role } = useAuth();
+  const { t } = useLanguage();
 
   // Fetch ALL inspections of the campaign
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
@@ -530,13 +532,13 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             <div style={fieldGroup}>
               <label style={labelStyle}>Type</label>
               <select style={selectInputStyle} value={defectType} onChange={(e) => setDefectType(e.target.value)}>
-                <option value="">— Select —</option>
-                <option value="LE EROSION">LE EROSION</option>
-                <option value="VORTEX (MISSING PANELS)">VORTEX (MISSING PANELS)</option>
-                <option value="PAINT DAMAGES">PAINT DAMAGES</option>
-                <option value="OTHER ADD-ONS MISSING">OTHER ADD-ONS MISSING</option>
-                <option value="BLADES WITH HYDRAULIC OIL">BLADES WITH HYDRAULIC OIL</option>
-                <option value="CRACK">CRACK</option>
+                <option value="">{t('analyze.select')}</option>
+                <option value="LE EROSION">{t('defect.leErosion')}</option>
+                <option value="VORTEX (MISSING PANELS)">{t('defect.vortex')}</option>
+                <option value="PAINT DAMAGES">{t('defect.paintDamages')}</option>
+                <option value="OTHER ADD-ONS MISSING">{t('defect.addOnsMissing')}</option>
+                <option value="BLADES WITH HYDRAULIC OIL">{t('defect.hydraulicOil')}</option>
+                <option value="CRACK">{t('defect.crack')}</option>
               </select>
             </div>
 
@@ -677,7 +679,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                     <div style={{ marginTop: 8 }}>
                       <textarea
                         style={{ ...textInputStyle, fontSize: 12, minHeight: 48, resize: 'vertical' }}
-                        placeholder={`Blade ${blade} notes`}
+                        placeholder={t('analyze.bladeNotes').replace('{blade}', blade)}
                         value={bladeNotes[blade]}
                         onChange={(e) => setBladeNotes(prev => ({ ...prev, [blade]: e.target.value }))}
                       />
@@ -697,7 +699,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             <div style={{ padding: '4px 0 8px' }}>
               <textarea
                 style={{ ...textInputStyle, fontSize: 12, minHeight: 48, resize: 'vertical' }}
-                placeholder="SubAsset notes"
+                placeholder={t('analyze.subassetNotes')}
               />
             </div>
           </div>

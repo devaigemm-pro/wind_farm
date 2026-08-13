@@ -170,7 +170,7 @@ export function WindFarmsDashboard() {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'var(--color-neutral-0)',
     borderRadius: '8px',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
     margin: '0 var(--space-4) var(--space-4)',
@@ -253,7 +253,7 @@ export function WindFarmsDashboard() {
             aria-labelledby="tab-defects"
           >
             {/* Defects toolbar */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid #E5E7EB', backgroundColor: 'var(--color-neutral-0)' }}>
               <ExportButton onClick={handleExport} loading={exporting} />
             </div>
             <DefectsWindFarmsView searchQuery={searchQuery} />
