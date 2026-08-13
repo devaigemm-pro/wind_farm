@@ -89,19 +89,32 @@ async function fetchInspectionPhotos(
     for (let i = 0; i < importedRows.length; i += BATCH_SIZE) {
       const batch = importedRows.slice(i, i + BATCH_SIZE);
       const originalPaths = batch.map(r => r.storagePath);
+      const thumbPaths = batch.map(r => getThumbStoragePath(r.storagePath));
 
       try {
-        // Fetch signed URLs for originals only — thumbnails will use the same
-        // signed URL with width/quality transforms appended by getPhotoPublicUrl
-        const originalResult = await supabase.storage
-          .from('asset-documents')
-          .createSignedUrls(originalPaths, 3600);
+        // Fetch signed URLs for originals and pre-generated thumbnails in parallel
+        const [originalResult, thumbResult] = await Promise.all([
+          supabase.storage.from('asset-documents').createSignedUrls(originalPaths, 3600),
+          supabase.storage.from('asset-documents').createSignedUrls(thumbPaths, 3600),
+        ]);
 
+        // Assign original signed URLs by index (API preserves order)
         if (originalResult.data) {
           for (let j = 0; j < originalResult.data.length; j++) {
             const item = originalResult.data[j];
             if (item?.signedUrl && !item.error) {
               batch[j]!.storagePath = item.signedUrl;
+            }
+          }
+        }
+
+        // Assign thumbnail signed URLs by index — these are the pre-generated
+        // thumb_ files which load much faster than on-the-fly transforms
+        if (thumbResult.data) {
+          for (let j = 0; j < thumbResult.data.length; j++) {
+            const signedItem = thumbResult.data[j];
+            if (signedItem?.signedUrl && !signedItem.error) {
+              batch[j]!.thumbnailUrl = signedItem.signedUrl;
             }
           }
         }
