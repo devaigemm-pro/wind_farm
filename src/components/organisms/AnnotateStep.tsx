@@ -263,7 +263,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   const groupedThumbnails = useMemo(() => {
     // Order: blade first (starting from verticalBlade), then CW (right, left)
-    const faceOrder = ['SS', 'PS', 'LE', 'TE'];
+    const faceOrder = ['LE', 'TE', 'PS', 'SS'];
     const allBlades = ['A', 'B', 'C'];
     const idx = Math.max(0, allBlades.indexOf(verticalBlade));
     const bladeOrder = [
