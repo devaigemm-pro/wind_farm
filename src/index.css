@@ -61,9 +61,19 @@
 
 /* Main photo viewer keeps white background for image visibility */
 [data-theme="dark"] .annotate-viewer,
-[data-theme="dark"] .annotate-viewer *:not(button):not(select):not(svg):not(path) {
+[data-theme="dark"] .annotate-viewer div,
+[data-theme="dark"] .annotate-viewer span {
   background-color: #FFFFFF !important;
+}
+/* Text inside viewer should be dark for contrast */
+[data-theme="dark"] .annotate-viewer * {
   color: #333333 !important;
+}
+/* DO NOT override backgrounds on deep children (canvas, images, etc.) */
+[data-theme="dark"] .annotate-viewer img,
+[data-theme="dark"] .annotate-viewer canvas,
+[data-theme="dark"] .annotate-viewer svg {
+  background-color: transparent !important;
 }
 
 /* Slightly different bg for page-level containers */
