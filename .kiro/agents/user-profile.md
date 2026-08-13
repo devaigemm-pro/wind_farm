@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 62
+- **Sesiones analizadas**: 63
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -90,6 +90,7 @@
 - **"la inspección asociada" ≠ step 4 del workflow** — cuando dice "redirigir a la inspección asociada" o "la página de la inspección", se refiere a la página de SubassetDetail (`/assets-wind/{windFarmId}/subasset/{turbineId}`) donde se muestra la turbina con su tabla de inspecciones. NO es el step 4 del workflow. La "inspección asociada" es la PÁGINA que muestra la inspección, no un step dentro del workflow.
 - **"no pedir permiso para user-profile.md"** — NUNCA pedir confirmación para editar `.kiro/agents/user-profile.md`. Editarlo directamente sin preguntar. Es un archivo propio del sistema de aprendizaje, no código del proyecto.
 - **"sobrio" ≠ cambiar identidad cromática** — cuando dice "más sobrio" o "tonos suaves" para colores, significa MANTENER los mismos colores pero desaturarlos/suavizarlos. No cambiar la paleta por completo. "Mate" = misma familia cromática sin brillo.
+- **"solo ordenar" ≠ cambiar lógica de negocio** — cuando dice "ordenar los bloques" o "copiar el orden", se refiere SOLO al array de ordenamiento visual. NO tocar lógica de negocio asociada (rotación CW de blades basada en verticalBlade, etc.). Si la instrucción es "ordenar X como Y", cambiar SOLO el orden, no eliminar funcionalidad adyacente. Mínimo cambio necesario.
 - **"solo ordenar" ≠ cambiar lógica de negocio** — cuando dice "ordenar los bloques" o "copiar el orden", se refiere SOLO al array de ordenamiento visual. NO tocar lógica de negocio asociada (rotación CW de blades basada en verticalBlade, etc.). Si la instrucción es "ordenar X como Y", cambiar SOLO el orden, no eliminar funcionalidad adyacente.
 
 ---
@@ -710,11 +711,11 @@
 - **Patrones confirmados**: español, directo, alta autonomía, no interrumpir flujo con archivos de sistema (confianza MUY alta - 2+ sesiones explícitas)
 
 ### Sesión 77 - 2026-08-13
-- **Tarea principal**: Reordenar secciones blade-face del sidebar de thumbnails en workflow step 2 para que coincida con el orden de Skyvisor (LE→TE→PS→SS, blades A→B→C fijo)
+- **Tarea principal**: Reordenar secciones blade-face del sidebar de thumbnails en workflow step 2 para que coincida con el orden de Skyvisor (LE→TE→PS→SS)
 - **Observaciones nuevas**:
   - Modo compañero activado con "compañero" al inicio + URL + DOM de Skyvisor como spec — patrón clásico ya consolidado
-  - "copiar el orden de los frentes de las palas del sistema original" + DOM completo — misma dinámica de siempre: DOM como spec definitiva
-  - Cambio simple y directo: solo modificar 2 arrays (faceOrder y bladeOrder) en un useMemo. No requirió iteraciones ni correcciones.
-  - Sesión ultra-corta: un solo cambio, compiló bien, deploy directo. Sin correcciones post-deploy.
-  - El orden de blades pasó de ser dinámico (rotación CW basada en verticalBlade) a fijo (A→B→C) — decisión tomada sin preguntar porque el DOM de Skyvisor era la spec definitiva
-- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, DOM como spec (confianza muy alta - 10+ sesiones), comunicación ultra-mínima, URL como referencia, cambio aceptado al primer intento sin correcciones
+  - **CORRECCIÓN**: "solo necesitaba que ordenaras los bloques de cada cara" — el agente cambió el faceOrder Y eliminó la lógica de rotación de blades (verticalBlade CW). El usuario SOLO quería el faceOrder cambiado. Tuvo que pedir revert.
+  - "hiciste algo que cambió el comportamiento de la visualización" — cuando dice "copiar el orden", es SOLO el array de orden, no tocar lógica adyacente.
+  - Después del revert parcial (restaurar blade rotation, mantener faceOrder), reportó un nuevo bug: "al seleccionar una [imagen] me muestra otra distinta" — bug de mapeo thumbnail→visor que puede o no estar relacionado con el cambio.
+  - Sesión terminó sin resolver el bug de imagen — se preguntó si existía antes del cambio. Sin respuesta antes del cierre.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, DOM como spec, corrección directa sin drama, "es un cambio simple" = hacer SOLO lo pedido sin tocar nada más (confianza MUY alta), mínimo cambio necesario
