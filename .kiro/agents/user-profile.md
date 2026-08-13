@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 60
+- **Sesiones analizadas**: 50
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -90,8 +90,6 @@
 - **"la inspección asociada" ≠ step 4 del workflow** — cuando dice "redirigir a la inspección asociada" o "la página de la inspección", se refiere a la página de SubassetDetail (`/assets-wind/{windFarmId}/subasset/{turbineId}`) donde se muestra la turbina con su tabla de inspecciones. NO es el step 4 del workflow. La "inspección asociada" es la PÁGINA que muestra la inspección, no un step dentro del workflow.
 - **"no pedir permiso para user-profile.md"** — NUNCA pedir confirmación para editar `.kiro/agents/user-profile.md`. Editarlo directamente sin preguntar. Es un archivo propio del sistema de aprendizaje, no código del proyecto.
 - **"sobrio" ≠ cambiar identidad cromática** — cuando dice "más sobrio" o "tonos suaves" para colores, significa MANTENER los mismos colores pero desaturarlos/suavizarlos. No cambiar la paleta por completo. "Mate" = misma familia cromática sin brillo.
-- **"todo el sitio" = VERIFICAR cada archivo** — cuando pide un cambio global (i18n, dark mode, etc.), NO declarar listo sin ejecutar una verificación automatizada que confirme cobertura al 100%. Usar grep/find para detectar archivos sin cubrir ANTES de reportar éxito.
-- **"cambio de color no funciona" = buscar HARDCODED primero** — cuando un cambio de color via variables CSS "no se aplica", la causa más probable es que los componentes tienen valores HEX hardcodeados (#fff, #FFFFFF, etc.) que ignoran las variables. SIEMPRE hacer `grep -r "#fff" src/` ANTES de tocar tokens. Es lo más básico.
 
 ---
 
@@ -537,121 +535,14 @@
   - Primer release oficial del proyecto: v0.1.0
 - **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima ("continua" = sigue con el siguiente paso lógico), confía en decisiones del agente, no necesita explicaciones de progreso
 
-### Sesión 47 - 2026-08-12
-- **Tarea principal**: Agregar selector de idioma (español/inglés) en el TopBar junto al dark mode, y luego aplicar las traducciones a TODO el sitio (todos los componentes, no solo sidebar/topbar)
-- **Observaciones nuevas**:
-  - "el idioma debe estar aplicado en todo el sitio, en todos sus componentes" — cuando implementas algo parcial, corrige inmediatamente pidiendo la implementación COMPLETA. No acepta soluciones parciales para features transversales.
-  - Instrucción en una sola frase para un feature complejo (i18n site-wide): "agregar opcion de lenguaje en español arriba a la derecha donde se selecciona el dark mode" — confía en que el agente entienda el alcance total.
-  - Modo compañero activado con "compañero" al inicio — patrón consistente.
-  - No dio spec técnica (no mencionó i18next, react-intl, etc.) — confía en que el agente elija la mejor solución técnica (en este caso, sistema propio ligero con Context + localStorage).
-  - Corrección fue directa y sin drama: "el idioma debe estar aplicado en todo el sitio" — no explicó qué faltaba, asumió que el agente entendería que "todo" significa TODO.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, corrección directa sin drama, exige implementación completa (no parcial), confía en decisiones técnicas del agente
-
-### Sesión 48 - 2026-08-13
-- **Tarea principal**: Cambiar dark mode para textos verdes y fondos en gris mate elegante — "para que se vea toda la información y nada quede escondido"
-- **Observaciones nuevas**:
-  - Modo compañero activado con "compañero" al inicio — patrón consistente
-  - Describe el cambio estético en una frase con resultado esperado incluido: colores + razón ("para que se vea toda la información")
-  - No da hex codes ni valores exactos — confía en la interpretación de "verde" + "gris mate elegante"
-  - "nada quede escondido" = prioridad de legibilidad/contraste. El verde no es decorativo, es funcional (alta legibilidad sobre gris oscuro)
-  - Sesión ultra-corta: una sola instrucción, cero correcciones, aceptada al primer intento (no respondió nada negativo)
-  - Cambio visual para dark mode específicamente, no para light mode — sabe exactamente qué scope quiere modificar
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, confía en decisiones estéticas del agente, describe feeling/resultado no valores exactos
-
-### Sesión 49 - 2026-08-13
-- **Tarea principal**: Corrección del dark mode — fondos seguían viéndose azules, los quiere grises puros. Textos verdes.
-- **Observaciones nuevas**:
-  - "se riguroso con el cambio" — cuando corrige algo que ya se intentó, exige que se haga completo y sin dejar cabos sueltos. "Riguroso" = buscar TODOS los lugares donde pueda haber residuos del problema, no solo el caso obvio.
-  - Corrección directa sin drama: "los fondos están azules, los quiero grises" — dice exactamente qué está mal y qué espera. No pregunta por qué, solo pide la corrección.
-  - Iteración estética confirmada: primera sesión definió verde+gris, esta sesión corrige que el gris no era suficientemente puro (tenía tono azulado). Necesita verlo en producción para validar.
-  - El root cause era `color-scheme: light` que forzaba rendering azulado + fallbacks CSS con tonos slate (#1e293b, #f8fafc). La corrección fue sistémica.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, "se riguroso" = búsqueda exhaustiva, iteración estética rápida, corrección directa sin drama
-
 ### Sesión 50 - 2026-08-13
-- **Tarea principal**: Corregir fondos blancos en dark mode — la pantalla /assets-wind seguía con fondo blanco porque había ~30 archivos con `#fff` / `#FFFFFF` hardcodeado que no respondían a las variables CSS
+- **Tarea principal**: Implementar selector de idioma EN/ES + traducir TODO el sitio a español. Sesión larga (~10 iteraciones) por falta de rigor en auditorías.
 - **Observaciones nuevas**:
-  - "no estas siendo eficiente, es muy basico cambiar el color" — frustración con el agente por no encontrar la causa real al primer intento. El problema era OBVIO (fondos hardcodeados) y no debería haber tomado múltiples intentos.
-  - "sigue con fondo blanco" — cuando da la URL exacta y dice qué ve, confía en que el agente vaya DIRECTO a resolver sin excusas ni explicaciones técnicas de por qué no funcionó antes.
-  - **CORRECCIÓN AL AGENTE**: Cuando un cambio de color "no funciona", la causa más probable es que los colores están HARDCODEADOS en los componentes y no usan variables CSS. SIEMPRE buscar hardcoded values PRIMERO antes de tocar solo los tokens/variables. Un `grep -r "#fff" src/` hubiera revelado el problema en 2 segundos.
-  - El fix fue simple pero masivo: sed global en 30 archivos cambiando `#fff`/`#FFFFFF` → `var(--color-neutral-0)`. Esto debió ser el PRIMER approach.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente no resuelve algo básico, URL exacta como referencia, corrección directa sin drama
-
-### Sesión 51 - 2026-08-13
-- **Tarea principal**: (1) Seguimiento del fondo blanco en /assets-wind (aún no se desplegaba). (2) Botón "cambiar contraseña" en /profile debe tener letras verdes en dark mode.
-- **Observaciones nuevas**:
-  - Sesión multi-fix continuada: primero reporta que /assets-wind sigue igual (era deploy en progreso), luego pasa a otro detalle en /profile — barrido de calidad confirmado
-  - "el boton cambiar contraseña debe tener las letras verdes" — instrucción ultra-precisa: componente exacto + propiedad visual + valor esperado. Una sola frase.
-  - Pasa de un problema no resuelto a otro sin drama — no se queda pegado esperando confirmación del primero, avanza al siguiente
-  - El botón usaba `color: var(--color-neutral-700)` que no tenía valor en dark mode tokens → cambió a `var(--color-neutral-800)` que resuelve a verde (#A8E6A8)
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL exacta como referencia, barrido de calidad por pantalla, instrucción precisa (componente + propiedad + valor)
-
-### Sesión 52 - 2026-08-13
-- **Tarea principal**: (1) Botón "cambiar contraseña" sigue con letras azules (deploy pendiente). (2) Pantalla /inspections/reports sigue con fondo blanco — más colores hardcodeados (#F4F6F8, #FAFAFA, rgba negros).
-- **Observaciones nuevas**:
-  - Reporta múltiples problemas en diferentes pantallas en el mismo mensaje — barrido de calidad multi-pantalla (no solo una pantalla por sesión)
-  - Cuando dice "sigue con letras azules" pero el código ya está cambiado, el problema es que Vercel aún estaba building. El usuario no distingue entre "no se desplegó" y "no se corrigió" — para él, si no se ve en producción, no está arreglado.
-  - Segunda ronda de limpieza de colores hardcodeados: Reports tenía rgba(0,0,0,X), #F4F6F8, #FAFAFA, borders con rgba. Otros componentes (DefectEditForm, ExportPanel, InspectStep) también tenían residuos.
-  - El approach correcto desde la PRIMERA sesión hubiera sido: `grep -rn "#F\|#f\|rgba(0" src/ --include="*.tsx"` para encontrar TODO de una vez.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL exacta como referencia, barrido de calidad multi-pantalla, frustración acumulada cuando el problema persiste
-
-### Sesión 53 - 2026-08-13
-- **Tarea principal**: (1) Reportes y títulos seguían sin aplicar dark mode → solución global con `[data-theme="dark"] * { color !important }`. (2) Sidebar cambió de color por el override global → excluir aside del override.
-- **Observaciones nuevas**:
-  - "estas fallando demasiado con un cambio simple" — frustración explícita. Para el usuario, cambiar colores es trivial y no debería tomar 5+ sesiones.
-  - "ser exhaustivo" = resolver TODO de una sola vez. La solución correcta desde el inicio era un override CSS global con `!important`, no parchar 150 archivos uno a uno.
-  - "el menu no debia cambiar" — cuando un override global afecta algo que ya funcionaba bien, el usuario corrige inmediatamente. La expectativa es que el agente anticipe estos side effects.
-  - **APRENDIZAJE**: Para cambios de color GLOBALES, SIEMPRE usar CSS `!important` override en index.css. Para componentes que deben PRESERVAR su estilo (sidebar, botones de color), excluirlos explícitamente.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente complica lo simple, corrección directa sin drama, espera que side effects se anticipen
-
-### Sesión 55 - 2026-08-13
-- **Tarea principal**: (1) Agregar selector de idioma EN/ES en TopBar junto al dark mode. (2) Aplicar traducciones a TODO el sitio. (3) Corregir que InspectStep (step 1) y otros 12 archivos nunca se tradujeron en las pasadas anteriores.
-- **Observaciones nuevas**:
-  - "hay mucho por traducir aun, que revision hiciste? todo se mantiene igual" — frustración porque las pasadas anteriores NO fueron exhaustivas. El agente declaró "listo" sin verificar que TODOS los archivos estuvieran cubiertos.
-  - "se riguroso y profesional" — exige rigor absoluto. Quiere auditoría REAL (verificar cada archivo), no solo los que se le ocurran al agente.
-  - "asesorate o busca informacion externa para hacer una buena traduccion" — para traducciones de dominio específico (eólico), quiere que el agente investigue terminología correcta antes de traducir.
-  - **CORRECCIÓN**: Cuando pide "traducir todo el sitio", hay que verificar CADA archivo .tsx con `grep -c "t('"` para confirmar que tiene traducciones. No asumir que porque se editaron "los principales" ya está todo.
-  - **APRENDIZAJE CLAVE**: Antes de declarar "listo" en una tarea de cobertura completa (i18n, dark mode, etc.), EJECUTAR una verificación automatizada que confirme que NO quedan archivos sin cubrir. Ejemplo: `find src -name "*.tsx" -exec grep -c "t('" {} \;` para detectar archivos con 0 traducciones.
-  - La URL que dio fue `wind-farm-eight.vercel.app` — este es el dominio de producción personalizado (diferente a los URLs de deploy automático de Vercel como `wind-farm-xxxxx-dev-ai2.vercel.app`)
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente dice "listo" sin ser exhaustivo, exige rigor ("se riguroso"), quiere verificación automatizada antes de declarar completado, modo compañero
-
-### Sesión 56 - 2026-08-13
-- **Tarea principal**: Cambiar icono SVG del botón "Image adjustments" en AnnotateStep por un icono de contraste (círculo mitad/mitad)
-- **Observaciones nuevas**:
-  - Proporcionó DOM del botón actual + imágenes de ejemplo del icono deseado en un solo mensaje — patrón de "DOM + imagen como spec" combinado
-  - Instrucción clara y simple: "cambiar el icono por uno relacionado a contraste de fotos" — no necesitó explicación de qué SVG path usar, confió en que el agente eligiera uno apropiado basándose en las imágenes de ejemplo
-  - Sesión ultra-corta: una sola instrucción, cero correcciones, tarea completada al primer intento
-  - Modo compañero activado con "compañero" al inicio del mensaje — patrón consistente
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec, imagen como referencia visual, cambios simples en una sola frase
-
-
-### Sesión 57 - 2026-08-13
-- **Tarea principal**: Dark mode completo — textos verdes, fondos gris mate, sidebar preservado, visor de imagen funcional
-- **Observaciones nuevas**:
-  - Sesión LARGA con múltiples iteraciones sobre el mismo tema (dark mode). El approach incremental fue INCORRECTO — debió ser un override global `!important` desde el inicio.
-  - "se profesional" + "esta instruccion la he dado mas de 4 veces" — frustración máxima. Cuando un problema se reporta 4+ veces sin resolverse, el approach está fundamentalmente mal.
-  - Componentes que deben EXCLUIRSE del dark mode global: sidebar (`<aside>`, mantiene grafito #2C2C2C), visor de imagen (`.annotate-viewer`, mantiene sus estilos originales de rendering)
-  - La imagen no se veía porque el override CSS con `!important` estaba sobreescribiendo los estilos inline del componente (background, colores) que eran necesarios para su funcionalidad. Solución: `unset !important` para anular la regla global.
-  - **REGLA CLAVE**: Cuando se hace un override global con `!important`, SIEMPRE identificar componentes que necesitan excepción ANTES de aplicar. No después de que el usuario reporte que algo se rompió.
-- **Patrones confirmados**: español, directo, alta autonomía, frustración explícita con repetición del problema, "se profesional" = exige calidad y no parches, componentes con rendering especial deben excluirse de overrides globales
-
-### Sesión 57 - 2026-08-13
-- **Tarea principal**: (1) Cambiar icono del botón "Image adjustments" por icono de contraste (círculo mitad/mitad). (2) Aplicar background transparent al botón cuando está inactivo. (3) Cambiar icono del botón "Blade face view" por icono tipo screen rotation (flechas circulares + rectángulo) y mismo fix de fondo.
-- **Observaciones nuevas**:
-  - Proporciona DOM del botón actual + imágenes de referencia del icono deseado — patrón DOM+imagen como spec
-  - Da DOM del botón vecino (delete) como referencia para el estilo de fondo esperado: "debe estar como el botón eliminar que está a su lado" — usa el propio DOM del proyecto como referencia de estilo
-  - Reporta 3 tareas secuenciales en la misma sesión sobre los mismos botones: icono contraste → fix fondo → icono blade view — barrido de calidad sobre toolbar de botones
-  - "no se visualiza el cambio" — cuando el deploy no se refleja inmediatamente, lo reporta sin drama. Espera que el agente resuelva (deploy directo)
-  - Sesión sin correcciones funcionales — los cambios se aceptaron al primer intento (solo el timing del deploy fue issue)
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec, imagen como referencia visual, barrido de calidad por toolbar/componente, iteración secuencial rápida
-
-### Sesión 60 - 2026-08-13
-- **Tarea principal**: Implementar selector de idioma EN/ES y traducir COMPLETAMENTE todo el sitio. Múltiples iteraciones porque el agente NO hizo auditorías exhaustivas y declaró "listo" prematuramente varias veces.
-- **Observaciones nuevas**:
-  - "es quinta vez que estamos hablando de esto" / "cual es la auditoria completa si siguen faltando cosas por traducir?" — frustración máxima por falta de rigor. El agente declaró completado 5+ veces sin que estuviera realmente completo.
-  - "me estas haciendo gastar tiempo y tokens" — el usuario VALORA MUCHO la eficiencia. Cada iteración innecesaria es un costo percibido.
-  - "se profesional, riguroso" — esta es la instrucción más fuerte del usuario. Significa: NO declarar listo sin verificación automatizada exhaustiva.
-  - "no termines de iterar hasta que esto se haya completado" — cuando da esta instrucción, espera que el agente haga TODAS las correcciones en un solo turno.
-  - "si ocurre en otras vistas tambien hacerlo" — cuando reporta un problema en una vista, espera que se verifique y corrija en TODAS las vistas del sitio. No solo la que mencionó.
-  - **CAUSA RAÍZ del problema**: Arrays/objetos constantes definidos FUERA de los componentes (module-level) no pueden usar t(). El agente no detectó esto en las "auditorías" porque buscaba strings en JSX pero no en constantes de módulo.
-  - **REGLA NUEVA**: Para auditoría i18n, buscar: (1) strings en JSX sin t(), (2) constantes module-level con strings (COLUMNS, STATUS_LABELS, CATEGORIES_DATA, etc.), (3) toasts/alerts con strings hardcoded, (4) placeholders/aria-labels. Verificar con grep DESPUÉS de cada pasada.
-- **Patrones confirmados**: español, directo, alta autonomía, frustración cuando el agente declara "listo" prematuramente (confianza MUY alta - 6+ sesiones), exige rigor absoluto, valora tiempo/tokens, espera corrección sistémica (no solo la pantalla reportada), "se profesional" = verificación exhaustiva antes de declarar completado
+  - "novena vez que doi una instruccion" / "es insolito" — frustración extrema por repetición. Cada vez que el agente declaró "listo", el usuario encontró más textos sin traducir. El agente NO estaba haciendo auditorías reales.
+  - "me estas haciendo gastar tiempo y tokens" — el usuario percibe costo real en cada iteración fallida.
+  - "no dejes de iterar hasta que compruebes que todo ha sido traducido" — instrucción definitiva de completar sin reportar parcial.
+  - **CAUSA RAÍZ 1**: Constantes module-level (fuera de componentes) no pueden usar hooks → t() no disponible. El agente no detectó esto.
+  - **CAUSA RAÍZ 2**: Los deploys vía git push tenían timing issues con Vercel (build con commit antiguo). Solución: siempre forzar `vercel deploy --prod` después del push.
+  - **CAUSA RAÍZ 3**: localStorage del usuario tenía 'en' del default anterior. Solución: migración con `locale_version` flag.
+  - **REGLA NUEVA CRÍTICA**: Para tareas de cobertura total (i18n, dark mode), el approach correcto es: (1) grep automatizado para encontrar TODOS los strings sin t(), (2) corregir TODO en un solo turno, (3) forzar deploy manual, (4) verificar en producción. NO declarar listo hasta verificar EN PRODUCCIÓN.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración máxima por declarar "listo" prematuramente (confianza ABSOLUTA - 10+ iteraciones), exige verificación en producción, valora tiempo/tokens, "se profesional riguroso" = auditoría automatizada real, deploy manual siempre como respaldo

@@ -8,13 +8,13 @@
 
   /* Neutral colors */
   --color-neutral-0: #FFFFFF;
-  --color-neutral-50: #F7F7F7;
-  --color-neutral-100: #F0F0F0;
-  --color-neutral-200: #E0E0E0;
-  --color-neutral-400: #9E9E9E;
-  --color-neutral-500: #757575;
-  --color-neutral-800: #212121;
-  --color-neutral-900: #121212;
+  --color-neutral-50: #F8FAFC;
+  --color-neutral-100: #F1F5F9;
+  --color-neutral-200: #E2E8F0;
+  --color-neutral-400: #94A3B8;
+  --color-neutral-500: #64748B;
+  --color-neutral-800: #1E293B;
+  --color-neutral-900: #0F172A;
 
   /* Semantic colors */
   --color-success-500: #10B981;
@@ -79,32 +79,32 @@
   /* --bp-2xl: 1536px */
 }
 
-/* Dark mode tokens — green text + matte grey backgrounds */
+/* Dark mode tokens */
 [data-theme="dark"] {
-  --color-primary-50: #1C1C1C;
-  --color-primary-100: #242424;
-  --color-primary-500: #6BBF6B;
-  --color-primary-600: #4DA64D;
-  --color-primary-700: #2E7D2E;
+  --color-primary-50: #1A1A1A;
+  --color-primary-100: #222222;
+  --color-primary-500: #8A8A8A;
+  --color-primary-600: #5A5A5A;
+  --color-primary-700: #2C2C2C;
 
-  --color-neutral-0: #1A1A1A;
-  --color-neutral-50: #212121;
-  --color-neutral-100: #2A2A2A;
-  --color-neutral-200: #3A3A3A;
-  --color-neutral-400: #6BBF6B;
-  --color-neutral-500: #7CCC7C;
-  --color-neutral-800: #A8E6A8;
-  --color-neutral-900: #C8F0C8;
+  --color-neutral-0: #0F1419;
+  --color-neutral-50: #1A1F2E;
+  --color-neutral-100: #252B3B;
+  --color-neutral-200: #334155;
+  --color-neutral-400: #64748B;
+  --color-neutral-500: #94A3B8;
+  --color-neutral-800: #E2E8F0;
+  --color-neutral-900: #F8FAFC;
 
-  --color-success-500: #5CD65C;
-  --color-warning-500: #FFD966;
-  --color-warning-600: #F5C542;
-  --color-danger-500: #FF7A7A;
-  --color-info-500: #66B3FF;
+  --color-success-500: #34D399;
+  --color-warning-500: #FBBF24;
+  --color-warning-600: #F59E0B;
+  --color-danger-500: #F87171;
+  --color-info-500: #60A5FA;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
 /* Reduced motion */
