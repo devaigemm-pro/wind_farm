@@ -101,7 +101,7 @@ export function DefectComments({ defectId, showAll = false }: DefectCommentsProp
   if (isLoading) {
     return (
       <div style={containerStyle}>
-        <span style={headerStyle}>Comments</span>
+        <span style={headerStyle}>{t('comments.title')}</span>
         <Skeleton variant="rect" height="40px" />
         <Skeleton variant="rect" height="40px" />
       </div>

@@ -451,7 +451,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
         <div style={sidebarInner}>
           {/* Fast forward mode toggle */}
           <div style={fastForwardRow}>
-            <span style={{ fontSize: 13, color: C.text }}>Fast forward mode</span>
+            <span style={{ fontSize: 13, color: C.text }}>{t('annotate.fastForwardMode')}</span>
             <label style={switchLabel}>
               <input
                 type="checkbox"
@@ -602,25 +602,25 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           {/* Left: nav buttons + flag */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <div style={{ display: 'flex' }}>
-              <button style={{ ...navBtnStyle, borderRadius: '4px 0 0 4px' }} title="Previous" onClick={handlePrevPhoto}>
+              <button style={{ ...navBtnStyle, borderRadius: '4px 0 0 4px' }} title={t('annotate.previous')} onClick={handlePrevPhoto}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
               </button>
-              <button style={{ ...navBtnStyle, borderRadius: '0 4px 4px 0', borderLeft: 'none' }} title="Next" onClick={handleNextPhoto}>
+              <button style={{ ...navBtnStyle, borderRadius: '0 4px 4px 0', borderLeft: 'none' }} title={t('annotate.next')} onClick={handleNextPhoto}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><path d="m6 18 8.5-6L6 6zM16 6v12h2V6z"/></svg>
               </button>
             </div>
             {role !== 'supervisor' && (
-            <button style={{ ...flagBtnStyle, background: taggedPhotos.has(selectedThumbnail) ? 'rgba(255, 235, 59, 0.2)' : 'transparent' }} title="Flag" onClick={handleToggleFlag}>
+            <button style={{ ...flagBtnStyle, background: taggedPhotos.has(selectedThumbnail) ? 'rgba(255, 235, 59, 0.2)' : 'transparent' }} title={t('annotate.flag')} onClick={handleToggleFlag}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFEB3B"><path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
             </button>
             )}
             {/* Shape toggle: rect / oval */}
             {role !== 'supervisor' && (
             <div style={{ display: 'flex', border: `1px solid ${C.primary}`, borderRadius: 4, overflow: 'hidden', marginLeft: 4 }}>
-              <button onClick={() => setDrawShape('rect')} style={{ padding: '4px 8px', background: drawShape === 'rect' ? C.primary : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Rectangle">
+              <button onClick={() => setDrawShape('rect')} style={{ padding: '4px 8px', background: drawShape === 'rect' ? C.primary : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title={t('annotate.rectangle')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill={drawShape === 'rect' ? '#fff' : C.primary}><path d="M3 5v14h18V5H3zm16 12H5V7h14v10z"/></svg>
               </button>
-              <button onClick={() => setDrawShape('oval')} style={{ padding: '4px 8px', background: drawShape === 'oval' ? C.primary : 'transparent', border: 'none', borderLeft: `1px solid ${C.primary}`, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Oval">
+              <button onClick={() => setDrawShape('oval')} style={{ padding: '4px 8px', background: drawShape === 'oval' ? C.primary : 'transparent', border: 'none', borderLeft: `1px solid ${C.primary}`, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title={t('annotate.oval')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill={drawShape === 'oval' ? '#fff' : C.primary}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>
               </button>
             </div>
@@ -725,14 +725,14 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {/* Zoom controls */}
             <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${C.primary}`, borderRadius: 4, overflow: 'hidden', marginRight: 4 }}>
-              <button onClick={handleZoomOut} style={{ padding: '4px 8px', background: 'transparent', border: 'none', borderRight: `1px solid ${C.primary}`, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.primary, lineHeight: 1 }} title="Zoom out">−</button>
-              <button onClick={handleZoomReset} style={{ padding: '4px 8px', background: 'transparent', border: 'none', borderRight: `1px solid ${C.primary}`, cursor: 'pointer', fontSize: 11, color: C.primary, lineHeight: 1, minWidth: 40, textAlign: 'center' }} title="Reset zoom">x{zoomLevel.toFixed(1)}</button>
-              <button onClick={handleZoomIn} style={{ padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.primary, lineHeight: 1 }} title="Zoom in">+</button>
+              <button onClick={handleZoomOut} style={{ padding: '4px 8px', background: 'transparent', border: 'none', borderRight: `1px solid ${C.primary}`, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.primary, lineHeight: 1 }} title={t('annotate.zoomOut')}>−</button>
+              <button onClick={handleZoomReset} style={{ padding: '4px 8px', background: 'transparent', border: 'none', borderRight: `1px solid ${C.primary}`, cursor: 'pointer', fontSize: 11, color: C.primary, lineHeight: 1, minWidth: 40, textAlign: 'center' }} title={t('annotate.resetZoom')}>x{zoomLevel.toFixed(1)}</button>
+              <button onClick={handleZoomIn} style={{ padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.primary, lineHeight: 1 }} title={t('annotate.zoomIn')}>+</button>
             </div>
-            <button style={{ ...actionBtnStyle, borderColor: showBladeOverlay ? C.primary : undefined, background: showBladeOverlay ? C.primaryLight : 'transparent' }} title="Blade face view" onClick={() => setShowBladeOverlay(v => !v)}>
+            <button style={{ ...actionBtnStyle, borderColor: showBladeOverlay ? C.primary : undefined, background: showBladeOverlay ? C.primaryLight : 'transparent' }} title={t('annotate.bladeFaceView')} onClick={() => setShowBladeOverlay(v => !v)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={showBladeOverlay ? C.primary : '#555'}><path d="M7.47 21.49C4.2 19.93 1.86 16.76 1.5 13H0c.51 6.16 5.66 11 11.95 11 .23 0 .44-.02.66-.03L8.8 20.15l-1.33 1.34zM12.05 0c-.23 0-.44.02-.66.04l3.81 3.81 1.33-1.33C19.8 4.07 22.14 7.24 22.5 11H24c-.51-6.16-5.66-11-11.95-11zM16 14h2V8c0-1.11-.9-2-2-2h-6v2h6v6zm-8 2V4H6v2H4v2h2v8c0 1.1.9 2 2 2h8v2h2v-2h2v-2H8z"/></svg>
             </button>
-            <button style={{ ...actionBtnStyle, borderColor: showImageAdjust ? C.primary : undefined, background: showImageAdjust ? C.primaryLight : 'transparent' }} title="Image adjustments" onClick={() => setShowImageAdjust(v => !v)}>
+            <button style={{ ...actionBtnStyle, borderColor: showImageAdjust ? C.primary : undefined, background: showImageAdjust ? C.primaryLight : 'transparent' }} title={t('annotate.imageAdjustments')} onClick={() => setShowImageAdjust(v => !v)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={showImageAdjust ? C.primary : '#555'}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18V4c4.41 0 8 3.59 8 8s-3.59 8-8 8z"/></svg>
             </button>
             <button style={actionBtnStyle} title={t('annotate.downloadPhoto')} onClick={() => {
@@ -759,7 +759,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               <svg width="18" height="18" viewBox="0 0 24 24" fill={C.primary}><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96M17 13l-5 5-5-5h3V9h4v4z"/></svg>
             </button>
             {role !== 'supervisor' && (
-            <button style={{ ...actionBtnStyle, borderColor: '#F15959', color: '#F15959' }} title="Delete photo">
+            <button style={{ ...actionBtnStyle, borderColor: '#F15959', color: '#F15959' }} title={t('annotate.deletePhoto')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#F15959"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>
             </button>
             )}
@@ -941,17 +941,17 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 </button>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>Contrast</span>
+                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>{t('annotate.contrast')}</span>
                 <input type="range" min="0" max="2" step="0.1" value={imgContrast} onChange={e => setImgContrast(Number(e.target.value))} style={{ width: '100%', accentColor: C.primary }} />
                 <span style={{ fontSize: 11, color: C.muted, float: 'right' }}>{imgContrast.toFixed(1)}</span>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>Brightness</span>
+                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>{t('annotate.brightness')}</span>
                 <input type="range" min="0" max="2" step="0.1" value={imgBrightness} onChange={e => setImgBrightness(Number(e.target.value))} style={{ width: '100%', accentColor: C.primary }} />
                 <span style={{ fontSize: 11, color: C.muted, float: 'right' }}>{imgBrightness.toFixed(1)}</span>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>Saturation</span>
+                <span style={{ fontSize: 12, color: C.muted, display: 'block', marginBottom: 4 }}>{t('annotate.saturation')}</span>
                 <input type="range" min="0" max="10" step="0.5" value={imgSaturation} onChange={e => setImgSaturation(Number(e.target.value))} style={{ width: '100%', accentColor: C.primary }} />
                 <span style={{ fontSize: 11, color: C.muted, float: 'right' }}>{imgSaturation.toFixed(1)}</span>
               </div>
@@ -1426,7 +1426,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 <button style={saveVerticalBtnStyle} onClick={() => setShowBladeConfirm(true)}>{t('button.save')}</button>
               </div>
               <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-                Blade order from the outside is set to<b> clockwise</b>
+                {t('annotate.bladeOrderCW')}<b> {t('annotate.clockwise')}</b>
               </p>
             </div>
           )}
@@ -1465,9 +1465,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       {showBladeConfirm && (
         <div style={modalOverlay}>
           <div style={popoverStyle}>
-            <div style={popoverTitle}>Update vertical blade</div>
+            <div style={popoverTitle}>{t('annotate.updateVerticalBlade')}</div>
             <div style={popoverQuestion}>
-              <p style={{ margin: '0 0 12px' }}>You are about to change the vertical blade, this action will change the blade picture distribution according to the specified blade ordering (CW or CCW).</p>
+              <p style={{ margin: '0 0 12px' }}>{t('annotate.verticalBladeWarning')}</p>
               <b>{t('annotate.confirmVerticalBlade')} &ldquo;{selectedBladeLabel}&rdquo;?</b>
             </div>
             <div style={popoverBtnGroup}>

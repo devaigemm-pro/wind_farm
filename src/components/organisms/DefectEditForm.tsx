@@ -74,13 +74,13 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
     <div style={formContainerStyle}>
       {/* Type select */}
       <div style={fieldStyle}>
-        <label style={labelStyle}>Type</label>
+        <label style={labelStyle}>{t('defectEdit.type')}</label>
         <select
           style={selectStyle}
           value={type}
           onChange={(e) => setType(e.target.value)}
         >
-          <option value={type}>{type || '-- Select --'}</option>
+          <option value={type}>{type || t('defectEdit.selectPlaceholder')}</option>
           {typeOptions.filter(t => t !== type).map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
@@ -91,7 +91,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {/* Category */}
         <div>
-          <span style={inlineLabelStyle}>Category</span>
+          <span style={inlineLabelStyle}>{t('defectEdit.category')}</span>
           <div style={buttonGroupStyle}>
             {[1, 2, 3, 4, 5].map((val) => (
               <button
@@ -108,7 +108,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
 
         {/* Root distance */}
         <div>
-          <span style={inlineLabelStyle}>Root distance (m)</span>
+          <span style={inlineLabelStyle}>{t('defectEdit.rootDistance')}</span>
           <input
             type="number"
             step="0.1"
@@ -121,7 +121,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
 
         {/* Blade face */}
         <div>
-          <span style={inlineLabelStyle}>Blade face</span>
+          <span style={inlineLabelStyle}>{t('defectEdit.bladeFace')}</span>
           <select
             style={smallSelectStyle}
             value={side}
@@ -137,7 +137,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
 
       {/* Note */}
       <div style={fieldStyle}>
-        <label style={labelStyle}>Note</label>
+        <label style={labelStyle}>{t('defectEdit.note')}</label>
         <div style={textareaWrapperStyle}>
           <textarea
             style={textareaStyle}
@@ -156,7 +156,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
 
       {/* Root cause */}
       <div style={fieldStyle}>
-        <label style={labelStyle}>Root cause</label>
+        <label style={labelStyle}>{t('defectEdit.rootCause')}</label>
         <div style={textareaWrapperStyle}>
           <textarea
             style={textareaStyle}
@@ -175,7 +175,7 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
 
       {/* Next step */}
       <div style={fieldStyle}>
-        <label style={labelStyle}>Next step</label>
+        <label style={labelStyle}>{t('defectEdit.nextStep')}</label>
         <div style={textareaWrapperStyle}>
           <textarea
             style={textareaStyle}
@@ -195,13 +195,13 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
       {/* Action buttons */}
       <div style={buttonRowStyle}>
         <button type="button" style={removeBtnStyle} onClick={onRemove}>
-          Remove Defect
+          {t('defectEdit.removeDefect')}
         </button>
         <button type="button" style={closeBtnStyle} onClick={onClose}>
-          Close
+          {t('defectEdit.close')}
         </button>
         <button type="button" style={updateBtnStyle} onClick={handleUpdate}>
-          Update
+          {t('defectEdit.update')}
         </button>
       </div>
     </div>

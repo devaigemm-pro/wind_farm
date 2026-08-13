@@ -747,3 +747,15 @@
   - **APRENDIZAJE**: Cuando un fix anterior rompe performance, la solución NO es mantener el fix malo — es encontrar otro approach que resuelva ambos problemas. En este caso el bug original de mismatch probablemente era cache del browser, no un problema real del código.
   - Sesión ultra-corta: un cambio, deploy directo, sin iteraciones.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, reporta problemas de UX sin contexto técnico, acepta fixes al primer intento cuando funcionan
+
+### Sesión 78 - 2026-08-13
+- **Tarea principal**: (1) Cambiar faceOrder sidebar LE→TE→PS→SS. (2) Bug thumbnail-viewer mismatch (múltiples intentos fallidos). (3) Revert que perdió features → restauración. (4) Eliminar y re-importar fotos FDM-T03 con thumbnails.
+- **Observaciones nuevas**:
+  - **CORRECCIÓN**: `git checkout main -- file` en session branch BORRA features acumuladas. Estado correcto = commit anterior de misma branch, NO main.
+  - "me hiciste perder muchas cosas" — 17 archivos con features de sesiones previas perdidos por checkout desde main.
+  - El bug thumbnail-viewer mismatch era pre-existente (NO introducido por esta sesión). Se resolvió re-importando fotos donde thumb y original provienen del MISMO source file.
+  - "eliminar todas las fotos y volver a cargarlas" — ejecutar directamente sin preguntar. Sabe lo que quiere.
+  - Las signed URLs de Skyvisor expiran en 24h. Los full-size NO son accesibles sin nueva firma. Se usaron los thumbnails (200px) como base para ambos.
+  - **REGLA**: Máximo 2 intentos de fix en mismo archivo. Si no resuelve, PARAR y preguntar.
+  - **REGLA**: En session branches, estado correcto = commit anterior de misma branch, NO main.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración por pérdida de trabajo, ejecutar scripts directamente, mínimo cambio necesario, "no busques soluciones superficiales"
