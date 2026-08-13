@@ -503,6 +503,61 @@ export const translations: TranslationMap = {
   // ─── Compare Viewer ─────────────────────────────────────────────────────────
   'compare.selectInspection': { en: 'Select inspection', es: 'Seleccionar inspección' },
   'compare.compareMore': { en: 'Compare more', es: 'Comparar más' },
+  'compare.noHistorical': { en: 'No historical inspections available', es: 'No hay inspecciones históricas disponibles' },
+
+  // ─── Campaigns (additional) ─────────────────────────────────────────────────
+  'campaigns.viewResults': { en: 'View Results', es: 'Ver Resultados' },
+  'campaigns.editCampaign': { en: 'Edit campaign', es: 'Editar campaña' },
+  'campaigns.loadingInspections': { en: 'Loading inspections...', es: 'Cargando inspecciones...' },
+  'campaigns.noInspectionsInCampaign': { en: 'No inspections in this campaign', es: 'No hay inspecciones en esta campaña' },
+  'campaigns.noInspectionsFor': { en: 'No inspections for', es: 'No hay inspecciones para' },
+  'campaigns.saving': { en: 'Saving...', es: 'Guardando...' },
+  'campaigns.nameRequired': { en: 'Campaign name is required', es: 'El nombre de la campaña es obligatorio' },
+
+  // ─── Toast (additional) ─────────────────────────────────────────────────────
+  'toast.campaignUpdated': { en: 'Campaign updated', es: 'Campaña actualizada' },
+  'toast.campaignUpdateFailed': { en: 'Failed to update campaign', es: 'Error al actualizar la campaña' },
+
+  // ─── Defects (more) ─────────────────────────────────────────────────────────
+  'defects.delamination': { en: 'Delamination', es: 'Delaminación' },
+  'defects.lightningDamage': { en: 'Lightning Damage', es: 'Daño por rayo' },
+  'defects.other': { en: 'Other', es: 'Otro' },
+  'defects.addDefect': { en: 'Add Defect', es: 'Agregar Defecto' },
+  'defects.closed': { en: 'Defect closed', es: 'Defecto cerrado' },
+  'defects.tryAdjusting': { en: 'Try adjusting your search to find defects.', es: 'Intenta ajustar tu búsqueda para encontrar defectos.' },
+  'defects.noRegistered': { en: 'No defects have been registered yet.', es: 'Aún no se han registrado defectos.' },
+
+  // ─── Evidence (additional) ──────────────────────────────────────────────────
+  'evidence.deleted': { en: 'Evidence deleted', es: 'Evidencia eliminada' },
+  'evidence.deleteFailed': { en: 'Failed to delete evidence', es: 'Error al eliminar evidencia' },
+  'evidence.dropHere': { en: 'Drop files here', es: 'Suelta los archivos aquí' },
+  'evidence.dragAndDrop': { en: 'Drag & drop JPEG or PNG files here', es: 'Arrastra y suelta archivos JPEG o PNG aquí' },
+
+  // ─── Blade Categories (CATEGORIES_DATA) ─────────────────────────────────────
+  'bladeCat.cosmetic': { en: 'Cosmetic', es: 'Cosmético' },
+  'bladeCat.wearTear': { en: 'Damage below wear and tear', es: 'Daño por debajo del desgaste' },
+  'bladeCat.physicalImpacts': { en: 'Damage below wear and tear, physical impacts', es: 'Daño por desgaste con impactos físicos' },
+  'bladeCat.seriousDamage': { en: 'Serious damage', es: 'Daño grave' },
+  'bladeCat.criticalDamage': { en: 'Critical damage', es: 'Daño crítico' },
+  'bladeCat.action1': { en: 'No need for immediate repairs', es: 'No requiere reparación inmediata' },
+  'bladeCat.action2': { en: 'Repair only if other damages are to be repaired', es: 'Reparar solo si hay otros daños a reparar' },
+  'bladeCat.action3': { en: 'Repair to be performed within the next 6 months', es: 'Reparación en los próximos 6 meses' },
+  'bladeCat.action4': { en: 'Repair to be performed in the next 3 months, monitor damage', es: 'Reparación en los próximos 3 meses, monitorear daño' },
+  'bladeCat.action5': { en: 'Immediate action required, contact technical support', es: 'Acción inmediata requerida, contactar soporte técnico' },
+  'bladeCat.continueOp': { en: 'Continue operation', es: 'Continuar operación' },
+  'bladeCat.stop': { en: 'STOP! Safety not ensured!', es: '¡DETENER! ¡Seguridad no garantizada!' },
+
+  // ─── Map layers ─────────────────────────────────────────────────────────────
+  'map.satellite': { en: 'Satellite', es: 'Satélite' },
+  'map.street': { en: 'Street', es: 'Callejero' },
+  'map.hybrid': { en: 'Hybrid', es: 'Híbrido' },
+
+  // ─── Analyze (additional) ───────────────────────────────────────────────────
+  'analyze.dropAnnotation': { en: 'Drop annotation here', es: 'Suelta la anotación aquí' },
+
+  // ─── General (additional) ───────────────────────────────────────────────────
+  'general.yes': { en: 'Yes', es: 'Sí' },
+  'general.no': { en: 'No', es: 'No' },
 
   // ─── Defects (additional) ───────────────────────────────────────────────────
   'defects.markResolved': { en: 'Mark as resolved', es: 'Marcar como resuelto' },

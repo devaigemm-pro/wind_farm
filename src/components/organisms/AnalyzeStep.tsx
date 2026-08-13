@@ -514,7 +514,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             ) : (
               <div style={{ width: '100%', height: '100%', background: '#2a2a2a', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: '#888', fontSize: 13 }}>
-                  {selectedDefect ? 'No image' : 'Drop annotation here'}
+                  {selectedDefect ? t('defectImage.noImage') : t('analyze.dropAnnotation')}
                 </span>
               </div>
             )}

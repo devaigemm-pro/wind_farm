@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 58
+- **Sesiones analizadas**: 59
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -622,3 +622,14 @@
   - Sesión ultra-corta: una sola instrucción, cero correcciones, tarea completada al primer intento
   - Modo compañero activado con "compañero" al inicio del mensaje — patrón consistente
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec, imagen como referencia visual, cambios simples en una sola frase
+
+
+### Sesión 57 - 2026-08-13
+- **Tarea principal**: Dark mode completo — textos verdes, fondos gris mate, sidebar preservado, visor de imagen funcional
+- **Observaciones nuevas**:
+  - Sesión LARGA con múltiples iteraciones sobre el mismo tema (dark mode). El approach incremental fue INCORRECTO — debió ser un override global `!important` desde el inicio.
+  - "se profesional" + "esta instruccion la he dado mas de 4 veces" — frustración máxima. Cuando un problema se reporta 4+ veces sin resolverse, el approach está fundamentalmente mal.
+  - Componentes que deben EXCLUIRSE del dark mode global: sidebar (`<aside>`, mantiene grafito #2C2C2C), visor de imagen (`.annotate-viewer`, mantiene sus estilos originales de rendering)
+  - La imagen no se veía porque el override CSS con `!important` estaba sobreescribiendo los estilos inline del componente (background, colores) que eran necesarios para su funcionalidad. Solución: `unset !important` para anular la regla global.
+  - **REGLA CLAVE**: Cuando se hace un override global con `!important`, SIEMPRE identificar componentes que necesitan excepción ANTES de aplicar. No después de que el usuario reporte que algo se rompió.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración explícita con repetición del problema, "se profesional" = exige calidad y no parches, componentes con rendering especial deben excluirse de overrides globales

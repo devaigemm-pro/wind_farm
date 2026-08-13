@@ -324,8 +324,8 @@ export function DefectCompareViewer({
             ) : (
               <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
                 {inspections.length === 0
-                  ? 'No historical inspections available'
-                  : 'Select an inspection to compare'}
+                  ? t('compare.noHistorical')
+                  : t('compare.selectInspection')}
               </span>
             )}
           </div>

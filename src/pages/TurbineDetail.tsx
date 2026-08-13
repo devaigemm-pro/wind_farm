@@ -1109,7 +1109,7 @@ function DetailsTable({ defects, selectedId, onSelect, onEdit, resolvedMap, onRe
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); if (!readonly) onResolvedToggle(d.displayId); }}
-                  aria-label={resolvedMap[d.displayId] ? 'Mark as unresolved' : 'Mark as resolved'}
+                  aria-label={resolvedMap[d.displayId] ? t('defectSidebar.markUnresolved') : t('defectSidebar.markResolved')}
                   aria-pressed={resolvedMap[d.displayId] ?? false}
                   disabled={readonly}
                   style={{

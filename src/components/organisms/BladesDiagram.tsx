@@ -26,13 +26,7 @@ const CAT_COLORS: Record<number, string> = {
   1: '#008F98',
 };
 
-const CATEGORIES_DATA = [
-  { cat: 1, color: '#008F98', damage: 'Cosmetic', action: 'No need for immediate repairs', nextStep: 'Continue operation' },
-  { cat: 2, color: '#006C7A', damage: 'Damage below wear and tear', action: 'Repair only if other damages are to be repaired', nextStep: 'Continue operation' },
-  { cat: 3, color: '#F29D00', damage: 'Damage below wear and tear, physical impacts', action: 'Repair to be performed within the next 6 months', nextStep: 'Continue operation' },
-  { cat: 4, color: '#FF5500', damage: 'Serious damage', action: 'Repair to be performed in the next 3 months, monitor damage', nextStep: 'Continue operation' },
-  { cat: 5, color: '#FF0000', damage: 'Critical damage', action: 'Immediate action required, contact technical support', nextStep: 'STOP! Safety not ensured!' },
-];
+// CATEGORIES_DATA moved inside component for i18n
 
 /**
  * Wind turbine blade diagram with meter scale, defect dots, zoom, and pan.
@@ -47,6 +41,13 @@ export function BladesDiagram({
   onDefectClick,
 }: BladesDiagramProps) {
   const { t } = useLanguage();
+  const CATEGORIES_DATA = [
+    { cat: 1, color: '#008F98', damage: t('bladeCat.cosmetic'), action: t('bladeCat.action1'), nextStep: t('bladeCat.continueOp') },
+    { cat: 2, color: '#006C7A', damage: t('bladeCat.wearTear'), action: t('bladeCat.action2'), nextStep: t('bladeCat.continueOp') },
+    { cat: 3, color: '#F29D00', damage: t('bladeCat.physicalImpacts'), action: t('bladeCat.action3'), nextStep: t('bladeCat.continueOp') },
+    { cat: 4, color: '#FF5500', damage: t('bladeCat.seriousDamage'), action: t('bladeCat.action4'), nextStep: t('bladeCat.continueOp') },
+    { cat: 5, color: '#FF0000', damage: t('bladeCat.criticalDamage'), action: t('bladeCat.action5'), nextStep: t('bladeCat.stop') },
+  ];
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);

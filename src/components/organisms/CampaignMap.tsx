@@ -42,11 +42,7 @@ const DEFAULT_TURBINES: TurbineMarker[] = [
 
 type MapLayerType = 'satellite' | 'street' | 'hybrid';
 
-const MAP_LAYERS: { id: MapLayerType; label: string }[] = [
-  { id: 'satellite', label: 'Satellite' },
-  { id: 'street', label: 'Street' },
-  { id: 'hybrid', label: 'Hybrid' },
-];
+// MAP_LAYERS labels built inside component for i18n
 
 // Wind turbine SVG icon as data URL (matching reference style - turbine marker)
 function turbineSvg(color: string): string {
@@ -106,6 +102,11 @@ export function CampaignMap({
   onTurbineClick,
 }: CampaignMapProps) {
   const { t } = useLanguage();
+  const MAP_LAYERS: { id: MapLayerType; label: string }[] = [
+    { id: 'satellite', label: t('map.satellite') },
+    { id: 'street', label: t('map.street') },
+    { id: 'hybrid', label: t('map.hybrid') },
+  ];
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<Map | null>(null);
   const vectorSourceRef = useRef<VectorSource | null>(null);

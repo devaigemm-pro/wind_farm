@@ -98,9 +98,9 @@ export function EvidenceGallery({ inspectionId, canEdit }: EvidenceGalleryProps)
     async (item: Evidence) => {
       try {
         await deleteEvidence.mutateAsync({ id: item.id, storagePath: item.storage_path });
-        toast.success('Evidence deleted');
+        toast.success(t('evidence.deleted'));
       } catch {
-        toast.error('Failed to delete evidence');
+        toast.error(t('evidence.deleteFailed'));
       }
     },
     [deleteEvidence, toast],
@@ -136,7 +136,7 @@ export function EvidenceGallery({ inspectionId, canEdit }: EvidenceGalleryProps)
         >
           <Upload size={24} style={{ color: 'var(--color-neutral-400)' }} aria-hidden="true" />
           <p style={styles.dropText}>
-            {isDragOver ? 'Drop files here' : 'Drag & drop JPEG or PNG files here'}
+            {isDragOver ? t('evidence.dropHere') : t('evidence.dragAndDrop')}
           </p>
           <Button
             variant="secondary"

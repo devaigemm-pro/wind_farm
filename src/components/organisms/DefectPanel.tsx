@@ -39,15 +39,7 @@ const INITIAL_FORM: DefectFormState = {
   next_step: '',
 };
 
-const DEFECT_TYPE_LABELS: Record<DefectType, string> = {
-  le_erosion: 'LE Erosion',
-  vortex: 'Vortex',
-  paint_defect: 'Paint Defect',
-  crack: 'Crack',
-  delamination: 'Delamination',
-  lightning_damage: 'Lightning Damage',
-  other: 'Other',
-};
+// DEFECT_TYPE_LABELS moved inside component for i18n
 
 const SEVERITY_VARIANT: Record<Severity, BadgeVariant> = {
   1: 'neutral',
@@ -59,6 +51,17 @@ const SEVERITY_VARIANT: Record<Severity, BadgeVariant> = {
 
 export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
   const { t } = useLanguage();
+
+  const DEFECT_TYPE_LABELS: Record<DefectType, string> = {
+    le_erosion: t('defect.leErosion'),
+    vortex: t('defect.vortex'),
+    paint_defect: t('defect.paintDamages'),
+    crack: t('defect.crack'),
+    delamination: t('defects.delamination'),
+    lightning_damage: t('defects.lightningDamage'),
+    other: t('defects.other'),
+  };
+
   const { data: defects, isLoading } = useDefects(inspectionId);
   const createDefect = useCreateDefect();
   const updateDefect = useUpdateDefect();
@@ -282,7 +285,7 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
               setShowForm(true);
             }}
           >
-            Add Defect
+            {t('defects.addDefect')}
           </Button>
         )}
       </div>
@@ -390,7 +393,7 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
               onClick={handleSubmit}
               loading={createDefect.isPending || updateDefect.isPending}
             >
-              {editingId ? 'Update' : 'Save'}
+              {editingId ? t('button.edit') : t('button.save')}
             </Button>
           </div>
         </div>
@@ -404,7 +407,7 @@ export function DefectPanel({ inspectionId, canEdit }: DefectPanelProps) {
           action={
             canEdit
               ? {
-                  label: 'Add Defect',
+                  label: t('defects.addDefect'),
                   onClick: () => setShowForm(true),
                 }
               : undefined

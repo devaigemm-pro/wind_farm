@@ -63,7 +63,7 @@ export function AssetSelector({
         aria-label={t('misc.selectWindFarm')}
       >
         {isLoading ? (
-          <option value="">Loading...</option>
+          <option value="">{t('general.loading')}</option>
         ) : (
           <>
             <option value="" disabled>

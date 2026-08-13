@@ -111,7 +111,7 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
   }, [deleteDefect]);
 
   const handleDefectClose = useCallback((id: string) => {
-    addComment.mutate({ defectId: id, text: 'Defect closed' });
+    addComment.mutate({ defectId: id, text: t('defects.closed') });
   }, [addComment]);
 
   const handleZoomIn = useCallback(() => {
@@ -159,7 +159,7 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
         <EmptyState
           icon={AlertTriangle}
           title={t('defects.noFound')}
-          description={searchQuery ? 'Try adjusting your search to find defects.' : 'No defects have been registered yet.'}
+          description={searchQuery ? t('defects.tryAdjusting') : t('defects.noRegistered')}
         />
       </div>
     );

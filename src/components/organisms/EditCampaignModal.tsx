@@ -77,7 +77,7 @@ export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: Edi
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error('Campaign name is required');
+      toast.error(t('campaigns.nameRequired'));
       return;
     }
     try {
@@ -101,10 +101,10 @@ export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: Edi
         await unassignInspections.mutateAsync(toUnassign);
       }
 
-      toast.success('Campaign updated');
+      toast.success(t('toast.campaignUpdated'));
       onClose();
     } catch {
-      toast.error('Failed to update campaign');
+      toast.error(t('toast.campaignUpdateFailed'));
     }
   };
 
@@ -203,7 +203,7 @@ export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: Edi
             Cancel
           </button>
           <button style={saveBtnStyle} onClick={handleSave} disabled={!name.trim() || isSaving}>
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? t('campaigns.saving') : t('button.save')}
           </button>
         </div>
       </div>

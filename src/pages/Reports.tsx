@@ -254,7 +254,7 @@ export function Reports() {
                             style={styles.downloadIcon}
                             onClick={(e) => handleDownload(e, row)}
                             disabled={downloadingId === row.id}
-                            aria-label={row.pdfStoragePath ? 'Download report' : 'Generate and download report'}
+                            aria-label={t('reports.downloadReport')}
                           >
                             {downloadingId === row.id ? (
                               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#4CAF50' }} />

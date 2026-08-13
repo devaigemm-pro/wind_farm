@@ -82,7 +82,7 @@ export function CampaignAccordion({
             size="sm"
             onClick={() => onViewResults(campaign.id)}
           >
-            View Results
+            {t('campaigns.viewResults')}
           </Button>
           {(onEdit || onDelete) && (
             <div style={{ position: 'relative' }}>
@@ -102,7 +102,7 @@ export function CampaignAccordion({
                         setShowMenu(false);
                       }}
                     >
-                      Edit campaign
+                      {t('campaigns.editCampaign')}
                     </button>
                   )}
                   {onDelete && (
@@ -113,7 +113,7 @@ export function CampaignAccordion({
                         setShowMenu(false);
                       }}
                     >
-                      Delete
+                      {t('button.delete')}
                     </button>
                   )}
                 </div>
@@ -127,20 +127,20 @@ export function CampaignAccordion({
       {effectiveExpanded && (
         <div style={tableWrapperStyle}>
           {isLoading ? (
-            <p style={loadingStyle}>Loading inspections...</p>
+            <p style={loadingStyle}>{t('campaigns.loadingInspections')}</p>
           ) : filteredInspections && filteredInspections.length > 0 ? (
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Inspection Date</th>
-                  <th style={thStyle}>Subasset name</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Type</th>
-                  <th style={thStyle}>Photos uploaded</th>
-                  <th style={thStyle}>Viewed %</th>
-                  <th style={thStyle}>Defects</th>
-                  <th style={thStyle}>Notes</th>
-                  <th style={thStyle}>PDF report</th>
+                  <th style={thStyle}>{t('subassetDetail.colInspectionDate')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colSubassetName')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colStatus')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colType')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colViewed')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colDefects')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colNotes')}</th>
+                  <th style={thStyle}>{t('subassetDetail.colPdf')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -198,8 +198,8 @@ export function CampaignAccordion({
           ) : (
             <p style={loadingStyle}>
               {filterBySubasset
-                ? `No inspections for "${filterBySubasset}" in this campaign`
-                : 'No inspections in this campaign'}
+                ? `${t('campaigns.noInspectionsFor')} "${filterBySubasset}"`
+                : t('campaigns.noInspectionsInCampaign')}
             </p>
           )}
         </div>

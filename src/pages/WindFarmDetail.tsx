@@ -101,7 +101,7 @@ export function WindFarmDetail() {
     const rows = data.map((d) => [
       d.turbineName, d.turbineModel, d.type, d.defectWidth, d.defectHeight,
       d.category, d.actionText, d.actionUrgency, d.bladePosition, d.side,
-      d.rootDistance, d.resolved ? 'Yes' : 'No',
+      d.rootDistance, d.resolved ? t('general.yes') : t('general.no'),
     ]);
     const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
