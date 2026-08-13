@@ -34,7 +34,7 @@ export function ExportButton({ onClick, loading = false }: ExportButtonProps) {
       style={buttonStyle}
       onClick={onClick}
       disabled={loading}
-      aria-label="Export defects list"
+      aria-label={t('misc.exportDefects')}
       onMouseEnter={(e) => {
         if (!loading) (e.currentTarget as HTMLElement).style.backgroundColor = '#1E8449';
       }}

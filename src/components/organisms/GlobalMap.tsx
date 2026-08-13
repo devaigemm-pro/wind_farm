@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/components/design-system';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -37,6 +38,7 @@ const TURBINE_ICON_SVG = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
 
 
 export function GlobalMap({ windFarms, isLoading, onWindFarmClick }: GlobalMapProps) {
+  const { t } = useLanguage();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
@@ -166,7 +168,7 @@ export function GlobalMap({ windFarms, isLoading, onWindFarmClick }: GlobalMapPr
         )}
         {isLoading && (
           <div style={loadingOverlayStyle}>
-            <span>Loading map data...</span>
+            <span>{t('map.loading')}</span>
           </div>
         )}
       </div>

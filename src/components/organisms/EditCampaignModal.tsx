@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Badge } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import {
   useWindFarmInspections,
   useUpdateCampaign,
@@ -18,6 +19,7 @@ export interface EditCampaignModalProps {
 }
 
 export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: EditCampaignModalProps) {
+  const { t } = useLanguage();
   const toast = useToast();
   const { data: inspections, isLoading } = useWindFarmInspections(isOpen ? windFarmId : undefined);
   const { data: campaigns } = useCampaigns(isOpen ? windFarmId : undefined);
@@ -142,7 +144,7 @@ export function EditCampaignModal({ campaign, windFarmId, isOpen, onClose }: Edi
             style={inputStyle}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Campaign name"
+            placeholder={t('inspectionForm.campaignName')}
             maxLength={30}
           />
           <span style={charCountStyle}>{name.length}/30</span>

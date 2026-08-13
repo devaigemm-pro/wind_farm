@@ -503,4 +503,31 @@ export const translations: TranslationMap = {
   // ─── Compare Viewer ─────────────────────────────────────────────────────────
   'compare.selectInspection': { en: 'Select inspection', es: 'Seleccionar inspección' },
   'compare.compareMore': { en: 'Compare more', es: 'Comparar más' },
+
+  // ─── Defects (additional) ───────────────────────────────────────────────────
+  'defects.markResolved': { en: 'Mark as resolved', es: 'Marcar como resuelto' },
+  'defects.descriptionPlaceholder': { en: 'Visual description of the defect', es: 'Descripción visual del defecto' },
+  'defects.causePlaceholder': { en: 'Probable cause of the defect', es: 'Causa probable del defecto' },
+  'defects.actionPlaceholder': { en: 'Recommended action and urgency', es: 'Acción recomendada y urgencia' },
+  'defects.description': { en: 'Description', es: 'Descripción' },
+  'defects.widthCm': { en: 'Width (cm)', es: 'Ancho (cm)' },
+  'defects.heightCm': { en: 'Height (cm)', es: 'Alto (cm)' },
+  'defects.noRecorded': { en: 'No defects recorded', es: 'No se registraron defectos' },
+  'defects.noRecordedDesc': { en: 'Add defects found during the blade inspection.', es: 'Agrega los defectos encontrados durante la inspección de palas.' },
+  'defects.noFound': { en: 'No defects found', es: 'No se encontraron defectos' },
+
+  // ─── Evidence ───────────────────────────────────────────────────────────────
+  'evidence.uploadPhotos': { en: 'Upload evidence photos', es: 'Subir fotos de evidencia' },
+  'evidence.selectPhotos': { en: 'Select photos to upload', es: 'Seleccionar fotos para subir' },
+
+  // ─── Map (additional) ──────────────────────────────────────────────────────
+  'map.loading': { en: 'Loading map data...', es: 'Cargando datos del mapa...' },
+
+  // ─── Miscellaneous UI ───────────────────────────────────────────────────────
+  'misc.selectAllTurbines': { en: 'Select all turbines', es: 'Seleccionar todos los aerogeneradores' },
+  'misc.selectWindFarm': { en: 'Select wind farm', es: 'Seleccionar parque eólico' },
+  'misc.openCalendar': { en: 'Open calendar', es: 'Abrir calendario' },
+  'misc.sendComment': { en: 'Send comment', es: 'Enviar comentario' },
+  'misc.weatherForecast': { en: 'Weather forecast map', es: 'Mapa de pronóstico meteorológico' },
+  'misc.exportDefects': { en: 'Export defects list', es: 'Exportar lista de defectos' },
 };

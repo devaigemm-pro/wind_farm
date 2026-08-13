@@ -140,7 +140,7 @@ export function DefectComments({ defectId, showAll = false }: DefectCommentsProp
           style={sendBtnStyle}
           onClick={handleSubmit}
           disabled={!newComment.trim()}
-          aria-label="Send comment"
+          aria-label={t('misc.sendComment')}
         >
           <Send size={16} />
         </button>

@@ -110,7 +110,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
               <button
                 style={iconBtnStyle}
                 onClick={() => handleDownload(doc)}
-                title="Download"
+                title={t('button.download')}
               >
                 <Download size={14} />
               </button>
@@ -118,7 +118,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
                 <button
                   style={iconBtnStyle}
                   onClick={() => handleDelete(doc)}
-                  title="Delete"
+                  title={t('button.delete')}
                 >
                   <Trash2 size={14} color="var(--color-danger-500)" />
                 </button>

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type DragEvent, useEffect } from 'react';
 import { Upload, X, Trash2, Image as ImageIcon } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 import { useEvidence, useDeleteEvidence } from '@/hooks/useEvidence';
 import { useEvidenceUpload } from '@/hooks/useEvidenceUpload';
 import { evidenceService } from '@/services/evidence.service';
@@ -14,6 +15,7 @@ export interface EvidenceGalleryProps {
 }
 
 export function EvidenceGallery({ inspectionId, canEdit }: EvidenceGalleryProps) {
+  const { t } = useLanguage();
   const { data: evidence, isLoading } = useEvidence(inspectionId);
   const { upload, isPending: isUploading, progress } = useEvidenceUpload(inspectionId);
   const deleteEvidence = useDeleteEvidence();
@@ -130,7 +132,7 @@ export function EvidenceGallery({ inspectionId, canEdit }: EvidenceGalleryProps)
             ...(isDragOver ? styles.dropZoneActive : {}),
           }}
           role="region"
-          aria-label="Upload evidence photos"
+          aria-label={t('evidence.uploadPhotos')}
         >
           <Upload size={24} style={{ color: 'var(--color-neutral-400)' }} aria-hidden="true" />
           <p style={styles.dropText}>
@@ -152,7 +154,7 @@ export function EvidenceGallery({ inspectionId, canEdit }: EvidenceGalleryProps)
             multiple
             onChange={handleFileInput}
             style={{ display: 'none' }}
-            aria-label="Select photos to upload"
+            aria-label={t('evidence.selectPhotos')}
           />
 
           {/* Upload progress */}
@@ -271,6 +273,7 @@ interface LightboxProps {
 }
 
 function Lightbox({ item, onClose }: LightboxProps) {
+  const { t } = useLanguage();
   const fullUrl = evidenceService.getFullUrl(item.storage_path);
   const uploadDate = new Date(item.uploaded_at).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -290,7 +293,7 @@ function Lightbox({ item, onClose }: LightboxProps) {
         <button
           onClick={onClose}
           style={styles.lightboxClose}
-          aria-label="Close lightbox"
+          aria-label={t('general.close')}
           type="button"
         >
           <X size={24} />

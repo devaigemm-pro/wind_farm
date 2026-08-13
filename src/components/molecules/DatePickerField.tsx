@@ -1,5 +1,6 @@
 import { useRef, type CSSProperties } from 'react';
 import { Calendar } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 
 export interface DatePickerFieldProps {
   label: string;
@@ -16,6 +17,7 @@ export function DatePickerField({
   error,
   required = false,
 }: DatePickerFieldProps) {
+  const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const containerStyle: CSSProperties = {
@@ -93,7 +95,7 @@ export function DatePickerField({
           type="button"
           style={iconButtonStyle}
           onClick={() => inputRef.current?.showPicker?.()}
-          aria-label="Open calendar"
+          aria-label={t('misc.openCalendar')}
           tabIndex={-1}
         >
           <Calendar size={16} />

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useLanguage } from '@/components/design-system';
 
 export interface AssetSelectorProps {
   windFarms: { id: string; name: string }[];
@@ -15,6 +16,7 @@ export function AssetSelector({
   isLoading = false,
   disabled = false,
 }: AssetSelectorProps) {
+  const { t } = useLanguage();
   const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
@@ -58,7 +60,7 @@ export function AssetSelector({
         onChange={(e) => onChange(e.target.value)}
         style={selectStyle}
         disabled={disabled || isLoading}
-        aria-label="Select wind farm"
+        aria-label={t('misc.selectWindFarm')}
       >
         {isLoading ? (
           <option value="">Loading...</option>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/atoms';
 import { useSerialNumbers, useUpdateSerialNumbers } from '@/hooks/useWindFarmDetail';
 import { useToast } from '@/store/toastStore';
+import { useLanguage } from '@/components/design-system';
 import type { TurbineSerialNumbers } from '@/types';
 
 export interface TurbineSerialNumbersModalProps {
@@ -16,6 +17,7 @@ export function TurbineSerialNumbersModal({
   onClose,
 }: TurbineSerialNumbersModalProps) {
   const toast = useToast();
+  const { t } = useLanguage();
   const { data: serials, isLoading } = useSerialNumbers(windFarmId);
   const updateMutation = useUpdateSerialNumbers();
   const [localData, setLocalData] = useState<TurbineSerialNumbers[]>([]);
@@ -56,21 +58,21 @@ export function TurbineSerialNumbersModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={modalTitleStyle}>Turbines serial numbers</h2>
+        <h2 style={modalTitleStyle}>{t('button.turbineSerialNumbers')}</h2>
 
         {isLoading ? (
-          <p>Loading...</p>
+          <p>{t('general.loading')}</p>
         ) : (
           <div style={tableWrapperStyle}>
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Turbine</th>
-                  <th style={thStyle}>Blade A</th>
-                  <th style={thStyle}>Blade B</th>
-                  <th style={thStyle}>Blade C</th>
-                  <th style={thStyle}>Tower</th>
+                  <th style={thStyle}>{t('table.name')}</th>
+                  <th style={thStyle}>{t('table.turbine')}</th>
+                  <th style={thStyle}>{`${t('table.blade')} A`}</th>
+                  <th style={thStyle}>{`${t('table.blade')} B`}</th>
+                  <th style={thStyle}>{`${t('table.blade')} C`}</th>
+                  <th style={thStyle}>{t('dashboard.tower')}</th>
                   <th style={thStyle}>Anticlockwise</th>
                 </tr>
               </thead>

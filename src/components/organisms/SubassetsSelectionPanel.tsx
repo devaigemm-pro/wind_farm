@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { Wind } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import type { SubassetSelectionRow } from '@/types';
 
 export interface SubassetsSelectionPanelProps {
@@ -16,6 +17,7 @@ export function SubassetsSelectionPanel({
   selectedIds,
   onSelectionChange,
 }: SubassetsSelectionPanelProps) {
+  const { t } = useLanguage();
   const allSelected = data.length > 0 && selectedIds.length === data.length;
   const someSelected = selectedIds.length > 0 && selectedIds.length < data.length;
 
@@ -125,7 +127,7 @@ export function SubassetsSelectionPanel({
                 onClick={handleMasterToggle}
                 role="checkbox"
                 aria-checked={allSelected ? true : someSelected ? 'mixed' : false}
-                aria-label="Select all turbines"
+                aria-label={t('misc.selectAllTurbines')}
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleMasterToggle(); } }}
               >

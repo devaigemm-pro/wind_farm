@@ -72,7 +72,7 @@ export function TablePagination({
         style={selectStyle}
         value={rowsPerPage}
         onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
-        aria-label="Rows per page"
+        aria-label={t('pagination.rowsPerPage')}
       >
         {rowsPerPageOptions.map((option) => (
           <option key={option} value={option}>
@@ -90,7 +90,7 @@ export function TablePagination({
         style={buttonStyle(!hasPrev)}
         disabled={!hasPrev}
         onClick={() => onPageChange(page - 1)}
-        aria-label="Previous page"
+        aria-label={t('general.previous')}
       >
         <ChevronLeft size={18} />
       </button>
@@ -99,7 +99,7 @@ export function TablePagination({
         style={buttonStyle(!hasNext)}
         disabled={!hasNext}
         onClick={() => onPageChange(page + 1)}
-        aria-label="Next page"
+        aria-label={t('general.next')}
       >
         <ChevronRight size={18} />
       </button>

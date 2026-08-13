@@ -5,6 +5,7 @@ import { TablePagination } from '@/components/molecules/TablePagination';
 import { DefectsTable } from './DefectsTable';
 import { DefectDetailSidebar } from './DefectDetailSidebar';
 import { DefectCompareViewer } from './DefectCompareViewer';
+import { useLanguage } from '@/components/design-system';
 import { useDefectsDashboard } from '@/hooks/useDefectsDashboard';
 import { useDefectResolvedToggle } from '@/hooks/useDefectResolvedToggle';
 import { useDefectUpdate } from '@/hooks/useDefectUpdate';
@@ -17,6 +18,7 @@ export interface DefectsWindFarmsViewProps {
 }
 
 export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps) {
+  const { t } = useLanguage();
   const [sortField, setSortField] = useState<DefectSortField>('assetName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -156,7 +158,7 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-8)' }}>
         <EmptyState
           icon={AlertTriangle}
-          title="No defects found"
+          title={t('defects.noFound')}
           description={searchQuery ? 'Try adjusting your search to find defects.' : 'No defects have been registered yet.'}
         />
       </div>

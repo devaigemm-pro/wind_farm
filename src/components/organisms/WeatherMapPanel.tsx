@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 
 export interface WeatherMapPanelProps {
   latitude: number | null;
@@ -30,6 +31,7 @@ function buildWindyUrl(lat: number, lon: number): string {
 }
 
 export function WeatherMapPanel({ latitude, longitude, isLoading }: WeatherMapPanelProps) {
+  const { t } = useLanguage();
   const containerStyle: CSSProperties = {
     width: '100%',
     height: '100%',
@@ -85,7 +87,7 @@ export function WeatherMapPanel({ latitude, longitude, isLoading }: WeatherMapPa
         style={{ border: 'none', minHeight: '500px' }}
         frameBorder="0"
         allow="geolocation"
-        title="Weather forecast map"
+        title={t('misc.weatherForecast')}
         loading="lazy"
       />
     </div>

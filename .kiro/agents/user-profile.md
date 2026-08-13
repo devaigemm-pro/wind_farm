@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 53
+- **Sesiones analizadas**: 55
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -583,3 +583,12 @@
   - Pasa de un problema no resuelto a otro sin drama — no se queda pegado esperando confirmación del primero, avanza al siguiente
   - El botón usaba `color: var(--color-neutral-700)` que no tenía valor en dark mode tokens → cambió a `var(--color-neutral-800)` que resuelve a verde (#A8E6A8)
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL exacta como referencia, barrido de calidad por pantalla, instrucción precisa (componente + propiedad + valor)
+
+### Sesión 52 - 2026-08-13
+- **Tarea principal**: (1) Botón "cambiar contraseña" sigue con letras azules (deploy pendiente). (2) Pantalla /inspections/reports sigue con fondo blanco — más colores hardcodeados (#F4F6F8, #FAFAFA, rgba negros).
+- **Observaciones nuevas**:
+  - Reporta múltiples problemas en diferentes pantallas en el mismo mensaje — barrido de calidad multi-pantalla (no solo una pantalla por sesión)
+  - Cuando dice "sigue con letras azules" pero el código ya está cambiado, el problema es que Vercel aún estaba building. El usuario no distingue entre "no se desplegó" y "no se corrigió" — para él, si no se ve en producción, no está arreglado.
+  - Segunda ronda de limpieza de colores hardcodeados: Reports tenía rgba(0,0,0,X), #F4F6F8, #FAFAFA, borders con rgba. Otros componentes (DefectEditForm, ExportPanel, InspectStep) también tenían residuos.
+  - El approach correcto desde la PRIMERA sesión hubiera sido: `grep -rn "#F\|#f\|rgba(0" src/ --include="*.tsx"` para encontrar TODO de una vez.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL exacta como referencia, barrido de calidad multi-pantalla, frustración acumulada cuando el problema persiste

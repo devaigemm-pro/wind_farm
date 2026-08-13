@@ -185,6 +185,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   // drawPhase: 'idle' → 'drawing-line' (mousedown+drag) → 'expanding' (after mouseup, move to set width) → 'idle' (click confirms)
   const [drawPhase, setDrawPhase] = useState<'idle' | 'drawing-line' | 'expanding'>('idle');
   const [drawWidth, setDrawWidth] = useState(3); // perpendicular width in % units
+  const [drawShape, setDrawShape] = useState<'rect' | 'oval'>('rect');
   const isMouseDownRef = useRef(false);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
@@ -612,6 +613,17 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             <button style={{ ...flagBtnStyle, background: taggedPhotos.has(selectedThumbnail) ? 'rgba(255, 235, 59, 0.2)' : 'transparent' }} title="Flag" onClick={handleToggleFlag}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFEB3B"><path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
             </button>
+            )}
+            {/* Shape toggle: rect / oval */}
+            {role !== 'supervisor' && (
+            <div style={{ display: 'flex', border: `1px solid ${C.primary}`, borderRadius: 4, overflow: 'hidden', marginLeft: 4 }}>
+              <button onClick={() => setDrawShape('rect')} style={{ padding: '4px 8px', background: drawShape === 'rect' ? C.primary : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Rectangle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={drawShape === 'rect' ? '#fff' : C.primary}><path d="M3 5v14h18V5H3zm16 12H5V7h14v10z"/></svg>
+              </button>
+              <button onClick={() => setDrawShape('oval')} style={{ padding: '4px 8px', background: drawShape === 'oval' ? C.primary : 'transparent', border: 'none', borderLeft: `1px solid ${C.primary}`, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Oval">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={drawShape === 'oval' ? '#fff' : C.primary}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>
+              </button>
+            </div>
             )}
           </div>
 
@@ -1061,7 +1073,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 </div>
               </div>
               {/* Rectangle border */}
-              <div style={{ width: '100%', height: '100%', border: '2.5px solid #FFA500', background: 'rgba(255, 165, 0, 0.08)' }} />
+              <div style={{ width: '100%', height: '100%', border: '2.5px solid #FF6600', background: 'rgba(255, 102, 0, 0.08)' }} />
               {/* Size label below */}
               <span style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, fontSize: 13, fontWeight: 600, color: '#fff', fontStyle: 'italic', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
                 {Math.round(ann.w * 1.5)} x {Math.round(ann.h * 1.3)} cm
@@ -1092,7 +1104,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   <line
                     x1={drawStart.x} y1={drawStart.y}
                     x2={drawEnd.x} y2={drawEnd.y}
-                    stroke="#FFA500" strokeWidth="0.3" strokeLinecap="round"
+                    stroke="#FF6600" strokeWidth="0.3" strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                   />
                 </svg>
@@ -1122,17 +1134,32 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 <line
                   x1={drawStart.x} y1={drawStart.y}
                   x2={drawEnd.x} y2={drawEnd.y}
-                  stroke="#FFA500" strokeWidth="0.15" strokeDasharray="0.5 0.3" opacity="0.6"
+                  stroke="#FF6600" strokeWidth="0.15" strokeDasharray="0.5 0.3" opacity="0.7"
                   vectorEffect="non-scaling-stroke"
                 />
-                {/* Rectangle as polygon */}
-                <polygon
-                  points={`${p1x},${p1y} ${p2x},${p2y} ${p3x},${p3y} ${p4x},${p4y}`}
-                  fill="rgba(255, 165, 0, 0.1)"
-                  stroke="#FFA500"
-                  strokeWidth="0.3"
-                  vectorEffect="non-scaling-stroke"
-                />
+                {drawShape === 'rect' ? (
+                  /* Rectangle as polygon */
+                  <polygon
+                    points={`${p1x},${p1y} ${p2x},${p2y} ${p3x},${p3y} ${p4x},${p4y}`}
+                    fill="rgba(255, 102, 0, 0.12)"
+                    stroke="#FF6600"
+                    strokeWidth="0.3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ) : (
+                  /* Oval/ellipse */
+                  <ellipse
+                    cx={(drawStart.x + drawEnd.x) / 2}
+                    cy={(drawStart.y + drawEnd.y) / 2}
+                    rx={w / 2}
+                    ry={halfH}
+                    fill="rgba(255, 102, 0, 0.12)"
+                    stroke="#FF6600"
+                    strokeWidth="0.3"
+                    vectorEffect="non-scaling-stroke"
+                    transform={`rotate(${Math.atan2(dy, dx) * (180 / Math.PI)} ${(drawStart.x + drawEnd.x) / 2} ${(drawStart.y + drawEnd.y) / 2})`}
+                  />
+                )}
               </svg>
             );
           })()}

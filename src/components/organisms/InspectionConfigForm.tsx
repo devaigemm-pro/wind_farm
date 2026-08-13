@@ -120,7 +120,7 @@ export function InspectionConfigForm({
       <div>
         <div style={fieldLabelStyle}>{t('inspectionForm.method')}</div>
         <SegmentedControl
-          name="Inspection method"
+          name={t('inspectionForm.method')}
           options={[
             { value: 'skyvisor', label: t('inspectionForm.coreInsight') },
             { value: 'external', label: t('inspectionForm.external') },
@@ -150,7 +150,7 @@ export function InspectionConfigForm({
           value={campaignName}
           onChange={(e) => onCampaignNameChange(e.target.value)}
           style={inputStyle}
-          aria-label="Campaign name"
+          aria-label={t('inspectionForm.campaignName')}
           aria-required="true"
           aria-invalid={!!errors.campaignName}
         />
@@ -165,7 +165,7 @@ export function InspectionConfigForm({
           onChange={(e) => onNotesChange(e.target.value)}
           style={textareaStyle}
           placeholder=""
-          aria-label="Notes"
+          aria-label={t('inspectionForm.notes')}
         />
       </div>
 
