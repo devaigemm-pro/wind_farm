@@ -100,9 +100,16 @@ async function fetchInspectionPhotos(
 
         if (originalResult.data) {
           for (let j = 0; j < originalResult.data.length; j++) {
-            const url = originalResult.data[j]?.signedUrl;
-            if (url) {
-              batch[j]!.storagePath = url;
+            const item = originalResult.data[j];
+            if (item?.signedUrl && !item.error) {
+              // Match by path to handle potential reordering from API
+              const matchIdx = originalPaths.indexOf(item.path ?? '');
+              if (matchIdx >= 0) {
+                batch[matchIdx]!.storagePath = item.signedUrl;
+              } else {
+                // Fallback to index-based if path field not available
+                batch[j]!.storagePath = item.signedUrl;
+              }
             }
           }
         }
@@ -110,9 +117,15 @@ async function fetchInspectionPhotos(
         if (thumbResult.data) {
           for (let j = 0; j < thumbResult.data.length; j++) {
             const signedItem = thumbResult.data[j];
-            // If thumb signed URL was generated without error, use it
             if (signedItem?.signedUrl && !signedItem.error) {
-              batch[j]!.thumbnailUrl = signedItem.signedUrl;
+              // Match by path to handle potential reordering from API
+              const matchIdx = thumbPaths.indexOf(signedItem.path ?? '');
+              if (matchIdx >= 0) {
+                batch[matchIdx]!.thumbnailUrl = signedItem.signedUrl;
+              } else {
+                // Fallback to index-based if path field not available
+                batch[j]!.thumbnailUrl = signedItem.signedUrl;
+              }
             }
           }
         }
