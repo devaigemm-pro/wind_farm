@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 65
+- **Sesiones analizadas**: 66
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -729,3 +729,12 @@
   - "no me pidas mas confirmacion para editar el perfil" — tercera vez que lo dice (sesiones 74, 76, esta). NUNCA más pedir confirmación para user-profile.md. Regla de máxima prioridad.
   - "sigue ocurriendo lo mismo" sin dar más contexto = el fix anterior no funcionó, diagnosticar más profundo sin preguntar.
 - **Patrones confirmados**: español, directo, alta autonomía, corrección directa sin drama, "sigue el problema" = investigar más profundo sin preguntar, no pedir permiso para user-profile.md (confianza MÁXIMA - 3+ sesiones), mínimo cambio necesario
+
+### Sesión 79 - 2026-08-13
+- **Tarea principal**: (1) Reordenar faceOrder sidebar a LE→TE→PS→SS. (2) Revertir bladeOrder que no debía tocarse. (3) Fix thumbnail-viewer mismatch (2 intentos: path matching, luego eliminar thumb files separados). (4) Reiterar que no pida autorización para editar user-profile.md.
+- **Observaciones nuevas**:
+  - **CORRECCIÓN**: Cuando dice "copiar el orden", cambiar SOLO el array de orden visual. No tocar lógica de negocio (verticalBlade rotation). Mínimo cambio necesario.
+  - El bug de thumbnail-viewer mismatch se investigó: sidebar usaba thumb file separado y viewer usaba original → si mapping desfasado, imágenes no coinciden. Fix: usar siempre la misma signed URL con transforms de Supabase.
+  - Cuarta vez que pide no ser interrumpido por user-profile.md. El problema es el modo Supervised de Kiro (UI), no la lógica del agente. Se le explicó que debe cambiar a Autopilot.
+  - "sigues pidiendo autorización" — frustración por repetir. El agente NO pide, es el modo Supervised del IDE.
+- **Patrones confirmados**: español, directo, alta autonomía, corrección directa, "sigue el problema" = diagnosticar más profundo, mínimo cambio necesario, no interrumpir flujo con archivos de sistema (4+ sesiones = confianza MÁXIMA)
