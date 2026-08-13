@@ -179,6 +179,10 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawEnd, setDrawEnd] = useState<{ x: number; y: number } | null>(null);
+  const [drawConfirmed, setDrawConfirmed] = useState(false);
+  // drawPhase: 'idle' → 'drawing-line' (mousedown+drag) → 'expanding' (after mouseup, move to set width) → 'idle' (click confirms)
+  const [drawPhase, setDrawPhase] = useState<'idle' | 'drawing-line' | 'expanding'>('idle');
+  const [drawWidth, setDrawWidth] = useState(3); // perpendicular width in % units
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
   const [editSide, setEditSide] = useState('LE');
@@ -781,15 +785,19 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
             const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
 
-            if (!drawStart || drawEnd) {
-              // First click: set start point
+            if (drawPhase === 'expanding') {
+              // Click confirms the width → open popover
+              setDrawConfirmed(true);
+              setDrawPhase('idle');
+              setShowAnnotationPopover(true);
+            } else {
+              // Start drawing a new line (Phase 1)
               setDrawStart({ x: imgX, y: imgY });
               setDrawEnd(null);
+              setDrawConfirmed(false);
+              setDrawWidth(3);
+              setDrawPhase('drawing-line');
               setShowEditPopover(false);
-            } else {
-              // Second click: set end point and open popover
-              setDrawEnd({ x: imgX, y: imgY });
-              setShowAnnotationPopover(true);
             }
           }}
           onMouseMove={(e) => {
@@ -800,21 +808,52 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setPanOffset({ x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy });
               return;
             }
-            // Live preview: update drawEnd position while moving after first click
-            if (drawStart && !drawEnd) {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const rawX = e.clientX - rect.left;
-              const rawY = e.clientY - rect.top;
-              const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
-              const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const rawX = e.clientX - rect.left;
+            const rawY = e.clientY - rect.top;
+            const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
+            const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
+
+            if (drawPhase === 'drawing-line' && drawStart) {
+              // Phase 1: update line endpoint as user drags
               setDrawEnd({ x: imgX, y: imgY });
+            } else if (drawPhase === 'expanding' && drawStart && drawEnd) {
+              // Phase 2: compute perpendicular distance from mouse to the line
+              const dx = drawEnd.x - drawStart.x;
+              const dy = drawEnd.y - drawStart.y;
+              const lineLen = Math.sqrt(dx * dx + dy * dy);
+              if (lineLen > 0) {
+                // Perpendicular distance from mouse point to line
+                const cx = (drawStart.x + drawEnd.x) / 2;
+                const cy = (drawStart.y + drawEnd.y) / 2;
+                // Normal vector (perpendicular to line)
+                const nx = -dy / lineLen;
+                const ny = dx / lineLen;
+                // Distance from mouse to center, projected onto normal
+                const projDist = Math.abs((imgX - cx) * nx + (imgY - cy) * ny);
+                setDrawWidth(Math.max(projDist * 2, 2));
+              }
             }
           }}
-          onMouseUp={() => {
+          onMouseUp={(e) => {
             if (isPanning) {
               setIsPanning(false);
               panStartRef.current = null;
               return;
+            }
+            // End of line drawing → transition to expanding phase
+            if (drawPhase === 'drawing-line' && drawStart && drawEnd) {
+              const dx = drawEnd.x - drawStart.x;
+              const dy = drawEnd.y - drawStart.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist > 1) {
+                setDrawPhase('expanding');
+              } else {
+                // Too short, cancel
+                setDrawStart(null);
+                setDrawEnd(null);
+                setDrawPhase('idle');
+              }
             }
           }}
           onMouseLeave={() => {
@@ -1153,7 +1192,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setEditingAnnotationId(null); setSaveError(null); }}>Cancel</button>
+              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setEditingAnnotationId(null); setSaveError(null); }}>Cancel</button>
               {editingAnnotationId !== null && (
                 <button style={{ ...confirmBtnStyle, background: '#F15959' }} onClick={() => {
                   
@@ -1161,6 +1200,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   deleteAnnotation.mutate(editingAnnotationId);
                   setDrawStart(null);
                   setDrawEnd(null);
+                  setDrawConfirmed(false);
                   setEditingAnnotationId(null);
                   setShowAnnotationPopover(false);
                   setAnnotationNote('');
@@ -1208,6 +1248,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 }
                 setDrawStart(null);
                 setDrawEnd(null);
+                setDrawConfirmed(false);
                 setEditingAnnotationId(null);
                 setShowAnnotationPopover(false);
                 setAnnotationNote('');
@@ -1300,6 +1341,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             }
             setDrawStart(null);
             setDrawEnd(null);
+            setDrawConfirmed(false);
           }}>Save</button>
           )}
         </div>

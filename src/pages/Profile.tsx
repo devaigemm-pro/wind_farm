@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Building, Key, Wind, Sun } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/store/toastStore';
+import { useLanguage } from '@/components/design-system';
 import { CampaignMap } from '@/components/organisms/CampaignMap';
 import { Skeleton } from '@/components/atoms';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 export function Profile() {
   const { data: profileData, isLoading } = useProfile();
   const toast = useToast();
+  const { t } = useLanguage();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -38,11 +40,11 @@ export function Profile() {
 
   // Password validation rules
   const passwordRules = useMemo(() => [
-    { label: 'Password must have at least 8 characters', valid: newPassword.length >= 8 },
-    { label: 'Password must have at least 1 lowercase character', valid: /[a-z]/.test(newPassword) },
-    { label: 'Password must have at least 1 uppercase character', valid: /[A-Z]/.test(newPassword) },
-    { label: 'Password must have at least 1 number or 1 special character', valid: /[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword) },
-  ], [newPassword]);
+    { label: t('profile.passwordMinChars'), valid: newPassword.length >= 8 },
+    { label: t('profile.passwordLowercase'), valid: /[a-z]/.test(newPassword) },
+    { label: t('profile.passwordUppercase'), valid: /[A-Z]/.test(newPassword) },
+    { label: t('profile.passwordNumberSpecial'), valid: /[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword) },
+  ], [newPassword, t]);
 
   const passwordsMatch = newPassword.length > 0 && confirmPassword.length > 0 && newPassword === confirmPassword;
   const showMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
@@ -59,20 +61,20 @@ export function Profile() {
         password: existingPassword,
       });
       if (signInError) {
-        toast.error('Current password is incorrect');
+        toast.error(t('toast.passwordIncorrect'));
         setPasswordUpdating(false);
         return;
       }
       // Update to new password
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) {
-        toast.error('Failed to update password');
+        toast.error(t('toast.passwordUpdateFailed'));
       } else {
-        toast.success('Password updated successfully');
+        toast.success(t('toast.passwordUpdated'));
         handleCancelPassword();
       }
     } catch {
-      toast.error('Failed to update password');
+      toast.error(t('toast.passwordUpdateFailed'));
     }
     setPasswordUpdating(false);
   };
@@ -100,7 +102,7 @@ export function Profile() {
     <div style={pageStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <h1 style={titleStyle}>My profile</h1>
+        <h1 style={titleStyle}>{t('page.profile')}</h1>
       </div>
 
       {/* Content - 2 columns */}
@@ -110,7 +112,7 @@ export function Profile() {
           {/* Card 1: Account information */}
           <div style={cardStyle}>
             <div style={cardHeaderStyle}>
-              <h2 style={cardTitleStyle}>Account information</h2>
+              <h2 style={cardTitleStyle}>{t('profile.accountInfo')}</h2>
             </div>
 
             <div style={cardBodyStyle}>
@@ -125,7 +127,7 @@ export function Profile() {
               {/* Form fields */}
               <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>First name *</label>
+                  <label style={labelStyle}>{t('profile.firstName')}</label>
                   <input
                     type="text"
                     value={firstName}
@@ -135,7 +137,7 @@ export function Profile() {
                   />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Last name *</label>
+                  <label style={labelStyle}>{t('profile.lastName')}</label>
                   <input
                     type="text"
                     value={lastName}
@@ -148,7 +150,7 @@ export function Profile() {
 
               {/* Email */}
               <div>
-                <label style={labelStyle}>Email</label>
+                <label style={labelStyle}>{t('profile.email')}</label>
                 <input
                   type="email"
                   value={profileData?.email ?? ''}
@@ -165,13 +167,13 @@ export function Profile() {
                     style={outlinedBtnStyle}
                   >
                     <Key size={14} />
-                    Change password
+                    {t('button.changePassword')}
                   </button>
                 </div>
               ) : (
                 <div style={passwordFormStyle}>
                   <div>
-                    <label style={labelStyle}>Existing password *</label>
+                    <label style={labelStyle}>{t('profile.existingPassword')}</label>
                     <input
                       type="password"
                       value={existingPassword}
@@ -182,7 +184,7 @@ export function Profile() {
                     />
                   </div>
                   <div>
-                    <label style={labelStyle}>New password *</label>
+                    <label style={labelStyle}>{t('profile.newPassword')}</label>
                     <input
                       type="password"
                       value={newPassword}
@@ -193,7 +195,7 @@ export function Profile() {
                     />
                   </div>
                   <div>
-                    <label style={labelStyle}>Confirm new password *</label>
+                    <label style={labelStyle}>{t('profile.confirmPassword')}</label>
                     <input
                       type="password"
                       value={confirmPassword}
@@ -203,7 +205,7 @@ export function Profile() {
                       required
                     />
                     {showMismatch && (
-                      <span style={mismatchText}>Passwords do not match</span>
+                      <span style={mismatchText}>{t('profile.passwordsNoMatch')}</span>
                     )}
                   </div>
 
@@ -224,7 +226,7 @@ export function Profile() {
                       onClick={handleCancelPassword}
                       style={cancelBtnStyle}
                     >
-                      Cancel
+                      {t('button.cancel')}
                     </button>
                     <button
                       type="button"
@@ -236,7 +238,7 @@ export function Profile() {
                         cursor: allPasswordValid && !passwordUpdating ? 'pointer' : 'not-allowed',
                       }}
                     >
-                      Update password
+                      {t('button.updatePassword')}
                     </button>
                   </div>
                 </div>
@@ -252,12 +254,12 @@ export function Profile() {
                 <Wind size={20} color="var(--color-primary-500, #1B4B7A)" />
               </div>
               <div style={{ flex: 1 }}>
-                <h3 style={assetTitleStyle}>Wind</h3>
+                <h3 style={assetTitleStyle}>{t('profile.wind')}</h3>
                 <p style={assetStatStyle}>
-                  {profileData?.windFarms?.length ?? 0} asset{(profileData?.windFarms?.length ?? 0) !== 1 ? 's' : ''}
+                  {profileData?.windFarms?.length ?? 0} {(profileData?.windFarms?.length ?? 0) !== 1 ? t('profile.assets') : t('profile.asset')}
                 </p>
                 <p style={assetStatStyle}>
-                  {(profileData?.totalPowerKw ?? 0).toLocaleString()} kW of total power
+                  {(profileData?.totalPowerKw ?? 0).toLocaleString()} {t('profile.totalPower')}
                 </p>
               </div>
             </div>
@@ -268,8 +270,8 @@ export function Profile() {
                 <Sun size={20} color="#f59e0b" />
               </div>
               <div style={{ flex: 1 }}>
-                <h3 style={assetTitleStyle}>Solar</h3>
-                <p style={assetStatStyle}>No assets</p>
+                <h3 style={assetTitleStyle}>{t('profile.solar')}</h3>
+                <p style={assetStatStyle}>{t('profile.noAssets')}</p>
               </div>
             </div>
           </div>

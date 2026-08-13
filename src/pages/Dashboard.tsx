@@ -16,29 +16,30 @@ import {
   SubassetsStatusChart,
 } from '@/components/organisms/charts';
 import { FilterSelect } from '@/components/atoms/FilterSelect';
-
-// Asset type options — "Type(s)" refers to sub-asset types in Skyvisor
-const TYPE_OPTIONS = [
-  { label: 'All Types', value: '' },
-  { label: 'Blades', value: 'blades' },
-  { label: 'Tower', value: 'tower' },
-  { label: 'Nacelle', value: 'nacelle' },
-];
-
-const SEVERITY_OPTIONS = [
-  { label: 'All', value: '' },
-  { label: 'Severity 1', value: '1' },
-  { label: 'Severity 2', value: '2' },
-  { label: 'Severity 3', value: '3' },
-  { label: 'Severity 4', value: '4' },
-  { label: 'Severity 5', value: '5' },
-];
+import { useLanguage } from '@/components/design-system';
 
 export default function Dashboard() {
+  const { t } = useLanguage();
   const { data: filterOptions } = useDashboardFilters();
 
-  const FARM_OPTIONS = filterOptions?.farmOptions ?? [{ label: 'All Farms', value: '' }];
-  const MODEL_OPTIONS = filterOptions?.modelOptions ?? [{ label: 'All Models', value: '' }];
+  const TYPE_OPTIONS = [
+    { label: t('dashboard.allTypes'), value: '' },
+    { label: t('dashboard.blades'), value: 'blades' },
+    { label: t('dashboard.tower'), value: 'tower' },
+    { label: t('dashboard.nacelle'), value: 'nacelle' },
+  ];
+
+  const SEVERITY_OPTIONS = [
+    { label: t('dashboard.allSeverities'), value: '' },
+    { label: `${t('dashboard.severity')} 1`, value: '1' },
+    { label: `${t('dashboard.severity')} 2`, value: '2' },
+    { label: `${t('dashboard.severity')} 3`, value: '3' },
+    { label: `${t('dashboard.severity')} 4`, value: '4' },
+    { label: `${t('dashboard.severity')} 5`, value: '5' },
+  ];
+
+  const FARM_OPTIONS = filterOptions?.farmOptions ?? [{ label: t('dashboard.allFarms'), value: '' }];
+  const MODEL_OPTIONS = filterOptions?.modelOptions ?? [{ label: t('dashboard.allModels'), value: '' }];
 
   // ─── Inspection Pipeline filters (Type only) ────────────────────────
   const [pipelineType, setPipelineType] = useState('');
@@ -88,7 +89,7 @@ export default function Dashboard() {
 
   const pipelineFilterSlot = (
     <FilterSelect
-      label="Type(s)"
+      label={t('dashboard.filterTypes')}
       value={pipelineType}
       options={TYPE_OPTIONS}
       onChange={setPipelineType}
@@ -98,25 +99,25 @@ export default function Dashboard() {
   const defectsFilterSlot = (
     <>
       <FilterSelect
-        label="Type(s)"
+        label={t('dashboard.filterTypes')}
         value={defectsType}
         options={TYPE_OPTIONS}
         onChange={setDefectsType}
       />
       <FilterSelect
-        label="Farm(s)"
+        label={t('dashboard.filterFarms')}
         value={defectsFarm}
         options={FARM_OPTIONS}
         onChange={setDefectsFarm}
       />
       <FilterSelect
-        label="Model(s)"
+        label={t('dashboard.filterModels')}
         value={defectsModel}
         options={MODEL_OPTIONS}
         onChange={setDefectsModel}
       />
       <FilterSelect
-        label="Severity"
+        label={t('dashboard.filterSeverity')}
         value={defectsSeverity}
         options={SEVERITY_OPTIONS}
         onChange={setDefectsSeverity}
@@ -127,13 +128,13 @@ export default function Dashboard() {
   const opsFilterSlot = (
     <>
       <FilterSelect
-        label="Type(s)"
+        label={t('dashboard.filterTypes')}
         value={opsType}
         options={TYPE_OPTIONS}
         onChange={setOpsType}
       />
       <FilterSelect
-        label="Farm(s)"
+        label={t('dashboard.filterFarms')}
         value={opsFarm}
         options={FARM_OPTIONS}
         onChange={setOpsFarm}
@@ -143,7 +144,7 @@ export default function Dashboard() {
 
   const subassetFilterSlot = (
     <FilterSelect
-      label="Type(s)"
+      label={t('dashboard.filterTypes')}
       value={subassetType}
       options={TYPE_OPTIONS}
       onChange={setSubassetType}
@@ -154,13 +155,13 @@ export default function Dashboard() {
     <div className="dashboard-page">
       {/* Header row */}
       <div className="dashboard-header">
-        <h1 className="dashboard-title">Dashboard</h1>
+        <h1 className="dashboard-title">{t('page.dashboard')}</h1>
       </div>
 
       {/* Top row: pipeline (smaller) + defects spread (larger) */}
       <div className="dashboard-grid dashboard-grid--top">
         <ChartCard
-          title="Inspection Pipeline"
+          title={t('dashboard.chartPipeline')}
           isLoading={pipeline.isLoading}
           isError={pipeline.isError}
           isEmpty={!pipeline.data || pipeline.data.length === 0}
@@ -170,7 +171,7 @@ export default function Dashboard() {
         </ChartCard>
 
         <ChartCard
-          title="Defects Spread"
+          title={t('dashboard.chartDefects')}
           isLoading={defects.isLoading}
           isError={defects.isError}
           isEmpty={!defects.data || defects.data.length === 0}
@@ -184,7 +185,7 @@ export default function Dashboard() {
       {/* Bottom row: operations (larger) + subassets status (smaller) */}
       <div className="dashboard-grid dashboard-grid--bottom">
         <ChartCard
-          title="Inspection Operations"
+          title={t('dashboard.chartOperations')}
           isLoading={operations.isLoading}
           isError={operations.isError}
           isEmpty={!operations.data || operations.data.length === 0}
@@ -195,7 +196,7 @@ export default function Dashboard() {
         </ChartCard>
 
         <ChartCard
-          title="Sub-assets Status"
+          title={t('dashboard.chartSubassets')}
           isLoading={subassets.isLoading}
           isError={subassets.isError}
           isEmpty={!subassets.data || subassets.data.length === 0}

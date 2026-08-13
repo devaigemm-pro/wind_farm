@@ -4,6 +4,7 @@ import { Plus, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { Button, Badge, Skeleton } from '@/components/atoms';
 import { FilterChip, EmptyState } from '@/components/molecules';
 import { useInspections } from '@/hooks/useInspections';
+import { useLanguage } from '@/components/design-system';
 import type { InspectionFilters } from '@/services/inspections.service';
 import type { InspectionStatus } from '@/types';
 import type { BadgeVariant } from '@/components/atoms';
@@ -18,18 +19,19 @@ const STATUS_BADGE_MAP: Record<InspectionStatus, BadgeVariant> = {
   approved: 'neutral',
 };
 
-const STATUS_LABELS: Record<InspectionStatus, string> = {
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  approved: 'Approved',
-};
-
 function truncateId(id: string): string {
   return id.length > 8 ? `${id.slice(0, 8)}…` : id;
 }
 
 export function Inspections() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+
+  const STATUS_LABELS: Record<InspectionStatus, string> = {
+    in_progress: t('status.inProgress'),
+    completed: t('status.completed'),
+    approved: t('status.approved'),
+  };
 
   // Filter state
   const [filters, setFilters] = useState<InspectionFilters>({});
@@ -259,14 +261,14 @@ export function Inspections() {
     return (
       <div style={pageStyle}>
         <div style={headerStyle}>
-          <h1 style={headerTitleStyle}>Inspections</h1>
+          <h1 style={headerTitleStyle}>{t('page.inspections')}</h1>
           <Button
             variant="primary"
             size="sm"
             icon={Plus}
             onClick={() => navigate('/inspections/new')}
           >
-            New Inspection
+            {t('button.newInspection')}
           </Button>
         </div>
         <div style={filterBarStyle}>
@@ -293,14 +295,14 @@ export function Inspections() {
     <div style={pageStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <h1 style={headerTitleStyle}>Inspections</h1>
+        <h1 style={headerTitleStyle}>{t('page.inspections')}</h1>
         <Button
           variant="primary"
           size="sm"
           icon={Plus}
           onClick={() => navigate('/inspections/new')}
         >
-          New Inspection
+          {t('button.newInspection')}
         </Button>
       </div>
 
@@ -312,7 +314,7 @@ export function Inspections() {
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Filter by status"
         >
-          <option value="">All Statuses</option>
+          <option value="">{t('inspections.allStatuses')}</option>
           {INSPECTION_STATUSES.map((status) => (
             <option key={status} value={status}>
               {STATUS_LABELS[status]}
@@ -339,7 +341,7 @@ export function Inspections() {
         />
 
         <Button variant="secondary" size="sm" onClick={handleApplyFilters}>
-          Apply
+          {t('button.apply')}
         </Button>
       </div>
 
@@ -355,7 +357,7 @@ export function Inspections() {
             />
           ))}
           <Button variant="ghost" size="sm" onClick={handleClearAllFilters}>
-            Clear all
+            {t('button.clearAll')}
           </Button>
         </div>
       )}
@@ -364,16 +366,16 @@ export function Inspections() {
       {showEmptyState ? (
         <EmptyState
           icon={ClipboardList}
-          title="No inspections found"
+          title={t('inspections.noFound')}
           description={
             activeFilters.length > 0
-              ? 'Try adjusting your filters to find inspections.'
-              : 'Create your first inspection to get started.'
+              ? t('inspections.noFoundFilterDesc')
+              : t('inspections.noFoundDesc')
           }
           action={
             activeFilters.length === 0
               ? {
-                  label: 'New Inspection',
+                  label: t('button.newInspection'),
                   onClick: () => navigate('/inspections/new'),
                 }
               : undefined
@@ -397,10 +399,10 @@ export function Inspections() {
                         : 'none'
                     }
                   >
-                    ID{sortIndicator('created_at')}
+                    {t('table.id')}{sortIndicator('created_at')}
                   </th>
-                  <th style={{ ...thStyle, cursor: 'default' }}>Blade</th>
-                  <th style={{ ...thStyle, cursor: 'default' }}>Farm</th>
+                  <th style={{ ...thStyle, cursor: 'default' }}>{t('table.blade')}</th>
+                  <th style={{ ...thStyle, cursor: 'default' }}>{t('table.farm')}</th>
                   <th
                     style={thStyle}
                     onClick={() => handleSort('scheduled_date')}
@@ -412,7 +414,7 @@ export function Inspections() {
                         : 'none'
                     }
                   >
-                    Date{sortIndicator('scheduled_date')}
+                    {t('table.date')}{sortIndicator('scheduled_date')}
                   </th>
                   <th
                     style={thStyle}
@@ -425,9 +427,9 @@ export function Inspections() {
                         : 'none'
                     }
                   >
-                    Status{sortIndicator('status')}
+                    {t('table.status')}{sortIndicator('status')}
                   </th>
-                  <th style={{ ...thStyle, cursor: 'default' }}>Inspector</th>
+                  <th style={{ ...thStyle, cursor: 'default' }}>{t('table.inspector')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -485,7 +487,7 @@ export function Inspections() {
               aria-label="Previous page"
             />
             <span style={pageIndicatorStyle}>
-              Page {page} of {totalPages || 1}
+              {t('inspections.page')} {page} {t('general.of')} {totalPages || 1}
             </span>
             <Button
               variant="secondary"

@@ -10,6 +10,7 @@ import { ExportButton } from '@/components/atoms/ExportButton';
 import { useWindFarmsDashboard } from '@/hooks/useWindFarmsDashboard';
 import { useWindFarms } from '@/hooks/useWindFarms';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import { defectsService } from '@/services/defects.service';
 import { generateDefectsXLSX, downloadBlob } from '@/utils/csv-export';
 import { Wind } from 'lucide-react';
@@ -24,6 +25,7 @@ const TABS = [
 export function WindFarmsDashboard() {
   const navigate = useNavigate();
   const { role } = useAuth();
+  const { t } = useLanguage();
 
   // Supervisor can only see specific wind farm(s)
   const SUPERVISOR_ALLOWED_FARMS = ['f0000000-0001-4000-8000-000000000001'];
@@ -192,11 +194,11 @@ export function WindFarmsDashboard() {
     <div style={pageStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Wind Farms</h1>
+        <h1 style={titleStyle}>{t('page.windFarms')}</h1>
         <div style={searchContainerStyle}>
           <SearchBar
             onSearch={handleSearch}
-            placeholder="Search all and filter"
+            placeholder={t('windFarms.searchPlaceholder')}
             debounceMs={300}
           />
         </div>
@@ -206,7 +208,11 @@ export function WindFarmsDashboard() {
       {/* Content Card */}
       <div style={contentStyle}>
         {/* Tabs */}
-        <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+        <TabBar tabs={[
+          { id: 'assets', label: t('windFarms.tabAssets') },
+          { id: 'defects', label: t('windFarms.tabDefects') },
+          { id: 'globalMap', label: t('windFarms.tabGlobalMap') },
+        ]} activeTab={activeTab} onChange={setActiveTab} />
 
         {/* Tab Panels */}
         {activeTab === 'assets' && (
@@ -219,8 +225,8 @@ export function WindFarmsDashboard() {
             {!isLoading && totalCount === 0 && searchQuery ? (
               <EmptyState
                 icon={Wind}
-                title="No wind farms found"
-                description="Try adjusting your search to find wind farms."
+                title={t('windFarms.noFound')}
+                description={t('windFarms.noFoundDesc')}
               />
             ) : (
               <>

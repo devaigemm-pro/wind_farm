@@ -13,6 +13,7 @@ import { useCreateWindFarm, useUpdateWindFarm, useDeleteWindFarm } from '@/hooks
 import { useCreateTurbine, useUpdateTurbine, useDeleteTurbine } from '@/hooks/useTurbines';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/store/toastStore';
+import { useLanguage } from '@/components/design-system';
 import { AssetServiceError } from '@/services/assets.service';
 import type { WindFarm, Turbine, Blade } from '@/types';
 import type { WindFarmFormData } from '@/utils/validation';
@@ -24,6 +25,7 @@ type FormMode = 'create_wind_farm' | 'edit_wind_farm' | 'create_turbine' | 'edit
 export function Assets() {
   const { role } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
 
   // Tree data
   const { data: treeData, isLoading: treeLoading } = useAssetTree();
@@ -123,7 +125,7 @@ export function Assets() {
       } else if (selectedType === 'turbine') {
         await deleteTurbine.mutateAsync(selectedId);
       }
-      toast.success(`${selectedType === 'wind_farm' ? 'Wind farm' : 'Turbine'} deleted successfully`);
+      toast.success(`${selectedType === 'wind_farm' ? t('toast.windFarmDeleted') : t('toast.turbineDeleted')}`);
       setSelectedId(null);
       setSelectedType(null);
       setMobileShowDetail(false);
@@ -131,7 +133,7 @@ export function Assets() {
       if (err instanceof AssetServiceError && err.code === '23503') {
         toast.error(err.message);
       } else {
-        toast.error('Failed to delete asset. Please try again.');
+        toast.error(t('toast.deleteAssetFailed'));
       }
     } finally {
       setShowConfirmDelete(false);
@@ -147,17 +149,17 @@ export function Assets() {
       try {
         if (formMode === 'create_wind_farm') {
           await createWindFarm.mutateAsync(data);
-          toast.success('Wind farm created successfully');
+          toast.success(t('toast.windFarmCreated'));
         } else if (formMode === 'edit_wind_farm' && selectedId) {
           await updateWindFarm.mutateAsync({ id: selectedId, input: data });
-          toast.success('Wind farm updated successfully');
+          toast.success(t('toast.windFarmUpdated'));
         }
         setFormMode(null);
       } catch (err) {
         if (err instanceof AssetServiceError) {
           toast.error(err.message);
         } else {
-          toast.error('Failed to save wind farm. Please try again.');
+          toast.error(t('toast.saveWindFarmFailed'));
         }
       }
     },
@@ -169,17 +171,17 @@ export function Assets() {
       try {
         if (formMode === 'create_turbine') {
           await createTurbine.mutateAsync(data);
-          toast.success('Turbine created successfully');
+          toast.success(t('toast.turbineCreated'));
         } else if (formMode === 'edit_turbine' && selectedId) {
           await updateTurbine.mutateAsync({ id: selectedId, input: data });
-          toast.success('Turbine updated successfully');
+          toast.success(t('toast.turbineUpdated'));
         }
         setFormMode(null);
       } catch (err) {
         if (err instanceof AssetServiceError) {
           toast.error(err.message);
         } else {
-          toast.error('Failed to save turbine. Please try again.');
+          toast.error(t('toast.saveTurbineFailed'));
         }
       }
     },
@@ -271,7 +273,7 @@ export function Assets() {
       return (
         <div style={{ padding: 'var(--space-4)' }}>
           <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--color-neutral-900)' }}>
-            {formMode === 'create_wind_farm' ? 'Create Wind Farm' : 'Edit Wind Farm'}
+            {formMode === 'create_wind_farm' ? t('assets.createWindFarm') : t('assets.editWindFarm')}
           </h3>
           <WindFarmForm
             initialData={formMode === 'edit_wind_farm' ? (selectedData as WindFarm) : undefined}
@@ -287,7 +289,7 @@ export function Assets() {
       return (
         <div style={{ padding: 'var(--space-4)' }}>
           <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--color-neutral-900)' }}>
-            {formMode === 'create_turbine' ? 'Create Turbine' : 'Edit Turbine'}
+            {formMode === 'create_turbine' ? t('assets.createTurbine') : t('assets.editTurbine')}
           </h3>
           <TurbineForm
             windFarmId={turbineFormWindFarmId}
@@ -313,7 +315,7 @@ export function Assets() {
               <ArrowLeft size={16} />
             </Button>
           )}
-          <h1 style={headerTitleStyle}>Assets</h1>
+          <h1 style={headerTitleStyle}>{t('page.assets')}</h1>
           {canManageAssets && (
             <div style={headerActionsStyle}>
               <Button variant="primary" size="sm" onClick={handleCreateWindFarm}>
@@ -332,10 +334,10 @@ export function Assets() {
               {canManageAssets && selectedId && (selectedType === 'wind_farm' || selectedType === 'turbine') && !formMode && (
                 <div style={detailActionsStyle}>
                   <Button variant="ghost" size="sm" onClick={handleEdit}>
-                    <Pencil size={14} /> Edit
+                    <Pencil size={14} /> {t('button.edit')}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={handleDelete}>
-                    <Trash2 size={14} /> Delete
+                    <Trash2 size={14} /> {t('button.delete')}
                   </Button>
                 </div>
               )}
@@ -354,10 +356,10 @@ export function Assets() {
 
         <ConfirmDialog
           open={showConfirmDelete}
-          title={`Delete ${selectedType === 'wind_farm' ? 'Wind Farm' : 'Turbine'}`}
-          message={`Are you sure you want to delete this ${selectedType === 'wind_farm' ? 'wind farm' : 'turbine'}? This action cannot be undone.`}
-          confirmLabel="Delete"
-          cancelLabel="Cancel"
+          title={selectedType === 'wind_farm' ? t('assets.deleteWindFarm') : t('assets.deleteTurbine')}
+          message={selectedType === 'wind_farm' ? t('assets.confirmDeleteWindFarm') : t('assets.confirmDeleteTurbine')}
+          confirmLabel={t('button.delete')}
+          cancelLabel={t('button.cancel')}
           variant="danger"
           onConfirm={handleConfirmDelete}
           onCancel={handleCancelDelete}
@@ -370,14 +372,14 @@ export function Assets() {
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>
-        <h1 style={headerTitleStyle}>Assets</h1>
+        <h1 style={headerTitleStyle}>{t('page.assets')}</h1>
         {canManageAssets && (
           <div style={headerActionsStyle}>
             <Button variant="primary" size="sm" onClick={handleCreateWindFarm}>
-              <Plus size={14} /> Add Wind Farm
+              <Plus size={14} /> {t('button.addWindFarm')}
             </Button>
             <Button variant="secondary" size="sm" onClick={handleCreateTurbine}>
-              <Plus size={14} /> Add Turbine
+              <Plus size={14} /> {t('button.addTurbine')}
             </Button>
           </div>
         )}
@@ -394,10 +396,10 @@ export function Assets() {
           {canManageAssets && selectedId && (selectedType === 'wind_farm' || selectedType === 'turbine') && !formMode && (
             <div style={detailActionsStyle}>
               <Button variant="ghost" size="sm" onClick={handleEdit}>
-                <Pencil size={14} /> Edit
+                <Pencil size={14} /> {t('button.edit')}
               </Button>
               <Button variant="ghost" size="sm" onClick={handleDelete}>
-                <Trash2 size={14} /> Delete
+                <Trash2 size={14} /> {t('button.delete')}
               </Button>
             </div>
           )}
@@ -413,10 +415,10 @@ export function Assets() {
 
       <ConfirmDialog
         open={showConfirmDelete}
-        title={`Delete ${selectedType === 'wind_farm' ? 'Wind Farm' : 'Turbine'}`}
-        message={`Are you sure you want to delete this ${selectedType === 'wind_farm' ? 'wind farm' : 'turbine'}? This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={selectedType === 'wind_farm' ? t('assets.deleteWindFarm') : t('assets.deleteTurbine')}
+        message={selectedType === 'wind_farm' ? t('assets.confirmDeleteWindFarm') : t('assets.confirmDeleteTurbine')}
+        confirmLabel={t('button.delete')}
+        cancelLabel={t('button.cancel')}
         variant="danger"
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
