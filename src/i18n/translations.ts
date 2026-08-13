@@ -230,10 +230,10 @@ export const translations: TranslationMap = {
   'ongoing.noFound': { en: 'No ongoing inspections found', es: 'No se encontraron inspecciones en curso' },
 
   // ─── Inspection Workflow ────────────────────────────────────────────────────
-  'workflow.step1': { en: '1. inspect', es: '1. inspeccionar' },
-  'workflow.step2': { en: '2. annotate', es: '2. anotar' },
-  'workflow.step3': { en: '3. analyze', es: '3. analizar' },
-  'workflow.step4': { en: '4. results', es: '4. resultados' },
+  'workflow.step1': { en: '1. INSPECT', es: '1. INSPECCIONAR' },
+  'workflow.step2': { en: '2. ANNOTATE', es: '2. ANOTAR' },
+  'workflow.step3': { en: '3. ANALYZE', es: '3. ANALIZAR' },
+  'workflow.step4': { en: '4. RESULTS', es: '4. RESULTADOS' },
 
   // ─── Turbine Detail ─────────────────────────────────────────────────────────
   'turbineDetail.loadingData': { en: 'Loading inspection data...', es: 'Cargando datos de inspección...' },
