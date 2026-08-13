@@ -50,7 +50,11 @@
   background-color: #1A1A1A !important;
 }
 
-/* Sidebar keeps its own grafito color */
+/* Sidebar keeps its own grafito color — including all children */
+[data-theme="dark"] aside,
+[data-theme="dark"] aside * {
+  background-color: inherit !important;
+}
 [data-theme="dark"] aside {
   background-color: #2C2C2C !important;
 }
