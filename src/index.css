@@ -13,6 +13,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Dark mode — force grey backgrounds and green text globally */
+[data-theme="dark"],
+[data-theme="dark"] body {
+  background-color: #212121 !important;
+  color: #A8E6A8 !important;
+}
+
 body {
   margin: 0;
   min-width: 320px;
