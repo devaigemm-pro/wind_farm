@@ -122,7 +122,7 @@ export function DefectsTable({
   };
 
   const thStyle: React.CSSProperties = {
-    textAlign: 'left',
+    textAlign: 'center',
     padding: '10px 8px',
     fontWeight: 600,
     fontSize: '10px',
