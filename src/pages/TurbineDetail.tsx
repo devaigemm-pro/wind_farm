@@ -614,7 +614,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           {/* Conclusion section */}
           <div style={conclusionCard}>
             <h5 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px', color: C.text }}><strong>{t('turbineDetail.conclusion')}</strong></h5>
-            <div style={{ overflowY: 'auto', maxHeight: 120 }}>
+            <div style={{ overflowY: 'auto', maxHeight: 70 }}>
               <p style={conclText}><b>Turbine ({turbineName}):</b><br /><i>{t('turbineDetail.noConclusion')}</i></p>
               {Object.entries(bladeSerials).map(([pos, serial]) => (
                 <p key={pos} style={conclText}><b>Blade {pos} ({serial}):</b><br /><i>No conclusion for this blade.</i></p>
