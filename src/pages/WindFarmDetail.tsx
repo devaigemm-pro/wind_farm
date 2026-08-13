@@ -6,15 +6,14 @@ import { DetailsBlock } from '@/components/organisms/DetailsBlock';
 import { SubassetsTable } from '@/components/organisms/SubassetsTable';
 import { DocumentDropbox } from '@/components/organisms/DocumentDropbox';
 import { CampaignsPanel } from '@/components/organisms/CampaignsPanel';
-import { DefectsTable } from '@/components/organisms/DefectsTable';
-import { DefectDetailPanel } from '@/components/organisms/DefectDetailPanel';
+import { DefectsWindFarmTab } from '@/components/organisms/DefectsWindFarmTab';
 import { TurbineSerialNumbersModal } from '@/components/organisms/TurbineSerialNumbersModal';
 import { EditCampaignModal } from '@/components/organisms/EditCampaignModal';
 import { useWindFarmDetail, useSubassets, useCampaigns, useDeleteCampaign, useWindFarmDefects, useDefectImages } from '@/hooks/useWindFarmDetail';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/store/toastStore';
 import { useLanguage } from '@/components/design-system';
-import type { TurbineSubassetRow, DefectSortField, DefectDashboardRow, Campaign } from '@/types';
+import type { TurbineSubassetRow, Campaign } from '@/types';
 
 export function WindFarmDetail() {
   const { id: windFarmId } = useParams<{ id: string }>();
@@ -46,11 +45,6 @@ export function WindFarmDetail() {
   const [showSerialModal, setShowSerialModal] = useState(false);
   const [filterSubasset, setFilterSubasset] = useState<string | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-
-  // Defects tab state
-  const [defectSortField, setDefectSortField] = useState<DefectSortField>('turbineName');
-  const [defectSortDirection, setDefectSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
 
   // Sort and paginate subassets
   const sortedSubassets = useMemo(() => {
@@ -186,34 +180,7 @@ export function WindFarmDetail() {
               {t('button.exportList')}
             </button>
           </div>
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', flex: selectedDefectId ? '0 0 70%' : '1 1 100%', overflow: 'hidden', minHeight: 0 }}>
-            <DefectsTable
-              data={defectsWithImages}
-              isLoading={defectsLoading}
-              sortField={defectSortField}
-              sortDirection={defectSortDirection}
-              onSort={(field) => {
-                if (field === defectSortField) {
-                  setDefectSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-                } else {
-                  setDefectSortField(field);
-                  setDefectSortDirection('asc');
-                }
-              }}
-              selectedId={selectedDefectId}
-              onSelect={setSelectedDefectId}
-            />
-            </div>
-            {selectedDefectId && (() => {
-              const selectedDefect = defectsWithImages.find((d: DefectDashboardRow) => d.id === selectedDefectId);
-              return selectedDefect ? (
-                <div style={{ flex: '0 0 30%', overflow: 'auto', minHeight: 0 }}>
-                  <DefectDetailPanel defect={selectedDefect} />
-                </div>
-              ) : null;
-            })()}
-          </div>
+          <DefectsWindFarmTab defects={defectsWithImages} isLoading={defectsLoading} />
         </div>
       )}
 

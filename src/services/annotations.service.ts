@@ -15,6 +15,7 @@ export interface Annotation {
   rootCause: string;
   nextStep: string;
   side: string | null;
+  isDefect: boolean;
   createdAt: string;
 }
 
@@ -63,6 +64,7 @@ function mapRow(row: Record<string, unknown>): Annotation {
     rootCause: (row.root_cause as string) ?? '',
     nextStep: (row.next_step as string) ?? '',
     side: (row.side as string) ?? null,
+    isDefect: Boolean(row.is_defect),
     createdAt: row.created_at as string,
   };
 }

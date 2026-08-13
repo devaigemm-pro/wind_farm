@@ -7,6 +7,8 @@ export function useDefectDelete() {
     mutationFn: (id: string) => defectsService.deleteDefect(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['defects-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['wind-farm-defects'] });
+      queryClient.invalidateQueries({ queryKey: ['turbine-defects'] });
     },
   });
 }

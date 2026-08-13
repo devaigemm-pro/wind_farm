@@ -124,12 +124,14 @@ export function Layout({ children, user, onLogout, breadcrumbs = [] }: LayoutPro
 
       {/* Main content area */}
       <div style={mainAreaStyle}>
-        <TopBar
-          onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-          user={user}
-          onLogout={onLogout}
-          onSearch={() => {}}
-        />
+        {!location.pathname.includes('/workflow') && (
+          <TopBar
+            onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+            user={user}
+            onLogout={onLogout}
+            onSearch={() => {}}
+          />
+        )}
 
         {breadcrumbs.length > 0 && (
           <div style={breadcrumbContainerStyle} className="layout-breadcrumb-container">

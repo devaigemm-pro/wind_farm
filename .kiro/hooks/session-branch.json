@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Create session branch",
+      "trigger": "SessionStart",
+      "description": "Creates a git branch for each session to isolate parallel work. Branch format: session/<id>-<timestamp>. Pulls latest main before branching.",
+      "action": {
+        "type": "command",
+        "command": "zsh /Users/Apple/Documents/Kiro/wind_farm/scripts/session-branch.sh",
+        "timeout": 30
+      }
+    }
+  ]
+}

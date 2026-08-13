@@ -4,15 +4,14 @@ import { ArrowUp, ArrowDown, Download, Plus } from 'lucide-react';
 import { TabBar } from '@/components/molecules/TabBar';
 import { TablePagination } from '@/components/molecules/TablePagination';
 import { DocumentDropbox } from '@/components/organisms/DocumentDropbox';
-import { DefectsTable } from '@/components/organisms/DefectsTable';
-import { DefectDetailPanel } from '@/components/organisms/DefectDetailPanel';
+import { DefectsWindFarmTab } from '@/components/organisms/DefectsWindFarmTab';
 import { Badge } from '@/components/atoms';
 import { Skeleton } from '@/components/atoms';
 import { Button } from '@/components/atoms';
 import { useTurbineDetail, useTurbineInspections, useTurbineDefects, useDefectImages } from '@/hooks/useWindFarmDetail';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/components/design-system';
-import type { CampaignInspection, DefectSortField, DefectDashboardRow } from '@/types';
+import type { CampaignInspection } from '@/types';
 
 export function SubassetDetail() {
   const { windFarmId, turbineId } = useParams<{ windFarmId: string; turbineId: string }>();
@@ -56,10 +55,7 @@ export function SubassetDetail() {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  // Defects tab state
-  const [defectSortField, setDefectSortField] = useState<DefectSortField>('rootDistance');
-  const [defectSortDirection, setDefectSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedDefectId, setSelectedDefectId] = useState<string | null>(null);
+
 
   // Sort inspections
   const sortedInspections = useMemo(() => {
@@ -272,34 +268,7 @@ export function SubassetDetail() {
       )}
 
       {activeTab === 'defects' && (
-        <div className="defects-split-container" style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-          <div className="defects-split-table" style={{ display: 'flex', flexDirection: 'column', flex: selectedDefectId ? '0 0 70%' : '1 1 100%', overflow: 'hidden', minHeight: 0 }}>
-            <DefectsTable
-              data={defectsWithImages}
-              isLoading={defectsLoading}
-              sortField={defectSortField}
-              sortDirection={defectSortDirection}
-              onSort={(field) => {
-                if (field === defectSortField) {
-                  setDefectSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-                } else {
-                  setDefectSortField(field);
-                  setDefectSortDirection('asc');
-                }
-              }}
-              selectedId={selectedDefectId}
-              onSelect={setSelectedDefectId}
-            />
-          </div>
-          {selectedDefectId && (() => {
-            const selectedDefect = defectsWithImages.find((d: DefectDashboardRow) => d.id === selectedDefectId);
-            return selectedDefect ? (
-              <div className="defects-split-detail" style={{ flex: '0 0 30%', overflow: 'auto', minHeight: 0 }}>
-                <DefectDetailPanel defect={selectedDefect} />
-              </div>
-            ) : null;
-          })()}
-        </div>
+        <DefectsWindFarmTab defects={defectsWithImages} isLoading={defectsLoading} />
       )}
     </div>
   );

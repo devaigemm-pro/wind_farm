@@ -19,6 +19,8 @@ export function useDefectUpdate() {
       defectsService.updateDefectFields(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['defects-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['wind-farm-defects'] });
+      queryClient.invalidateQueries({ queryKey: ['turbine-defects'] });
     },
   });
 }

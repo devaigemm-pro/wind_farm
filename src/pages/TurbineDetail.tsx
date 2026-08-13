@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Info, CheckCircle, BarChart3, ListFilter, Pencil, Plus, FileDown, Share2, ArrowLeft, Check } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -15,6 +16,7 @@ import { useAnnotationComments, useAddAnnotationComment } from '@/hooks/useAnnot
 import { useAuth } from '@/hooks/useAuth';
 import { useInspectionPhotos, getPhotoPublicUrl } from '@/hooks/useInspectionPhotos';
 import { useDefects } from '@/hooks/useDefects';
+import { useTurbineDefects } from '@/hooks/useWindFarmDetail';
 import type { ResultsDefect } from '@/types';
 
 // ─── Palette (matches reference) ─────────────────────────────────────────────
@@ -73,6 +75,34 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   const isSharedView = shared;
   const { data: inspectionData, isLoading } = useTurbineInspection(turbineId ?? '');
 
+  // Fetch ALL inspection IDs for this turbine (blade path + direct path)
+  // This is independent of useTurbineInspection to ensure annotations are always loaded
+  const { data: allTurbineInspIds = [] } = useQuery({
+    queryKey: ['all-turbine-inspections', turbineId],
+    queryFn: async () => {
+      if (!turbineId) return [];
+      const { supabase } = await import('@/lib/supabase');
+      // Get blades
+      const { data: blades } = await supabase.from('blade').select('id').eq('turbine_id', turbineId);
+      const bladeIds = (blades ?? []).map((b: { id: string }) => b.id);
+      
+      // Get inspections via blade_id
+      const { data: bladeInsps } = bladeIds.length > 0
+        ? await supabase.from('inspection').select('id').in('blade_id', bladeIds)
+        : { data: [] };
+      
+      // Get inspections via turbine_id direct
+      const { data: directInsps } = await supabase.from('inspection').select('id').in('turbine_id', [turbineId]);
+      
+      const idSet = new Set<string>();
+      for (const i of (bladeInsps ?? [])) idSet.add(i.id);
+      for (const i of (directInsps ?? [])) idSet.add(i.id);
+      return Array.from(idSet);
+    },
+    enabled: !!turbineId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Get inspection IDs for the specific campaign (when coming from workflow)
   const { data: campaignInspIds = [] } = useCampaignInspectionIds(filterCampaignId);
 
@@ -84,11 +114,26 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     if (filterCampaignId && campaignInspIds.length > 0) {
       return campaignInspIds;
     }
+    // Use ALL inspections for this turbine (independent query, both paths)
+    if (allTurbineInspIds.length > 0) {
+      if (filterInspectionId && !allTurbineInspIds.includes(filterInspectionId)) {
+        return [...allTurbineInspIds, filterInspectionId];
+      }
+      return allTurbineInspIds;
+    }
+    // Fallback: use inspectionData or just the filter ID
+    const turbineInspIds = inspectionData?.inspectionIds ?? [];
+    if (turbineInspIds.length > 0) {
+      if (filterInspectionId && !turbineInspIds.includes(filterInspectionId)) {
+        return [...turbineInspIds, filterInspectionId];
+      }
+      return turbineInspIds;
+    }
     if (filterInspectionId) {
       return [filterInspectionId];
     }
-    return inspectionData?.inspectionIds ?? [];
-  }, [filterCampaignId, campaignInspIds, filterInspectionId, inspectionData]);
+    return [];
+  }, [filterCampaignId, campaignInspIds, filterInspectionId, allTurbineInspIds, inspectionData]);
 
   const { data: dbAnnotations = [] } = useMultiAnnotations(annotationInspectionIds);
 
@@ -185,22 +230,91 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   //   (have a matching record in the defect table with description = annotationId)
   // - Otherwise, use defects table (for general turbine view)
   const { data: confirmedDefectRecords = [] } = useDefects(filterInspectionId ?? '');
+  // Fallback: fetch ALL defects for this turbine (works with both blade_id and turbine_id paths)
+  const { data: turbineLevelDefects = [] } = useTurbineDefects(turbineId);
   const confirmedAnnotationIds = useMemo<Set<string>>(() => {
     const ids = new Set<string>();
     for (const d of confirmedDefectRecords) {
       if (d.description) ids.add(d.description);
     }
+    // Also include annotations flagged as is_defect
+    for (const a of dbAnnotations) {
+      if ((a as any).isDefect) ids.add(a.id);
+    }
     return ids;
-  }, [confirmedDefectRecords]);
+  }, [confirmedDefectRecords, dbAnnotations]);
 
   const defects: TurbineDefect[] = useMemo(() => {
-    if (filterCampaignId || filterInspectionId) {
-      return annotationDefects.filter(d => confirmedAnnotationIds.size === 0 ? true : confirmedAnnotationIds.has(d.id));
+    // Path 1: If we have annotations (from annotation table), use them
+    if (annotationDefects.length > 0) {
+      // Filter by confirmed defects if available
+      if (confirmedAnnotationIds.size > 0) {
+        return annotationDefects.filter(d => confirmedAnnotationIds.has(d.id));
+      }
+      return annotationDefects;
     }
-    return (inspectionData?.defects && inspectionData.defects.length > 0)
-      ? inspectionData.defects
-      : annotationDefects;
-  }, [filterCampaignId, filterInspectionId, annotationDefects, confirmedAnnotationIds, inspectionData]);
+
+    // Path 2: Use confirmed defect records for this specific inspection
+    if (confirmedDefectRecords.length > 0) {
+      const counters: Record<string, number> = {};
+      return confirmedDefectRecords.map((d) => {
+        const bladeLetter = 'A';
+        counters[bladeLetter] = (counters[bladeLetter] || 0) + 1;
+        const displayId = `${bladeLetter}${counters[bladeLetter]}`;
+        return {
+          id: d.id,
+          displayId,
+          type: d.type?.toUpperCase().replace(/_/g, ' ') ?? 'UNKNOWN',
+          cat: d.severity ?? 3,
+          blade: bladeLetter,
+          side: (d as any).side ?? 'LE',
+          root: d.distance_from_root ?? 0,
+          size: `${d.width_cm ?? 0} x ${d.height_cm ?? 0}`,
+          description: d.description ?? '',
+          resolved: (d as any).resolved ?? false,
+          images: [],
+          notes: d.description ?? '',
+          rootCause: (d as any).root_cause ?? null,
+          nextStep: (d as any).next_step ?? null,
+          comments: [],
+        };
+      });
+    }
+
+    // Path 3: Use turbine-level defects (listDefectsByTurbine — supports both blade_id and turbine_id paths)
+    if (turbineLevelDefects.length > 0) {
+      const counters: Record<string, number> = {};
+      return turbineLevelDefects.map((d) => {
+        const blade = d.bladePosition || 'A';
+        counters[blade] = (counters[blade] || 0) + 1;
+        const displayId = `${blade}${counters[blade]}`;
+        return {
+          id: d.id,
+          displayId,
+          type: d.type,
+          cat: d.category,
+          blade,
+          side: d.side || 'LE',
+          root: d.rootDistance || 0,
+          size: `${d.defectWidth || 0} x ${d.defectHeight || 0}`,
+          description: d.notes || '',
+          resolved: d.resolved,
+          images: [],
+          notes: d.notes || '',
+          rootCause: d.rootCause || null,
+          nextStep: d.nextStep || null,
+          comments: [],
+        };
+      });
+    }
+
+    // Path 4: inspectionData defects (from useTurbineInspection)
+    if (inspectionData?.defects && inspectionData.defects.length > 0) {
+      return inspectionData.defects;
+    }
+
+    return [];
+  }, [annotationDefects, confirmedAnnotationIds, confirmedDefectRecords, turbineLevelDefects, inspectionData]);
   const windFarmName = inspectionData?.windFarmName ?? '';
   const turbineName = inspectionData?.turbineName ?? '';
   const inspectionDate = inspectionData?.inspectionDate
@@ -228,7 +342,10 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   // Computed stats from real data
   const catCounts = useMemo(() => {
     const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    defects.forEach((d) => { if (d.cat >= 1 && d.cat <= 5) counts[d.cat] = (counts[d.cat] ?? 0) + 1; });
+    defects.forEach((d) => {
+      const cat = Number(d.cat) || 0;
+      if (cat >= 1 && cat <= 5) counts[cat] = (counts[cat] ?? 0) + 1;
+    });
     return counts;
   }, [defects]);
 
@@ -474,7 +591,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
       />
 
       <div style={body}>
-        {/* ── Column 1: Blades ── */}
+        {/* ── Column 1: Blades + stats (matching Skyvisor layout) ── */}
         <div style={col1}>
           <BladesDiagram
             defects={diagramDefects}
@@ -483,24 +600,31 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             selectedDefectId={selectedDefectId}
             onDefectClick={handleDefectClick}
           />
-          <div style={counters}>
-            <span style={counterItem}><Info size={15} color={C.blue} /> <b>{defects.length}</b> {t('turbineDetail.defects')}</span>
-            <span style={counterItem}><CheckCircle size={15} color={C.cat1} /> <b>{resolvedCount}</b> {t('turbineDetail.resolved')}</span>
+          {/* Counters row: defects | resolved */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={counterCard}>
+              <Info size={18} color={C.blue} />
+              <p style={counterCardText}><strong>{defects.length}</strong> {t('turbineDetail.defects')}</p>
+            </div>
+            <div style={counterCard}>
+              <CheckCircle size={18} color={C.cat1} />
+              <p style={counterCardText}><strong>{resolvedCount}</strong> {t('turbineDetail.resolved')}</p>
+            </div>
           </div>
-          <div style={{ padding: '8px 0' }}>
-            <h3 style={{ color: C.blue, fontSize: 17, margin: '0 0 10px' }}>{t('turbineDetail.conclusion')}</h3>
-            <p style={conclText}><b>Turbine ({turbineName}):</b><br /><i>{t('turbineDetail.noConclusion')}</i></p>
-            {Object.entries(bladeSerials).map(([pos, serial]) => (
-              <p key={pos} style={conclText}><b>Blade {pos} ({serial}):</b><br /><i>No conclusion for this blade.</i></p>
-            ))}
+          {/* Conclusion section */}
+          <div style={conclusionCard}>
+            <h5 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px', color: C.text }}><strong>{t('turbineDetail.conclusion')}</strong></h5>
+            <div style={{ overflowY: 'auto', maxHeight: 120 }}>
+              <p style={conclText}><b>Turbine ({turbineName}):</b><br /><i>{t('turbineDetail.noConclusion')}</i></p>
+              {Object.entries(bladeSerials).map(([pos, serial]) => (
+                <p key={pos} style={conclText}><b>Blade {pos} ({serial}):</b><br /><i>No conclusion for this blade.</i></p>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {!isSharedView && role !== 'supervisor' && (
-              <button style={planBtn} onClick={() => navigate(`/inspections/new?windFarm=${windFarmId}`)}>
-                {t('button.planNextInspection')}
-              </button>
-            )}
-          </div>
+          {/* Plan next inspection */}
+          <button style={planBtn} onClick={() => navigate(`/inspections/new?windFarm=${windFarmId || inspectionData?.windFarmId || ''}`)}>
+            {t('button.planNextInspection')}
+          </button>
         </div>
 
         {tab === 'statistics' ? (
@@ -1177,8 +1301,8 @@ const infoDot: React.CSSProperties = { width: 28, height: 28, borderRadius: '50%
 const tabRow: React.CSSProperties = { display: 'flex', gap: 24, borderBottom: 'none' };
 const tabBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: C.muted, padding: '4px 2px' };
 const tabActive: React.CSSProperties = { color: C.blue, borderBottom: `2px solid ${C.blue}` };
-const body: React.CSSProperties = { display: 'flex', gap: 16, padding: 16, alignItems: 'flex-start' };
-const col1: React.CSSProperties = { width: 480, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 };
+const body: React.CSSProperties = { display: 'flex', gap: 12, padding: '8px 16px', alignItems: 'flex-start' };
+const col1: React.CSSProperties = { flex: '0 0 33%', maxWidth: '33%', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' };
 const col2: React.CSSProperties = { width: 220, flexShrink: 0, background: 'var(--color-neutral-0)', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, outline: 'none', overflow: 'hidden' };
 const col3: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 };
 const card: React.CSSProperties = { background: 'var(--color-neutral-0)', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 };
@@ -1186,7 +1310,10 @@ const cardTitle: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: C
 const counters: React.CSSProperties = { display: 'flex', gap: 20, padding: '12px 0', borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` };
 const counterItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text };
 const conclText: React.CSSProperties = { fontSize: 12.5, color: '#555', margin: '0 0 8px', lineHeight: 1.45 };
-const planBtn: React.CSSProperties = { flex: 1, padding: '12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer' };
+const planBtn: React.CSSProperties = { width: '100%', padding: '12px', background: '#00A6FF', color: '#fff', border: 'none', borderRadius: 8, fontSize: '0.9rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer' };
+const counterCard: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--color-neutral-0)', boxShadow: '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)' };
+const counterCardText: React.CSSProperties = { margin: 0, fontSize: 14, fontFamily: 'var(--font-family-sans)', color: C.text };
+const conclusionCard: React.CSSProperties = { padding: 12, borderRadius: 8, background: 'var(--color-neutral-0)', boxShadow: '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)' };
 
 const filterSelect: React.CSSProperties = { padding: '4px 8px', fontSize: 11, border: `1px solid ${C.border}`, borderRadius: 4, fontFamily: 'inherit', backgroundColor: 'var(--color-neutral-0)', color: C.text, cursor: 'pointer' };
 const donutCenter: React.CSSProperties = { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2, pointerEvents: 'none' };

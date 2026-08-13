@@ -209,7 +209,7 @@ export function NewInspection() {
               disabled={isCreateDisabled}
               loading={createMutation.isPending}
               style={{
-                backgroundColor: isCreateDisabled ? undefined : '#00A3E0',
+                backgroundColor: isCreateDisabled ? undefined : '#5A8F5A',
                 textTransform: 'uppercase',
                 fontWeight: 600,
                 letterSpacing: '0.5px',

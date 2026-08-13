@@ -276,31 +276,153 @@ export const defectsService = {
     sortDir?: 'asc' | 'desc';
     turbineId?: string;
   }): Promise<{ data: DefectDashboardRow[]; totalCount: number }> {
-    const { data, error } = await db.rpc('get_defects_dashboard', {
-      p_search: params.search ?? '',
-      p_limit: params.limit ?? 25,
-      p_offset: params.offset ?? 0,
-      p_sort_field: params.sortField ?? 'asset_name',
-      p_sort_dir: params.sortDir ?? 'asc',
-    });
+    // Query all defects with both blade and direct turbine paths (no broken INNER JOIN)
+    const { data: defects, error } = await supabase
+      .from('defect')
+      .select(`
+        id,
+        type,
+        severity,
+        distance_from_root,
+        description,
+        width_cm,
+        height_cm,
+        side,
+        notes,
+        root_cause,
+        next_step,
+        resolved,
+        action_text,
+        action_urgency,
+        inspection_id,
+        inspection:inspection!inner(
+          blade_id,
+          turbine_id,
+          blade:blade(
+            position,
+            turbine:turbine!blade_turbine_id_fkey(
+              id,
+              name,
+              model,
+              wind_farm:wind_farm!turbine_wind_farm_id_fkey(name)
+            )
+          ),
+          direct_turbine:turbine!inspection_turbine_id_fkey(
+            id,
+            name,
+            model,
+            wind_farm:wind_farm!turbine_wind_farm_id_fkey(name)
+          )
+        )
+      `)
+      .order('distance_from_root', { ascending: true });
 
     if (error) throw new DefectServiceError(error.message, error.code);
 
-    let rows = (data ?? []) as Array<Record<string, unknown>>;
+    let rows = ((defects as unknown[]) ?? []).map((row: unknown) => {
+      const r = row as Record<string, unknown>;
+      const inspection = r.inspection as Record<string, unknown> | null;
+      const blade = inspection?.blade as Record<string, unknown> | null;
+      const turbineViaBlade = blade?.turbine as Record<string, unknown> | null;
+      const directTurbine = inspection?.direct_turbine as Record<string, unknown> | null;
+      const turbine = turbineViaBlade ?? directTurbine;
+      const windFarm = (turbine?.wind_farm as Record<string, unknown>) ?? null;
+      const bladePos = Number(blade?.position) || 0;
+
+      const severity = Number(r.severity) || 3;
+      let actionText = (r.action_text as string) ?? '';
+      let actionUrgency = (r.action_urgency as string) ?? 'medium';
+      if (!actionText) {
+        if (severity >= 4) { actionText = 'Repair'; actionUrgency = 'high'; }
+        else if (severity === 3) { actionText = 'Monitor closely'; actionUrgency = 'medium'; }
+        else { actionText = 'Monitor'; actionUrgency = 'low'; }
+      }
+
+      return {
+        id: r.id as string,
+        assetName: (windFarm?.name as string) ?? '',
+        turbineName: (turbine?.name as string) ?? '',
+        turbineModel: (turbine?.model as string) ?? '',
+        turbineId: (turbine?.id as string) ?? '',
+        type: DEFECT_TYPE_DISPLAY_LABELS[(r.type as string) ?? ''] ?? (r.type as string) ?? '',
+        defectWidth: Number(r.width_cm) || 0,
+        defectHeight: Number(r.height_cm) || 0,
+        category: severity,
+        actionText,
+        actionUrgency: actionUrgency as 'high' | 'medium' | 'low',
+        nextStep: (r.next_step as string) ?? '',
+        bladePosition: BLADE_POSITION_LABELS[bladePos] ?? String(bladePos),
+        side: (r.side as string) ?? 'LE',
+        rootDistance: Number(r.distance_from_root) || 0,
+        rootCause: (r.root_cause as string) ?? null,
+        notes: (r.notes as string) ?? null,
+        imageUrl: null as string | null,
+        resolved: Boolean(r.resolved),
+        inspectionId: (r.inspection_id as string) ?? '',
+        bladeId: (inspection?.blade_id as string) ?? '',
+      };
+    });
+
+    // Filter: must have at least a turbine resolved
+    rows = rows.filter(r => r.turbineName !== '');
 
     // Client-side filter by turbine ID if provided
     if (params.turbineId) {
-      rows = rows.filter((row) => row.turbine_id === params.turbineId);
+      rows = rows.filter((row) => row.turbineId === params.turbineId);
     }
+
+    // Client-side search
+    const search = (params.search ?? '').toLowerCase();
+    if (search) {
+      rows = rows.filter(r =>
+        r.assetName.toLowerCase().includes(search) ||
+        r.turbineName.toLowerCase().includes(search) ||
+        r.turbineModel.toLowerCase().includes(search) ||
+        r.type.toLowerCase().includes(search)
+      );
+    }
+
+    // Client-side sorting
+    const sortField = params.sortField ?? 'asset_name';
+    const sortDir = params.sortDir ?? 'asc';
+    const fieldMap: Record<string, keyof typeof rows[0]> = {
+      asset_name: 'assetName',
+      turbine_name: 'turbineName',
+      turbine_model: 'turbineModel',
+      type: 'type',
+      next_step: 'nextStep',
+      side: 'side',
+      category: 'category',
+      root_distance: 'rootDistance',
+      blade: 'bladePosition',
+      resolved: 'resolved',
+    };
+    const key = fieldMap[sortField] ?? 'assetName';
+    rows.sort((a, b) => {
+      const aVal = a[key] ?? '';
+      const bVal = b[key] ?? '';
+      const cmp = typeof aVal === 'number' && typeof bVal === 'number'
+        ? aVal - bVal
+        : String(aVal).localeCompare(String(bVal), undefined, { numeric: true });
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
 
     const totalCount = rows.length;
 
+    // Pagination
+    const offset = params.offset ?? 0;
+    const limit = params.limit ?? 25;
+    const paginatedRows = rows.slice(offset, offset + limit);
+
     // Fetch real evidence images for these defects
-    const defectIds = rows.map((r) => r.id as string);
+    const defectIds = paginatedRows.map((r) => r.id);
     const imageMap = await fetchDefectImageMap(defectIds);
 
     return {
-      data: rows.map((row) => mapToDefectDashboardRow(row, imageMap[row.id as string] ?? null)),
+      data: paginatedRows.map(r => ({
+        ...r,
+        imageUrl: imageMap[r.id] ?? null,
+      })) as DefectDashboardRow[],
       totalCount,
     };
   },
@@ -440,25 +562,33 @@ export const defectsService = {
    * List defects for a specific turbine (via blade → inspection → defect).
    */
   async listDefectsByTurbine(turbineId: string): Promise<DefectDashboardRow[]> {
-    // Get blades for this turbine, then inspections, then defects
+    // Get blades for this turbine
     const { data: blades, error: bladeErr } = await supabase
       .from('blade')
       .select('id, position')
       .eq('turbine_id', turbineId);
-    if (bladeErr || !blades || blades.length === 0) return [];
 
-    const bladeIds = blades.map((b: { id: string }) => b.id);
+    const bladeIds = (!bladeErr && blades) ? blades.map((b: { id: string }) => b.id) : [];
 
-    // Get inspections for these blades
-    const { data: inspections, error: inspErr } = await supabase
+    // Path 1: inspections via blade_id
+    const { data: bladeInspections } = bladeIds.length > 0
+      ? await supabase.from('inspection').select('id').in('blade_id', bladeIds)
+      : { data: [] };
+
+    // Path 2: inspections via turbine_id directly
+    const { data: turbineInspections } = await supabase
       .from('inspection')
       .select('id')
-      .in('blade_id', bladeIds);
-    if (inspErr || !inspections || inspections.length === 0) return [];
+      .in('turbine_id', [turbineId]);
 
-    const inspectionIds = inspections.map((i: { id: string }) => i.id);
+    // Deduplicate inspection IDs
+    const inspIdSet = new Set<string>();
+    for (const i of (bladeInspections ?? [])) inspIdSet.add((i as { id: string }).id);
+    for (const i of (turbineInspections ?? [])) inspIdSet.add((i as { id: string }).id);
+    const inspectionIds = Array.from(inspIdSet);
+    if (inspectionIds.length === 0) return [];
 
-    // Get defects for these inspections
+    // Get defects for these inspections (join blade optionally, turbine via both paths)
     const { data: defects, error: defErr } = await supabase
       .from('defect')
       .select(`
@@ -477,13 +607,19 @@ export const defectsService = {
         inspection_id,
         inspection:inspection!inner(
           blade_id,
-          blade:blade!inner(
+          turbine_id,
+          blade:blade(
             position,
-            turbine:turbine!inner(
+            turbine:turbine!blade_turbine_id_fkey(
               name,
               model,
-              wind_farm:wind_farm!inner(name)
+              wind_farm:wind_farm!turbine_wind_farm_id_fkey(name)
             )
+          ),
+          direct_turbine:turbine!inspection_turbine_id_fkey(
+            name,
+            model,
+            wind_farm:wind_farm!turbine_wind_farm_id_fkey(name)
           )
         )
       `)
@@ -495,8 +631,10 @@ export const defectsService = {
       const r = row as Record<string, unknown>;
       const inspection = r.inspection as Record<string, unknown> | null;
       const blade = inspection?.blade as Record<string, unknown> | null;
-      const turbine = blade?.turbine as Record<string, unknown> | null;
-      const windFarm = turbine?.wind_farm as Record<string, unknown> | null;
+      const turbineViaBlade = blade?.turbine as Record<string, unknown> | null;
+      const directTurbine = inspection?.direct_turbine as Record<string, unknown> | null;
+      const turbine = turbineViaBlade ?? directTurbine;
+      const windFarm = (turbine?.wind_farm as Record<string, unknown>) ?? null;
       const bladePos = Number(blade?.position) || 1;
 
       const severity = Number(r.severity) || 3;

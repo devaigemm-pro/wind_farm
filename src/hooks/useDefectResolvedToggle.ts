@@ -50,6 +50,9 @@ export function useDefectResolvedToggle() {
     onSuccess: (_, { id }) => {
       // Only invalidate comments (lightweight), NOT the full defects dashboard
       queryClient.invalidateQueries({ queryKey: ['defect-comments', id] });
+      // Also invalidate wind-farm and turbine defects so other views stay in sync
+      queryClient.invalidateQueries({ queryKey: ['wind-farm-defects'] });
+      queryClient.invalidateQueries({ queryKey: ['turbine-defects'] });
     },
     // Do NOT invalidate defects-dashboard on settle — trust the optimistic update
     // The RPC will be re-called naturally when the user navigates or changes page/sort/search

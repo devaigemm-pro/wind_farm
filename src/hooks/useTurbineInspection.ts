@@ -62,8 +62,8 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
 
   const bladeIds = blades.map((b) => b.id);
 
-  // Get the latest finalized inspection for any blade of this turbine
-  const { data: inspections, error: inspErr } = await supabase
+  // Get the latest finalized inspection for any blade of this turbine OR directly linked
+  const { data: bladeInspections } = await supabase
     .from('inspection')
     .select('id, completed_at, scheduled_date, stage')
     .in('blade_id', bladeIds)
@@ -71,27 +71,44 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
     .order('completed_at', { ascending: false })
     .limit(1);
 
-  if (inspErr) return null;
+  const { data: directInspections } = await supabase
+    .from('inspection')
+    .select('id, completed_at, scheduled_date, stage')
+    .in('turbine_id', [turbineId])
+    .eq('stage', 'report')
+    .order('completed_at', { ascending: false })
+    .limit(1);
 
-  // If no finalized inspection exists, return basic turbine/blade data
-  // so the Results view can still render annotations from the workflow
-  if (!inspections || inspections.length === 0) {
+  // Combine and pick the latest
+  const allFinalizedInsp = [...(bladeInspections ?? []), ...(directInspections ?? [])];
+  const inspections = allFinalizedInsp.length > 0
+    ? [allFinalizedInsp.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))[0]!]
+    : [];
+
+  if (inspections.length === 0) {
     const positionToLetter: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
     const bladeIdToPosition: Record<string, string> = {};
     for (const b of blades) {
       bladeIdToPosition[b.id] = positionToLetter[b.position] || String(b.position);
     }
 
-    // Try to get ANY inspection for the blade position mapping
-    const { data: anyInspections } = await supabase
+    // Try to get ANY inspection for the blade position mapping (both paths)
+    const { data: anyBladeInspections } = await supabase
       .from('inspection')
       .select('id, blade_id')
       .in('blade_id', bladeIds);
 
+    const { data: anyDirectInspections } = await supabase
+      .from('inspection')
+      .select('id, blade_id')
+      .in('turbine_id', [turbineId]);
+
+    const anyInspections = [...(anyBladeInspections ?? []), ...(anyDirectInspections ?? [])];
+
     const inspectionToBladePosition: Record<string, string> = {};
     const inspectionIds: string[] = [];
-    for (const insp of anyInspections || []) {
-      inspectionToBladePosition[insp.id] = bladeIdToPosition[insp.blade_id] || '?';
+    for (const insp of anyInspections) {
+      inspectionToBladePosition[insp.id] = insp.blade_id ? (bladeIdToPosition[insp.blade_id] || '?') : 'A';
       inspectionIds.push(insp.id);
     }
 
@@ -120,14 +137,24 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
 
   const inspection = inspections[0]!;
 
-  // Get ALL inspections for this turbine's blades (not just finalized)
-  // to build the inspection→blade position map (needed for annotation display)
-  const { data: allInspections, error: allInspErr } = await supabase
+  // Get ALL inspections for this turbine (via blades AND direct turbine_id)
+  const { data: bladeAllInspections } = await supabase
     .from('inspection')
     .select('id, blade_id, stage')
     .in('blade_id', bladeIds);
 
-  if (allInspErr || !allInspections) return null;
+  const { data: directAllInspections } = await supabase
+    .from('inspection')
+    .select('id, blade_id, stage')
+    .in('turbine_id', [turbineId]);
+
+  // Deduplicate
+  const allInspMap = new Map<string, { id: string; blade_id: string | null; stage: string }>();
+  for (const i of (bladeAllInspections ?? [])) allInspMap.set(i.id, i);
+  for (const i of (directAllInspections ?? [])) { if (!allInspMap.has(i.id)) allInspMap.set(i.id, i); }
+  const allInspections = Array.from(allInspMap.values());
+
+  if (allInspections.length === 0) return null;
 
   // For defects, only use finalized inspections
   const finalizedInspections = allInspections.filter(i => i.stage === 'report');
@@ -137,7 +164,9 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
   // inspections can still be mapped to the correct blade)
   const inspToBlade: Record<string, string> = {};
   for (const insp of allInspections) {
-    inspToBlade[insp.id] = insp.blade_id;
+    if (insp.blade_id) {
+      inspToBlade[insp.id] = insp.blade_id;
+    }
   }
 
   // Get defects for all finalized inspections of this turbine
@@ -220,7 +249,7 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
   // Build inspectionId → blade position letter mapping
   const inspectionToBladePosition: Record<string, string> = {};
   for (const insp of allInspections) {
-    inspectionToBladePosition[insp.id] = bladeIdToPosition[insp.blade_id] || '?';
+    inspectionToBladePosition[insp.id] = insp.blade_id ? (bladeIdToPosition[insp.blade_id] || '?') : 'A';
   }
 
   const maxBladeLength = blades.reduce((max, b) => Math.max(max, b.length_meters || 43), 0);

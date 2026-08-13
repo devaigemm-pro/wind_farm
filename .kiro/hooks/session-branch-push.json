@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Push session branch",
+      "trigger": "Stop",
+      "description": "At session end: auto-commits pending changes and pushes the session branch to origin. Does not auto-merge to main.",
+      "action": {
+        "type": "command",
+        "command": "zsh /Users/Apple/Documents/Kiro/wind_farm/scripts/session-branch-push.sh",
+        "timeout": 60
+      }
+    }
+  ]
+}

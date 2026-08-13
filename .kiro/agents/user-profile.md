@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 50
+- **Sesiones analizadas**: 58
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -84,7 +84,7 @@
 - **"es un cambio simple"** — no sobrecomplicar. Si el usuario dice que es simple, probablemente lo es. Hacer el cambio directo sin refactorizar ni agregar abstracción.
 - **"se riguroso"** — verificar el resultado ANTES de reportar éxito. No asumir que funciona. Probar con el caso exacto que el usuario describe.
 - **"diagnosticar más profundo"** — cuando un fix no funciona al primer intento, no hacer otro parche superficial. Ir a la raíz real del problema. Si dice "AUN no funciona" en mayúsculas, el approach anterior fue incorrecto.
-- **"usar el mismo metodo que X"** — cuando dice que algo en otra parte funciona bien, buscar EXACTAMENTE cómo está implementado y replicar. No inventar un approach diferente. Siempre revisar el patrón existente PRIMERO antes de hacer algo nuevo.
+- **"usar el mismo metodo que X"** — cuando dice que algo en otra parte funciona bien, buscar EXACTAMENTE cómo está implementado y replicar. No inventar un approach diferente. Siempre revisar el patrón existente PRIMERO antes de hacer algo nuevo. **CRÍTICO**: Esto incluye TODA la estructura — no solo el componente sino cómo se monta, su lifecycle, su aislamiento de estado. Si la referencia es un componente hijo aislado, la solución es un componente hijo aislado. No intentar parches parciales (memoizar, refs, useEffect hacks). ACATAR la instrucción desde el primer intento. Si hay duda, PREGUNTAR antes de implementar algo distinto.
 - **"las imagenes no se ven de alta calidad"** — cuando reporta un problema de calidad, la causa probable es que usaste un approach incorrecto. Busca cómo funciona en otra parte del sistema que SÍ funciona bien.
 - **"fila" = lo visual, no lo lógico** — cuando habla de "fila de fotos" se refiere a las fotos que se ven en una fila del grid (3 columnas = 3 fotos), NO a agrupaciones lógicas de datos. Interpretar siempre desde lo que el usuario VE en pantalla, no desde la estructura del código.
 - **"la inspección asociada" ≠ step 4 del workflow** — cuando dice "redirigir a la inspección asociada" o "la página de la inspección", se refiere a la página de SubassetDetail (`/assets-wind/{windFarmId}/subasset/{turbineId}`) donde se muestra la turbina con su tabla de inspecciones. NO es el step 4 del workflow. La "inspección asociada" es la PÁGINA que muestra la inspección, no un step dentro del workflow.
@@ -546,3 +546,147 @@
   - **CAUSA RAÍZ 3**: localStorage del usuario tenía 'en' del default anterior. Solución: migración con `locale_version` flag.
   - **REGLA NUEVA CRÍTICA**: Para tareas de cobertura total (i18n, dark mode), el approach correcto es: (1) grep automatizado para encontrar TODOS los strings sin t(), (2) corregir TODO en un solo turno, (3) forzar deploy manual, (4) verificar en producción. NO declarar listo hasta verificar EN PRODUCCIÓN.
 - **Patrones confirmados**: español, directo, alta autonomía, frustración máxima por declarar "listo" prematuramente (confianza ABSOLUTA - 10+ iteraciones), exige verificación en producción, valora tiempo/tokens, "se profesional riguroso" = auditoría automatizada real, deploy manual siempre como respaldo
+
+### Sesión 58 - 2026-08-13
+- **Tarea principal**: Barrido de refinamiento visual sobre workflow: (1) Cambiar icono "Image adjustments" por icono de contraste. (2) Fix fondo transparente en botones. (3) Cambiar icono "Blade face view" por screen rotation. (4) Eliminar botón "Search all" y código asociado. (5) Labels de steps a mayúscula (INSPECT, ANNOTATE, ANALYZE, RESULTS).
+- **Observaciones nuevas**:
+  - Sesión de 5 micro-cambios visuales secuenciales sobre la misma pantalla (workflow) — barrido de calidad visual intenso
+  - Cada cambio en un mensaje separado de 1 línea — patrón de iteración ultra-rápida consecutiva confirmado
+  - Proporciona DOM del componente existente como referencia para identificar qué cambiar — no da rutas de archivo ni líneas, da el DOM renderizado
+  - "también aplicar el cambio de fondo realizado anteriormente" — espera que el agente recuerde y aplique cambios de mensajes previos en la misma sesión sin repetir
+  - "eliminar... y todo el código asociado" — cuando pide eliminar, quiere limpieza completa (estilos, variables, contenedores). No dejar código muerto.
+  - Todos los cambios aceptados sin correcciones al primer intento (excepto timing de deploy)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, DOM como spec, barrido de calidad por pantalla (5+ cambios consecutivos), modo compañero implícito, iteración secuencial rápida, "también X anterior" = recordar contexto de sesión
+
+### Sesión 59 - 2026-08-13
+- **Tarea principal**: Barrido visual workflow step 2 toolbar: (1) Icono contraste para Image Adjustments. (2) Background transparent en botones. (3) Icono screen rotation para Blade face view. (4) Eliminar botón Search All + código. (5) Steps en mayúscula. (6) Fix: traducciones i18n también en mayúscula.
+- **Observaciones nuevas**:
+  - "siguen igual 1. inspeccionar..." — cuando reporta que no cambió, da los valores ACTUALES que ve en pantalla. El problema era que los labels venían de traducciones i18n, no del array hardcoded. La primera corrección (array STEPS) no fue suficiente porque el rendering usaba `t(step.key)`.
+  - **APRENDIZAJE**: Cuando un texto se muestra diferente a lo esperado post-cambio, verificar si hay sistema i18n interceptando. Siempre buscar AMBOS: el hardcoded Y las traducciones. No asumir que cambiar uno resuelve todo.
+  - 6 micro-cambios en una sola sesión sobre la misma pantalla — barrido de calidad visual más largo de la sesión
+  - Cada instrucción en un mensaje ultra-breve de 1 línea
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, DOM como spec, barrido de calidad por pantalla (6+ cambios), modo compañero implícito, iteración secuencial rápida, corrección directa sin drama
+
+
+### Sesión 47 - 2026-08-13
+- **Tarea principal**: Sesión completa de CI/CD: (1) Diseñar pipeline, (2) Implementar workflows + Playwright + Vitest, (3) Configurar git remote + push inicial, (4) Configurar GitHub Secrets via API, (5) Fix CI hasta verde, (6) Crear primer release v0.1.0, (7) Implementar hook de session branches para trabajo paralelo
+- **Observaciones nuevas**:
+  - Primera sesión de infraestructura/DevOps completa — piensa en el proceso de desarrollo, no solo en features
+  - "desarrolles y me preguntes cuando implementarlo" — para tareas de arquitectura/infraestructura pide ver propuesta antes de ejecutar (a diferencia de features UI donde confía 100%)
+  - Aprobó diseño con 👍 — patrón de aprobación minimalista (confirmado 3+ veces, confianza alta)
+  - Compartió token GitHub sin explicaciones — confianza total para manejar credenciales
+  - "configuralo por tu cuenta" — cuando da credenciales, espera ejecución completa sin intervención
+  - "continua" — una sola palabra cuando el siguiente paso es obvio
+  - "si, implementa el hook" — cuando se le ofrece una opción que resuelve su problema, acepta y pide implementación directa
+  - Trabaja con sesiones paralelas en Kiro — necesita aislamiento de cambios por sesión
+  - **Nuevo patrón**: piensa en infraestructura de desarrollo como producto (CI/CD, git flow, hooks de automatización, session branches)
+  - **Git/DevOps**: GitHub repo `devaigemm-pro/wind_farm`, versionamiento semántico con tags, deploy via Vercel CLI --prebuilt en releases
+- **Patrones confirmados**: español, directo, alta autonomía TOTAL (incluye credenciales), comunicación ultra-mínima (👍, "continua", "si"), pensamiento meta-nivel/infraestructura, confía en decisiones del agente, "configuralo por tu cuenta" = ejecutar sin preguntar
+
+### Sesión 60 - 2026-08-13
+- **Tarea principal**: (1) Fix defectos no visibles en SubassetDetail (listDefectsByTurbine solo usaba blade_id path). (2) Fix turbine name incorrecto en tabla defectos /assets-wind (reemplazar RPC con query directa dual-path). (3) Fix editar defecto en WindFarmDetail (reemplazar DefectDetailPanel read-only por DefectDetailSidebar con edición). (4) Fix invalidación de cache en hooks de mutación de defectos.
+- **Observaciones nuevas**:
+  - 4 bugs reportados secuencialmente en la misma sesión sobre defectos en diferentes vistas — barrido de calidad por funcionalidad (no solo por pantalla)
+  - "basarse en [URL] para referenciar el mismo metodo para editar" — patrón "usar mismo método que X" una vez más (6+ sesiones)
+  - "la página mencionada" — referencia implícita sin repetir URL cuando ya se estableció contexto
+  - No dice "compañero" pero el flujo es claramente modo compañero implícito
+  - Root cause sistémico recurrente: queries que solo usan blade_id path ignorando turbine_id directo
+  - Todos aceptados sin correcciones al primer intento
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "usar mismo método que X" (confianza muy alta), URL como referencia, modo compañero implícito, barrido de calidad por funcionalidad, bug sistémico = verificar en todos los lugares, referencia implícita a contexto previo
+
+### Sesión 61 - 2026-08-13
+- **Tarea principal**: Continuación sesión 60 — el botón editar defecto en WindFarmDetail seguía sin funcionar después del primer fix
+- **Observaciones nuevas**:
+  - "se profesional para la solucion, te di la referencia de la otra pagina" — frustración por fix parcial. Cuando da referencia, espera que se replique EXACTAMENTE el patrón, no solo el componente sino toda la lógica de rendering (IIFE vs renderizado estable).
+  - "es simple" — cuando dice esto, indica que el approach del agente fue demasiado complejo/parcial. El fix real era simplemente replicar el patrón de la referencia (sin IIFE, con auto-select, sidebar siempre montado).
+  - Root cause: IIFE `(() => { ... })()` dentro del JSX causaba que React desmontara/remontara el sidebar en cada render, reseteando el estado `isEditing`. La referencia usa rendering condicional estable sin IIFE.
+- **Patrones confirmados**: español, directo, alta autonomía, "usar mismo método que X" = replicar TODO el patrón (no solo el componente sino cómo se renderiza), "es simple" = no sobrecomplicar, frustración cuando el fix anterior no resolvió
+
+### Sesión 62 - 2026-08-13
+- **Tarea principal**: Tercer intento de fix del botón editar defecto en WindFarmDetail — seguía sin funcionar después de 2 fixes previos
+- **Observaciones nuevas**:
+  - "se riguroso" + DOM del SVG como prueba — cuando algo sigue sin funcionar después de múltiples intentos, da evidencia exacta (el SVG del ícono) para que no haya ambigüedad de qué está roto
+  - "te he entregado todo para hacer la modificacion y no hay resultados" — frustración acumulada por 3 iteraciones fallidas del mismo bug. Cada iteración que no resuelve degrada la confianza.
+  - Root cause final: combinación de (1) sidebar que se montaba/desmontaba condicionalmente, (2) auto-select useEffect con dependencias inestables que causaban re-renders, (3) `defectsWithImages` regenerándose con cada carga de imágenes async. Fix: sidebar siempre montado + auto-select estable + selectedDefect memoizado.
+  - **APRENDIZAJE CRÍTICO**: Cuando se dice "usar el mismo método que X", significa replicar no solo QUÉ componente se usa, sino CÓMO se monta (lifecycle, condiciones, estabilidad de estado). Incluye: patrón de rendering, manejo de estado, dependencias de effects, estructura del JSX.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración escalada por iteraciones fallidas, "se riguroso" = verificar que funciona ANTES de reportar, da prueba visual/DOM del problema exacto
+
+### Sesión 63 - 2026-08-13
+- **Tarea principal**: Cuarto y definitivo fix del botón editar defecto en WindFarmDetail — extraer pestaña defectos a componente hijo independiente
+- **Observaciones nuevas**:
+  - "es insolito la cantidad de veces que tengo que decir lo que debes hacer" — frustración MÁXIMA. 4+ iteraciones del mismo bug es inaceptable. Cuando llega a este punto, el approach debe cambiar radicalmente.
+  - "compañero no dejes de iterar hasta que esto este resuelto" — activó modo compañero explícitamente + instrucción de no parar hasta resolver
+  - "que el desarrollador pida asesoria" — quiere que el agente delegue y use todos los recursos disponibles, no que siga parchando solo
+  - "sen profesionales" — expectativa de calidad profesional, no iteraciones incrementales que fallan
+  - Root cause REAL: re-renders del componente padre WindFarmDetail (por image loading, queries, etc.) propagaban al sidebar y reseteaban su estado. La solución definitiva fue extraer la pestaña a un componente hijo (`DefectsWindFarmTab`) que aísla su estado — exactamente como la referencia.
+  - **REGLA NUEVA**: Cuando un componente con estado interno (isEditing, isOpen, etc.) se usa dentro de un padre con muchos re-renders, SIEMPRE aislarlo en un componente hijo dedicado. Nunca embeder lógica de estado interactivo directamente en un componente padre complejo.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración extrema por repetición (confianza MUY alta), "usar mismo método que X" = aislar como la referencia, modo compañero, delegar al desarrollador para problemas persistentes
+
+### Sesión 64 - 2026-08-13
+- **Tarea principal**: Feedback correctivo — el usuario señala que la solución final fue exactamente lo que pidió desde el inicio
+- **Observaciones nuevas**:
+  - **CORRECCIÓN FUNDAMENTAL AL AGENTE**: "solucionaste el problema usando la primera instruccion que te dí, antes de eso probaste un sin fin de cosas que no resultaron" — cuando el usuario da una referencia ("basarse en X"), la acción correcta es ir DIRECTAMENTE a replicar el patrón completo de X. No probar parches intermedios.
+  - "debes acatar las ordenes" — si el usuario da una instrucción clara con referencia, ejecutarla TAL CUAL. Si el agente cree que hay un approach diferente/mejor, PREGUNTAR primero, no implementar silenciosamente otra cosa.
+  - "si te parece algo distinto preguntar para llegar a un consenso" — la regla es: (1) Acatar instrucción exacta, o (2) Preguntar si hay duda. NUNCA hacer algo diferente sin consultar.
+  - "gastamos demasiado tiempo y tokens" — el costo de no acatar la instrucción desde el inicio fue 4+ iteraciones = desperdicio real. Una iteración si se acataba desde el principio.
+  - **REGLA NUEVA MÁXIMA PRIORIDAD**: Cuando el usuario dice "basarse en X para hacer Y", el approach es: (1) Leer EXACTAMENTE cómo está implementado X (no solo el componente, sino toda la estructura), (2) Replicar ESA estructura en Y. Si eso implica extraer a un componente hijo, extraer. Si implica copiar el patrón 1:1, copiar. NO inventar "mejoras" ni "optimizaciones" propias. ACATAR.
+- **Patrones confirmados**: español, directo, alta autonomía, "acatar instrucciones" > "inventar approach propio" (REGLA MÁXIMA), frustración extrema por desperdicio de tokens/tiempo, preguntar si hay duda antes de divergir
+
+### Sesión 65 - 2026-08-13
+- **Tarea principal**: Fix gráfico "breakdown by category" vacío en step 4 del workflow para inspección 07a234d2
+- **Observaciones nuevas**:
+  - Bug de data path: los defectos existían en tabla `defect` pero el chart solo mostraba datos de `annotations`. Cuando no hay annotations (defectos creados directamente), el chart quedaba vacío.
+  - Patrón sistémico continúa: múltiples vistas asumen que los datos vienen por UN solo path, cuando en realidad hay 2+ paths posibles (blade_id vs turbine_id, annotations vs defect table).
+  - Sesión resuelta al primer intento sin correcciones — el diagnóstico fue correcto y la solución directa.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL como referencia, bug sistémico de data paths múltiples (confirmado en 5+ sesiones = confianza muy alta)
+
+### Sesión 66 - 2026-08-13
+- **Tarea principal**: Fix gráficos step 4 que seguían sin poblarse — 2 iteraciones. El usuario proporcionó inspección de referencia que SÍ funciona (abe05885) vs la que no (07a234d2).
+- **Observaciones nuevas**:
+  - "te entrego una inspeccion que si pobla los graficos... compara" — cuando el agente no logra resolver solo, el usuario da la REFERENCIA que funciona para comparar. Patrón clave: siempre usar la referencia que funciona como punto de partida.
+  - "que no entiendes de la instruccion?" — frustración por iteraciones fallidas. El primer fix no fue suficiente (solo cambió el fallthrough pero no resolvió el data path).
+  - Root cause final: la inspección `07a234d2` no tiene defectos propios. Los defectos de la turbina están en OTRA inspección (`abe05885`). El fix correcto fue agregar `useTurbineDefects(turbineId)` como fallback final — ese hook ya busca por ambos paths (blade_id + turbine_id).
+  - **APRENDIZAJE**: Cuando un fix "de lógica" no funciona, verificar los DATOS reales. El bug no era de lógica sino de data: la inspección simplemente no tenía defectos. La solución es buscar defectos a nivel de TURBINE, no de inspección individual.
+- **Patrones confirmados**: español, directo, alta autonomía, da referencia que funciona para comparar, frustración por iteraciones múltiples, bug sistémico de data paths, "compara" = usar la referencia como punto de partida absoluto
+
+### Sesión 69 - 2026-08-13
+- **Tarea principal**: Continuación fix gráficos step 4 FDM-T03 — múltiples iteraciones por dependencia inestable en useTurbineInspection para obtener inspectionIds
+- **Observaciones nuevas**:
+  - La dependencia de `inspectionData?.inspectionIds` para cargar annotations era el punto de fallo: si `useTurbineInspection` estaba loading o retornaba inspectionIds vacío, las annotations nunca se cargaban.
+  - Fix definitivo: crear query independiente (`allTurbineInspIds`) que busca TODAS las inspecciones de la turbina directamente (blade_id + turbine_id paths) sin depender del hook complejo `useTurbineInspection`.
+  - **APRENDIZAJE SISTÉMICO**: En este proyecto, cuando un hook/query depende de OTRO hook/query para obtener IDs intermedios, y ese hook tiene condiciones de early-return o stages filtrados, la cadena se rompe. Solución: queries independientes que van directo a los datos sin intermediarios.
+  - Sesión larga con 4+ iteraciones del mismo problema — cada vez el fix era "más profundo" pero no suficiente hasta llegar a la query independiente.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración máxima acumulada por 6+ iteraciones del mismo bug (cross-session), queries independientes > cadenas de dependencias
+
+### Sesión 70 - 2026-08-13
+- **Tarea principal**: Fix categorías 1 y 2 no aparecen en gráficos step 4 — conversión de tipo numérico
+- **Observaciones nuevas**:
+  - "al parecer los graficos solo estan aceptando categorias 3 4 y 5" — el usuario ahora reporta un problema DIFERENTE al anterior. Los gráficos YA se pueblan (fix anterior funcionó) pero no muestran todas las categorías.
+  - Posible causa: `d.cat` venía como string de la DB → la comparación numérica y la indexación del Record no funcionaban correctamente. Fix: `Number(d.cat)`.
+  - Sesión corta — un solo cambio puntual desplegado.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, describe el síntoma exacto ("solo categorias 3 4 y 5")
+
+### Sesión 71 - 2026-08-13
+- **Tarea principal**: Continuación — los gráficos SIGUEN sin poblarse para 07a234d2/FDM-T03 después de 6+ iteraciones
+- **Observaciones nuevas**:
+  - Después de múltiples iteraciones fallidas, el agente finalmente PREGUNTÓ al usuario para confirmar si los datos existen en la DB (si hay annotations creadas en step 2).
+  - **APRENDIZAJE**: Cuando un bug persiste después de 3+ iteraciones de fixes de código, PREGUNTAR AL USUARIO para confirmar que los datos realmente existen. No seguir asumiendo que es un bug de código cuando podría ser que la data simplemente no existe.
+  - La sesión terminó sin resolución — esperando respuesta del usuario para confirmar estado de los datos.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración extrema por iteraciones, preguntar después de 3+ intentos fallidos es CORRECTO (no antes, no mucho después)
+
+### Sesión 73 - 2026-08-13
+- **Tarea principal**: Fix edición defecto en SubassetDetail (/subasset/:id) — roto por cambios previos
+- **Observaciones nuevas**:
+  - "pasaste a llevar la edicion" — cuando un fix en un lugar rompe otro lugar, el usuario lo reporta inmediatamente. Indica que revisa TODAS las pantallas afectadas, no solo la que se está trabajando.
+  - El fix fue directo: SubassetDetail seguía usando DefectDetailPanel + IIFE (el patrón roto). Se reemplazó por DefectsWindFarmTab (el componente aislado que ya funciona).
+  - **APRENDIZAJE**: Cuando se hace un fix en una pantalla (WindFarmDetail), verificar si el MISMO patrón roto existe en OTRAS pantallas (SubassetDetail). "Bug sistémico" aplica también a patrones de código, no solo a queries.
+  - Sesión rápida — un solo cambio aceptado al primer intento.
+- **Patrones confirmados**: español, directo, alta autonomía, reporta bugs en otras pantallas inmediatamente, "pasaste a llevar" = regresión causada por cambios del agente, bug sistémico aplica a patrones de código
+
+### Sesión 74 - 2026-08-13
+- **Tarea principal**: Feedback — "actualiza el perfil en background es molesto estar aprobando la edición del archivo"
+- **Observaciones nuevas**:
+  - NO quiere que la actualización del perfil interrumpa su flujo de trabajo (pidiendo aprobación en cada turno)
+  - Prefiere que el perfil se actualice SOLO al cierre de sesión (hook Stop), no durante la conversación
+  - **REGLA**: No actualizar user-profile.md DURANTE la sesión activa. Solo al final (hook Stop). Si el hook Stop se dispara, ahí sí actualizar sin preguntar.
+- **Patrones confirmados**: español, directo, alta autonomía, no interrumpir flujo de trabajo con archivos de sistema

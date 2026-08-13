@@ -77,7 +77,7 @@ export function SubassetsSelectionPanel({
     height: '18px',
     borderRadius: '4px',
     border: checked ? 'none' : '2px solid var(--color-neutral-300)',
-    backgroundColor: checked ? '#00A3E0' : 'transparent',
+    backgroundColor: checked ? '#5A8F5A' : 'transparent',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -155,10 +155,10 @@ export function SubassetsSelectionPanel({
             return (
               <tr
                 key={row.id}
-                style={{ ...rowStyle, backgroundColor: isSelected ? 'rgba(0, 163, 224, 0.04)' : undefined }}
+                style={{ ...rowStyle, backgroundColor: isSelected ? 'rgba(90, 143, 90, 0.06)' : undefined }}
                 onClick={() => handleRowToggle(row.id)}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? 'rgba(0, 163, 224, 0.04)' : ''; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? 'rgba(90, 143, 90, 0.06)' : ''; }}
               >
                 <td style={tdStyle}>
                   <div style={checkboxStyle(isSelected)}>

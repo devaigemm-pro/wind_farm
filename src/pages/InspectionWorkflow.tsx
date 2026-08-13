@@ -19,7 +19,7 @@ export function InspectionWorkflow() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, locale, setLocale } = useLanguage();
 
   const initialStep = Number(searchParams.get('step')) || 0; // 0 means "auto-detect from stage"
   const [currentStep, setCurrentStep] = useState(initialStep || 1);
@@ -175,8 +175,30 @@ export function InspectionWorkflow() {
             </div>
           </div>
 
-          {/* Right: search button (4/12) */}
+          {/* Right: language + dark mode (4/12) */}
           <div style={gridRight}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setLocale(locale === 'en' ? 'es' : 'en')}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1.5px solid var(--color-neutral-300)', backgroundColor: 'transparent', color: 'var(--color-neutral-700)', cursor: 'pointer', borderRadius: 'var(--radius-md)', fontFamily: 'var(--font-family-sans)', fontSize: 11, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}
+                title={t('topbar.language')}
+              >
+                {locale.toUpperCase()}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                  document.documentElement.setAttribute('data-theme', next);
+                  localStorage.setItem('theme', next);
+                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: 'none', backgroundColor: 'transparent', color: 'var(--color-neutral-500)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+                title="Dark mode"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -195,7 +217,7 @@ const pageStyle: React.CSSProperties = {
   flexDirection: 'column',
   // Cancel Layout's padding and fill the entire available space
   margin: 'calc(-1 * var(--space-6))',
-  height: 'calc(100vh - 64px)', // 64px = TopBar height
+  height: '100vh',
   fontFamily: 'var(--font-family-sans)',
   overflow: 'hidden',
   background: 'var(--color-neutral-0)',
@@ -290,6 +312,6 @@ const stepLabelHighlight: React.CSSProperties = {
 
 const contentStyle: React.CSSProperties = {
   flex: 1,
-  overflow: 'hidden',
+  overflow: 'auto',
   minHeight: 0,
 };

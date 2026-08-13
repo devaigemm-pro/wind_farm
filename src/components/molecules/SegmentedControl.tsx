@@ -37,7 +37,7 @@ export function SegmentedControl({
     fontFamily: 'var(--font-family-sans)',
     fontSize: 'var(--text-sm)',
     fontWeight: isActive ? 600 : 400,
-    backgroundColor: isActive ? '#00A3E0' : 'var(--color-neutral-50)',
+    backgroundColor: isActive ? '#5A8F5A' : 'var(--color-neutral-50)',
     color: isActive ? '#FFFFFF' : 'var(--color-neutral-700)',
     transition: 'background-color 150ms ease, color 150ms ease',
     minWidth: '80px',
