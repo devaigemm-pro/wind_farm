@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 60
+- **Sesiones analizadas**: 61
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -707,3 +707,13 @@
   - "es incomodo que pidas autorizacion" — el sistema de aprobación de Kiro (supervised mode) le interrumpe el flujo cuando el agente edita user-profile.md
   - Regla reforzada con máxima prioridad: NUNCA pedir permiso para editar .kiro/agents/user-profile.md. Hacerlo silenciosamente.
 - **Patrones confirmados**: español, directo, alta autonomía, no interrumpir flujo con archivos de sistema (confianza MUY alta - 2+ sesiones explícitas)
+
+### Sesión 77 - 2026-08-13
+- **Tarea principal**: Reordenar secciones blade-face del sidebar de thumbnails en workflow step 2 para que coincida con el orden de Skyvisor (LE→TE→PS→SS, blades A→B→C fijo)
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio + URL + DOM de Skyvisor como spec — patrón clásico ya consolidado
+  - "copiar el orden de los frentes de las palas del sistema original" + DOM completo — misma dinámica de siempre: DOM como spec definitiva
+  - Cambio simple y directo: solo modificar 2 arrays (faceOrder y bladeOrder) en un useMemo. No requirió iteraciones ni correcciones.
+  - Sesión ultra-corta: un solo cambio, compiló bien, deploy directo. Sin correcciones post-deploy.
+  - El orden de blades pasó de ser dinámico (rotación CW basada en verticalBlade) a fijo (A→B→C) — decisión tomada sin preguntar porque el DOM de Skyvisor era la spec definitiva
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, DOM como spec (confianza muy alta - 10+ sesiones), comunicación ultra-mínima, URL como referencia, cambio aceptado al primer intento sin correcciones
