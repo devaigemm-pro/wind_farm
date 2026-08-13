@@ -89,43 +89,19 @@ async function fetchInspectionPhotos(
     for (let i = 0; i < importedRows.length; i += BATCH_SIZE) {
       const batch = importedRows.slice(i, i + BATCH_SIZE);
       const originalPaths = batch.map(r => r.storagePath);
-      const thumbPaths = batch.map(r => getThumbStoragePath(r.storagePath));
 
       try {
-        // Fetch signed URLs for originals and thumbnails in parallel
-        const [originalResult, thumbResult] = await Promise.all([
-          supabase.storage.from('asset-documents').createSignedUrls(originalPaths, 3600),
-          supabase.storage.from('asset-documents').createSignedUrls(thumbPaths, 3600),
-        ]);
+        // Fetch signed URLs for originals only — thumbnails will use the same
+        // signed URL with width/quality transforms appended by getPhotoPublicUrl
+        const originalResult = await supabase.storage
+          .from('asset-documents')
+          .createSignedUrls(originalPaths, 3600);
 
         if (originalResult.data) {
           for (let j = 0; j < originalResult.data.length; j++) {
             const item = originalResult.data[j];
             if (item?.signedUrl && !item.error) {
-              // Match by path to handle potential reordering from API
-              const matchIdx = originalPaths.indexOf(item.path ?? '');
-              if (matchIdx >= 0) {
-                batch[matchIdx]!.storagePath = item.signedUrl;
-              } else {
-                // Fallback to index-based if path field not available
-                batch[j]!.storagePath = item.signedUrl;
-              }
-            }
-          }
-        }
-
-        if (thumbResult.data) {
-          for (let j = 0; j < thumbResult.data.length; j++) {
-            const signedItem = thumbResult.data[j];
-            if (signedItem?.signedUrl && !signedItem.error) {
-              // Match by path to handle potential reordering from API
-              const matchIdx = thumbPaths.indexOf(signedItem.path ?? '');
-              if (matchIdx >= 0) {
-                batch[matchIdx]!.thumbnailUrl = signedItem.signedUrl;
-              } else {
-                // Fallback to index-based if path field not available
-                batch[j]!.thumbnailUrl = signedItem.signedUrl;
-              }
+              batch[j]!.storagePath = item.signedUrl;
             }
           }
         }
