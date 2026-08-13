@@ -33,7 +33,6 @@
 [data-theme="dark"] div,
 [data-theme="dark"] section,
 [data-theme="dark"] main,
-[data-theme="dark"] aside,
 [data-theme="dark"] article,
 [data-theme="dark"] header,
 [data-theme="dark"] footer,
@@ -49,6 +48,11 @@
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
   background-color: #1A1A1A !important;
+}
+
+/* Sidebar keeps its own grafito color */
+[data-theme="dark"] aside {
+  background-color: #2C2C2C !important;
 }
 
 /* Slightly different bg for page-level containers */
