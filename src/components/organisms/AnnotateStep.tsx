@@ -596,7 +596,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       </div>
 
       {/* ═══ MAIN VIEWER ═══ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <div className="annotate-viewer" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         {/* Image toolbar bar */}
         <div style={imageBarStyle}>
           {/* Left: nav buttons + flag */}

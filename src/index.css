@@ -59,6 +59,12 @@
   background-color: #2C2C2C !important;
 }
 
+/* Main photo viewer keeps white background for image visibility */
+[data-theme="dark"] .annotate-viewer,
+[data-theme="dark"] .annotate-viewer > div {
+  background-color: #FFFFFF !important;
+}
+
 /* Slightly different bg for page-level containers */
 [data-theme="dark"] body > div,
 [data-theme="dark"] [style*="height: 100%"],
