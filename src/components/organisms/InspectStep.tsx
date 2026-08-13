@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Skeleton } from '@/components/atoms';
 import { CheckCircle, Pencil, Check } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import type { Inspection } from '@/types';
 
 // OpenLayers imports
@@ -35,6 +36,7 @@ const TURBINE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="32" hei
 
 export function InspectStep({ inspection, isLoading }: InspectStepProps) {
   const { role } = useAuth();
+  const { t, locale } = useLanguage();
   const [notes, setNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [mapType, setMapType] = useState<'street' | 'satellite'>('satellite');
@@ -51,7 +53,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
   const turbineModel = (turbine as Record<string, unknown> | undefined)?.model as string ?? '—';
   const farmName = windFarm?.name ?? '—';
   const scheduledDate = inspection?.scheduled_date
-    ? new Date(inspection.scheduled_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+    ? new Date(inspection.scheduled_date).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
     : '—';
   const inspectionType = inspection?.inspection_type ?? 'blades';
   const photosCount = inspection?.photos_count ?? 0;
@@ -64,16 +66,16 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
   // Acquisition data derived from inspection
   const acquisitionData = useMemo(() => {
     const dateStr = inspection?.scheduled_date
-      ? new Date(inspection.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
+      ? new Date(inspection.scheduled_date).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
       : '—';
     return {
       dateTime: `${dateStr} 19:22`,
       photos: photosCount,
       tagged: Math.round(photosCount * (viewedPercent / 100)),
-      duration: photosCount > 0 ? `${Math.round(photosCount / 35)} minutes` : '—',
-      rtk: 'Fixed (100%)',
+      duration: photosCount > 0 ? `${Math.round(photosCount / 35)} ${t('inspect.minutes')}` : '—',
+      rtk: t('inspect.rtkFixed'),
     };
-  }, [inspection?.scheduled_date, photosCount, viewedPercent]);
+  }, [inspection?.scheduled_date, photosCount, viewedPercent, locale, t]);
 
   // Upload data
   const uploadData = useMemo(() => ({
@@ -169,17 +171,17 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
       {/* Left Column */}
       <div style={leftCol}>
         <div style={card}>
-          <h5 style={cardHeader}>Inspection Details</h5>
+          <h5 style={cardHeader}>{t('inspect.detailsTitle')}</h5>
           <div style={divider} />
           <table style={tableStyle}>
             <tbody>
-              <tr><td style={cellLabel}>Asset Name</td><td style={cellValue}>{farmName}</td></tr>
-              <tr><td style={cellLabel}>Inspection type</td><td style={cellValue}>{inspectionType}</td></tr>
-              <tr><td style={cellLabel}>Turbine</td><td style={cellValue}>{turbineName}</td></tr>
-              <tr><td style={cellLabel}>Model</td><td style={cellValue}>{turbineModel}</td></tr>
-              <tr><td style={cellLabel}>Date</td><td style={cellValue}>{scheduledDate}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.assetName')}</td><td style={cellValue}>{farmName}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.inspectionType')}</td><td style={cellValue}>{inspectionType}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.turbine')}</td><td style={cellValue}>{turbineName}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.model')}</td><td style={cellValue}>{turbineModel}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.date')}</td><td style={cellValue}>{scheduledDate}</td></tr>
               <tr>
-                <td style={cellLabel}>Notes</td>
+                <td style={cellLabel}>{t('inspect.notes')}</td>
                 <td style={{ ...cellValue, borderLeft: '1px solid #ddd' }}>
                   {role !== 'supervisor' && isEditingNotes ? (
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
@@ -190,7 +192,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
                         rows={2}
                         style={notesTextarea}
                       />
-                      <button type="button" onClick={handleSaveNotes} style={okBtn} title="Save">
+                      <button type="button" onClick={handleSaveNotes} style={okBtn} title={t('inspect.save')}>
                         <Check size={14} color="#fff" />
                       </button>
                     </div>
@@ -198,7 +200,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                       <span style={{ textAlign: 'right' }}>{notes || '—'}</span>
                       {role !== 'supervisor' && (
-                        <button type="button" onClick={() => setIsEditingNotes(true)} style={editBtn} title="Edit notes">
+                        <button type="button" onClick={() => setIsEditingNotes(true)} style={editBtn} title={t('inspect.editNotes')}>
                           <Pencil size={13} />
                         </button>
                       )}
@@ -206,20 +208,20 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
                   )}
                 </td>
               </tr>
-              <tr><td style={cellLabel}>Legislation</td><td style={{ ...cellValue, color: '#d32f2f' }}>Please check local legislation before your flight</td></tr>
-              <tr><td style={cellLabel}>Status</td><td style={{ ...cellValue, color: '#4CAF50' }}>{inspection?.stage ?? '—'}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.legislation')}</td><td style={{ ...cellValue, color: '#d32f2f' }}>{t('inspect.legislationText')}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.status')}</td><td style={{ ...cellValue, color: '#4CAF50' }}>{inspection?.stage ?? '—'}</td></tr>
             </tbody>
           </table>
         </div>
 
         <div style={card}>
           <div style={docHeaderRow}>
-            <h6 style={docTitle}>Documents dropbox</h6>
-            {role !== 'supervisor' && <button style={addDocBtn}>Add document</button>}
+            <h6 style={docTitle}>{t('inspect.documentsTitle')}</h6>
+            {role !== 'supervisor' && <button style={addDocBtn}>{t('inspect.addDocument')}</button>}
           </div>
           <div style={docBody}>
-            <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 4px' }}>Have all your key documents at your disposal here.</p>
-            <p style={{ fontSize: 12, color: '#888', margin: 0, fontStyle: 'italic' }}>Master service agreement, asset initial audit, insurance contracts, …</p>
+            <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 4px' }}>{t('inspect.documentsPlaceholder')}</p>
+            <p style={{ fontSize: 12, color: '#888', margin: 0, fontStyle: 'italic' }}>{t('inspect.documentsExamples')}</p>
           </div>
         </div>
 
@@ -233,7 +235,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
             type="button"
             onClick={() => setMapType(mapType === 'street' ? 'satellite' : 'street')}
             style={mapTypeBtn}
-            title={mapType === 'street' ? 'Switch to satellite' : 'Switch to street map'}
+            title={mapType === 'street' ? t('inspect.switchToSatellite') : t('inspect.switchToStreetMap')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="m20.5 3-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5M15 19l-6-2.11V5l6 2.11z" />
@@ -246,34 +248,34 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
       <div style={rightCol}>
         <div style={stepperContainer}>
           <div style={stepperBar}>
-            <div style={stepItem}><CheckCircle size={24} color={photosCount > 0 ? '#4caf50' : '#ccc'} /><span style={stepLabelSt}>{photosCount > 0 ? 'Complete' : 'Pending'}</span></div>
+            <div style={stepItem}><CheckCircle size={24} color={photosCount > 0 ? '#4caf50' : '#ccc'} /><span style={stepLabelSt}>{photosCount > 0 ? t('inspect.complete') : t('inspect.pending')}</span></div>
             <div style={{ ...stepLine, background: photosCount > 0 ? '#4caf50' : '#ddd' }} />
-            <div style={stepItem}><CheckCircle size={24} color={uploadData.pending === 0 && photosCount > 0 ? '#4caf50' : '#ccc'} /><span style={stepLabelSt}>{uploadData.pending === 0 && photosCount > 0 ? 'Complete' : 'Pending'}</span></div>
+            <div style={stepItem}><CheckCircle size={24} color={uploadData.pending === 0 && photosCount > 0 ? '#4caf50' : '#ccc'} /><span style={stepLabelSt}>{uploadData.pending === 0 && photosCount > 0 ? t('inspect.complete') : t('inspect.pending')}</span></div>
           </div>
         </div>
 
         <div style={cardsRow}>
           <div style={{ ...card, flex: 1 }}>
-            <h5 style={cardHeaderCenter}>Acquisition</h5>
+            <h5 style={cardHeaderCenter}>{t('inspect.acquisition')}</h5>
             <div style={divider} />
             <table style={tableStyle}>
               <tbody>
-                <tr><td style={cellLabel}>Date and time</td><td style={cellValue}>{acquisitionData.dateTime}</td></tr>
-                <tr><td style={cellLabel}>Photos</td><td style={cellValue}>{acquisitionData.photos}</td></tr>
-                <tr><td style={cellLabel}>Tagged photos</td><td style={cellValue}>{acquisitionData.tagged}</td></tr>
-                <tr><td style={cellLabel}>Inspection duration</td><td style={cellValue}>{acquisitionData.duration}</td></tr>
-                <tr><td style={cellLabel}>RTK Status</td><td style={cellValue}>{acquisitionData.rtk}</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.dateAndTime')}</td><td style={cellValue}>{acquisitionData.dateTime}</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.photos')}</td><td style={cellValue}>{acquisitionData.photos}</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.taggedPhotos')}</td><td style={cellValue}>{acquisitionData.tagged}</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.inspectionDuration')}</td><td style={cellValue}>{acquisitionData.duration}</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.rtkStatus')}</td><td style={cellValue}>{acquisitionData.rtk}</td></tr>
               </tbody>
             </table>
           </div>
 
           <div style={{ ...card, flex: 1 }}>
-            <h5 style={cardHeaderCenter}>Photo upload</h5>
+            <h5 style={cardHeaderCenter}>{t('inspect.photoUpload')}</h5>
             <div style={divider} />
             <table style={tableStyle}>
               <tbody>
-                <tr><td style={cellLabel}>Uploaded photos</td><td style={cellValue}>{uploadData.uploaded} ({uploadData.pending === 0 && photosCount > 0 ? '100%' : '0%'})</td></tr>
-                <tr><td style={cellLabel}>Pending photos</td><td style={cellValue}>{uploadData.pending}</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.uploadedPhotos')}</td><td style={cellValue}>{uploadData.uploaded} ({uploadData.pending === 0 && photosCount > 0 ? '100%' : '0%'})</td></tr>
+                <tr><td style={cellLabel}>{t('inspect.pendingPhotos')}</td><td style={cellValue}>{uploadData.pending}</td></tr>
               </tbody>
             </table>
           </div>

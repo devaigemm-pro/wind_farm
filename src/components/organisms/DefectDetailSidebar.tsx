@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ExternalLink, Pencil, Maximize2 } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 import type { DefectDashboardRow } from '@/types';
 import { DefectComments } from '@/components/molecules/DefectComments';
 import { DefectImageViewer } from './DefectImageViewer';
@@ -30,6 +31,7 @@ export function DefectDetailSidebar({
   onCompare,
 }: DefectDetailSidebarProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const { t } = useLanguage();
 
   // Reset edit mode when selected defect changes
   useEffect(() => {
@@ -40,7 +42,7 @@ export function DefectDetailSidebar({
     return (
       <div style={containerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-neutral-400)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-family-sans)' }}>
-          Select a defect to view details
+          {t('defectSidebar.selectDefect')}
         </div>
       </div>
     );
@@ -166,17 +168,17 @@ export function DefectDetailSidebar({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', fontFamily: 'var(--font-family-sans)' }}>
             <tbody>
               <tr>
-                <td style={firstTableKeyStyle}>Category:</td>
+                <td style={firstTableKeyStyle}>{t('defectSidebar.category')}:</td>
                 <td style={firstTableValStyle}>
                   <span style={getCategoryBadgeStyle(defect.category)}>{defect.category}</span>
                 </td>
-                <td style={{ ...firstTableKeyStyle, textAlign: 'right' }}>Status:</td>
+                <td style={{ ...firstTableKeyStyle, textAlign: 'right' }}>{t('defectSidebar.status')}:</td>
                 <td style={firstTableValStyle}>
                   <button
                     type="button"
                     style={toggleStyle}
                     onClick={() => onResolvedToggle(defect.id, !defect.resolved)}
-                    aria-label={defect.resolved ? 'Mark as unresolved' : 'Mark as resolved'}
+                    aria-label={defect.resolved ? t('defectSidebar.markUnresolved') : t('defectSidebar.markResolved')}
                     aria-pressed={defect.resolved}
                   >
                     <span style={toggleKnobStyle} />
@@ -184,9 +186,9 @@ export function DefectDetailSidebar({
                 </td>
               </tr>
               <tr>
-                <td style={{ ...firstTableKeyStyle, paddingRight: '1rem' }}>Defect size:</td>
+                <td style={{ ...firstTableKeyStyle, paddingRight: '1rem' }}>{t('defectSidebar.defectSize')}:</td>
                 <td style={firstTableValStyle}>{defect.defectWidth} x {defect.defectHeight}</td>
-                <td style={{ ...firstTableKeyStyle, textAlign: 'right' }}>Blade Side:</td>
+                <td style={{ ...firstTableKeyStyle, textAlign: 'right' }}>{t('defectSidebar.bladeSide')}:</td>
                 <td style={firstTableValStyle}>{defect.side}</td>
               </tr>
             </tbody>
@@ -200,19 +202,19 @@ export function DefectDetailSidebar({
             <tbody>
               {defect.rootCause && (
                 <tr>
-                  <td style={secondTableKeyStyle}>Root Cause:</td>
+                  <td style={secondTableKeyStyle}>{t('defectSidebar.rootCause')}:</td>
                   <td style={secondTableValStyle}>{defect.rootCause}</td>
                 </tr>
               )}
               {defect.nextStep && (
                 <tr>
-                  <td style={secondTableKeyStyle}>Next Step:</td>
+                  <td style={secondTableKeyStyle}>{t('defectSidebar.nextStep')}:</td>
                   <td style={secondTableValStyle}>{defect.nextStep}</td>
                 </tr>
               )}
               {defect.notes && (
                 <tr>
-                  <td style={secondTableKeyStyle}>Note:</td>
+                  <td style={secondTableKeyStyle}>{t('defectSidebar.note')}:</td>
                   <td style={secondTableValStyle}>{defect.notes}</td>
                 </tr>
               )}

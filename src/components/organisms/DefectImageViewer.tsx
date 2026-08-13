@@ -1,4 +1,5 @@
 import { ImageIcon } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 
 export interface DefectImageViewerProps {
   imageUrl: string | null;
@@ -15,6 +16,8 @@ export function DefectImageViewer({
   onZoomOut,
   onCompare,
 }: DefectImageViewerProps) {
+  const { t } = useLanguage();
+
   function handleWheel(e: React.WheelEvent) {
     // Don't call preventDefault to avoid passive event listener violation
     if (e.deltaY < 0) {
@@ -115,7 +118,7 @@ export function DefectImageViewer({
           <div style={placeholderStyle}>
             <ImageIcon size={32} />
             <span style={{ fontSize: '12px', fontFamily: 'var(--font-family-sans)' }}>
-              No image available
+              {t('defectImage.noImage')}
             </span>
           </div>
         )}
@@ -124,7 +127,7 @@ export function DefectImageViewer({
       {/* Bottom bar: Compare left, Zoom right */}
       <div style={bottomBarStyle}>
         <button type="button" style={compareBtnStyle} onClick={onCompare}>
-          Compare
+          {t('defectImage.compare')}
         </button>
 
         <div style={zoomGroupStyle}>

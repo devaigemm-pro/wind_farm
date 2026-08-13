@@ -1049,7 +1049,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     
                     setAnnotationType(ann.type);
                     setAnnotationCategory(ann.category);
-                    setAnnotationNote(ann.note);
+                    setAnnotationNote(ann.note.replace('[oval]', ''));
+                    setDrawShape(ann.note.startsWith('[oval]') ? 'oval' : 'rect');
                     // Reconstruct drawStart/drawEnd from center + angle + width
                     const rad = (ann.angle || 0) * (Math.PI / 180);
                     const halfW = ann.w / 2;
@@ -1072,8 +1073,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   )}
                 </div>
               </div>
-              {/* Rectangle border */}
-              <div style={{ width: '100%', height: '100%', border: '2.5px solid #FF6600', background: 'rgba(255, 102, 0, 0.08)' }} />
+              {/* Rectangle or oval border */}
+              <div style={{ width: '100%', height: '100%', border: '2.5px solid #FF6600', background: 'rgba(255, 102, 0, 0.08)', borderRadius: ann.note.startsWith('[oval]') ? '50%' : 0 }} />
               {/* Size label below */}
               <span style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, fontSize: 13, fontWeight: 600, color: '#fff', fontStyle: 'italic', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
                 {Math.round(ann.w * 1.5)} x {Math.round(ann.h * 1.3)} cm
@@ -1100,12 +1101,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             if (isLine) {
               // Phase 1: SVG line
               return (
-                <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                   <line
-                    x1={drawStart.x} y1={drawStart.y}
-                    x2={drawEnd.x} y2={drawEnd.y}
-                    stroke="#FF6600" strokeWidth="0.3" strokeLinecap="round"
-                    vectorEffect="non-scaling-stroke"
+                    x1={`${drawStart.x}%`} y1={`${drawStart.y}%`}
+                    x2={`${drawEnd.x}%`} y2={`${drawEnd.y}%`}
+                    stroke="#FF3300" strokeWidth="2.5" strokeLinecap="round"
                   />
                 </svg>
               );
@@ -1129,35 +1129,34 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const p4y = drawStart.y - ny * halfH;
 
             return (
-              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} viewBox="0 0 100 100" preserveAspectRatio="none">
-                {/* Center line */}
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                {/* Center line (dashed) */}
                 <line
-                  x1={drawStart.x} y1={drawStart.y}
-                  x2={drawEnd.x} y2={drawEnd.y}
-                  stroke="#FF6600" strokeWidth="0.15" strokeDasharray="0.5 0.3" opacity="0.7"
-                  vectorEffect="non-scaling-stroke"
+                  x1={`${drawStart.x}%`} y1={`${drawStart.y}%`}
+                  x2={`${drawEnd.x}%`} y2={`${drawEnd.y}%`}
+                  stroke="#FF3300" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.7"
                 />
                 {drawShape === 'rect' ? (
-                  /* Rectangle as polygon */
-                  <polygon
-                    points={`${p1x},${p1y} ${p2x},${p2y} ${p3x},${p3y} ${p4x},${p4y}`}
-                    fill="rgba(255, 102, 0, 0.12)"
-                    stroke="#FF6600"
-                    strokeWidth="0.3"
-                    vectorEffect="non-scaling-stroke"
-                  />
+                  /* Rectangle as 4 lines */
+                  <>
+                    <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF3300" strokeWidth="2.5" />
+                    <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF3300" strokeWidth="2.5" />
+                    <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF3300" strokeWidth="2.5" />
+                    <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF3300" strokeWidth="2.5" />
+                    {/* Fill rectangle — use a polygon with absolute pixel coords calculated from % */}
+                  </>
                 ) : (
-                  /* Oval/ellipse */
+                  /* Oval — use ellipse with % center and radii in % */
                   <ellipse
-                    cx={(drawStart.x + drawEnd.x) / 2}
-                    cy={(drawStart.y + drawEnd.y) / 2}
-                    rx={w / 2}
-                    ry={halfH}
-                    fill="rgba(255, 102, 0, 0.12)"
-                    stroke="#FF6600"
-                    strokeWidth="0.3"
-                    vectorEffect="non-scaling-stroke"
-                    transform={`rotate(${Math.atan2(dy, dx) * (180 / Math.PI)} ${(drawStart.x + drawEnd.x) / 2} ${(drawStart.y + drawEnd.y) / 2})`}
+                    cx={`${(drawStart.x + drawEnd.x) / 2}%`}
+                    cy={`${(drawStart.y + drawEnd.y) / 2}%`}
+                    rx={`${w / 2}%`}
+                    ry={`${halfH}%`}
+                    fill="rgba(255, 51, 0, 0.15)"
+                    stroke="#FF3300"
+                    strokeWidth="2.5"
+                    transform={`rotate(${Math.atan2(dy, dx) * (180 / Math.PI)}, ${50}%, ${50}%)`}
+                    style={{ transformOrigin: `${(drawStart.x + drawEnd.x) / 2}% ${(drawStart.y + drawEnd.y) / 2}%`, transform: `rotate(${Math.atan2(dy, dx) * (180 / Math.PI)}deg)` }}
                   />
                 )}
               </svg>
@@ -1276,7 +1275,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     const w = Math.sqrt(dx * dx + dy * dy);
                     const h = drawWidth;
                     // Store x,y as center point, w/h as rotated dimensions
-                    updateAnnotation.mutate({ id: editingAnnotationId, x: cx, y: cy, w, h, angle, type: annotationType, category: annotationCategory, note: annotationNote });
+                    updateAnnotation.mutate({ id: editingAnnotationId, x: cx, y: cy, w, h, angle, type: annotationType, category: annotationCategory, note: (drawShape === 'oval' ? '[oval]' : '') + annotationNote });
                   }
                 } else {
                   // Create new annotation in DB
@@ -1295,7 +1294,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       angle,
                       type: annotationType,
                       category: annotationCategory,
-                      note: annotationNote,
+                      note: (drawShape === 'oval' ? '[oval]' : '') + annotationNote,
                     }, {
                       onError: (err) => {
                         setSaveError(err instanceof Error ? err.message : t('annotate.saveFailed'));
@@ -1394,7 +1393,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   angle,
                   type: rightPanelType,
                   category: rightPanelCategory,
-                  note: '',
+                  note: drawShape === 'oval' ? '[oval]' : '',
                 });
               }
             }

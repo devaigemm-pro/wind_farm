@@ -1,4 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, LabelList } from 'recharts';
+import { useLanguage } from '@/components/design-system';
 
 export interface OperationsDataItem {
   month: string;
@@ -12,6 +13,7 @@ export interface InspectionOperationsChartProps {
 }
 
 export function InspectionOperationsChart({ data }: InspectionOperationsChartProps) {
+  const { t } = useLanguage();
   // Find index of current month to draw a "Now" reference line
   const now = new Date();
   const currentMonthShort = now.toLocaleString('en', { month: 'short' });
@@ -50,9 +52,9 @@ export function InspectionOperationsChart({ data }: InspectionOperationsChartPro
           wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
           formatter={(value: string) => {
             const labels: Record<string, string> = {
-              toPlan: 'Inspections to Plan',
-              planned: 'Inspections Planned',
-              done: 'Inspections Done',
+              toPlan: t('chart.inspectionsToPlan'),
+              planned: t('chart.inspectionsPlanned'),
+              done: t('chart.inspectionsDone'),
             };
             return labels[value] ?? value;
           }}
@@ -61,7 +63,7 @@ export function InspectionOperationsChart({ data }: InspectionOperationsChartPro
           <ReferenceLine
             x={data[nowIndex]?.month}
             stroke="#5a9e5a"
-            label={{ value: 'Now', position: 'top', fill: '#5a9e5a', fontSize: 11, fontWeight: 600 }}
+            label={{ value: t('chart.now'), position: 'top', fill: '#5a9e5a', fontSize: 11, fontWeight: 600 }}
           />
         )}
         <Bar dataKey="toPlan" fill="#2c3e6b" radius={[4, 4, 0, 0]} maxBarSize={32}>

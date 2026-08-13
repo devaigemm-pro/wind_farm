@@ -1,4 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { useLanguage } from '@/components/design-system';
 
 export interface DefectsSpreadDataItem {
   category: string;
@@ -17,19 +18,20 @@ const SEVERITY_COLORS: Record<string, string> = {
   sev5: '#b84a4a',   // Severity 5 - matte red
 };
 
-const SEVERITY_LABELS: Record<string, string> = {
-  sev1: 'Severity 1',
-  sev2: 'Severity 2',
-  sev3: 'Severity 3',
-  sev4: 'Severity 4',
-  sev5: 'Severity 5',
-};
-
 export function DefectsSpreadChart({ data }: DefectsSpreadChartProps) {
+  const { t } = useLanguage();
   const firstItem = data[0];
   const severityKeys = firstItem
     ? Object.keys(firstItem).filter((k) => k !== 'category')
     : [];
+
+  const SEVERITY_LABELS_I18N: Record<string, string> = {
+    sev1: `${t('chart.severity')} 1`,
+    sev2: `${t('chart.severity')} 2`,
+    sev3: `${t('chart.severity')} 3`,
+    sev4: `${t('chart.severity')} 4`,
+    sev5: `${t('chart.severity')} 5`,
+  };
 
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -60,7 +62,7 @@ export function DefectsSpreadChart({ data }: DefectsSpreadChartProps) {
           iconType="circle"
           iconSize={8}
           wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
-          formatter={(value: string) => SEVERITY_LABELS[value] ?? value}
+          formatter={(value: string) => SEVERITY_LABELS_I18N[value] ?? value}
         />
         {severityKeys.map((key, index) => (
           <Bar

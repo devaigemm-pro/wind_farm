@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useDefects } from '@/hooks/useDefects';
 import { useMultiAnnotations, useCampaignInspectionIds } from '@/hooks/useAnnotations';
 import { useInspectionPhotos, getFaceShort } from '@/hooks/useInspectionPhotos';
+import { useLanguage } from '@/components/design-system';
 import { BladesDiagram } from '@/components/organisms/BladesDiagram';
 import type { Inspection } from '@/types';
 
@@ -31,6 +32,7 @@ function deriveBladeFaceLegacy(thumbnailId: string): { blade: string; face: stri
 }
 
 export function ResultsStep({ inspectionId, inspection, campaignId: propCampaignId }: ResultsStepProps) {
+  const { t } = useLanguage();
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
   const { data: campaignInspIds = [] } = useCampaignInspectionIds(campaignId);
 
@@ -117,7 +119,7 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid #eee', borderTopColor: '#4CAF50', animation: 'spin 1s linear infinite' }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          <span style={{ fontSize: 13, color: '#888' }}>Loading results...</span>
+          <span style={{ fontSize: 13, color: '#888' }}>{t('results.loading')}</span>
         </div>
       </div>
     );
@@ -127,9 +129,9 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
   if (diagramDefects.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, padding: 48 }}>
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: '#555', margin: 0 }}>No confirmed defects</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: '#555', margin: 0 }}>{t('results.noConfirmedDefects')}</h3>
         <p style={{ fontSize: 14, color: '#888', margin: 0, textAlign: 'center', maxWidth: 400 }}>
-          Go to step 3 (Analyze) and confirm annotations as defects to see them here.
+          {t('results.noConfirmedDefectsDesc')}
         </p>
       </div>
     );
@@ -139,7 +141,7 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
     <div style={containerStyle}>
       <div style={headerStyle}>
         <h5 style={{ fontSize: 18, fontWeight: 600, color: C.text, margin: 0 }}>
-          Inspection Results — {diagramDefects.length} defect{diagramDefects.length !== 1 ? 's' : ''} confirmed
+          {t('results.title')} — {diagramDefects.length} {diagramDefects.length !== 1 ? t('results.defectsPlural') : t('results.defectSingular')} {t('results.confirmed')}
         </h5>
       </div>
       <div style={diagramContainerStyle}>
@@ -154,11 +156,11 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
           <thead>
             <tr>
               <th style={thStyle}>#</th>
-              <th style={thStyle}>Blade</th>
-              <th style={thStyle}>Type</th>
-              <th style={thStyle}>Face</th>
-              <th style={thStyle}>Category</th>
-              <th style={thStyle}>Root (m)</th>
+              <th style={thStyle}>{t('results.blade')}</th>
+              <th style={thStyle}>{t('results.type')}</th>
+              <th style={thStyle}>{t('results.face')}</th>
+              <th style={thStyle}>{t('results.category')}</th>
+              <th style={thStyle}>{t('results.rootM')}</th>
             </tr>
           </thead>
           <tbody>

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import { CampaignAccordion } from './CampaignAccordion';
 import type { Campaign } from '@/types';
 
@@ -18,17 +19,18 @@ export interface CampaignsPanelProps {
 export function CampaignsPanel({
   campaigns, isLoading, onViewResults, onSubassetClick, onInspectionClick, onEditCampaign, onDeleteCampaign, filterBySubasset, onClearFilter,
 }: CampaignsPanelProps) {
+  const { t } = useLanguage();
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <h3 style={titleStyle}>Campaigns</h3>
+        <h3 style={titleStyle}>{t('campaigns.title')}</h3>
       </div>
       {filterBySubasset && (
         <div style={filterBadgeStyle}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-primary-700)' }}>
-            Filtered by: <strong>{filterBySubasset}</strong>
+            {t('campaigns.filteredBy')}: <strong>{filterBySubasset}</strong>
           </span>
-          <button style={clearFilterBtnStyle} onClick={onClearFilter} title="Clear filter">
+          <button style={clearFilterBtnStyle} onClick={onClearFilter} title={t('campaigns.clearFilter')}>
             <X size={14} />
           </button>
         </div>
@@ -40,7 +42,7 @@ export function CampaignsPanel({
           ))}
         </div>
       ) : campaigns.length === 0 ? (
-        <p style={emptyStyle}>No campaigns yet.</p>
+        <p style={emptyStyle}>{t('campaigns.noCampaigns')}</p>
       ) : (
         <div style={listStyle}>
           {campaigns.map((campaign) => (

@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 55
+- **Sesiones analizadas**: 56
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -592,3 +592,12 @@
   - Segunda ronda de limpieza de colores hardcodeados: Reports tenía rgba(0,0,0,X), #F4F6F8, #FAFAFA, borders con rgba. Otros componentes (DefectEditForm, ExportPanel, InspectStep) también tenían residuos.
   - El approach correcto desde la PRIMERA sesión hubiera sido: `grep -rn "#F\|#f\|rgba(0" src/ --include="*.tsx"` para encontrar TODO de una vez.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, URL exacta como referencia, barrido de calidad multi-pantalla, frustración acumulada cuando el problema persiste
+
+### Sesión 53 - 2026-08-13
+- **Tarea principal**: (1) Reportes y títulos seguían sin aplicar dark mode → solución global con `[data-theme="dark"] * { color !important }`. (2) Sidebar cambió de color por el override global → excluir aside del override.
+- **Observaciones nuevas**:
+  - "estas fallando demasiado con un cambio simple" — frustración explícita. Para el usuario, cambiar colores es trivial y no debería tomar 5+ sesiones.
+  - "ser exhaustivo" = resolver TODO de una sola vez. La solución correcta desde el inicio era un override CSS global con `!important`, no parchar 150 archivos uno a uno.
+  - "el menu no debia cambiar" — cuando un override global afecta algo que ya funcionaba bien, el usuario corrige inmediatamente. La expectativa es que el agente anticipe estos side effects.
+  - **APRENDIZAJE**: Para cambios de color GLOBALES, SIEMPRE usar CSS `!important` override en index.css. Para componentes que deben PRESERVAR su estilo (sidebar, botones de color), excluirlos explícitamente.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente complica lo simple, corrección directa sin drama, espera que side effects se anticipen

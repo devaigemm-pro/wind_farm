@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { Button, Skeleton } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import type { WindFarmDetail } from '@/types';
 
 export interface DetailsBlockProps {
@@ -11,15 +12,16 @@ export interface DetailsBlockProps {
 
 export function DetailsBlock({ detail, isLoading, onPlanInspection }: DetailsBlockProps) {
   const { role } = useAuth();
+  const { t, locale } = useLanguage();
   const formatDate = (date: string | null) => {
     if (!date) return '—';
-    return new Date(date).toLocaleDateString();
+    return new Date(date).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US');
   };
 
   if (isLoading) {
     return (
       <div style={containerStyle}>
-        <h3 style={titleStyle}>Details</h3>
+        <h3 style={titleStyle}>{t('details.title')}</h3>
         <div style={gridStyle}>
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} variant="rect" height="40px" />
@@ -31,28 +33,28 @@ export function DetailsBlock({ detail, isLoading, onPlanInspection }: DetailsBlo
 
   return (
     <div style={containerStyle}>
-      <h3 style={titleStyle}>Details</h3>
+      <h3 style={titleStyle}>{t('details.title')}</h3>
       <div style={gridStyle}>
         <div style={metricStyle}>
-          <span style={labelStyle}>Oldest inspection</span>
+          <span style={labelStyle}>{t('details.oldestInspection')}</span>
           <span style={valueStyle}>{formatDate(detail?.oldestInspection ?? null)}</span>
         </div>
         <div style={metricStyle}>
-          <span style={labelStyle}>Total power</span>
+          <span style={labelStyle}>{t('details.totalPower')}</span>
           <span style={valueStyle}>{detail?.totalPower?.toLocaleString() ?? 0} kW</span>
         </div>
         <div style={metricStyle}>
-          <span style={labelStyle}>Powering date</span>
+          <span style={labelStyle}>{t('details.poweringDate')}</span>
           <span style={valueStyle}>{formatDate(detail?.poweringDate ?? null)}</span>
         </div>
         <div style={metricStyle}>
-          <span style={labelStyle}>Number of sub-assets</span>
+          <span style={labelStyle}>{t('details.numberOfSubassets')}</span>
           <span style={valueStyle}>{detail?.subAssetsCount ?? 0}</span>
         </div>
       </div>
       {role !== 'supervisor' && (
         <Button variant="primary" icon={Plus} onClick={onPlanInspection} style={{ width: '100%', marginTop: 'var(--space-4)' }}>
-          Plan a New Inspection
+          {t('details.planInspection')}
         </Button>
       )}
     </div>

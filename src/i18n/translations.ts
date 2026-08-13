@@ -530,4 +530,106 @@ export const translations: TranslationMap = {
   'misc.sendComment': { en: 'Send comment', es: 'Enviar comentario' },
   'misc.weatherForecast': { en: 'Weather forecast map', es: 'Mapa de pronóstico meteorológico' },
   'misc.exportDefects': { en: 'Export defects list', es: 'Exportar lista de defectos' },
+
+  // ─── Inspect Step ───────────────────────────────────────────────────────────
+  'inspect.detailsTitle': { en: 'Inspection Details', es: 'Detalles de Inspección' },
+  'inspect.assetName': { en: 'Asset Name', es: 'Nombre del Activo' },
+  'inspect.inspectionType': { en: 'Inspection type', es: 'Tipo de Inspección' },
+  'inspect.turbine': { en: 'Turbine', es: 'Aerogenerador' },
+  'inspect.model': { en: 'Model', es: 'Modelo' },
+  'inspect.date': { en: 'Date', es: 'Fecha' },
+  'inspect.notes': { en: 'Notes', es: 'Notas' },
+  'inspect.legislation': { en: 'Legislation', es: 'Legislación' },
+  'inspect.legislationText': { en: 'Please check local legislation before your flight', es: 'Verifique la legislación local antes de su vuelo' },
+  'inspect.status': { en: 'Status', es: 'Estado' },
+  'inspect.documentsTitle': { en: 'Documents dropbox', es: 'Buzón de documentos' },
+  'inspect.addDocument': { en: 'Add document', es: 'Agregar documento' },
+  'inspect.documentsPlaceholder': { en: 'Have all your key documents at your disposal here.', es: 'Ten todos tus documentos clave aquí.' },
+  'inspect.documentsExamples': { en: 'Master service agreement, asset initial audit, insurance contracts, …', es: 'Contrato de servicio, auditoría inicial del activo, contratos de seguro, …' },
+  'inspect.switchToSatellite': { en: 'Switch to satellite', es: 'Cambiar a satélite' },
+  'inspect.switchToStreetMap': { en: 'Switch to street map', es: 'Cambiar a mapa callejero' },
+  'inspect.complete': { en: 'Complete', es: 'Completo' },
+  'inspect.pending': { en: 'Pending', es: 'Pendiente' },
+  'inspect.acquisition': { en: 'Acquisition', es: 'Adquisición' },
+  'inspect.dateAndTime': { en: 'Date and time', es: 'Fecha y hora' },
+  'inspect.photos': { en: 'Photos', es: 'Fotografías' },
+  'inspect.taggedPhotos': { en: 'Tagged photos', es: 'Fotos marcadas' },
+  'inspect.inspectionDuration': { en: 'Inspection duration', es: 'Duración de inspección' },
+  'inspect.rtkStatus': { en: 'RTK Status', es: 'Estado RTK' },
+  'inspect.rtkFixed': { en: 'Fixed (100%)', es: 'Fijo (100%)' },
+  'inspect.minutes': { en: 'minutes', es: 'minutos' },
+  'inspect.photoUpload': { en: 'Photo upload', es: 'Subida de fotos' },
+  'inspect.uploadedPhotos': { en: 'Uploaded photos', es: 'Fotos subidas' },
+  'inspect.pendingPhotos': { en: 'Pending photos', es: 'Fotos pendientes' },
+  'inspect.save': { en: 'Save', es: 'Guardar' },
+  'inspect.editNotes': { en: 'Edit notes', es: 'Editar notas' },
+
+  // ─── Details Block ──────────────────────────────────────────────────────────
+  'details.title': { en: 'Details', es: 'Detalles' },
+  'details.oldestInspection': { en: 'Oldest inspection', es: 'Inspección más antigua' },
+  'details.totalPower': { en: 'Total power', es: 'Potencia total' },
+  'details.poweringDate': { en: 'Powering date', es: 'Fecha de puesta en marcha' },
+  'details.numberOfSubassets': { en: 'Number of sub-assets', es: 'Número de sub-activos' },
+  'details.planInspection': { en: 'Plan a New Inspection', es: 'Planificar Nueva Inspección' },
+
+  // ─── Campaigns Panel ────────────────────────────────────────────────────────
+  'campaigns.title': { en: 'Campaigns', es: 'Campañas' },
+  'campaigns.filteredBy': { en: 'Filtered by', es: 'Filtrado por' },
+  'campaigns.clearFilter': { en: 'Clear filter', es: 'Limpiar filtro' },
+  'campaigns.noCampaigns': { en: 'No campaigns yet.', es: 'Sin campañas aún.' },
+
+  // ─── Results Step ───────────────────────────────────────────────────────────
+  'results.loading': { en: 'Loading results...', es: 'Cargando resultados...' },
+  'results.noConfirmedDefects': { en: 'No confirmed defects', es: 'Sin defectos confirmados' },
+  'results.noConfirmedDefectsDesc': { en: 'Go to step 3 (Analyze) and confirm annotations as defects to see them here.', es: 'Ve al paso 3 (Analizar) y confirma anotaciones como defectos para verlos aquí.' },
+  'results.title': { en: 'Inspection Results', es: 'Resultados de Inspección' },
+  'results.defectsPlural': { en: 'defects', es: 'defectos' },
+  'results.defectSingular': { en: 'defect', es: 'defecto' },
+  'results.confirmed': { en: 'confirmed', es: 'confirmados' },
+  'results.blade': { en: 'Blade', es: 'Pala' },
+  'results.type': { en: 'Type', es: 'Tipo' },
+  'results.face': { en: 'Face', es: 'Cara' },
+  'results.category': { en: 'Category', es: 'Categoría' },
+  'results.rootM': { en: 'Root (m)', es: 'Raíz (m)' },
+
+  // ─── Turbine Result Accordion ───────────────────────────────────────────────
+  'turbineResult.resolved': { en: 'resolved', es: 'resueltos' },
+  'turbineResult.downloadPdf': { en: 'Download PDF', es: 'Descargar PDF' },
+  'turbineResult.downloadXlsx': { en: 'Download XLSX', es: 'Descargar XLSX' },
+  'turbineResult.openInspection': { en: 'Open inspection', es: 'Abrir inspección' },
+  'turbineResult.blade': { en: 'BLADE', es: 'PALA' },
+
+  // ─── Defect Detail Sidebar ──────────────────────────────────────────────────
+  'defectSidebar.selectDefect': { en: 'Select a defect to view details', es: 'Seleccione un defecto para ver detalles' },
+  'defectSidebar.category': { en: 'Category', es: 'Categoría' },
+  'defectSidebar.status': { en: 'Status', es: 'Estado' },
+  'defectSidebar.markResolved': { en: 'Mark as resolved', es: 'Marcar como resuelto' },
+  'defectSidebar.markUnresolved': { en: 'Mark as unresolved', es: 'Marcar como no resuelto' },
+  'defectSidebar.defectSize': { en: 'Defect size', es: 'Tamaño del defecto' },
+  'defectSidebar.bladeSide': { en: 'Blade Side', es: 'Cara de pala' },
+  'defectSidebar.rootCause': { en: 'Root Cause', es: 'Causa raíz' },
+  'defectSidebar.nextStep': { en: 'Next Step', es: 'Siguiente paso' },
+  'defectSidebar.note': { en: 'Note', es: 'Nota' },
+
+  // ─── Defect Image Viewer ────────────────────────────────────────────────────
+  'defectImage.noImage': { en: 'No image available', es: 'Sin imagen disponible' },
+  'defectImage.compare': { en: 'Compare', es: 'Comparar' },
+
+  // ─── Blade Diagram ──────────────────────────────────────────────────────────
+  'bladeDiagram.ariaLabel': { en: 'Blade diagram showing defect at {distance}m on {side} side', es: 'Diagrama de pala mostrando defecto a {distance}m en cara {side}' },
+  'bladeDiagram.expand': { en: 'Expand blade view', es: 'Expandir vista de pala' },
+
+  // ─── Asset Tree ─────────────────────────────────────────────────────────────
+  'assetTree.loading': { en: 'Loading asset tree', es: 'Cargando árbol de activos' },
+
+  // ─── Charts ─────────────────────────────────────────────────────────────────
+  'chart.inspectionsToPlan': { en: 'Inspections to Plan', es: 'Inspecciones por Planificar' },
+  'chart.inspectionsPlanned': { en: 'Inspections Planned', es: 'Inspecciones Planificadas' },
+  'chart.inspectionsDone': { en: 'Inspections Done', es: 'Inspecciones Realizadas' },
+  'chart.now': { en: 'Now', es: 'Ahora' },
+  'chart.totalAssets': { en: 'Total assets', es: 'Activos totales' },
+  'chart.lessThan3Months': { en: '< 3 months', es: '< 3 meses' },
+  'chart.6to3Months': { en: '6 to 3 months', es: '6 a 3 meses' },
+  'chart.moreThan6Months': { en: '> 6 months', es: '> 6 meses' },
+  'chart.severity': { en: 'Severity', es: 'Severidad' },
 };

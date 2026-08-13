@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Download, FileText, ExternalLink } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 import type { CampaignTurbineResult } from '@/types';
 
 const CAT_COLORS: Record<number, string> = {
@@ -69,6 +70,7 @@ export function TurbineResultAccordion({
   onDownloadCsv,
 }: TurbineResultAccordionProps) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <div style={accordionContainer}>
@@ -89,16 +91,16 @@ export function TurbineResultAccordion({
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <SeverityRow defectsByCat={result.defectsByCat} small />
           <span style={{ fontSize: '0.75rem', color: 'var(--color-neutral-600)', whiteSpace: 'nowrap' }}>
-            <strong>{result.resolvedCount} / {result.totalDefects}</strong> resolved
+            <strong>{result.resolvedCount} / {result.totalDefects}</strong> {t('turbineResult.resolved')}
           </span>
           <div style={{ display: 'flex', gap: '4px' }}>
-            <IconBtn title="Download PDF" onClick={() => onDownloadPdf?.(result.turbineId)}>
+            <IconBtn title={t('turbineResult.downloadPdf')} onClick={() => onDownloadPdf?.(result.turbineId)}>
               <Download size={14} />
             </IconBtn>
-            <IconBtn title="Download XLSX" onClick={() => onDownloadCsv?.(result.turbineId)}>
+            <IconBtn title={t('turbineResult.downloadXlsx')} onClick={() => onDownloadCsv?.(result.turbineId)}>
               <FileText size={14} />
             </IconBtn>
-            <IconBtn title="Open inspection" onClick={() => onOpenInspection?.(result.turbineId)}>
+            <IconBtn title={t('turbineResult.openInspection')} onClick={() => onOpenInspection?.(result.turbineId)}>
               <ExternalLink size={14} />
             </IconBtn>
           </div>
@@ -111,11 +113,11 @@ export function TurbineResultAccordion({
           {result.blades.map((blade) => (
             <div key={blade.position} style={bladeRow}>
               <span style={{ fontWeight: 600, fontSize: '0.75rem', minWidth: '60px', color: 'var(--color-neutral-700)' }}>
-                BLADE {blade.position}
+                {t('turbineResult.blade')} {blade.position}
               </span>
               <SeverityRow defectsByCat={blade.defectsByCat} small />
               <span style={{ fontSize: '0.7rem', color: 'var(--color-neutral-500)', marginLeft: 'auto' }}>
-                <strong>{blade.resolvedCount} / {blade.totalDefects}</strong> resolved
+                <strong>{blade.resolvedCount} / {blade.totalDefects}</strong> {t('turbineResult.resolved')}
               </span>
             </div>
           ))}

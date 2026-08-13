@@ -1,4 +1,5 @@
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, Label } from 'recharts';
+import { useLanguage } from '@/components/design-system';
 
 export interface SubassetStatusItem {
   name: string;
@@ -10,14 +11,16 @@ export interface SubassetsStatusChartProps {
 }
 
 const COLORS = ['#5a9e5a', '#5a9e5a', '#2c3e6b'];
-const LABELS_MAP: Record<string, string> = {
-  recent: '< 3 months',
-  moderate: '6 to 3 months',
-  overdue: '> 6 months',
-};
 
 export function SubassetsStatusChart({ data }: SubassetsStatusChartProps) {
+  const { t } = useLanguage();
   const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  const LABELS_MAP_I18N: Record<string, string> = {
+    recent: t('chart.lessThan3Months'),
+    moderate: t('chart.6to3Months'),
+    overdue: t('chart.moreThan6Months'),
+  };
 
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -44,7 +47,7 @@ export function SubassetsStatusChart({ data }: SubassetsStatusChartProps) {
             style={{ fontSize: '24px', fontWeight: 700, fill: 'var(--color-neutral-800, #1e293b)' }}
           />
           <Label
-            value="Total assets"
+            value={t('chart.totalAssets')}
             position="centerTop"
             dy={12}
             style={{ fontSize: '11px', fill: 'var(--color-neutral-500, #64748b)' }}
@@ -62,7 +65,7 @@ export function SubassetsStatusChart({ data }: SubassetsStatusChartProps) {
           iconType="circle"
           iconSize={8}
           wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
-          formatter={(value: string) => LABELS_MAP[value] ?? value}
+          formatter={(value: string) => LABELS_MAP_I18N[value] ?? value}
         />
       </PieChart>
     </ResponsiveContainer>

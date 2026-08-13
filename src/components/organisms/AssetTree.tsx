@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Wind, Cog, Fan } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import type { WindFarm } from '@/types';
 
 export interface AssetTreeProps {
@@ -11,6 +12,7 @@ export interface AssetTreeProps {
 
 export function AssetTree({ data, selectedId, onSelect }: AssetTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const { t } = useLanguage();
 
   const toggle = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -26,7 +28,7 @@ export function AssetTree({ data, selectedId, onSelect }: AssetTreeProps) {
 
   if (!data) {
     return (
-      <div style={{ padding: 'var(--space-3)' }} aria-label="Loading asset tree">
+      <div style={{ padding: 'var(--space-3)' }} aria-label={t('assetTree.loading')}>
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} style={{ marginBottom: 'var(--space-2)' }}>
             <Skeleton variant="text" width="80%" height="24px" />

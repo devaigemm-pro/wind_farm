@@ -1,4 +1,5 @@
 import { Maximize2 } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 
 export interface BladeDiagramProps {
   side: string;
@@ -7,6 +8,7 @@ export interface BladeDiagramProps {
 }
 
 export function BladeDiagram({ side, rootDistance, bladeLength = 45 }: BladeDiagramProps) {
+  const { t } = useLanguage();
   // Calculate relative position (0 = root, 1 = tip)
   const relativePos = Math.min(Math.max(rootDistance / bladeLength, 0), 1);
 
@@ -71,7 +73,7 @@ export function BladeDiagram({ side, rootDistance, bladeLength = 45 }: BladeDiag
     <div
       style={containerStyle}
       role="img"
-      aria-label={`Blade diagram showing defect at ${rootDistance}m on ${side} side`}
+      aria-label={t('bladeDiagram.ariaLabel').replace('{distance}', String(rootDistance)).replace('{side}', side)}
     >
       <div style={imageContainerStyle}>
         <img
@@ -80,7 +82,7 @@ export function BladeDiagram({ side, rootDistance, bladeLength = 45 }: BladeDiag
           style={bladeImgStyle}
         />
         <div style={defectChipStyle} />
-        <button type="button" style={expandBtnStyle} aria-label="Expand blade view">
+        <button type="button" style={expandBtnStyle} aria-label={t('bladeDiagram.expand')}>
           <Maximize2 size={12} />
         </button>
       </div>
