@@ -1042,11 +1042,11 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
 // ─── Donut (Pure SVG – click to highlight segment) ──────────────────────────
 function Donut({ label, orange }: { label: string; orange: number }) {
   const [active, setActive] = useState<number | null>(null);
-  const size = 180;
+  const size = 220;
   const cx = size / 2;
   const cy = size / 2;
-  const outerR = 82;
-  const innerR = 58;
+  const outerR = 100;
+  const innerR = 72;
 
   // Build arc path for a donut segment (clockwise from top)
   function arcPath(startAngle: number, endAngle: number, outer: number, inner: number) {
