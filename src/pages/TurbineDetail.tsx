@@ -632,7 +632,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             {/* ── Column 2: Breakdown by blade ── */}
             <div style={col2}>
               <h3 style={cardTitle}>{t('turbineDetail.breakdownByBlade')}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-around', alignItems: 'center' }}>
                 {donutData.map((d) => (
                   <Donut key={d.label} label={d.label} orange={d.orange} />
                 ))}
