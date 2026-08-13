@@ -13,6 +13,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { NavItem } from '@/components/molecules';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 
 interface NavSection {
   title: string;
@@ -31,35 +32,6 @@ export interface SidebarProps {
   onNavigate: (path: string) => void;
 }
 
-const navSections: NavSection[] = [
-  {
-    title: 'Overview',
-    items: [
-      { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    ],
-  },
-  {
-    title: 'Assets',
-    items: [{ icon: Wind, label: 'Wind Farms', path: '/assets-wind' }],
-  },
-  {
-    title: 'Inspections',
-    items: [
-      { icon: PlusCircle, label: 'New', path: '/inspections/new' },
-      { icon: Upload, label: 'Uploader', path: '/inspections/upload' },
-      { icon: Clock, label: 'Ongoing', path: '/inspections/ongoing' },
-      { icon: FileText, label: 'Reports', path: '/inspections/reports' },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { icon: User, label: 'Profile', path: '/profile' },
-      { icon: LogOut, label: 'Logout', path: '/logout' },
-    ],
-  },
-];
-
 export function Sidebar({
   isCollapsed,
   onToggleCollapse,
@@ -67,35 +39,65 @@ export function Sidebar({
   onNavigate,
 }: SidebarProps) {
   const { role } = useAuth();
+  const { t } = useLanguage();
+
+  const navSectionsAll: NavSection[] = [
+    {
+      title: t('sidebar.overview'),
+      items: [
+        { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/dashboard' },
+      ],
+    },
+    {
+      title: t('sidebar.assets'),
+      items: [{ icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' }],
+    },
+    {
+      title: t('sidebar.inspections'),
+      items: [
+        { icon: PlusCircle, label: t('sidebar.new'), path: '/inspections/new' },
+        { icon: Upload, label: t('sidebar.uploader'), path: '/inspections/upload' },
+        { icon: Clock, label: t('sidebar.ongoing'), path: '/inspections/ongoing' },
+        { icon: FileText, label: t('sidebar.reports'), path: '/inspections/reports' },
+      ],
+    },
+    {
+      title: t('sidebar.account'),
+      items: [
+        { icon: User, label: t('sidebar.profile'), path: '/profile' },
+        { icon: LogOut, label: t('sidebar.logout'), path: '/logout' },
+      ],
+    },
+  ];
 
   const visibleSections: NavSection[] =
     !role
-      ? [] // Don't show nav while role is loading to prevent flash
+      ? []
       : role === 'supervisor'
         ? [
             {
-              title: 'Overview',
+              title: t('sidebar.overview'),
               items: [
-                { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+                { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/dashboard' },
               ],
             },
             {
-              title: 'Assets',
-              items: [{ icon: Wind, label: 'Wind Farms', path: '/assets-wind' }],
+              title: t('sidebar.assets'),
+              items: [{ icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' }],
             },
             {
-              title: 'Reports',
-              items: [{ icon: FileText, label: 'Reports', path: '/reports' }],
+              title: t('sidebar.reports'),
+              items: [{ icon: FileText, label: t('sidebar.reports'), path: '/reports' }],
             },
             {
-              title: 'Account',
+              title: t('sidebar.account'),
               items: [
-                { icon: User, label: 'Profile', path: '/profile' },
-                { icon: LogOut, label: 'Logout', path: '/logout' },
+                { icon: User, label: t('sidebar.profile'), path: '/profile' },
+                { icon: LogOut, label: t('sidebar.logout'), path: '/logout' },
               ],
             },
           ]
-        : navSections;
+        : navSectionsAll;
   const sidebarStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
@@ -206,7 +208,7 @@ export function Sidebar({
         type="button"
         style={toggleButtonStyle}
         onClick={onToggleCollapse}
-        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
       >
         {isCollapsed ? (
           <ChevronsRight size={18} aria-hidden="true" />

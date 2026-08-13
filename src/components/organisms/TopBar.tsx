@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Menu, Bell, LogOut, Sun, Moon } from 'lucide-react';
 import { Avatar } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import type { Profile } from '@/types';
 
 export interface TopBarProps {
@@ -22,6 +23,7 @@ export function TopBar({
   const [isDarkTheme, setIsDarkTheme] = useState(
     () => document.documentElement.getAttribute('data-theme') === 'dark',
   );
+  const { locale, setLocale, t } = useLanguage();
 
   const toggleTheme = () => {
     const next = isDarkTheme ? 'light' : 'dark';
@@ -104,6 +106,24 @@ export function TopBar({
     position: 'relative',
   };
 
+  const langButtonStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '40px',
+    height: '40px',
+    border: '1.5px solid var(--color-neutral-300)',
+    backgroundColor: 'transparent',
+    color: 'var(--color-neutral-700)',
+    cursor: 'pointer',
+    borderRadius: 'var(--radius-md)',
+    fontFamily: 'var(--font-family-sans)',
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+  };
+
   const dropdownStyle: React.CSSProperties = {
     position: 'absolute',
     top: '100%',
@@ -163,7 +183,7 @@ export function TopBar({
         style={hamburgerStyle}
         className="topbar-hamburger"
         onClick={onMenuToggle}
-        aria-label="Toggle navigation menu"
+        aria-label={t('topbar.toggleNav')}
       >
         <Menu size={20} aria-hidden="true" />
       </button>
@@ -171,8 +191,18 @@ export function TopBar({
       <div style={actionsStyle}>
         <button
           type="button"
+          style={langButtonStyle}
+          onClick={() => setLocale(locale === 'en' ? 'es' : 'en')}
+          aria-label={t('topbar.language')}
+          title={t('topbar.language')}
+        >
+          {locale.toUpperCase()}
+        </button>
+
+        <button
+          type="button"
           style={iconButtonStyle}
-          aria-label={`Notifications${notificationCount > 0 ? `, ${notificationCount} unread` : ''}`}
+          aria-label={`${t('topbar.notifications')}${notificationCount > 0 ? `, ${notificationCount} unread` : ''}`}
         >
           <Bell size={20} aria-hidden="true" />
           {notificationCount > 0 && (
@@ -187,7 +217,7 @@ export function TopBar({
             type="button"
             style={avatarButtonStyle}
             onClick={() => setShowDropdown(!showDropdown)}
-            aria-label="User menu"
+            aria-label={t('topbar.userMenu')}
             aria-expanded={showDropdown}
             aria-haspopup="true"
           >
@@ -211,7 +241,7 @@ export function TopBar({
                 role="menuitem"
               >
                 {isDarkTheme ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
-                {isDarkTheme ? 'Light mode' : 'Dark mode'}
+                {isDarkTheme ? t('topbar.lightMode') : t('topbar.darkMode')}
               </button>
               <button
                 type="button"
@@ -223,7 +253,7 @@ export function TopBar({
                 role="menuitem"
               >
                 <LogOut size={16} aria-hidden="true" />
-                Logout
+                {t('sidebar.logout')}
               </button>
             </div>
           )}

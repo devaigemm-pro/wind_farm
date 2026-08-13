@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useSearchParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
-import { ThemeProvider } from '@/components/design-system';
+import { ThemeProvider, LanguageProvider } from '@/components/design-system';
 import { AuthGuard } from '@/components/AuthGuard';
 import { RoleGuard } from '@/components/RoleGuard';
 import { Layout } from '@/components/organisms';
@@ -148,12 +148,14 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+        <LanguageProvider>
         <BrowserRouter>
           <Suspense fallback={<LoadingSplash />}>
             <AppRoutes />
           </Suspense>
           <ToastContainer />
         </BrowserRouter>
+        </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
