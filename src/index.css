@@ -59,21 +59,18 @@
   background-color: #2C2C2C !important;
 }
 
-/* Main photo viewer keeps white background for image visibility */
-[data-theme="dark"] .annotate-viewer,
+/* Main photo viewer — exclude from dark mode overrides entirely */
 [data-theme="dark"] .annotate-viewer div,
-[data-theme="dark"] .annotate-viewer span {
-  background-color: #FFFFFF !important;
-}
-/* Text inside viewer should be dark for contrast */
-[data-theme="dark"] .annotate-viewer * {
-  color: #333333 !important;
-}
-/* DO NOT override backgrounds on deep children (canvas, images, etc.) */
+[data-theme="dark"] .annotate-viewer span,
 [data-theme="dark"] .annotate-viewer img,
 [data-theme="dark"] .annotate-viewer canvas,
-[data-theme="dark"] .annotate-viewer svg {
-  background-color: transparent !important;
+[data-theme="dark"] .annotate-viewer svg,
+[data-theme="dark"] .annotate-viewer input,
+[data-theme="dark"] .annotate-viewer select,
+[data-theme="dark"] .annotate-viewer button {
+  background-color: unset !important;
+  color: unset !important;
+  border-color: unset !important;
 }
 
 /* Slightly different bg for page-level containers */
