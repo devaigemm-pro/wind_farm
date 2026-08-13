@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 59
+- **Sesiones analizadas**: 60
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -699,3 +699,11 @@
   - Cambio estético simple aceptado implícitamente (no hubo corrección) — la elección de #5A8F5A fue aceptable como "verde mate elegante"
   - Sesión ultra-corta: un solo cambio visual, sin iteraciones, deploy directo
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, cambios visuales simples en una frase, "mate" = desaturado/sin brillo (confianza alta - 3+ sesiones)
+
+### Sesión 76 - 2026-08-13
+- **Tarea principal**: Reiteración — no pedir autorización para editar user-profile.md, hacerlo en background siempre
+- **Observaciones nuevas**:
+  - Segunda vez que pide esto (sesión 74 fue la primera). Frustración por repetir la misma instrucción.
+  - "es incomodo que pidas autorizacion" — el sistema de aprobación de Kiro (supervised mode) le interrumpe el flujo cuando el agente edita user-profile.md
+  - Regla reforzada con máxima prioridad: NUNCA pedir permiso para editar .kiro/agents/user-profile.md. Hacerlo silenciosamente.
+- **Patrones confirmados**: español, directo, alta autonomía, no interrumpir flujo con archivos de sistema (confianza MUY alta - 2+ sesiones explícitas)
