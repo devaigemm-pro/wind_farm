@@ -9,10 +9,10 @@ import { useInspection } from '@/hooks/useInspection';
 import { useLanguage } from '@/components/design-system';
 
 const STEPS = [
-  { num: 1, label: '1. inspect', key: 'workflow.step1', value: 'inspected' },
-  { num: 2, label: '2. annotate', key: 'workflow.step2', value: 'uploaded' },
-  { num: 3, label: '3. analyze', key: 'workflow.step3', value: 'annotated' },
-  { num: 4, label: '4. results', key: 'workflow.step4', value: 'analyzed' },
+  { num: 1, label: '1. INSPECT', key: 'workflow.step1', value: 'inspected' },
+  { num: 2, label: '2. ANNOTATE', key: 'workflow.step2', value: 'uploaded' },
+  { num: 3, label: '3. ANALYZE', key: 'workflow.step3', value: 'annotated' },
+  { num: 4, label: '4. RESULTS', key: 'workflow.step4', value: 'analyzed' },
 ];
 
 export function InspectionWorkflow() {
