@@ -43,7 +43,7 @@
 }
 
 /* Force backgrounds on common container elements */
-[data-theme="dark"] div,
+[data-theme="dark"] div:not(.preserve-bg),
 [data-theme="dark"] section,
 [data-theme="dark"] main,
 [data-theme="dark"] article,
@@ -70,6 +70,11 @@
 }
 [data-theme="dark"] aside {
   background-color: #2C2C2C !important;
+}
+
+/* Elements that must keep their original background in dark mode */
+[data-theme="dark"] .preserve-bg {
+  color: #FFFFFF !important;
 }
 
 /* Slightly different bg for page-level containers */

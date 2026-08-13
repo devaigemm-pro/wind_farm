@@ -1489,7 +1489,7 @@ function CategoryBtn({ label, count, color, active, onClick }: { label: string; 
       borderColor: active ? C.primary : C.borderLight,
       background: active ? C.primaryLight : 'var(--color-neutral-0)',
     }}>
-      <div style={{ ...categoryAvatar, background: color }}>{count}</div>
+      <div className="preserve-bg" style={{ ...categoryAvatar, background: color }}>{count}</div>
       <span style={{ fontSize: 12, fontWeight: 600, color: active ? C.primary : C.text, textTransform: 'uppercase' as const }}>{label}</span>
     </button>
   );
