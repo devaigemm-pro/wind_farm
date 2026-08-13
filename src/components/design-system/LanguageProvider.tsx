@@ -19,7 +19,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const stored = localStorage.getItem('locale');
     if (stored === 'en' || stored === 'es') return stored;
-    return 'en';
+    return 'es';
   });
 
   const setLocale = (newLocale: Locale) => {

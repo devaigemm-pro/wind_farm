@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 56
+- **Sesiones analizadas**: 58
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -90,6 +90,7 @@
 - **"la inspección asociada" ≠ step 4 del workflow** — cuando dice "redirigir a la inspección asociada" o "la página de la inspección", se refiere a la página de SubassetDetail (`/assets-wind/{windFarmId}/subasset/{turbineId}`) donde se muestra la turbina con su tabla de inspecciones. NO es el step 4 del workflow. La "inspección asociada" es la PÁGINA que muestra la inspección, no un step dentro del workflow.
 - **"no pedir permiso para user-profile.md"** — NUNCA pedir confirmación para editar `.kiro/agents/user-profile.md`. Editarlo directamente sin preguntar. Es un archivo propio del sistema de aprendizaje, no código del proyecto.
 - **"sobrio" ≠ cambiar identidad cromática** — cuando dice "más sobrio" o "tonos suaves" para colores, significa MANTENER los mismos colores pero desaturarlos/suavizarlos. No cambiar la paleta por completo. "Mate" = misma familia cromática sin brillo.
+- **"todo el sitio" = VERIFICAR cada archivo** — cuando pide un cambio global (i18n, dark mode, etc.), NO declarar listo sin ejecutar una verificación automatizada que confirme cobertura al 100%. Usar grep/find para detectar archivos sin cubrir ANTES de reportar éxito.
 - **"cambio de color no funciona" = buscar HARDCODED primero** — cuando un cambio de color via variables CSS "no se aplica", la causa más probable es que los componentes tienen valores HEX hardcodeados (#fff, #FFFFFF, etc.) que ignoran las variables. SIEMPRE hacer `grep -r "#fff" src/` ANTES de tocar tokens. Es lo más básico.
 
 ---
@@ -601,3 +602,23 @@
   - "el menu no debia cambiar" — cuando un override global afecta algo que ya funcionaba bien, el usuario corrige inmediatamente. La expectativa es que el agente anticipe estos side effects.
   - **APRENDIZAJE**: Para cambios de color GLOBALES, SIEMPRE usar CSS `!important` override en index.css. Para componentes que deben PRESERVAR su estilo (sidebar, botones de color), excluirlos explícitamente.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente complica lo simple, corrección directa sin drama, espera que side effects se anticipen
+
+### Sesión 55 - 2026-08-13
+- **Tarea principal**: (1) Agregar selector de idioma EN/ES en TopBar junto al dark mode. (2) Aplicar traducciones a TODO el sitio. (3) Corregir que InspectStep (step 1) y otros 12 archivos nunca se tradujeron en las pasadas anteriores.
+- **Observaciones nuevas**:
+  - "hay mucho por traducir aun, que revision hiciste? todo se mantiene igual" — frustración porque las pasadas anteriores NO fueron exhaustivas. El agente declaró "listo" sin verificar que TODOS los archivos estuvieran cubiertos.
+  - "se riguroso y profesional" — exige rigor absoluto. Quiere auditoría REAL (verificar cada archivo), no solo los que se le ocurran al agente.
+  - "asesorate o busca informacion externa para hacer una buena traduccion" — para traducciones de dominio específico (eólico), quiere que el agente investigue terminología correcta antes de traducir.
+  - **CORRECCIÓN**: Cuando pide "traducir todo el sitio", hay que verificar CADA archivo .tsx con `grep -c "t('"` para confirmar que tiene traducciones. No asumir que porque se editaron "los principales" ya está todo.
+  - **APRENDIZAJE CLAVE**: Antes de declarar "listo" en una tarea de cobertura completa (i18n, dark mode, etc.), EJECUTAR una verificación automatizada que confirme que NO quedan archivos sin cubrir. Ejemplo: `find src -name "*.tsx" -exec grep -c "t('" {} \;` para detectar archivos con 0 traducciones.
+  - La URL que dio fue `wind-farm-eight.vercel.app` — este es el dominio de producción personalizado (diferente a los URLs de deploy automático de Vercel como `wind-farm-xxxxx-dev-ai2.vercel.app`)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, frustración cuando el agente dice "listo" sin ser exhaustivo, exige rigor ("se riguroso"), quiere verificación automatizada antes de declarar completado, modo compañero
+
+### Sesión 56 - 2026-08-13
+- **Tarea principal**: Cambiar icono SVG del botón "Image adjustments" en AnnotateStep por un icono de contraste (círculo mitad/mitad)
+- **Observaciones nuevas**:
+  - Proporcionó DOM del botón actual + imágenes de ejemplo del icono deseado en un solo mensaje — patrón de "DOM + imagen como spec" combinado
+  - Instrucción clara y simple: "cambiar el icono por uno relacionado a contraste de fotos" — no necesitó explicación de qué SVG path usar, confió en que el agente eligiera uno apropiado basándose en las imágenes de ejemplo
+  - Sesión ultra-corta: una sola instrucción, cero correcciones, tarea completada al primer intento
+  - Modo compañero activado con "compañero" al inicio del mensaje — patrón consistente
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec, imagen como referencia visual, cambios simples en una sola frase
