@@ -660,9 +660,9 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
                 </div>
               </div>
 
-              <div style={card}>
+              <div style={{ ...card, flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <h3 style={cardTitle}>{t('turbineDetail.breakdownByType')}</h3>
-                <div style={{ height: 220 }}>
+                <div style={{ flex: 1, minHeight: 200 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={typeBreakdown} margin={{ top: 10, right: 10, left: -20, bottom: 30 }}>
                       <CartesianGrid vertical={false} stroke={C.border} />
