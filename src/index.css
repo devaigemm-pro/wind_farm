@@ -76,6 +76,21 @@
 [data-theme="dark"] .preserve-bg {
   color: #FFFFFF !important;
 }
+[data-theme="dark"] .preserve-bg--grey {
+  background: #9E9E9E !important;
+  background-color: #9E9E9E !important;
+  color: #FFFFFF !important;
+}
+[data-theme="dark"] .preserve-bg--yellow {
+  background: #FFEB3B !important;
+  background-color: #FFEB3B !important;
+  color: #FFFFFF !important;
+}
+[data-theme="dark"] .preserve-bg--red {
+  background: #F44336 !important;
+  background-color: #F44336 !important;
+  color: #FFFFFF !important;
+}
 
 /* Slightly different bg for page-level containers */
 [data-theme="dark"] body > div,

@@ -1483,13 +1483,14 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 function CategoryBtn({ label, count, color, active, onClick }: { label: string; count: number; color: string; active: boolean; onClick: () => void }) {
+  const colorClass = color === '#9E9E9E' ? 'preserve-bg--grey' : color === '#FFEB3B' ? 'preserve-bg--yellow' : 'preserve-bg--red';
   return (
     <button onClick={onClick} style={{
       ...categoryBtnStyle,
       borderColor: active ? C.primary : C.borderLight,
       background: active ? C.primaryLight : 'var(--color-neutral-0)',
     }}>
-      <div className="preserve-bg" style={{ ...categoryAvatar, background: color }}>{count}</div>
+      <div className={`preserve-bg ${colorClass}`} style={{ ...categoryAvatar, background: color }}>{count}</div>
       <span style={{ fontSize: 12, fontWeight: 600, color: active ? C.primary : C.text, textTransform: 'uppercase' as const }}>{label}</span>
     </button>
   );
