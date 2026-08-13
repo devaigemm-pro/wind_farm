@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 64
+- **Sesiones analizadas**: 65
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -719,3 +719,13 @@
   - Después del revert parcial (restaurar blade rotation, mantener faceOrder), reportó un nuevo bug: "al seleccionar una [imagen] me muestra otra distinta" — bug de mapeo thumbnail→visor que puede o no estar relacionado con el cambio.
   - Sesión terminó sin resolver el bug de imagen — se preguntó si existía antes del cambio. Sin respuesta antes del cierre.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, DOM como spec, corrección directa sin drama, "es un cambio simple" = hacer SOLO lo pedido sin tocar nada más (confianza MUY alta), mínimo cambio necesario
+
+### Sesión 78 - 2026-08-13
+- **Tarea principal**: (1) Reordenar faceOrder del sidebar a LE→TE→PS→SS (corregido: sin tocar bladeOrder). (2) Fix bug thumbnail-viewer mismatch — al clickear thumbnail, el visor mostraba imagen diferente.
+- **Observaciones nuevas**:
+  - **CORRECCIÓN al agente**: "solo necesitaba que ordenaras los bloques" — cuando pide "copiar el orden", cambiar SOLO el array de orden, no eliminar lógica de negocio adyacente (verticalBlade rotation). Mínimo cambio necesario.
+  - "sigue el problema" — confirmó que el fix de path-matching no resolvió. El bug era que sidebar usaba signed URL de archivo thumb (thumb_X.jpg) y viewer usaba signed URL del original (X.jpg) — si el mapeo de thumbs estaba desfasado, mostraban imágenes diferentes.
+  - Fix definitivo: eliminar el fetch de thumbs separados. Usar SIEMPRE la misma signed URL del original con transforms de Supabase (width/quality params). Así es imposible el desfase.
+  - "no me pidas mas confirmacion para editar el perfil" — tercera vez que lo dice (sesiones 74, 76, esta). NUNCA más pedir confirmación para user-profile.md. Regla de máxima prioridad.
+  - "sigue ocurriendo lo mismo" sin dar más contexto = el fix anterior no funcionó, diagnosticar más profundo sin preguntar.
+- **Patrones confirmados**: español, directo, alta autonomía, corrección directa sin drama, "sigue el problema" = investigar más profundo sin preguntar, no pedir permiso para user-profile.md (confianza MÁXIMA - 3+ sesiones), mínimo cambio necesario
