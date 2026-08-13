@@ -89,20 +89,30 @@ async function fetchInspectionPhotos(
     for (let i = 0; i < importedRows.length; i += BATCH_SIZE) {
       const batch = importedRows.slice(i, i + BATCH_SIZE);
       const originalPaths = batch.map(r => r.storagePath);
+      const thumbPaths = batch.map(r => getThumbStoragePath(r.storagePath));
 
       try {
-        // Fetch signed URLs for originals — both sidebar thumbnails and viewer
-        // derive from the same signed URL with different width/quality params
-        // to guarantee they always show the same image
-        const originalResult = await supabase.storage
-          .from('asset-documents')
-          .createSignedUrls(originalPaths, 3600);
+        // Fetch signed URLs for originals and thumbnails in parallel
+        const [originalResult, thumbResult] = await Promise.all([
+          supabase.storage.from('asset-documents').createSignedUrls(originalPaths, 3600),
+          supabase.storage.from('asset-documents').createSignedUrls(thumbPaths, 3600),
+        ]);
 
         if (originalResult.data) {
           for (let j = 0; j < originalResult.data.length; j++) {
-            const item = originalResult.data[j];
-            if (item?.signedUrl && !item.error) {
-              batch[j]!.storagePath = item.signedUrl;
+            const url = originalResult.data[j]?.signedUrl;
+            if (url) {
+              batch[j]!.storagePath = url;
+            }
+          }
+        }
+
+        if (thumbResult.data) {
+          for (let j = 0; j < thumbResult.data.length; j++) {
+            const signedItem = thumbResult.data[j];
+            // If thumb signed URL was generated without error, use it
+            if (signedItem?.signedUrl && !signedItem.error) {
+              batch[j]!.thumbnailUrl = signedItem.signedUrl;
             }
           }
         }
@@ -122,7 +132,7 @@ async function fetchInspectionPhotos(
 export type ImageSize = 'thumbnail' | 'viewer' | 'full';
 
 const IMAGE_PRESETS: Record<ImageSize, { width: number; quality: number } | null> = {
-  thumbnail: { width: 100, quality: 40 },    // ~3-8KB per image (grid thumbnails, fast)
+  thumbnail: { width: 150, quality: 60 },   // ~5-15KB per image (grid thumbnails)
   viewer: { width: 1400, quality: 82 },      // ~80-200KB (main viewer, good quality)
   full: null,                                 // original resolution (download only)
 };
