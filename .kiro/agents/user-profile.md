@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 61
+- **Sesiones analizadas**: 62
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -90,6 +90,7 @@
 - **"la inspección asociada" ≠ step 4 del workflow** — cuando dice "redirigir a la inspección asociada" o "la página de la inspección", se refiere a la página de SubassetDetail (`/assets-wind/{windFarmId}/subasset/{turbineId}`) donde se muestra la turbina con su tabla de inspecciones. NO es el step 4 del workflow. La "inspección asociada" es la PÁGINA que muestra la inspección, no un step dentro del workflow.
 - **"no pedir permiso para user-profile.md"** — NUNCA pedir confirmación para editar `.kiro/agents/user-profile.md`. Editarlo directamente sin preguntar. Es un archivo propio del sistema de aprendizaje, no código del proyecto.
 - **"sobrio" ≠ cambiar identidad cromática** — cuando dice "más sobrio" o "tonos suaves" para colores, significa MANTENER los mismos colores pero desaturarlos/suavizarlos. No cambiar la paleta por completo. "Mate" = misma familia cromática sin brillo.
+- **"solo ordenar" ≠ cambiar lógica de negocio** — cuando dice "ordenar los bloques" o "copiar el orden", se refiere SOLO al array de ordenamiento visual. NO tocar lógica de negocio asociada (rotación CW de blades basada en verticalBlade, etc.). Si la instrucción es "ordenar X como Y", cambiar SOLO el orden, no eliminar funcionalidad adyacente.
 
 ---
 
