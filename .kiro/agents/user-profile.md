@@ -769,3 +769,13 @@
   - "lo mismo ocurre en X" — cuando reporta que el mismo bug existe en otra pantalla, da solo la URL y la sección ("defects edit"). No repite la explicación.
   - Sesión con 2 tareas secuenciales: reorder + traducciones. Ambas aceptadas sin correcciones.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, mínimo cambio necesario, "lo mismo en X" = aplicar el mismo fix en otra pantalla, bug sistémico por pantalla, auditoría completa sin preguntar qué falta
+
+### Sesión 82 - 2026-08-13
+- **Tarea principal**: (1) Eliminar columna "Activo" de la tabla de defectos en SubassetDetail. (2) Ajustar header "Tamaño del defecto" para que haga wrap. (3) Centrar cabeceras de todas las columnas.
+- **Observaciones nuevas**:
+  - Modo compañero + URL + instrucción de 1 frase — patrón clásico
+  - 3 micro-cambios secuenciales en la misma tabla — barrido de calidad por componente
+  - "en la misma tabla" — referencia implícita al contexto ya establecido (no repite URL)
+  - "que el string no quede encima de la columna siguiente" — describe desde lo visual sin sugerir solución técnica
+  - Todos los cambios aceptados sin correcciones al primer intento — sesión limpia
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe problemas desde UX, barrido de calidad por componente, referencia implícita a contexto previo, acepta fixes al primer intento
