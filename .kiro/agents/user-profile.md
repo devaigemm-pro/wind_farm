@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 59
+- **Sesiones analizadas**: 60
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -643,3 +643,15 @@
   - "no se visualiza el cambio" — cuando el deploy no se refleja inmediatamente, lo reporta sin drama. Espera que el agente resuelva (deploy directo)
   - Sesión sin correcciones funcionales — los cambios se aceptaron al primer intento (solo el timing del deploy fue issue)
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec, imagen como referencia visual, barrido de calidad por toolbar/componente, iteración secuencial rápida
+
+### Sesión 60 - 2026-08-13
+- **Tarea principal**: Implementar selector de idioma EN/ES y traducir COMPLETAMENTE todo el sitio. Múltiples iteraciones porque el agente NO hizo auditorías exhaustivas y declaró "listo" prematuramente varias veces.
+- **Observaciones nuevas**:
+  - "es quinta vez que estamos hablando de esto" / "cual es la auditoria completa si siguen faltando cosas por traducir?" — frustración máxima por falta de rigor. El agente declaró completado 5+ veces sin que estuviera realmente completo.
+  - "me estas haciendo gastar tiempo y tokens" — el usuario VALORA MUCHO la eficiencia. Cada iteración innecesaria es un costo percibido.
+  - "se profesional, riguroso" — esta es la instrucción más fuerte del usuario. Significa: NO declarar listo sin verificación automatizada exhaustiva.
+  - "no termines de iterar hasta que esto se haya completado" — cuando da esta instrucción, espera que el agente haga TODAS las correcciones en un solo turno.
+  - "si ocurre en otras vistas tambien hacerlo" — cuando reporta un problema en una vista, espera que se verifique y corrija en TODAS las vistas del sitio. No solo la que mencionó.
+  - **CAUSA RAÍZ del problema**: Arrays/objetos constantes definidos FUERA de los componentes (module-level) no pueden usar t(). El agente no detectó esto en las "auditorías" porque buscaba strings en JSX pero no en constantes de módulo.
+  - **REGLA NUEVA**: Para auditoría i18n, buscar: (1) strings en JSX sin t(), (2) constantes module-level con strings (COLUMNS, STATUS_LABELS, CATEGORIES_DATA, etc.), (3) toasts/alerts con strings hardcoded, (4) placeholders/aria-labels. Verificar con grep DESPUÉS de cada pasada.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración cuando el agente declara "listo" prematuramente (confianza MUY alta - 6+ sesiones), exige rigor absoluto, valora tiempo/tokens, espera corrección sistémica (no solo la pantalla reportada), "se profesional" = verificación exhaustiva antes de declarar completado

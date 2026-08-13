@@ -17,6 +17,13 @@ const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
+    // Migration: force 'es' for users who had old default 'en'
+    const version = localStorage.getItem('locale_version');
+    if (!version) {
+      localStorage.setItem('locale', 'es');
+      localStorage.setItem('locale_version', '2');
+      return 'es';
+    }
     const stored = localStorage.getItem('locale');
     if (stored === 'en' || stored === 'es') return stored;
     return 'es';
