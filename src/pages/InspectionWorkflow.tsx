@@ -177,17 +177,6 @@ export function InspectionWorkflow() {
 
           {/* Right: search button (4/12) */}
           <div style={gridRight}>
-            <div style={rightContent}>
-              <div />
-              <div>
-                <button style={searchBtn} type="button" title="Search all">
-                  <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -297,26 +286,7 @@ const stepLabelHighlight: React.CSSProperties = {
   fontWeight: 700,
 };
 
-const rightContent: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 8,
-};
 
-const searchBtn: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '6px 12px',
-  border: '1px solid #00A6FF',
-  borderRadius: 4,
-  background: 'transparent',
-  color: '#00A6FF',
-  cursor: 'pointer',
-  fontSize: 16,
-  outline: 'none',
-};
 
 const contentStyle: React.CSSProperties = {
   flex: 1,
