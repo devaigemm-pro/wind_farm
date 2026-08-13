@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { AssetSelector } from '@/components/molecules/AssetSelector';
 import { SegmentedControl } from '@/components/molecules/SegmentedControl';
 import { DatePickerField } from '@/components/molecules/DatePickerField';
+import { useLanguage } from '@/components/design-system';
 import type { InspectionType, InspectionMethod } from '@/types';
 
 export interface InspectionConfigFormProps {
@@ -39,6 +40,7 @@ export function InspectionConfigForm({
   onCampaignNameChange,
   onNotesChange,
 }: InspectionConfigFormProps) {
+  const { t } = useLanguage();
   const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
@@ -102,12 +104,12 @@ export function InspectionConfigForm({
 
       {/* Type */}
       <div>
-        <div style={fieldLabelStyle}>Type</div>
+        <div style={fieldLabelStyle}>{t('inspectionForm.type')}</div>
         <SegmentedControl
           name="Inspection type"
           options={[
-            { value: 'blades', label: 'BLADES' },
-            { value: 'tower', label: 'TOWER' },
+            { value: 'blades', label: t('inspectionForm.blades') },
+            { value: 'tower', label: t('inspectionForm.tower') },
           ]}
           value={inspectionType}
           onChange={(v) => onTypeChange(v as InspectionType)}
@@ -116,12 +118,12 @@ export function InspectionConfigForm({
 
       {/* Method */}
       <div>
-        <div style={fieldLabelStyle}>Method</div>
+        <div style={fieldLabelStyle}>{t('inspectionForm.method')}</div>
         <SegmentedControl
           name="Inspection method"
           options={[
-            { value: 'skyvisor', label: 'CORE Insight' },
-            { value: 'external', label: 'External >' },
+            { value: 'skyvisor', label: t('inspectionForm.coreInsight') },
+            { value: 'external', label: t('inspectionForm.external') },
           ]}
           value={inspectionMethod}
           onChange={(v) => onMethodChange(v as InspectionMethod)}
@@ -130,7 +132,7 @@ export function InspectionConfigForm({
 
       {/* Inspection Date */}
       <DatePickerField
-        label="Inspection Date"
+        label={t('inspectionForm.inspectionDate')}
         value={scheduledDate}
         onChange={onDateChange}
         error={errors.scheduledDate}
@@ -140,7 +142,7 @@ export function InspectionConfigForm({
       {/* Campaign Name */}
       <div>
         <div style={fieldLabelStyle}>
-          Campaign name
+          {t('inspectionForm.campaignName')}
           <span style={{ color: 'var(--color-danger-500)', marginLeft: '2px' }}>*</span>
         </div>
         <input
@@ -157,7 +159,7 @@ export function InspectionConfigForm({
 
       {/* Notes */}
       <div>
-        <div style={fieldLabelStyle}>Notes</div>
+        <div style={fieldLabelStyle}>{t('inspectionForm.notes')}</div>
         <textarea
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}

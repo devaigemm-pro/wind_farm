@@ -11,6 +11,7 @@ import {
   useCreateCampaignInspections,
 } from '@/hooks/useNewInspection';
 import { useToast } from '@/store/toastStore';
+import { useLanguage } from '@/components/design-system';
 import { newCampaignInspectionSchema } from '@/utils/validation';
 import type { InspectionType, InspectionMethod } from '@/types';
 
@@ -27,6 +28,7 @@ export function NewInspection() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const { t } = useLanguage();
 
   // ─── Data hooks ─────────────────────────────────────────────────────────
   const { data: windFarms = [], isLoading: isLoadingFarms } = useWindFarmsList();
@@ -100,10 +102,10 @@ export function NewInspection() {
 
     try {
       await createMutation.mutateAsync(result.data);
-      toast.success('Campaign created successfully');
+      toast.success(t('toast.campaignCreated'));
       navigate(windFarmId ? `/assets-wind/${windFarmId}` : '/inspections');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create campaign';
+      const message = err instanceof Error ? err.message : t('toast.campaignDeleteFailed');
       toast.error(message);
     }
   };
@@ -167,7 +169,7 @@ export function NewInspection() {
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Create new inspection</h1>
+        <h1 style={titleStyle}>{t('page.newInspection')}</h1>
       </div>
 
       <div style={gridStyle}>
@@ -213,7 +215,7 @@ export function NewInspection() {
                 letterSpacing: '0.5px',
               }}
             >
-              CREATE
+              {t('button.createInspection')}
             </Button>
           </div>
         </div>

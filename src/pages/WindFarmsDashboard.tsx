@@ -16,12 +16,6 @@ import { generateDefectsXLSX, downloadBlob } from '@/utils/csv-export';
 import { Wind } from 'lucide-react';
 import type { WindFarmSortField } from '@/components/organisms/WindFarmsTable';
 
-const TABS = [
-  { id: 'assets', label: 'Assets' },
-  { id: 'defects', label: 'Defects' },
-  { id: 'globalMap', label: 'Global Map' },
-];
-
 export function WindFarmsDashboard() {
   const navigate = useNavigate();
   const { role } = useAuth();

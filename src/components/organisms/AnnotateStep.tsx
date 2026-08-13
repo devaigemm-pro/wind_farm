@@ -753,7 +753,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
         {/* Image viewer with click-to-mark annotation (2 points define rectangle) */}
         <div
-          style={{ ...mainViewerStyle, cursor: drawStart && !drawEnd ? 'crosshair' : 'crosshair', position: 'relative' }}
+          style={{ ...mainViewerStyle, cursor: drawPhase === 'expanding' ? 'ns-resize' : 'crosshair', position: 'relative' }}
           onWheel={(e) => {
             e.preventDefault();
             if (e.deltaY < 0) {
@@ -1064,46 +1064,43 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             </div>
           ))}
 
-          {/* Current drawing rectangle + point markers */}
+          {/* Current drawing — line + expanding rectangle */}
           {drawStart && (() => {
-            // Show first point marker
             if (!drawEnd) {
-              return (
-                <div style={{ position: 'absolute', left: `${drawStart.x}%`, top: `${drawStart.y}%`, width: 10, height: 10, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
-              );
+              return null;
             }
             const dx = drawEnd.x - drawStart.x;
             const dy = drawEnd.y - drawStart.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 1) return (
-              <div style={{ position: 'absolute', left: `${drawStart.x}%`, top: `${drawStart.y}%`, width: 10, height: 10, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
-            );
+            if (dist < 1) return null;
             const angle = Math.atan2(dy, dx) * (180 / Math.PI);
             const cx = (drawStart.x + drawEnd.x) / 2;
             const cy = (drawStart.y + drawEnd.y) / 2;
             const w = dist;
-            const h = Math.max(w * 0.25, 3);
+            // In phase 'drawing-line', show just the line; in 'expanding' or confirmed, show rect with drawWidth
+            const h = drawPhase === 'drawing-line' ? 1.5 : drawWidth;
+            const isLine = drawPhase === 'drawing-line';
             return (
               <>
-                {/* Point markers */}
-                <div style={{ position: 'absolute', left: `${drawStart.x}%`, top: `${drawStart.y}%`, width: 8, height: 8, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10, boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
-                <div style={{ position: 'absolute', left: `${drawEnd.x}%`, top: `${drawEnd.y}%`, width: 8, height: 8, borderRadius: '50%', background: '#FFA500', border: '2px solid #fff', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10, boxShadow: '0 0 4px rgba(0,0,0,0.5)' }} />
-                {/* Rectangle */}
+                {/* Line or Rectangle */}
                 <div style={{
                   position: 'absolute',
                   left: `${cx}%`,
                   top: `${cy}%`,
                   width: `${w}%`,
-                  height: `${h}%`,
+                  height: isLine ? '3px' : `${h}%`,
                   transform: `translate(-50%, -50%) rotate(${angle}deg)`,
                   transformOrigin: 'center',
-                  border: '2.5px solid #FFA500',
-                  background: 'rgba(255, 165, 0, 0.1)',
+                  border: isLine ? 'none' : '2.5px solid #FFA500',
+                  background: isLine ? '#FFA500' : 'rgba(255, 165, 0, 0.1)',
                   pointerEvents: 'none',
+                  borderRadius: isLine ? '2px' : 0,
                 }}>
-                  <span style={{ position: 'absolute', bottom: -18, left: 0, fontSize: 11, color: '#FFA500', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
-                    {Math.round(w * 1.5)} x {Math.round(h * 1.3)} cm
-                  </span>
+                  {!isLine && (
+                    <span style={{ position: 'absolute', bottom: -18, left: 0, fontSize: 11, color: '#FFA500', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+                      {Math.round(w * 1.5)} x {Math.round(h * 1.3)} cm
+                    </span>
+                  )}
                 </div>
               </>
             );
@@ -1192,7 +1189,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setEditingAnnotationId(null); setSaveError(null); }}>Cancel</button>
+              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setDrawPhase('idle'); setDrawWidth(3); setEditingAnnotationId(null); setSaveError(null); }}>Cancel</button>
               {editingAnnotationId !== null && (
                 <button style={{ ...confirmBtnStyle, background: '#F15959' }} onClick={() => {
                   
@@ -1201,6 +1198,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   setDrawStart(null);
                   setDrawEnd(null);
                   setDrawConfirmed(false);
+                  setDrawPhase('idle');
+                  setDrawWidth(3);
                   setEditingAnnotationId(null);
                   setShowAnnotationPopover(false);
                   setAnnotationNote('');
@@ -1217,7 +1216,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     const cx = (drawStart.x + drawEnd.x) / 2;
                     const cy = (drawStart.y + drawEnd.y) / 2;
                     const w = Math.sqrt(dx * dx + dy * dy);
-                    const h = Math.max(w * 0.25, 3);
+                    const h = drawWidth;
                     // Store x,y as center point, w/h as rotated dimensions
                     updateAnnotation.mutate({ id: editingAnnotationId, x: cx, y: cy, w, h, angle, type: annotationType, category: annotationCategory, note: annotationNote });
                   }
@@ -1230,7 +1229,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     const cx = (drawStart.x + drawEnd.x) / 2;
                     const cy = (drawStart.y + drawEnd.y) / 2;
                     const w = Math.sqrt(dx * dx + dy * dy);
-                    const h = Math.max(w * 0.25, 3);
+                    const h = drawWidth;
                     createAnnotation.mutate({
                       inspectionId,
                       thumbnailId: selectedThumbnail,
@@ -1249,6 +1248,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 setDrawStart(null);
                 setDrawEnd(null);
                 setDrawConfirmed(false);
+                setDrawPhase('idle');
+                setDrawWidth(3);
                 setEditingAnnotationId(null);
                 setShowAnnotationPopover(false);
                 setAnnotationNote('');
@@ -1326,7 +1327,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               const cx = (drawStart.x + drawEnd.x) / 2;
               const cy = (drawStart.y + drawEnd.y) / 2;
               const w = Math.sqrt(dx * dx + dy * dy);
-              const h = Math.max(w * 0.25, 3);
+              const h = drawWidth;
               if (w > 0) {
                 createAnnotation.mutate({
                   inspectionId,
@@ -1342,6 +1343,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             setDrawStart(null);
             setDrawEnd(null);
             setDrawConfirmed(false);
+            setDrawPhase('idle');
+            setDrawWidth(3);
           }}>Save</button>
           )}
         </div>

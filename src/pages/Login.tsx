@@ -147,7 +147,7 @@ export default function Login() {
       void navigate(from, { replace: true });
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Invalid email or password. Please try again.';
+        err instanceof Error ? err.message : t('login.invalidCredentials');
       setSubmitError(message);
     } finally {
       setIsSubmitting(false);
@@ -174,13 +174,13 @@ export default function Login() {
 
           <div style={styles.fieldGroup}>
             <label htmlFor="email" style={styles.label}>
-              Email
+              {t('login.email')}
             </label>
             <input
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t('login.emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{
@@ -200,13 +200,13 @@ export default function Login() {
 
           <div style={styles.fieldGroup}>
             <label htmlFor="password" style={styles.label}>
-              Password
+              {t('login.password')}
             </label>
             <input
               id="password"
               type="password"
               autoComplete="current-password"
-              placeholder="Enter your password"
+              placeholder={t('login.passwordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
@@ -232,7 +232,7 @@ export default function Login() {
             }}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
+            {isSubmitting ? t('button.signingIn') : t('button.signIn')}
           </button>
         </form>
       </div>

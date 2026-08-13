@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/atoms/Skeleton';
 import { EmptyState } from '@/components/molecules';
 import { useAuth } from '@/hooks/useAuth';
 import { useFinalizedInspections } from '@/hooks/useReports';
+import { useLanguage } from '@/components/design-system';
 import { getPdfBlob, downloadBlob } from '@/utils/pdfStorage';
 import { supabase } from '@/lib/supabase';
 import type { InspectionReportRow, ReportSortField } from '@/types';
@@ -15,6 +16,7 @@ export function Reports() {
   const { role } = useAuth();
   const { data: rows, isLoading } = useFinalizedInspections();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   // State
   const [search, setSearch] = useState('');
@@ -135,13 +137,13 @@ export function Reports() {
 
   // Column definitions
   const columns: { field: ReportSortField; label: string; width?: string }[] = [
-    { field: 'inspectionDate', label: 'Inspection Date', width: '130px' },
-    { field: 'asset', label: 'Asset' },
-    { field: 'subAsset', label: 'SubAsset', width: '100px' },
-    { field: 'type', label: 'Type', width: '90px' },
-    { field: 'defectsCount', label: 'Defects', width: '80px' },
-    { field: 'note', label: 'Note' },
-    { field: 'pdfReport', label: 'PDF report', width: '130px' },
+    { field: 'inspectionDate', label: t('reports.colInspectionDate'), width: '130px' },
+    { field: 'asset', label: t('reports.colAsset') },
+    { field: 'subAsset', label: t('reports.colSubAsset'), width: '100px' },
+    { field: 'type', label: t('reports.colType'), width: '90px' },
+    { field: 'defectsCount', label: t('reports.colDefects'), width: '80px' },
+    { field: 'note', label: t('reports.colNote') },
+    { field: 'pdfReport', label: t('reports.colPdf'), width: '130px' },
   ];
 
   // Render sort indicator
@@ -158,7 +160,7 @@ export function Reports() {
     return (
       <div style={styles.page}>
         <div style={styles.toolbar}>
-          <h5 style={styles.title}>Reports</h5>
+          <h5 style={styles.title}>{t('page.reports')}</h5>
         </div>
         <div style={styles.content}>
           {Array.from({ length: 8 }).map((_, i) => (
@@ -173,12 +175,12 @@ export function Reports() {
     <div style={styles.page}>
       {/* Toolbar */}
       <div style={styles.toolbar}>
-        <h5 style={styles.title}>Reports</h5>
+        <h5 style={styles.title}>{t('page.reports')}</h5>
         <div style={styles.searchContainer}>
           <Search size={16} style={{ color: 'rgba(0, 0, 0, 0.4)' }} />
           <input
             type="text"
-            placeholder="Search all"
+            placeholder={t('reports.searchPlaceholder')}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -195,8 +197,8 @@ export function Reports() {
       <div style={styles.content}>
         {sorted.length === 0 ? (
           <EmptyState
-            title="No finalized inspections"
-            description="Reports will appear here once inspections are completed and finalized."
+            title={t('reports.noFinalized')}
+            description={t('reports.noFinalizedDesc')}
           />
         ) : (
           <>
@@ -279,7 +281,7 @@ export function Reports() {
 
             {/* Pagination */}
             <div style={styles.pagination}>
-              <span style={styles.rowsPerPageLabel}>Rows per page:</span>
+              <span style={styles.rowsPerPageLabel}>{t('reports.rowsPerPage')}</span>
               <div style={styles.rowsPerPage}>
                 <select
                   value={rowsPerPage}

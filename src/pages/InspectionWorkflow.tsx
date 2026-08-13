@@ -6,18 +6,20 @@ import { AnnotateStep } from '@/components/organisms/AnnotateStep';
 import { AnalyzeStep } from '@/components/organisms/AnalyzeStep';
 import { TurbineDetail } from '@/pages/TurbineDetail';
 import { useInspection } from '@/hooks/useInspection';
+import { useLanguage } from '@/components/design-system';
 
 const STEPS = [
-  { num: 1, label: '1. inspect', value: 'inspected' },
-  { num: 2, label: '2. annotate', value: 'uploaded' },
-  { num: 3, label: '3. analyze', value: 'annotated' },
-  { num: 4, label: '4. results', value: 'analyzed' },
+  { num: 1, label: '1. inspect', key: 'workflow.step1', value: 'inspected' },
+  { num: 2, label: '2. annotate', key: 'workflow.step2', value: 'uploaded' },
+  { num: 3, label: '3. analyze', key: 'workflow.step3', value: 'annotated' },
+  { num: 4, label: '4. results', key: 'workflow.step4', value: 'analyzed' },
 ];
 
 export function InspectionWorkflow() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const initialStep = Number(searchParams.get('step')) || 0; // 0 means "auto-detect from stage"
   const [currentStep, setCurrentStep] = useState(initialStep || 1);
@@ -166,7 +168,7 @@ export function InspectionWorkflow() {
                   value={step.value}
                 >
                   <span style={step.num === currentStep ? stepLabelHighlight : stepLabelNormal}>
-                    {step.label}
+                    {t(step.key)}
                   </span>
                 </button>
               ))}

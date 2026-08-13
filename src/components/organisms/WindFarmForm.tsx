@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { useLanguage } from '@/components/design-system';
 import { windFarmSchema, type WindFarmFormData } from '@/utils/validation';
 import type { WindFarm } from '@/types';
 
@@ -12,6 +13,7 @@ export interface WindFarmFormProps {
 }
 
 export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false }: WindFarmFormProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState(initialData?.name ?? '');
   const [location, setLocation] = useState(initialData?.location ?? '');
   const [latitude, setLatitude] = useState(initialData?.latitude?.toString() ?? '');
@@ -80,47 +82,47 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
   return (
     <form onSubmit={handleSubmit} style={formStyle} noValidate>
       <FormField
-        label="Name"
+        label={t('windFarmForm.name')}
         required
         value={name}
         onChange={(e) => setName(e.target.value)}
         error={errors.name}
-        placeholder="e.g. North Sea Wind Farm"
+        placeholder={t('windFarmForm.namePlaceholder')}
       />
       <FormField
-        label="Location"
+        label={t('windFarmForm.location')}
         required
         value={location}
         onChange={(e) => setLocation(e.target.value)}
         error={errors.location}
-        placeholder="e.g. North Sea, Netherlands"
+        placeholder={t('windFarmForm.locationPlaceholder')}
       />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
         <FormField
-          label="Latitude"
+          label={t('windFarmForm.latitude')}
           type="text"
           inputMode="decimal"
           value={latitude}
           onChange={(e) => setLatitude(e.target.value)}
           error={errors.latitude}
-          placeholder="e.g. 52.3676"
+          placeholder={t('windFarmForm.latPlaceholder')}
         />
         <FormField
-          label="Longitude"
+          label={t('windFarmForm.longitude')}
           type="text"
           inputMode="decimal"
           value={longitude}
           onChange={(e) => setLongitude(e.target.value)}
           error={errors.longitude}
-          placeholder="e.g. 4.9041"
+          placeholder={t('windFarmForm.lonPlaceholder')}
         />
       </div>
       <div style={actionsStyle}>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>
-          Cancel
+          {t('button.cancel')}
         </Button>
         <Button type="submit" variant="primary" loading={loading}>
-          {initialData ? 'Update Wind Farm' : 'Create Wind Farm'}
+          {initialData ? t('windFarmForm.updateWindFarm') : t('windFarmForm.createWindFarm')}
         </Button>
       </div>
     </form>

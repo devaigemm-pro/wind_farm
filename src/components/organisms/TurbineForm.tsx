@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
+import { useLanguage } from '@/components/design-system';
 import { turbineSchema, type TurbineFormData } from '@/utils/validation';
 import type { Turbine } from '@/types';
 
@@ -13,6 +14,7 @@ export interface TurbineFormProps {
 }
 
 export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loading = false }: TurbineFormProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState(initialData?.name ?? '');
   const [model, setModel] = useState(initialData?.model ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -65,26 +67,26 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
   return (
     <form onSubmit={handleSubmit} style={formStyle} noValidate>
       <FormField
-        label="Name"
+        label={t('turbineForm.name')}
         required
         value={name}
         onChange={(e) => setName(e.target.value)}
         error={errors.name}
-        placeholder="e.g. Turbine A-01"
+        placeholder={t('turbineForm.namePlaceholder')}
       />
       <FormField
-        label="Model"
+        label={t('turbineForm.model')}
         value={model}
         onChange={(e) => setModel(e.target.value)}
         error={errors.model}
-        placeholder="e.g. Vestas V164-9.5 MW"
+        placeholder={t('turbineForm.modelPlaceholder')}
       />
       <div style={actionsStyle}>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>
-          Cancel
+          {t('button.cancel')}
         </Button>
         <Button type="submit" variant="primary" loading={loading}>
-          {initialData ? 'Update Turbine' : 'Create Turbine'}
+          {initialData ? t('turbineForm.updateTurbine') : t('turbineForm.createTurbine')}
         </Button>
       </div>
     </form>

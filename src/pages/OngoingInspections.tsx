@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Upload, FileText, Wind, ExternalLink, ChevronDown, ChevronRight, Info, List, Columns3 } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
 import { useOngoingInspections } from '@/hooks/useOngoingInspections';
+import { useLanguage } from '@/components/design-system';
 import type { OngoingInspectionItem } from '@/services/ongoing.service';
 
 // ─── Column Config ──────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ const COLUMNS: ColumnConfig[] = [
 export function OngoingInspections() {
   const navigate = useNavigate();
   const { data, isLoading } = useOngoingInspections();
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<'status' | 'list'>('status');
   const [collapsedFarms, setCollapsedFarms] = useState<Set<string>>(new Set());
 
@@ -113,7 +115,7 @@ export function OngoingInspections() {
     <div style={pageContainer}>
       {/* ─── Toolbar ─────────────────────────────────────────────── */}
       <div style={toolbarStyle}>
-        <h1 style={titleStyle}>Ongoing Inspections</h1>
+        <h1 style={titleStyle}>{t('page.ongoingInspections')}</h1>
 
         <div style={toggleContainer}>
           <button
@@ -122,7 +124,7 @@ export function OngoingInspections() {
             title="Status view"
           >
             <Columns3 size={14} />
-            <span>Status</span>
+            <span>{t('ongoing.viewStatus')}</span>
           </button>
           <button
             style={viewMode === 'list' ? toggleBtnActive : toggleBtn}
@@ -130,7 +132,7 @@ export function OngoingInspections() {
             title="List view"
           >
             <List size={14} />
-            <span>List</span>
+            <span>{t('ongoing.viewList')}</span>
           </button>
         </div>
       </div>
@@ -253,17 +255,17 @@ export function OngoingInspections() {
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>Asset</th>
-                <th style={thStyle}>Turbine</th>
-                <th style={thStyle}>Stage</th>
-                <th style={thStyle}>Date</th>
-                <th style={thStyle}>Progress</th>
+                <th style={thStyle}>{t('table.asset')}</th>
+                <th style={thStyle}>{t('table.turbine')}</th>
+                <th style={thStyle}>{t('table.stage')}</th>
+                <th style={thStyle}>{t('table.date')}</th>
+                <th style={thStyle}>{t('table.progress')}</th>
               </tr>
             </thead>
             <tbody>
               {listItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={emptyTd}>No ongoing inspections found</td>
+                  <td colSpan={5} style={emptyTd}>{t('ongoing.noFound')}</td>
                 </tr>
               ) : (
                 listItems.map((item) => (

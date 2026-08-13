@@ -1,4 +1,5 @@
 import { Download, Loader2 } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 
 export interface ExportButtonProps {
   onClick: () => void;
@@ -6,6 +7,7 @@ export interface ExportButtonProps {
 }
 
 export function ExportButton({ onClick, loading = false }: ExportButtonProps) {
+  const { t } = useLanguage();
   const buttonStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -41,7 +43,7 @@ export function ExportButton({ onClick, loading = false }: ExportButtonProps) {
       }}
     >
       {loading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-      Export List
+      {t('export.list')}
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 
 export interface TablePaginationProps {
   page: number;
@@ -17,6 +18,7 @@ export function TablePagination({
   onPageChange,
   onRowsPerPageChange,
 }: TablePaginationProps) {
+  const { t } = useLanguage();
   const totalPages = Math.ceil(totalCount / rowsPerPage);
   const from = totalCount === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const to = Math.min(page * rowsPerPage, totalCount);
@@ -65,7 +67,7 @@ export function TablePagination({
 
   return (
     <div style={containerStyle}>
-      <span>Rows per page:</span>
+      <span>{t('pagination.rowsPerPage')}</span>
       <select
         style={selectStyle}
         value={rowsPerPage}

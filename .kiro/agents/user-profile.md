@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 46
-- **Última actualización**: 2026-08-12
+- **Sesiones analizadas**: 48
+- **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -501,3 +501,36 @@
   - No tiene git remote, SSH keys, ni gh CLI configurado — el proyecto era solo local hasta ahora
   - Confirma el patrón meta-nivel: piensa en optimizar la infraestructura del proceso de desarrollo, no solo en features
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima (👍 como aprobación), pensamiento meta-nivel/infraestructura, confía en decisiones del agente para diseño técnico, quiere autonomía máxima del agente
+
+### Sesión 45 - 2026-08-13
+- **Tarea principal**: Continuación — configurar git remote, push inicial a GitHub, configurar GitHub Secrets para CI/CD, y hacer que el pipeline pase en verde
+- **Observaciones nuevas**:
+  - Comparte token de GitHub directamente sin explicaciones — confianza total en el agente para manejar credenciales
+  - "configuralo por tu cuenta" — cuando da credenciales/tokens, espera que el agente haga TODO sin preguntar más. No quiere que le expliquen qué hacer manualmente.
+  - Aprobó con 👍 nuevamente — patrón de aprobación minimalista confirmado (3+ sesiones, confianza alta)
+  - Quiere que el agente tenga capacidad de operación completa: push/pull git, configurar secrets en GitHub via API, resolver problemas de CI sin intervención humana
+  - No le preocupa dar tokens/credenciales al agente — confía en que se manejen correctamente
+  - Patrón de "hazlo todo tú": cuando la tarea es clara, no quiere intermediarios ni pasos manuales. El agente debe ejecutar end-to-end.
+- **Patrones confirmados**: español, directo, alta autonomía TOTAL (incluye operaciones con credenciales), comunicación ultra-mínima (👍), pensamiento meta-nivel, "configuralo por tu cuenta" = ejecutar sin preguntar, confianza en manejo de secrets
+
+### Sesión 45 - 2026-08-12
+- **Tarea principal**: (1) Replicar toolbar del workflow según DOM de Skyvisor (3-column grid, breadcrumb, step buttons, search). (2) Corregir que las anotaciones no se veían. (3) Cambiar interacción de anotación para que funcione como Skyvisor: click-drag traza línea → mover mouse expande ancho → click confirma.
+- **Observaciones nuevas**:
+  - "no funciona, hacer correccion" — reporta bugs de forma ultra-breve. No describe qué no funciona, confía en que el agente diagnostique.
+  - "dar solucion profesional" — exige calidad de producción. No quiere parches, quiere soluciones bien implementadas.
+  - "estudia bien el dom de skyvisor" + URL + credenciales — cuando algo no funciona como el original, pide que el agente vaya directamente a estudiarlo en producción, no que adivine. Patrón: "ve y mira cómo funciona" > "yo te explico cómo funciona".
+  - "primero se debe trazar una linea y luego ampliar" — describe la interacción UX esperada en términos de ACCIÓN del usuario, no de código. Terminología visual/gestual.
+  - Sesión larga con múltiples iteraciones de fix (toolbar layout, contentStyle, annotation layer, drawPhase) — paciencia con fixes iterativos siempre que se avance hacia la solución
+  - Proporciona credenciales de Skyvisor directamente para que el agente investigue — confianza total en el agente
+- **Patrones confirmados**: español, directo, alta autonomía, DOM como spec, URL + credenciales para investigación, comunicación ultra-mínima, describe UX con terminología gestual/visual, exige soluciones profesionales, corrección directa sin drama, barrido de calidad por pantalla (9+ iteraciones sobre step 2)
+
+
+### Sesión 46 - 2026-08-13
+- **Tarea principal**: (continuación) Crear primer release v0.1.0 y verificar que el pipeline release.yml funcione end-to-end (validate → build → deploy producción --prebuilt → GitHub Release → smoke tests)
+- **Observaciones nuevas**:
+  - "continua" — una sola palabra como instrucción cuando el contexto es claro. No necesita repetir qué hacer, confía en que el agente sabe el siguiente paso lógico.
+  - El pipeline release.yml funcionó exitosamente al primer intento: validate, build, deploy --prebuilt, GitHub Release creado automáticamente
+  - Smoke tests se dispararon correctamente post-deploy producción
+  - E2E tests se skipearon correctamente (solo para previews, no producción) — la lógica de filtrado funciona
+  - Primer release oficial del proyecto: v0.1.0
+- **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima ("continua" = sigue con el siguiente paso lógico), confía en decisiones del agente, no necesita explicaciones de progreso

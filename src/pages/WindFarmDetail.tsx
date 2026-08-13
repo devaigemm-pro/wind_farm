@@ -13,18 +13,15 @@ import { EditCampaignModal } from '@/components/organisms/EditCampaignModal';
 import { useWindFarmDetail, useSubassets, useCampaigns, useDeleteCampaign, useWindFarmDefects, useDefectImages } from '@/hooks/useWindFarmDetail';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/store/toastStore';
+import { useLanguage } from '@/components/design-system';
 import type { TurbineSubassetRow, DefectSortField, DefectDashboardRow, Campaign } from '@/types';
-
-const TABS = [
-  { id: 'general', label: 'General' },
-  { id: 'defects', label: 'Defects' },
-];
 
 export function WindFarmDetail() {
   const { id: windFarmId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
 
   const { data: detail, isLoading: detailLoading } = useWindFarmDetail(windFarmId);
   const { data: subassets, isLoading: subassetsLoading } = useSubassets(windFarmId);
@@ -92,14 +89,14 @@ export function WindFarmDetail() {
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
-    if (!confirm('Delete this campaign?')) return;
-    try { await deleteCampaign.mutateAsync(campaignId); toast.success('Campaign deleted'); }
-    catch { toast.error('Failed to delete campaign'); }
+    if (!confirm(t('windFarmDetail.deleteCampaign'))) return;
+    try { await deleteCampaign.mutateAsync(campaignId); toast.success(t('toast.campaignDeleted')); }
+    catch { toast.error(t('toast.campaignDeleteFailed')); }
   };
 
   const handleExportDefects = useCallback(() => {
     const data = windFarmDefects ?? [];
-    if (data.length === 0) { toast.error('No defects to export'); return; }
+    if (data.length === 0) { toast.error(t('windFarmDetail.noDefectsExport')); return; }
     const headers = ['Turbine', 'Model', 'Type', 'Width', 'Height', 'Category', 'Action', 'Urgency', 'Blade Position', 'Side', 'Root Distance', 'Resolved'];
     const rows = data.map((d) => [
       d.turbineName, d.turbineModel, d.type, d.defectWidth, d.defectHeight,
@@ -120,9 +117,12 @@ export function WindFarmDetail() {
     <div style={pageStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <h1 style={pageTitleStyle}>{detail?.name ?? 'Loading...'}</h1>
+        <h1 style={pageTitleStyle}>{detail?.name ?? t('general.loading')}</h1>
       </div>
-      <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+      <TabBar tabs={[
+        { id: 'general', label: t('windFarmDetail.tabGeneral') },
+        { id: 'defects', label: t('windFarmDetail.tabDefects') },
+      ]} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'general' && (
         <div style={contentStyle} className="wind-farm-detail-content">
@@ -183,7 +183,7 @@ export function WindFarmDetail() {
               onClick={handleExportDefects}
             >
               <Download size={16} />
-              Export List
+              {t('button.exportList')}
             </button>
           </div>
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>

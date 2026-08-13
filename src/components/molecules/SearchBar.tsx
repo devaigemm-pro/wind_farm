@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
+import { useLanguage } from '@/components/design-system';
 
 export interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -10,10 +11,12 @@ export interface SearchBarProps {
 
 export function SearchBar({
   onSearch,
-  placeholder = 'Search all...',
+  placeholder,
   debounceMs = 300,
   defaultValue = '',
 }: SearchBarProps) {
+  const { t } = useLanguage();
+  const resolvedPlaceholder = placeholder ?? t('search.placeholder');
   const [value, setValue] = useState(defaultValue);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -106,8 +109,8 @@ export function SearchBar({
         role="searchbox"
         value={value}
         onChange={handleChange}
-        placeholder={placeholder}
-        aria-label={placeholder}
+        placeholder={resolvedPlaceholder}
+        aria-label={resolvedPlaceholder}
         style={inputStyle}
       />
       {value && (
@@ -115,7 +118,7 @@ export function SearchBar({
           type="button"
           onClick={handleClear}
           style={clearButtonStyle}
-          aria-label="Clear search"
+          aria-label={t('search.clear')}
         >
           <X size={16} />
         </button>

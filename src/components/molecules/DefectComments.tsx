@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Send } from 'lucide-react';
 import { useDefectComments, useAddDefectComment } from '@/hooks/useDefectComments';
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 
 export interface DefectCommentsProps {
   defectId: string;
@@ -12,6 +13,7 @@ export function DefectComments({ defectId, showAll = false }: DefectCommentsProp
   const { data: comments, isLoading } = useDefectComments(defectId);
   const addComment = useAddDefectComment();
   const [newComment, setNewComment] = useState('');
+  const { t } = useLanguage();
 
   function handleSubmit() {
     const text = newComment.trim();
@@ -108,7 +110,7 @@ export function DefectComments({ defectId, showAll = false }: DefectCommentsProp
 
   return (
     <div style={containerStyle}>
-      <span style={headerStyle}>Comments ({comments?.length ?? 0})</span>
+      <span style={headerStyle}>{t('comments.title')} ({comments?.length ?? 0})</span>
 
       {comments && comments.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: showAll ? '200px' : 'none', overflowY: showAll ? 'auto' : 'hidden' }}>
@@ -127,11 +129,11 @@ export function DefectComments({ defectId, showAll = false }: DefectCommentsProp
         <input
           type="text"
           style={inputStyle}
-          placeholder="New comment"
+          placeholder={t('comments.new')}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           onKeyDown={handleKeyDown}
-          aria-label="New comment"
+          aria-label={t('comments.new')}
         />
         <button
           type="button"

@@ -1,6 +1,7 @@
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { Button, Skeleton } from '@/components/atoms';
 import { TablePagination } from '@/components/molecules/TablePagination';
+import { useLanguage } from '@/components/design-system';
 import type { TurbineSubassetRow } from '@/types';
 
 export interface SubassetsTableProps {
@@ -19,19 +20,20 @@ export interface SubassetsTableProps {
   selectedSubassetName?: string | null;
 }
 
-const COLUMNS = [
-  { key: 'name', label: 'Name' },
-  { key: 'model', label: 'Model' },
-  { key: 'lastInspection', label: 'Last Inspection' },
-  { key: 'poweringDate', label: 'Powering Date' },
-  { key: 'inspectionsCount', label: '# Inspections' },
-];
-
 export function SubassetsTable({
   data, isLoading, sortField, sortDirection, onSort,
   page, rowsPerPage, totalCount, onPageChange, onRowsPerPageChange,
   onOpenSerialNumbers, onRowClick, selectedSubassetName,
 }: SubassetsTableProps) {
+  const { t } = useLanguage();
+  
+  const COLS = [
+    { key: 'name', label: t('subassets.colName') },
+    { key: 'model', label: t('subassets.colModel') },
+    { key: 'lastInspection', label: t('subassets.colLastInspection') },
+    { key: 'poweringDate', label: t('subassets.colPoweringDate') },
+    { key: 'inspectionsCount', label: t('subassets.colInspections') },
+  ];
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '—';
 
   const SortIcon = ({ field }: { field: string }) => {
@@ -41,12 +43,12 @@ export function SubassetsTable({
 
   return (
     <div style={containerStyle}>
-      <h3 style={titleStyle}>Subassets</h3>
+      <h3 style={titleStyle}>{t('subassets.title')}</h3>
       <div style={tableWrapperStyle} className="responsive-table-wrapper">
         <table style={tableStyle}>
           <thead>
             <tr>
-              {COLUMNS.map((col) => (
+              {COLS.map((col) => (
                 <th key={col.key} style={thStyle} onClick={() => onSort(col.key)}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                     {col.label} <SortIcon field={col.key} />
@@ -90,7 +92,7 @@ export function SubassetsTable({
       />
       <div style={{ padding: 'var(--space-3) 0' }}>
         <Button variant="secondary" size="sm" onClick={onOpenSerialNumbers}>
-          Turbines Serial Numbers
+          {t('button.turbineSerialNumbers')}
         </Button>
       </div>
     </div>

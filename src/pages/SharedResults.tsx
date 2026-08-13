@@ -2,6 +2,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { TurbineDetail } from './TurbineDetail';
 import { LoadingSplash } from '@/components/atoms/LoadingSplash';
+import { useLanguage } from '@/components/design-system';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -13,6 +14,7 @@ export function SharedResults() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [state, setState] = useState<'loading' | 'valid' | 'expired'>('loading');
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!token) { setState('expired'); return; }
@@ -62,7 +64,7 @@ export function SharedResults() {
   }, [token]);
 
   if (!windFarmId || !turbineId) {
-    return <div style={center}><p style={txt}>Invalid shared link.</p></div>;
+    return <div style={center}><p style={txt}>{t('shared.invalidLink')}</p></div>;
   }
 
   if (state === 'loading') return <LoadingSplash />;
@@ -72,8 +74,8 @@ export function SharedResults() {
       <div style={center}>
         <div style={{ textAlign: 'center' }}>
           <img src="/coretec-logo.svg" width="64" height="64" alt="CORE Insight" style={{ marginBottom: 16 }} />
-          <h2 style={{ fontSize: 20, color: '#1e293b', margin: '0 0 8px' }}>Link Expired</h2>
-          <p style={txt}>This shared link is no longer active.</p>
+          <h2 style={{ fontSize: 20, color: '#1e293b', margin: '0 0 8px' }}>{t('shared.linkExpired')}</h2>
+          <p style={txt}>{t('shared.linkExpiredDesc')}</p>
         </div>
       </div>
     );
@@ -85,7 +87,7 @@ export function SharedResults() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <img src="/coretec-logo.svg" width="32" height="32" alt="CORE Insight" />
         </div>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>Shared Inspection Results</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>{t('page.sharedResults')}</span>
         <div style={{ width: 120 }} />
       </div>
       <div style={content}>

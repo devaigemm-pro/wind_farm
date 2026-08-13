@@ -5,6 +5,7 @@ import { useAssetDocuments, useUploadDocument, useDeleteDocument } from '@/hooks
 import { assetDetailService } from '@/services/asset-detail.service';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import type { AssetDocument } from '@/types';
 
 export interface DocumentDropboxProps {
@@ -14,6 +15,7 @@ export interface DocumentDropboxProps {
 export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
   const { role } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { data: documents, isLoading } = useAssetDocuments(windFarmId);
   const uploadMutation = useUploadDocument();
@@ -34,15 +36,15 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
       'image/jpeg',
     ];
     if (!allowed.includes(file.type)) {
-      toast.error('File type not allowed. Use PDF, DOCX, XLSX, PNG or JPG.');
+      toast.error(t('toast.fileTypeNotAllowed'));
       return;
     }
 
     try {
       await uploadMutation.mutateAsync({ windFarmId, file });
-      toast.success('Document uploaded successfully');
+      toast.success(t('toast.documentUploaded'));
     } catch {
-      toast.error('Failed to upload document');
+      toast.error(t('toast.documentUploadFailed'));
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -52,7 +54,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
       const url = await assetDetailService.getDocumentUrl(doc.filePath);
       window.open(url, '_blank');
     } catch {
-      toast.error('Failed to download document');
+      toast.error(t('toast.documentDownloadFailed'));
     }
   };
 
@@ -60,9 +62,9 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
     if (!confirm(`Delete "${doc.fileName}"?`)) return;
     try {
       await deleteMutation.mutateAsync({ documentId: doc.id, filePath: doc.filePath });
-      toast.success('Document deleted');
+      toast.success(t('toast.documentDeleted'));
     } catch {
-      toast.error('Failed to delete document');
+      toast.error(t('toast.documentDeleteFailed'));
     }
   };
 
@@ -75,7 +77,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <h4 style={titleStyle}>Documents dropbox</h4>
+        <h4 style={titleStyle}>{t('documents.title')}</h4>
         {canUpload && (
           <Button
             variant="primary"
@@ -84,7 +86,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
             onClick={() => fileInputRef.current?.click()}
             loading={uploadMutation.isPending}
           >
-            Add Document
+            {t('button.addDocument')}
           </Button>
         )}
         <input
@@ -97,7 +99,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
       </div>
 
       {isLoading ? (
-        <p style={placeholderStyle}>Loading documents...</p>
+        <p style={placeholderStyle}>{t('documents.loadingDocs')}</p>
       ) : documents && documents.length > 0 ? (
         <div style={listStyle}>
           {documents.map((doc) => (
@@ -126,8 +128,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
         </div>
       ) : (
         <p style={placeholderStyle}>
-          Have all your key documents at your disposal here. Master service agreement, asset
-          initial audit, insurance contracts, ...
+          {t('documents.placeholder')}
         </p>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import type { WindFarmDashboardRow } from '@/types';
 
 export type WindFarmSortField =
@@ -18,15 +19,6 @@ export interface WindFarmsTableProps {
   onRowClick?: (id: string) => void;
   skeletonRows?: number;
 }
-
-const COLUMNS: { field: WindFarmSortField; label: string }[] = [
-  { field: 'name', label: 'Asset Name' },
-  { field: 'subAssetsCount', label: 'SubAssets Count' },
-  { field: 'inspectionsCount', label: '# Inspections' },
-  { field: 'totalPower', label: 'Total Power' },
-  { field: 'poweringDate', label: 'Powering Date' },
-  { field: 'oldestInspection', label: 'Oldest Inspection' },
-];
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
@@ -51,6 +43,16 @@ export function WindFarmsTable({
   onRowClick,
   skeletonRows = 5,
 }: WindFarmsTableProps) {
+  const { t } = useLanguage();
+  
+  const COLS: { field: WindFarmSortField; label: string }[] = [
+    { field: 'name', label: t('windFarmsTable.assetName') },
+    { field: 'subAssetsCount', label: t('windFarmsTable.subAssetsCount') },
+    { field: 'inspectionsCount', label: t('windFarmsTable.inspections') },
+    { field: 'totalPower', label: t('windFarmsTable.totalPower') },
+    { field: 'poweringDate', label: t('windFarmsTable.poweringDate') },
+    { field: 'oldestInspection', label: t('windFarmsTable.oldestInspection') },
+  ];
   const tableStyle: React.CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
@@ -102,7 +104,7 @@ export function WindFarmsTable({
       <table style={tableStyle}>
         <thead>
           <tr>
-            {COLUMNS.map((col) => (
+            {COLS.map((col) => (
               <th
                 key={col.field}
                 style={thStyle}

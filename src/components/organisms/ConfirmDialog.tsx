@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -16,12 +17,15 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'default',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useLanguage();
+  const resolvedConfirmLabel = confirmLabel ?? t('confirmDialog.confirm');
+  const resolvedCancelLabel = cancelLabel ?? t('confirmDialog.cancel');
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -108,13 +112,13 @@ export function ConfirmDialog({
             variant="secondary"
             onClick={onCancel}
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </Button>
           <Button
             variant={variant === 'danger' ? 'danger' : 'primary'}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </Button>
         </div>
       </div>

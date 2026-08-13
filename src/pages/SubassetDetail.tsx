@@ -11,29 +11,26 @@ import { Skeleton } from '@/components/atoms';
 import { Button } from '@/components/atoms';
 import { useTurbineDetail, useTurbineInspections, useTurbineDefects, useDefectImages } from '@/hooks/useWindFarmDetail';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/design-system';
 import type { CampaignInspection, DefectSortField, DefectDashboardRow } from '@/types';
-
-const TABS = [
-  { id: 'general', label: 'General' },
-  { id: 'defects', label: 'Defects' },
-];
-
-const COLUMNS: { key: string; label: string }[] = [
-  { key: 'inspectionDate', label: 'Inspection Date' },
-  { key: 'subassetName', label: 'Subasset name' },
-  { key: 'status', label: 'Status' },
-  { key: 'inspectionType', label: 'Type' },
-  { key: 'photosCount', label: 'Photos uploaded' },
-  { key: 'viewedPercent', label: 'Viewed %' },
-  { key: 'defectsCount', label: 'Defects' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'report', label: 'PDF report' },
-];
 
 export function SubassetDetail() {
   const { windFarmId, turbineId } = useParams<{ windFarmId: string; turbineId: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
+  const { t } = useLanguage();
+
+  const COLUMNS: { key: string; label: string }[] = [
+    { key: 'inspectionDate', label: t('subassetDetail.colInspectionDate') },
+    { key: 'subassetName', label: t('subassetDetail.colSubassetName') },
+    { key: 'status', label: t('subassetDetail.colStatus') },
+    { key: 'inspectionType', label: t('subassetDetail.colType') },
+    { key: 'photosCount', label: t('subassetDetail.colPhotos') },
+    { key: 'viewedPercent', label: t('subassetDetail.colViewed') },
+    { key: 'defectsCount', label: t('subassetDetail.colDefects') },
+    { key: 'notes', label: t('subassetDetail.colNotes') },
+    { key: 'report', label: t('subassetDetail.colPdf') },
+  ];
 
   const { data: detail, isLoading: detailLoading } = useTurbineDetail(turbineId);
   const { data: inspections, isLoading: inspectionsLoading } = useTurbineInspections(turbineId);
@@ -116,15 +113,18 @@ export function SubassetDetail() {
       <div style={toolbarStyle}>
         <div style={breadcrumbStyle}>
           <Link to={`/assets-wind/${windFarmId}`} style={bcLinkStyle}>
-            {detail?.windFarmName ?? 'Wind Farm'}
+            {detail?.windFarmName ?? t('subassetDetail.windFarm')}
           </Link>
           <span style={bcSepStyle}>&gt;</span>
-          <span style={bcCurrentStyle}>{detail?.name ?? 'Loading...'}</span>
+          <span style={bcCurrentStyle}>{detail?.name ?? t('general.loading')}</span>
         </div>
       </div>
 
       {/* Tabs */}
-      <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+      <TabBar tabs={[
+        { id: 'general', label: t('windFarmDetail.tabGeneral') },
+        { id: 'defects', label: t('windFarmDetail.tabDefects') },
+      ]} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'general' && (
         <div style={contentStyle} className="wind-farm-detail-content">
@@ -132,7 +132,7 @@ export function SubassetDetail() {
           <div style={leftColStyle} className="wind-farm-detail-left">
             {/* Details Card */}
             <div style={cardStyle}>
-              <h3 style={cardTitleStyle}>Details</h3>
+              <h3 style={cardTitleStyle}>{t('subassetDetail.details')}</h3>
               {detailLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -142,23 +142,23 @@ export function SubassetDetail() {
               ) : (
                 <div style={detailsGridStyle}>
                   <div style={detailRowStyle}>
-                    <span style={detailLabelStyle}>Model:</span>
+                    <span style={detailLabelStyle}>{t('subassetDetail.model')}</span>
                     <span style={detailValueStyle}>{detail?.model ?? '—'}</span>
                   </div>
                   <div style={detailRowStyle}>
-                    <span style={detailLabelStyle}>Latest inspection:</span>
+                    <span style={detailLabelStyle}>{t('subassetDetail.latestInspection')}</span>
                     <span style={detailValueStyle}>{formatDate(detail?.latestInspection ?? null)}</span>
                   </div>
                   <div style={detailRowStyle}>
-                    <span style={detailLabelStyle}>Powering date:</span>
+                    <span style={detailLabelStyle}>{t('subassetDetail.poweringDate')}</span>
                     <span style={detailValueStyle}>{formatDate(detail?.poweringDate ?? null)}</span>
                   </div>
                   <div style={detailRowStyle}>
-                    <span style={detailLabelStyle}>Power:</span>
+                    <span style={detailLabelStyle}>{t('subassetDetail.power')}</span>
                     <span style={detailValueStyle}>{detail?.powerKw ? `${detail.powerKw} kW` : '—'}</span>
                   </div>
                   <div style={detailRowStyle}>
-                    <span style={detailLabelStyle}>Number of inspections:</span>
+                    <span style={detailLabelStyle}>{t('subassetDetail.numberOfInspections')}</span>
                     <span style={detailValueStyle}>{detail?.inspectionsCount ?? 0}</span>
                   </div>
                 </div>
@@ -170,7 +170,7 @@ export function SubassetDetail() {
                   onClick={handlePlanInspection}
                   style={{ width: '100%', marginTop: 'var(--space-4)' }}
                 >
-                  Plan a new inspection
+                  {t('button.planInspection')}
                 </Button>
               )}
             </div>
@@ -182,7 +182,7 @@ export function SubassetDetail() {
           {/* Right column: Inspections table */}
           <div style={rightColStyle} className="wind-farm-detail-right">
             <div style={inspectionsPanelStyle}>
-              <h3 style={cardTitleStyle}>Inspections</h3>
+              <h3 style={cardTitleStyle}>{t('subassetDetail.inspections')}</h3>
               <div style={tableWrapperStyle} className="subasset-inspections-table">
                 <table style={tableStyle}>
                   <thead>
@@ -213,7 +213,7 @@ export function SubassetDetail() {
                         ? (
                           <tr>
                             <td colSpan={COLUMNS.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-neutral-500)' }}>
-                              No inspections found for this subasset.
+                              {t('subassetDetail.noInspections')}
                             </td>
                           </tr>
                         )

@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/atoms';
+import { useLanguage } from '@/components/design-system';
 import type { DefectDashboardRow, DefectSortField } from '@/types';
 
 export interface DefectsTableProps {
@@ -12,21 +13,6 @@ export interface DefectsTableProps {
   onToggleResolved?: (id: string, resolved: boolean) => void;
   skeletonRows?: number;
 }
-
-const COLUMNS: { field: DefectSortField; label: string; width?: string; sortable: boolean }[] = [
-  { field: 'assetName', label: 'Asset', width: '10%', sortable: true },
-  { field: 'turbineName', label: 'Turbine', width: '7%', sortable: true },
-  { field: 'turbineModel', label: 'Model', width: '9%', sortable: true },
-  { field: 'type', label: 'Type', width: '11%', sortable: true },
-  { field: 'defectSize', label: 'Defect size (cm)', width: '9%', sortable: false },
-  { field: 'category', label: 'Category', width: '7%', sortable: true },
-  { field: 'action', label: 'Action', width: '13%', sortable: false },
-  { field: 'nextStep', label: 'Next step', width: '12%', sortable: true },
-  { field: 'blade', label: 'Blade', width: '5%', sortable: true },
-  { field: 'side', label: 'Side', width: '5%', sortable: true },
-  { field: 'rootDistance', label: 'Root distance (m)', width: '13%', sortable: true },
-  { field: 'resolved', label: 'Resolved', width: '10%', sortable: true },
-];
 
 function getCategoryBadgeStyle(category: number): React.CSSProperties {
   let bgColor = '#F2994A'; // default orange for cat 3
@@ -112,6 +98,22 @@ export function DefectsTable({
   onToggleResolved,
   skeletonRows = 10,
 }: DefectsTableProps) {
+  const { t } = useLanguage();
+  
+  const COLS: { field: DefectSortField; label: string; width?: string; sortable: boolean }[] = [
+    { field: 'assetName', label: t('defectsTable.asset'), width: '10%', sortable: true },
+    { field: 'turbineName', label: t('defectsTable.turbine'), width: '7%', sortable: true },
+    { field: 'turbineModel', label: t('defectsTable.model'), width: '9%', sortable: true },
+    { field: 'type', label: t('defectsTable.type'), width: '11%', sortable: true },
+    { field: 'defectSize', label: t('defectsTable.defectSize'), width: '9%', sortable: false },
+    { field: 'category', label: t('defectsTable.category'), width: '7%', sortable: true },
+    { field: 'action', label: t('defectsTable.action'), width: '13%', sortable: false },
+    { field: 'nextStep', label: t('defectsTable.nextStep'), width: '12%', sortable: true },
+    { field: 'blade', label: t('defectsTable.blade'), width: '5%', sortable: true },
+    { field: 'side', label: t('defectsTable.side'), width: '5%', sortable: true },
+    { field: 'rootDistance', label: t('defectsTable.rootDistance'), width: '13%', sortable: true },
+    { field: 'resolved', label: t('defectsTable.resolved'), width: '10%', sortable: true },
+  ];
   const tableStyle: React.CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
@@ -165,7 +167,7 @@ export function DefectsTable({
       <table style={tableStyle}>
         <thead>
           <tr>
-            {COLUMNS.map((col) => (
+            {COLS.map((col) => (
               <th
                 key={col.field}
                 style={{ ...thStyle, width: col.width, cursor: col.sortable ? 'pointer' : 'default' }}
