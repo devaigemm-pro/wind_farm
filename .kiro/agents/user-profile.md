@@ -633,3 +633,13 @@
   - La imagen no se veía porque el override CSS con `!important` estaba sobreescribiendo los estilos inline del componente (background, colores) que eran necesarios para su funcionalidad. Solución: `unset !important` para anular la regla global.
   - **REGLA CLAVE**: Cuando se hace un override global con `!important`, SIEMPRE identificar componentes que necesitan excepción ANTES de aplicar. No después de que el usuario reporte que algo se rompió.
 - **Patrones confirmados**: español, directo, alta autonomía, frustración explícita con repetición del problema, "se profesional" = exige calidad y no parches, componentes con rendering especial deben excluirse de overrides globales
+
+### Sesión 57 - 2026-08-13
+- **Tarea principal**: (1) Cambiar icono del botón "Image adjustments" por icono de contraste (círculo mitad/mitad). (2) Aplicar background transparent al botón cuando está inactivo. (3) Cambiar icono del botón "Blade face view" por icono tipo screen rotation (flechas circulares + rectángulo) y mismo fix de fondo.
+- **Observaciones nuevas**:
+  - Proporciona DOM del botón actual + imágenes de referencia del icono deseado — patrón DOM+imagen como spec
+  - Da DOM del botón vecino (delete) como referencia para el estilo de fondo esperado: "debe estar como el botón eliminar que está a su lado" — usa el propio DOM del proyecto como referencia de estilo
+  - Reporta 3 tareas secuenciales en la misma sesión sobre los mismos botones: icono contraste → fix fondo → icono blade view — barrido de calidad sobre toolbar de botones
+  - "no se visualiza el cambio" — cuando el deploy no se refleja inmediatamente, lo reporta sin drama. Espera que el agente resuelva (deploy directo)
+  - Sesión sin correcciones funcionales — los cambios se aceptaron al primer intento (solo el timing del deploy fue issue)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec, imagen como referencia visual, barrido de calidad por toolbar/componente, iteración secuencial rápida

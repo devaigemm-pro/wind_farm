@@ -391,14 +391,14 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
       <div style={panelStyle}>
         <div style={panelInner}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h5 style={{ ...panelTitle, margin: 0 }}>Annotations</h5>
+            <h5 style={{ ...panelTitle, margin: 0 }}>{t('analyze.annotations')}</h5>
             {currentBladePending.length > 0 && (
               <button
                 style={{ ...saveBtnStyle, fontSize: 11, padding: '5px 10px' }}
                 onClick={handleBulkSave}
                 disabled={role === 'supervisor'}
               >
-                Save {currentBladePending.length} as defects
+                {t('analyze.saveAsDefects')} ({currentBladePending.length})
               </button>
             )}
           </div>
@@ -419,7 +419,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
           {currentBladePending.length === 0 ? (
             <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, padding: 12, marginBottom: 12 }}>
               <p style={{ fontSize: 13, color: C.muted, margin: 0, textAlign: 'center' }}>
-                All annotations for Blade {selectedBlade} have been confirmed
+                {t('analyze.allConfirmed')} {selectedBlade}
               </p>
             </div>
           ) : (
@@ -465,7 +465,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               <div style={previewHeaderStyle}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{selectedDefect.type}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Category: {selectedDefect.cat}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('analyze.categoryLabel')}: {selectedDefect.cat}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{selectedDefect.blade} - {selectedDefect.face} - {selectedDefect.root}m</div>
@@ -477,18 +477,18 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                   <img src={selectedDefect.imageUrl} alt="defect preview" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ color: '#888', fontSize: 12 }}>No image available</span>
+                    <span style={{ color: '#888', fontSize: 12 }}>{t('defectImage.noImage')}</span>
                   </div>
                 )}
                 <div style={openBtnContainerStyle}>
-                  <button style={openBtnStyle} onClick={() => { if (selectedDefect && onOpenPhoto) onOpenPhoto(selectedDefect.photoId, selectedDefect.blade); }}>OPEN</button>
+                  <button style={openBtnStyle} onClick={() => { if (selectedDefect && onOpenPhoto) onOpenPhoto(selectedDefect.photoId, selectedDefect.blade); }}>{t('analyze.open')}</button>
                 </div>
               </div>
             </div>
           ) : (
             <div style={previewAreaStyle}>
               <p style={{ fontSize: 13, color: C.muted, margin: 0, textAlign: 'center' }}>
-                Select or drag an annotation to view it
+                {t('analyze.selectOrDrag')}
               </p>
             </div>
           )}
@@ -501,7 +501,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
       {/* ═══ CENTER PANEL: Defect Editor ═══ */}
       <div style={panelStyle} onDragOver={handleDragOver} onDrop={handleDrop}>
         <div style={panelInner}>
-          <h5 style={panelTitle}>Defect Editor</h5>
+          <h5 style={panelTitle}>{t('analyze.defectEditor')}</h5>
 
           {/* Defect image */}
           <div style={imageContainerStyle}>
@@ -530,7 +530,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* Type */}
             <div style={fieldGroup}>
-              <label style={labelStyle}>Type</label>
+              <label style={labelStyle}>{t('analyze.type')}</label>
               <select style={selectInputStyle} value={defectType} onChange={(e) => setDefectType(e.target.value)}>
                 <option value="">{t('analyze.select')}</option>
                 <option value="LE EROSION">{t('defect.leErosion')}</option>
@@ -545,7 +545,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             {/* Category + Root distance + Blade face row */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
               <div style={{ ...fieldGroup, flex: 0 }}>
-                <label style={labelStyle}>Category</label>
+                <label style={labelStyle}>{t('analyze.category')}</label>
                 <div style={{ display: 'flex', gap: 0 }}>
                   {[1, 2, 3, 4, 5].map((c) => {
                     const isActive = category === c;
@@ -561,11 +561,11 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                 </div>
               </div>
               <div style={{ ...fieldGroup, flex: 1 }}>
-                <label style={labelStyle}>Root distance (m)</label>
+                <label style={labelStyle}>{t('annotate.rootDistance')}</label>
                 <input type="number" step="0.1" min="0" style={textInputStyle} value={rootDistance} onChange={(e) => setRootDistance(e.target.value)} />
               </div>
               <div style={{ ...fieldGroup, flex: 1 }}>
-                <label style={labelStyle}>Blade face</label>
+                <label style={labelStyle}>{t('analyze.bladeFace')}</label>
                 <select style={selectInputStyle} value={bladeFace} onChange={(e) => setBladeFace(e.target.value)}>
                   <option value="">—</option>
                   <option value="LE">LE</option>
@@ -578,40 +578,40 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
 
             {/* Note */}
             <div style={fieldGroup}>
-              <label style={labelStyle}>Note</label>
+              <label style={labelStyle}>{t('analyze.noteLabel')}</label>
               <div style={inputWithClearStyle}>
-                <input style={{ ...textInputStyle, paddingRight: 28 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Visual description of the defect" />
+                <input style={{ ...textInputStyle, paddingRight: 28 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('defects.descriptionPlaceholder')} />
                 {note && <button style={clearIconBtn} onClick={() => setNote('')}>&times;</button>}
               </div>
             </div>
 
             {/* Root cause */}
             <div style={fieldGroup}>
-              <label style={labelStyle}>Root cause</label>
+              <label style={labelStyle}>{t('analyze.rootCause')}</label>
               <div style={inputWithClearStyle}>
-                <input style={{ ...textInputStyle, paddingRight: 28 }} value={rootCause} onChange={(e) => setRootCause(e.target.value)} placeholder="Probable cause of the defect" />
+                <input style={{ ...textInputStyle, paddingRight: 28 }} value={rootCause} onChange={(e) => setRootCause(e.target.value)} placeholder={t('defects.causePlaceholder')} />
                 {rootCause && <button style={clearIconBtn} onClick={() => setRootCause('')}>&times;</button>}
               </div>
             </div>
 
             {/* Next step */}
             <div style={fieldGroup}>
-              <label style={labelStyle}>Next step</label>
+              <label style={labelStyle}>{t('analyze.nextStep')}</label>
               <div style={inputWithClearStyle}>
-                <input style={{ ...textInputStyle, paddingRight: 28 }} value={nextStep} onChange={(e) => setNextStep(e.target.value)} placeholder="Recommended action and urgency" />
+                <input style={{ ...textInputStyle, paddingRight: 28 }} value={nextStep} onChange={(e) => setNextStep(e.target.value)} placeholder={t('defects.actionPlaceholder')} />
                 {nextStep && <button style={clearIconBtn} onClick={() => setNextStep('')}>&times;</button>}
               </div>
             </div>
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-              <button style={clearBtnStyle} onClick={handleClear}>CLEAR</button>
+              <button style={clearBtnStyle} onClick={handleClear}>{t('analyze.clear')}</button>
               <button
                 style={{ ...saveBtnStyle, opacity: selectedDefectId && role !== 'supervisor' ? 1 : 0.5, cursor: selectedDefectId && role !== 'supervisor' ? 'pointer' : 'not-allowed' }}
                 onClick={handleSaveDefect}
                 disabled={!selectedDefectId || saveStatus === 'saving' || role === 'supervisor'}
               >
-                {saveStatus === 'saving' ? 'SAVING...' : saveStatus === 'saved' ? '✓ SAVED' : 'SAVE AS DEFECT'}
+                {saveStatus === 'saving' ? t('analyze.saving') : saveStatus === 'saved' ? t('analyze.saved') : t('analyze.saveAsDefect')}
               </button>
             </div>
           </div>
@@ -624,7 +624,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
       {/* ═══ RIGHT PANEL: Summary and Reviews ═══ */}
       <div style={panelStyle}>
         <div style={panelInner}>
-          <h5 style={panelTitle}>Summary and Reviews</h5>
+          <h5 style={panelTitle}>{t('analyze.summaryTitle')}</h5>
 
           {/* Blade accordions — show only CONFIRMED defects */}
           {(['A', 'B', 'C'] as const).map((blade) => {
@@ -645,16 +645,16 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                 {isExpanded && (
                   <div style={{ paddingBottom: 8 }}>
                     {bladeDefects.length === 0 ? (
-                      <p style={{ fontSize: 12, color: C.muted, margin: '4px 0', paddingLeft: 4 }}>No confirmed defects yet</p>
+                      <p style={{ fontSize: 12, color: C.muted, margin: '4px 0', paddingLeft: 4 }}>{t('analyze.noConfirmed')}</p>
                     ) : (
                       <table style={summaryTableStyle}>
                         <thead>
                           <tr>
                             <th style={summaryThStyle}>#</th>
-                            <th style={summaryThStyle}>Type</th>
-                            <th style={summaryThStyle}>Face</th>
-                            <th style={summaryThStyle}>Category</th>
-                            <th style={summaryThStyle}>Root (m)</th>
+                            <th style={summaryThStyle}>{t('analyze.type')}</th>
+                            <th style={summaryThStyle}>{t('results.face')}</th>
+                            <th style={summaryThStyle}>{t('analyze.category')}</th>
+                            <th style={summaryThStyle}>{t('results.rootM')}</th>
                           </tr>
                         </thead>
                         <tbody>
