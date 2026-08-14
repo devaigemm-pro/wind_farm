@@ -145,7 +145,7 @@ export function BladesDiagram({
                 <tr style={catTheadRowStyle}>
                   <th style={{ ...catThStyle, width: 80 }}>Category</th>
                   <th style={{ ...catThStyle, width: 140 }}>Damage</th>
-                  <th style={catThStyle}>Action</th>
+                  <th style={catThStyle}>Recommended action</th>
                   <th style={{ ...catThStyle, width: 100 }}>Next step</th>
                 </tr>
               </thead>
