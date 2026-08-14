@@ -28,7 +28,7 @@ const C = {
   cat1: '#008F98',
   amber: '#F29D00',
   orange: '#FF5500',
-  blue: '#4CAF50',
+  blue: '#5A8F5A',
   ring: '#EDEFF1',
   text: '#535353',
   muted: '#8A9099',
@@ -529,7 +529,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: '1.5px solid #4CAF50', background: 'transparent', color: '#4CAF50', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: '1.5px solid #5A8F5A', background: 'transparent', color: '#5A8F5A', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
             onClick={(e) => setExportAnchorEl(e.currentTarget)}
           >
             <FileDown size={14} />
@@ -537,7 +537,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           </button>
           {!isSharedView && (
             <button
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: 'none', background: '#4CAF50', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: 'none', background: '#5A8F5A', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
               onClick={(e) => setShareAnchor(e.currentTarget)}
             >
               <Share2 size={14} />
@@ -942,7 +942,7 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
                   padding: '6px 14px',
                   borderRadius: 6,
                   border: 'none',
-                  background: '#4CAF50',
+                  background: '#5A8F5A',
                   color: '#fff',
                   fontSize: 12,
                   fontWeight: 600,
@@ -1290,10 +1290,10 @@ const toolbarLeftSt: React.CSSProperties = { flex: '0 0 25%', minWidth: 0 };
 const toolbarCenterSt: React.CSSProperties = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 };
 const toolbarRightSt: React.CSSProperties = { flex: '0 0 25%', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' };
 const breadcrumbSt: React.CSSProperties = { fontSize: 13, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
-const bcLinkSt: React.CSSProperties = { color: '#00A6FF', textDecoration: 'none', fontWeight: 500 };
+const bcLinkSt: React.CSSProperties = { color: '#5A8F5A', textDecoration: 'none', fontWeight: 500 };
 const bcSepSt: React.CSSProperties = { margin: '0 6px', color: '#999' };
 const phaseBtnNormal: React.CSSProperties = { padding: '6px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 500, color: '#666', borderRadius: 4, transition: 'all 0.2s ease' };
-const phaseBtnActive: React.CSSProperties = { padding: '6px 16px', border: '2px solid #222', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 700, color: '#222', borderRadius: 20, transition: 'all 0.2s ease' };
+const phaseBtnActive: React.CSSProperties = { padding: '6px 16px', border: '2px solid #5A8F5A', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-family-sans)', fontSize: 13, fontWeight: 700, color: '#5A8F5A', borderRadius: 20, transition: 'all 0.2s ease' };
 const phaseLabelNormal: React.CSSProperties = {};
 const phaseLabelActive: React.CSSProperties = { fontWeight: 700 };
 const topBar: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '14px 20px', borderBottom: `1px solid ${C.border}`, gap: 20 };
