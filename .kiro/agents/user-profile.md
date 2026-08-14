@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 92
+- **Sesiones analizadas**: 93
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -919,6 +919,15 @@
   - "dejarla en 40 px" — decisión final del tamaño. Logo final: `core-insight-logo.png` a 40px de alto.
   - Patrón de ajuste iterativo visual confirmado por 4ta vez: 28→40→35→40.
 - **Patrones confirmados**: español, directo, alta autonomía, ajuste iterativo de tamaños (confianza: muy alta), "he actualizado" = redesplegar implícito, colabora manualmente con assets
+
+### Sesión 101 - 2026-08-13
+- **Tarea principal**: Continuación ajuste logo sidebar: imagen actualizada 4 veces + tamaño iterado hasta 50px final.
+- **Observaciones nuevas**:
+  - Secuencia de tamaños en esta sesión completa: 28→40→35→40→45→50. Tamaño final: 50px.
+  - "he actualizado la imagen" se repitió 4 veces — flujo consolidado: usuario edita PNG → avisa → agente redesplega.
+  - El usuario no pidió nunca reducir después de 45→50. Esto sugiere que 50px es el tamaño definitivo.
+  - Archivo final: `/public/core-insight-logo.png` a height="50" en Sidebar.tsx.
+- **Patrones confirmados**: español, directo, alta autonomía, "he actualizado" = redesplegar (confianza: máxima), ajuste iterativo visual hasta satisfacción, tamaño logo final = 50px
 
 ### Sesión 101 - 2026-08-13
 - **Tarea principal**: Sesión extensa de QA visual: (1) Unificación cromática #5A8F5A en toda la app (DefectsTable, workflow toolbar, CampaignResults, InspectStep, AnalyzeStep, AnnotateStep, DefectEditForm, ExportButton, DefectDetailSidebar/Panel, BladesDiagram). (2) Logo sidebar: reemplazo por imagen exacta del usuario + ajuste iterativo tamaño (28→40→35→40→45). (3) Traducción headers Defect Categories. (4) Renombrar "Action"→"Recommended action". (5) Eliminar columna "Activo" DefectsTable. (6) Centrar cabeceras + wrap texto.

@@ -45,9 +45,9 @@ interface InspectorInfo {
 
 type RGB = [number, number, number];
 
-const COLOR_PRIMARY = '#4CAF50';
-const COLOR_COVER_BG = '#2B6B99';
-const COLOR_HEADER_TABLE: RGB = [74, 74, 74];
+const COLOR_PRIMARY = '#5A8F5A';
+const COLOR_COVER_BG = '#5A8F5A';
+const COLOR_HEADER_TABLE: RGB = [90, 143, 90];
 const COLOR_CAT5: RGB = [255, 0, 0];
 const COLOR_CAT4: RGB = [255, 140, 0];
 const COLOR_CAT3: RGB = [255, 215, 0];
