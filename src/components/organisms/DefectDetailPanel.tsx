@@ -177,13 +177,13 @@ export function DefectDetailPanel({ defect, onResolvedToggle }: DefectDetailPane
         </div>
         {/* Compare / Zoom controls */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
-          <button type="button" style={{ padding: '6px 16px', backgroundColor: 'transparent', color: 'rgb(25, 118, 210)', border: '1px solid rgb(25, 118, 210)', borderRadius: '4px', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-family-sans)', textTransform: 'uppercase', cursor: 'pointer', letterSpacing: '0.025em' }}>
+          <button type="button" style={{ padding: '6px 16px', backgroundColor: 'transparent', color: '#5A8F5A', border: '1px solid #5A8F5A', borderRadius: '4px', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-family-sans)', textTransform: 'uppercase', cursor: 'pointer', letterSpacing: '0.025em' }}>
             Compare
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid rgb(25, 118, 210)', borderRadius: '4px', overflow: 'hidden' }}>
-            <button type="button" aria-label="Zoom out" style={{ padding: '4px 10px', backgroundColor: 'transparent', color: 'rgb(25, 118, 210)', borderWidth: '0 1px 0 0', borderStyle: 'none solid none none', borderColor: 'rgb(25, 118, 210)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family-sans)' }}>-</button>
-            <span style={{ padding: '4px 10px', backgroundColor: 'transparent', color: 'rgb(25, 118, 210)', borderWidth: '0 1px 0 0', borderStyle: 'none solid none none', borderColor: 'rgb(25, 118, 210)', fontSize: '11px', fontWeight: 600, cursor: 'default', fontFamily: 'var(--font-family-sans)', textTransform: 'lowercase' }}>x1.00</span>
-            <button type="button" aria-label="Zoom in" style={{ padding: '4px 10px', backgroundColor: 'transparent', color: 'rgb(25, 118, 210)', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family-sans)' }}>+</button>
+          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #5A8F5A', borderRadius: '4px', overflow: 'hidden' }}>
+            <button type="button" aria-label="Zoom out" style={{ padding: '4px 10px', backgroundColor: 'transparent', color: '#5A8F5A', borderWidth: '0 1px 0 0', borderStyle: 'none solid none none', borderColor: '#5A8F5A', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family-sans)' }}>-</button>
+            <span style={{ padding: '4px 10px', backgroundColor: 'transparent', color: '#5A8F5A', borderWidth: '0 1px 0 0', borderStyle: 'none solid none none', borderColor: '#5A8F5A', fontSize: '11px', fontWeight: 600, cursor: 'default', fontFamily: 'var(--font-family-sans)', textTransform: 'lowercase' }}>x1.00</span>
+            <button type="button" aria-label="Zoom in" style={{ padding: '4px 10px', backgroundColor: 'transparent', color: '#5A8F5A', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family-sans)' }}>+</button>
           </div>
         </div>
       </div>

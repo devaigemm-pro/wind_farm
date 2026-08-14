@@ -840,3 +840,11 @@
   - También incluyó links, breadcrumbs y elementos de acento (no solo botones). "botones" para el usuario = todo elemento interactivo con color de acento.
   - **REGLA**: `#5A8F5A` es el ÚNICO color de acento de toda la app. Reemplaza: `#4CAF50`, `#00A6FF`, `var(--color-primary-500)` en botones/links/tabs/acentos. Las excepciones son colores semánticos (danger rojo, warning naranja, category badges).
 - **Patrones confirmados**: español, directo, alta autonomía, "aplicar lo mismo en [URL]" = mismo cambio en otra pantalla sin repetir explicación, unificación cromática global, #5A8F5A como acento único, "botones" = todo elemento interactivo con acento
+
+### Sesión 90 - 2026-08-13
+- **Tarea principal**: Continuar unificación cromática: (1) Botón "Defect Categories" en BladesDiagram (step 4 RESULTS). (2) Breadcrumb links en InspectionWorkflow.tsx (#00A6FF→#5A8F5A). (3) Fecha breadcrumb en TurbineDetail (quitar override #555).
+- **Observaciones nuevas**:
+  - Pega HTML del botón exacto con `rgb(76,175,80)` y dice "que se encuentra en 4.RESULTS" — DOM literal + ubicación por step label.
+  - Pega HTML del breadcrumb completo para señalar que los links siguen azules. El cambio previo (bcLinkSt en TurbineDetail) no cubría InspectionWorkflow.tsx que es el archivo real de esa ruta.
+  - **APRENDIZAJE**: La ruta `/inspections/:id/workflow` NO usa TurbineDetail directamente para el toolbar — usa `InspectionWorkflow.tsx` que tiene su propio `linkStyle`. Hay duplicación de estilos entre ambos archivos.
+- **Patrones confirmados**: español, directo, alta autonomía, DOM como spec, señala botón exacto por HTML cuando el agente no lo encontró automáticamente, ubica por step label ("4.RESULTS")
