@@ -162,8 +162,8 @@ export function Inspections() {
   const headerTitleStyle: React.CSSProperties = {
     margin: 0,
     fontSize: 'var(--text-xl)',
-    fontWeight: 600,
-    color: 'var(--color-neutral-900)',
+    fontWeight: 700,
+    color: '#111827',
   };
 
   const filterBarStyle: React.CSSProperties = {

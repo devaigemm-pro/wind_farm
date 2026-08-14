@@ -160,7 +160,7 @@ export function Reports() {
     return (
       <div style={styles.page}>
         <div style={styles.toolbar}>
-          <h5 style={styles.title}>{t('page.reports')}</h5>
+          <h1 style={styles.title}>{t('page.reports')}</h1>
         </div>
         <div style={styles.content}>
           {Array.from({ length: 8 }).map((_, i) => (
@@ -175,7 +175,7 @@ export function Reports() {
     <div style={styles.page}>
       {/* Toolbar */}
       <div style={styles.toolbar}>
-        <h5 style={styles.title}>{t('page.reports')}</h5>
+        <h1 style={styles.title}>{t('page.reports')}</h1>
         <div style={styles.searchContainer}>
           <Search size={16} style={{ color: 'var(--color-neutral-400)' }} />
           <input
@@ -333,29 +333,27 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    fontFamily: 'Calibri, "Gill Sans", Arial, sans-serif',
-    backgroundColor: 'var(--color-neutral-50)',
+    fontFamily: 'var(--font-family-sans)',
   },
   toolbar: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 20px',
-    borderBottom: '1px solid var(--color-neutral-200)',
-    backgroundColor: 'var(--color-neutral-0)',
+    padding: 'var(--space-4) var(--space-5)',
+    borderBottom: '1px solid var(--color-neutral-100)',
     flexShrink: 0,
   },
   title: {
     margin: 0,
-    fontSize: '16.8px',
-    fontWeight: 400,
-    color: '#000',
+    fontSize: 'var(--text-xl)',
+    fontWeight: 700,
+    color: '#111827',
   },
   searchContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) var(--space-4)',
     borderRadius: '20px',
     border: '1px solid var(--color-neutral-200)',
     backgroundColor: 'var(--color-neutral-0)',
@@ -364,8 +362,8 @@ const styles: Record<string, React.CSSProperties> = {
   searchInput: {
     border: 'none',
     outline: 'none',
-    fontSize: '13px',
-    fontFamily: 'inherit',
+    fontSize: 'var(--text-sm)',
+    fontFamily: 'var(--font-family-sans)',
     flex: 1,
     color: 'var(--color-neutral-800)',
     backgroundColor: 'transparent',
@@ -385,12 +383,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   th: {
     textAlign: 'left',
-    padding: '14px 16px',
-    fontSize: '11px',
-    fontWeight: 700,
-    color: 'var(--color-neutral-800)',
-    backgroundColor: 'var(--color-neutral-100)',
-    borderBottom: '1px solid var(--color-neutral-200)',
+    padding: 'var(--space-3) var(--space-4)',
+    fontSize: 'var(--text-xs)',
+    fontWeight: 600,
+    color: 'var(--color-neutral-600)',
+    borderBottom: '2px solid var(--color-neutral-200)',
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
@@ -401,13 +398,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   row: {
     cursor: 'pointer',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-    height: '65px',
-    transition: 'background-color 0.15s',
+    borderBottom: '1px solid var(--color-neutral-100)',
+    transition: 'background-color var(--duration-fast) var(--easing-default)',
   },
   td: {
-    padding: '16px',
-    fontSize: '12px',
+    padding: 'var(--space-3) var(--space-4)',
+    fontSize: 'var(--text-sm)',
     color: 'var(--color-neutral-800)',
     whiteSpace: 'nowrap',
   },
@@ -427,20 +423,15 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: '12px',
-    padding: '10px 16px',
-    borderTop: '1px solid var(--color-neutral-200)',
-    backgroundColor: 'var(--color-neutral-0)',
-    fontSize: '12px',
-    color: 'var(--color-neutral-500)',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-3) var(--space-4)',
+    borderTop: '1px solid var(--color-neutral-100)',
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-neutral-600)',
   },
   rowsPerPageLabel: {
-    fontSize: '12px',
-    color: 'var(--color-neutral-500)',
-    padding: '4px 8px',
-    border: '1px solid #4CAF50',
-    borderRadius: '4px',
-    backgroundColor: 'transparent',
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-neutral-600)',
   },
   rowsPerPage: {
     display: 'flex',
@@ -449,16 +440,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   select: {
     padding: '4px 8px',
-    fontSize: '12px',
+    fontSize: 'var(--text-sm)',
     border: '1px solid var(--color-neutral-200)',
-    borderRadius: '4px',
-    fontFamily: 'inherit',
+    borderRadius: 'var(--radius-sm)',
+    fontFamily: 'var(--font-family-sans)',
     backgroundColor: 'var(--color-neutral-0)',
-    color: 'var(--color-neutral-500)',
+    color: 'var(--color-neutral-600)',
   },
   pageInfo: {
-    fontSize: '12px',
-    color: 'var(--color-neutral-500)',
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-neutral-600)',
   },
   pageBtn: {
     width: '28px',
@@ -467,10 +458,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     border: '1px solid var(--color-neutral-200)',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     backgroundColor: 'var(--color-neutral-0)',
     cursor: 'pointer',
-    fontSize: '16px',
-    color: 'var(--color-neutral-500)',
+    fontSize: 'var(--text-base)',
+    color: 'var(--color-neutral-600)',
   },
 };
