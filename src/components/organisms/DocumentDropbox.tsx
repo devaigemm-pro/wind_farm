@@ -85,6 +85,7 @@ export function DocumentDropbox({ windFarmId }: DocumentDropboxProps) {
             icon={Upload}
             onClick={() => fileInputRef.current?.click()}
             loading={uploadMutation.isPending}
+            style={{ backgroundColor: '#4CAF50' }}
           >
             {t('button.addDocument')}
           </Button>

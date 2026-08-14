@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 75
+- **Sesiones analizadas**: 76
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -797,3 +797,12 @@
   - No hubo correcciones en toda la sesión — 5/5 cambios aceptados al primer intento
   - "continue" como respuesta cuando el deploy ya estaba en progreso — no tiene paciencia para esperas innecesarias, confía en que el agente complete
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe problemas desde UX, barrido de calidad visual transversal, referencia implícita, "mismo cambio" = aplicar la misma lógica en otra pantalla, "continue" = terminar/deploy sin preguntar
+
+### Sesión 85 - 2026-08-13
+- **Tarea principal**: (1) Eliminar columna "Activo" tabla defectos SubassetDetail. (2) Wrap header "Tamaño del defecto". (3) Centrar cabeceras. (4) Botón "Plan next inspection" mismo color que "Share". (5) Aplicar mismo color verde a TODOS los botones de WindFarmDetail.
+- **Observaciones nuevas**:
+  - **CORRECCIÓN**: "no solo ese boton sino todos los correspondientes a esa pantalla" — cuando dice "aplicar el mismo cambio" en una pantalla, quiere que se aplique a TODOS los botones de esa pantalla, no solo al equivalente directo. Regla: "aplicar cambio en pantalla X" = auditoría completa de todos los elementos afectables en esa pantalla.
+  - "esa pantalla" — referencia implícita a la URL dada en el mensaje anterior. No repite la URL.
+  - Barrido de 6 micro-cambios visuales en una sesión sobre 3 pantallas — patrón de QA visual completo
+  - El usuario espera que "el mismo cambio" se aplique exhaustivamente, no conservadoramente
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, barrido de calidad visual transversal, "mismo cambio en pantalla X" = TODOS los botones/elementos afectables (NO solo el equivalente directo), referencia implícita a contexto previo
