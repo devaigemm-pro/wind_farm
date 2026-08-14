@@ -831,3 +831,12 @@
   - El usuario corrige la decisión de color del agente (el agente eligió #4CAF50, el usuario prefería el verde más oscuro/mate del radio button BLADES). Patrón: prefiere tonos sobrios/mate sobre colores brillantes.
   - **APRENDIZAJE**: El color verde "oficial" de los botones de esta app es `#5A8F5A` (rgb(90,143,90)), NO el verde Material UI `#4CAF50`. Recordar para futuro.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, DOM como spec, prefiere colores mate/sobrios sobre brillantes, pega HTML literal como referencia visual
+
+### Sesión 89 - 2026-08-13
+- **Tarea principal**: Unificación cromática masiva de la app a #5A8F5A: (1) Botones Save en AnalyzeStep/AnnotateStep/InspectStep/DefectEditForm. (2) Toolbar del workflow: breadcrumb links, step activo, Export/Share/Comment buttons, C.blue en TurbineDetail. (3) CampaignResults: Export, Share, breadcrumbs, links, outlined button.
+- **Observaciones nuevas**:
+  - "aplicar ese mismo color a los botones de la pagina [URL]" — patrón repetido: da URL nueva y dice "aplicar lo mismo". No repite qué color ni qué cambio. Contexto implícito.
+  - El barrido cubre ya 8+ pantallas en una sola sesión — el usuario quiere unificación cromática TOTAL de la app en #5A8F5A.
+  - También incluyó links, breadcrumbs y elementos de acento (no solo botones). "botones" para el usuario = todo elemento interactivo con color de acento.
+  - **REGLA**: `#5A8F5A` es el ÚNICO color de acento de toda la app. Reemplaza: `#4CAF50`, `#00A6FF`, `var(--color-primary-500)` en botones/links/tabs/acentos. Las excepciones son colores semánticos (danger rojo, warning naranja, category badges).
+- **Patrones confirmados**: español, directo, alta autonomía, "aplicar lo mismo en [URL]" = mismo cambio en otra pantalla sin repetir explicación, unificación cromática global, #5A8F5A como acento único, "botones" = todo elemento interactivo con acento

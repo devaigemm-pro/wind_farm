@@ -389,7 +389,7 @@ const infoBtnStyle: React.CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: '50%',
-  background: '#4CAF50',
+  background: '#5A8F5A',
   border: 'none',
   cursor: 'pointer',
   display: 'flex',
