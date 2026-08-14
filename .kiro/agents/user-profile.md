@@ -919,3 +919,12 @@
   - "dejarla en 40 px" — decisión final del tamaño. Logo final: `core-insight-logo.png` a 40px de alto.
   - Patrón de ajuste iterativo visual confirmado por 4ta vez: 28→40→35→40.
 - **Patrones confirmados**: español, directo, alta autonomía, ajuste iterativo de tamaños (confianza: muy alta), "he actualizado" = redesplegar implícito, colabora manualmente con assets
+
+### Sesión 101 - 2026-08-13
+- **Tarea principal**: Sesión extensa de QA visual: (1) Unificación cromática #5A8F5A en toda la app (DefectsTable, workflow toolbar, CampaignResults, InspectStep, AnalyzeStep, AnnotateStep, DefectEditForm, ExportButton, DefectDetailSidebar/Panel, BladesDiagram). (2) Logo sidebar: reemplazo por imagen exacta del usuario + ajuste iterativo tamaño (28→40→35→40→45). (3) Traducción headers Defect Categories. (4) Renombrar "Action"→"Recommended action". (5) Eliminar columna "Activo" DefectsTable. (6) Centrar cabeceras + wrap texto.
+- **Observaciones nuevas**:
+  - Sesión de QA visual más extensa: 20+ cambios, 10+ archivos, 4+ redespliegues de imagen.
+  - "he actualizado la imagen" repetido 4 veces — patrón de colaboración asset binario totalmente consolidado.
+  - Tamaño final logo: 45px. Archivo: `/public/core-insight-logo.png`.
+  - **REGLA FINAL COLORES**: Todo color de acento es `#5A8F5A`. Lista completa reemplazada: `#4CAF50`, `#27AE60`, `#1E8449`, `#00A6FF`, `#0288D1`, `#2196F3`, `rgb(25,118,210)`, `rgb(76,175,80)`, `rgb(39,174,96)`, `var(--color-primary-500)`.
+- **Patrones confirmados**: español, directo, alta autonomía, "he actualizado" = redesplegar (confianza: muy alta), ajuste iterativo visual, QA visual exhaustivo, #5A8F5A acento único global, DOM como spec, colabora con assets binarios
