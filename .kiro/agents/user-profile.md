@@ -902,3 +902,11 @@
   - "es la imagen que mas me gusta no modificar su estructura" — la preferencia estética del usuario es inamovible. No reinterpretar, no recrear.
   - **CORRECCIÓN al agente**: Cuando el usuario envía una imagen para usar como asset, NO recrearla como SVG aproximado. Pedir que la guarde en el proyecto directamente o que pegue el código SVG como texto.
 - **Patrones confirmados**: español, directo, alta autonomía, quiere la imagen EXACTA no aproximaciones, "no modificar estructura" = usar tal cual sin reinterpretar, corrección directa cuando el agente no cumple
+
+### Sesión 98 - 2026-08-13
+- **Tarea principal**: Usar la imagen PNG exacta que el usuario guardó manualmente en `public/core-insight-logo.png` como logo del sidebar.
+- **Observaciones nuevas**:
+  - "listo, guardada en public" — confirmó que guardó el archivo manualmente tras la instrucción del agente. Colaboración exitosa.
+  - Flujo correcto: (1) agente explica limitación, (2) usuario guarda archivo, (3) agente actualiza referencia y despliega.
+  - Archivo final: `/public/core-insight-logo.png` referenciado desde Sidebar.tsx con height="35".
+- **Patrones confirmados**: español, directo, alta autonomía, colabora manualmente cuando el agente tiene limitaciones técnicas, confirma con "listo" cuando completó su parte
