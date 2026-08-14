@@ -340,7 +340,7 @@ export function Inspections() {
           placeholder={t('inspections.to')}
         />
 
-        <Button variant="secondary" size="sm" onClick={handleApplyFilters}>
+        <Button variant="secondary" size="sm" onClick={handleApplyFilters} style={{ backgroundColor: '#5A8F5A', color: '#fff', border: 'none' }}>
           {t('button.apply')}
         </Button>
       </div>
