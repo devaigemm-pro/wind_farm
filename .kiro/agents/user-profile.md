@@ -910,3 +910,12 @@
   - Flujo correcto: (1) agente explica limitación, (2) usuario guarda archivo, (3) agente actualiza referencia y despliega.
   - Archivo final: `/public/core-insight-logo.png` referenciado desde Sidebar.tsx con height="35".
 - **Patrones confirmados**: español, directo, alta autonomía, colabora manualmente cuando el agente tiene limitaciones técnicas, confirma con "listo" cuando completó su parte
+
+### Sesión 99 - 2026-08-13
+- **Tarea principal**: (1) Redespliegue tras actualización manual de la imagen. (2) Ajuste iterativo del tamaño del logo: 35→40px.
+- **Observaciones nuevas**:
+  - "he actualizado la foto" — avisa que modificó el archivo manualmente y espera que el agente redespliegue. "desplegar" implícito.
+  - "aumentar el tamaño a 35px" — ya estaba en 35. El usuario no vio el cambio (posible caché). Luego pidió 40px.
+  - "dejarla en 40 px" — decisión final del tamaño. Logo final: `core-insight-logo.png` a 40px de alto.
+  - Patrón de ajuste iterativo visual confirmado por 4ta vez: 28→40→35→40.
+- **Patrones confirmados**: español, directo, alta autonomía, ajuste iterativo de tamaños (confianza: muy alta), "he actualizado" = redesplegar implícito, colabora manualmente con assets
