@@ -1,21 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80" width="400" height="80">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" width="160" height="40">
   <!-- Eye/turbine icon -->
-  <g transform="translate(20, 12)">
+  <g transform="translate(4, 6)">
     <!-- Outer eye shape -->
-    <path d="M0 28 C12 8, 40 0, 56 28 C40 56, 12 48, 0 28Z" fill="none" stroke="#5A8F5A" stroke-width="4"/>
-    <!-- Inner circle (iris) -->
-    <circle cx="28" cy="28" r="12" fill="none" stroke="#5A8F5A" stroke-width="2.5"/>
-    <!-- Pupil/hub -->
-    <circle cx="28" cy="28" r="4" fill="#5A8F5A"/>
-    <!-- Turbine blades inside eye -->
-    <line x1="28" y1="28" x2="28" y2="14" stroke="#5A8F5A" stroke-width="2" stroke-linecap="round"/>
-    <line x1="28" y1="28" x2="16" y2="35" stroke="#5A8F5A" stroke-width="2" stroke-linecap="round"/>
-    <line x1="28" y1="28" x2="40" y2="35" stroke="#5A8F5A" stroke-width="2" stroke-linecap="round"/>
+    <path d="M0 14 Q14 2 28 14 Q14 26 0 14 Z" fill="none" stroke="#5A8F5A" stroke-width="2"/>
+    <!-- Inner eye shape (smaller) -->
+    <path d="M4 14 Q14 6 24 14 Q14 22 4 14 Z" fill="none" stroke="#5A8F5A" stroke-width="1.2"/>
+    <!-- Iris circle -->
+    <circle cx="14" cy="14" r="5" fill="none" stroke="#5A8F5A" stroke-width="1.5"/>
+    <!-- Hub -->
+    <circle cx="14" cy="14" r="1.8" fill="#5A8F5A"/>
+    <!-- Blade up -->
+    <line x1="14" y1="14" x2="14" y2="6" stroke="#5A8F5A" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Blade lower-right -->
+    <line x1="14" y1="14" x2="20" y2="20" stroke="#5A8F5A" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Blade lower-left -->
+    <line x1="14" y1="14" x2="8" y2="20" stroke="#5A8F5A" stroke-width="1.5" stroke-linecap="round"/>
   </g>
-  <!-- CORE text -->
-  <text x="92" y="50" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="800" fill="#FFFFFF" letter-spacing="2">CORE</text>
-  <!-- Separator -->
-  <line x1="225" y1="18" x2="225" y2="62" stroke="#5A8F5A" stroke-width="2"/>
+  <!-- Vertical separator -->
+  <line x1="80" y1="8" x2="80" y2="32" stroke="#5A8F5A" stroke-width="1.5"/>
   <!-- Insight text -->
-  <text x="238" y="50" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="300" fill="#A0A0A0" letter-spacing="1">Insight</text>
+  <text x="90" y="26" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="400" fill="rgba(255,255,255,0.8)" letter-spacing="0.5">Insight</text>
 </svg>
