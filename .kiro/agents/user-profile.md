@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 79
+- **Sesiones analizadas**: 82
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -848,3 +848,12 @@
   - Pega HTML del breadcrumb completo para señalar que los links siguen azules. El cambio previo (bcLinkSt en TurbineDetail) no cubría InspectionWorkflow.tsx que es el archivo real de esa ruta.
   - **APRENDIZAJE**: La ruta `/inspections/:id/workflow` NO usa TurbineDetail directamente para el toolbar — usa `InspectionWorkflow.tsx` que tiene su propio `linkStyle`. Hay duplicación de estilos entre ambos archivos.
 - **Patrones confirmados**: español, directo, alta autonomía, DOM como spec, señala botón exacto por HTML cuando el agente no lo encontró automáticamente, ubica por step label ("4.RESULTS")
+
+### Sesión 91 - 2026-08-13
+- **Tarea principal**: Unificación cromática completa de la app: (1) Save buttons (AnalyzeStep/AnnotateStep/InspectStep/DefectEditForm). (2) Workflow toolbar: breadcrumb links (InspectionWorkflow + TurbineDetail), step activo, Export/Share. (3) CampaignResults: todos los botones/links. (4) BladesDiagram: Defect Categories button. (5) Zoom buttons en todas las vistas (DefectDetailPanel, DefectImageViewer, TurbineDetail, AnnotateStep). (6) Breadcrumb fecha en TurbineDetail.
+- **Observaciones nuevas**:
+  - "aplicar ese color a todos los botones de zoom de TODAS las vistas que posean zoom" — instrucción global: rastrear TODOS los componentes con zoom en toda la app. Usa "todas las vistas" = auditoría exhaustiva cross-app.
+  - Sesión entera dedicada a unificación cromática — 10+ archivos, 20+ cambios, 0 correcciones de lógica. Solo colores.
+  - Colores reemplazados en esta sesión: `#4CAF50`, `#00A6FF`, `rgb(25,118,210)`, `rgb(76,175,80)`, `var(--color-primary-500)`, `#222` (step activo) → todos a `#5A8F5A`.
+  - **REGLA CONSOLIDADA**: El color de acento ÚNICO es `#5A8F5A`. Todo nuevo componente o botón que se cree debe usar este color. Excepciones: category badges (semánticos), danger/warning, toggle switches.
+- **Patrones confirmados**: español, directo, alta autonomía, "todas las vistas" = auditoría cross-app exhaustiva, #5A8F5A como acento único global, sesiones dedicadas a QA visual, DOM como spec (confianza: muy alta)

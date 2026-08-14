@@ -84,7 +84,7 @@ export function DefectDetailSidebar({
         {/* Image section still visible below the form */}
         <div style={{ padding: '0 16px 16px', position: 'relative' }}>
           <div style={{ marginBottom: '4px' }}>
-            <Maximize2 size={18} color="#0288D1" style={{ cursor: 'pointer' }} />
+            <Maximize2 size={18} color="#5A8F5A" style={{ cursor: 'pointer' }} />
           </div>
           <DefectImageViewer
             imageUrl={defect.imageUrl}
@@ -152,12 +152,12 @@ export function DefectDetailSidebar({
       {/* Header: title (link) + edit pen */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-family-sans)', color: '#0288D1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-family-sans)', color: '#5A8F5A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {defect.type}
           </h3>
-          <ExternalLink size={14} color="#0288D1" style={{ flexShrink: 0 }} />
+          <ExternalLink size={14} color="#5A8F5A" style={{ flexShrink: 0 }} />
         </div>
-        <Pencil size={20} color="#2196F3" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setIsEditing(true)} />
+        <Pencil size={20} color="#5A8F5A" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setIsEditing(true)} />
       </div>
 
       {/* Main content row: Info left + Blade right */}
@@ -255,7 +255,7 @@ export function DefectDetailSidebar({
       <div style={{ position: 'relative', maxWidth: '90%' }}>
         {/* Fullscreen icon */}
         <div style={{ marginBottom: '4px' }}>
-          <Maximize2 size={18} color="#0288D1" style={{ cursor: 'pointer' }} />
+          <Maximize2 size={18} color="#5A8F5A" style={{ cursor: 'pointer' }} />
         </div>
 
         {/* Image Viewer */}
