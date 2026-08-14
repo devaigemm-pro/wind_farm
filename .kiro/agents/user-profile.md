@@ -822,3 +822,12 @@
   - "también" indica que es continuación del cambio anterior — el usuario extiende la tarea, no crea una nueva.
   - Cambio aceptado al primer intento sin correcciones.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, nombra elementos por su label visible, "también" = extender tarea anterior, barrido visual exhaustivo por pantalla
+
+### Sesión 88 - 2026-08-13
+- **Tarea principal**: Reemplazar color #4CAF50 por #5A8F5A (rgb(90,143,90)) en todos los botones de acción que se cambiaron en esta sesión (7 archivos, 7 botones).
+- **Observaciones nuevas**:
+  - El usuario pega HTML literal de un botón existente como referencia de color — patrón "DOM como spec". Extrae `rgb(90, 143, 90)` del style inline del botón BLADES.
+  - "reemplazar todos aquellos botones con color #4CAF50 por el color de este boton" — da la instrucción completa en una frase. No necesita desglosar archivos ni componentes.
+  - El usuario corrige la decisión de color del agente (el agente eligió #4CAF50, el usuario prefería el verde más oscuro/mate del radio button BLADES). Patrón: prefiere tonos sobrios/mate sobre colores brillantes.
+  - **APRENDIZAJE**: El color verde "oficial" de los botones de esta app es `#5A8F5A` (rgb(90,143,90)), NO el verde Material UI `#4CAF50`. Recordar para futuro.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, DOM como spec, prefiere colores mate/sobrios sobre brillantes, pega HTML literal como referencia visual

@@ -27,7 +27,7 @@ export interface InspectStepProps {
 }
 
 const TURBINE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <circle cx="16" cy="16" r="14" fill="#4CAF50" stroke="white" stroke-width="2"/>
+  <circle cx="16" cy="16" r="14" fill="#5A8F5A" stroke="white" stroke-width="2"/>
   <path d="M16 6 L17 14 L16 16 L15 14 Z" fill="white"/>
   <path d="M16 16 L22 22 L20 23 L16 17 Z" fill="white"/>
   <path d="M16 16 L10 22 L12 23 L16 17 Z" fill="white"/>
@@ -209,7 +209,7 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
                 </td>
               </tr>
               <tr><td style={cellLabel}>{t('inspect.legislation')}</td><td style={{ ...cellValue, color: '#d32f2f' }}>{t('inspect.legislationText')}</td></tr>
-              <tr><td style={cellLabel}>{t('inspect.status')}</td><td style={{ ...cellValue, color: '#4CAF50' }}>{inspection?.stage ?? '—'}</td></tr>
+              <tr><td style={cellLabel}>{t('inspect.status')}</td><td style={{ ...cellValue, color: '#5A8F5A' }}>{inspection?.stage ?? '—'}</td></tr>
             </tbody>
           </table>
         </div>
@@ -248,9 +248,9 @@ export function InspectStep({ inspection, isLoading }: InspectStepProps) {
       <div style={rightCol}>
         <div style={stepperContainer}>
           <div style={stepperBar}>
-            <div style={stepItem}><CheckCircle size={24} color={photosCount > 0 ? '#4caf50' : '#ccc'} /><span style={stepLabelSt}>{photosCount > 0 ? t('inspect.complete') : t('inspect.pending')}</span></div>
-            <div style={{ ...stepLine, background: photosCount > 0 ? '#4caf50' : '#ddd' }} />
-            <div style={stepItem}><CheckCircle size={24} color={uploadData.pending === 0 && photosCount > 0 ? '#4caf50' : '#ccc'} /><span style={stepLabelSt}>{uploadData.pending === 0 && photosCount > 0 ? t('inspect.complete') : t('inspect.pending')}</span></div>
+            <div style={stepItem}><CheckCircle size={24} color={photosCount > 0 ? '#5A8F5A' : '#ccc'} /><span style={stepLabelSt}>{photosCount > 0 ? t('inspect.complete') : t('inspect.pending')}</span></div>
+            <div style={{ ...stepLine, background: photosCount > 0 ? '#5A8F5A' : '#ddd' }} />
+            <div style={stepItem}><CheckCircle size={24} color={uploadData.pending === 0 && photosCount > 0 ? '#5A8F5A' : '#ccc'} /><span style={stepLabelSt}>{uploadData.pending === 0 && photosCount > 0 ? t('inspect.complete') : t('inspect.pending')}</span></div>
           </div>
         </div>
 
@@ -301,7 +301,7 @@ const cellValue: React.CSSProperties = { padding: '6px 0', color: '#222', fontWe
 
 const docHeaderRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 };
 const docTitle: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: '#333', margin: 0 };
-const addDocBtn: React.CSSProperties = { background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+const addDocBtn: React.CSSProperties = { background: '#5A8F5A', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' };
 const docBody: React.CSSProperties = { textAlign: 'center', padding: '16px 0' };
 
 const mapContainer: React.CSSProperties = { flex: 1, minHeight: 260, position: 'relative' };
@@ -311,11 +311,11 @@ const mapTypeBtn: React.CSSProperties = { position: 'absolute', top: 12, left: 1
 const stepperContainer: React.CSSProperties = { background: 'var(--color-neutral-50)', borderRadius: 8, padding: '20px 32px' };
 const stepperBar: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const stepItem: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 };
-const stepLine: React.CSSProperties = { flex: 1, height: 4, background: '#4caf50', margin: '0 12px', borderRadius: 2, minWidth: 80, maxWidth: 300, alignSelf: 'flex-start', marginTop: 10 };
+const stepLine: React.CSSProperties = { flex: 1, height: 4, background: '#5A8F5A', margin: '0 12px', borderRadius: 2, minWidth: 80, maxWidth: 300, alignSelf: 'flex-start', marginTop: 10 };
 const stepLabelSt: React.CSSProperties = { fontSize: 12, color: '#555', fontWeight: 500 };
 
 const cardsRow: React.CSSProperties = { display: 'flex', gap: 16 };
 
 const notesTextarea: React.CSSProperties = { flex: 1, border: '1px solid #ccc', borderRadius: 4, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', textAlign: 'right' };
 const editBtn: React.CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#555', flexShrink: 0, display: 'flex', alignItems: 'center' };
-const okBtn: React.CSSProperties = { background: '#4caf50', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '4px 8px', flexShrink: 0, display: 'flex', alignItems: 'center' };
+const okBtn: React.CSSProperties = { background: '#5A8F5A', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '4px 8px', flexShrink: 0, display: 'flex', alignItems: 'center' };

@@ -37,15 +37,15 @@ interface Defect {
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const C = {
-  primary: '#4CAF50',
-  primaryDark: '#388E3C',
+  primary: '#5A8F5A',
+  primaryDark: '#4A7A4A',
   text: '#333B46',
   muted: '#8A9099',
   border: '#E0E0E0',
   bg: '#FFFFFF',
   bgLight: '#F5F7FA',
-  selected: 'rgba(76, 175, 80, 0.10)',
-  selectedBorder: '#4CAF50',
+  selected: 'rgba(90, 143, 90, 0.10)',
+  selectedBorder: '#5A8F5A',
 };
 
 // ─── Legacy thumbnail → blade/face mapping (for old annotations with t1-t18 IDs) ─
@@ -377,7 +377,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 48 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid #eee', borderTopColor: '#4CAF50', animation: 'spin 1s linear infinite' }} />
+          <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid #eee', borderTopColor: '#5A8F5A', animation: 'spin 1s linear infinite' }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <span style={{ fontSize: 13, color: '#888' }}>Loading...</span>
         </div>
@@ -523,7 +523,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               <img src={selectedDefect.imageUrl} alt="defect" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
             ) : photosLoading ? (
               <div style={{ width: '100%', height: '100%', background: '#2a2a2a', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 28, height: 28, border: '3px solid #555', borderTopColor: '#4CAF50', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <div style={{ width: 28, height: 28, border: '3px solid #555', borderTopColor: '#5A8F5A', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               </div>
             ) : (
               <div style={{ width: '100%', height: '100%', background: '#2a2a2a', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -365,7 +365,7 @@ const updateBtnStyle: React.CSSProperties = {
   fontSize: '13px',
   fontWeight: 600,
   fontFamily: 'var(--font-family-sans)',
-  backgroundColor: '#4CAF50',
+  backgroundColor: '#5A8F5A',
   color: '#FFF',
   border: 'none',
   borderRadius: '4px',
