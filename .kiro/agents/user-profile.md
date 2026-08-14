@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 74
+- **Sesiones analizadas**: 75
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -788,3 +788,12 @@
   - "debe tener el mismo color que el boton Share" — describe el resultado comparándolo con otro elemento existente. Patrón: "X debe ser como Y" para igualación visual.
   - Todos aceptados al primer intento sin correcciones — sesión limpia de 4 cambios
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe problemas desde UX, barrido de calidad visual, referencia implícita, "mismo color/estilo que X" = igualar a otro elemento existente
+
+### Sesión 84 - 2026-08-13
+- **Tarea principal**: (1) Eliminar columna "Activo" tabla defectos SubassetDetail. (2) Wrap texto header "Tamaño del defecto". (3) Centrar cabeceras. (4) Botón "Plan next inspection" mismo color que "Share" (step 4). (5) Aplicar mismo cambio de color botones en WindFarmDetail.
+- **Observaciones nuevas**:
+  - "en la pantalla [URL] aplicar el mismo cambio en el color de los botones" — reutiliza contexto de cambios anteriores de la misma sesión. Sabe que el agente entiende "el mismo cambio" = el verde #4CAF50 aplicado antes.
+  - 5 micro-cambios secuenciales sobre 3 pantallas distintas — barrido de calidad visual transversal
+  - No hubo correcciones en toda la sesión — 5/5 cambios aceptados al primer intento
+  - "continue" como respuesta cuando el deploy ya estaba en progreso — no tiene paciencia para esperas innecesarias, confía en que el agente complete
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe problemas desde UX, barrido de calidad visual transversal, referencia implícita, "mismo cambio" = aplicar la misma lógica en otra pantalla, "continue" = terminar/deploy sin preguntar

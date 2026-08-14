@@ -81,6 +81,7 @@ export function CampaignAccordion({
             variant="primary"
             size="sm"
             onClick={() => onViewResults(campaign.id)}
+            style={{ backgroundColor: '#4CAF50' }}
           >
             {t('campaigns.viewResults')}
           </Button>

@@ -221,7 +221,7 @@ const exportBtnStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 'var(--space-2)',
   padding: 'var(--space-2) var(--space-4)',
-  backgroundColor: 'rgb(39, 174, 96)',
+  backgroundColor: '#4CAF50',
   color: 'rgb(255, 255, 255)',
   border: 'none',
   borderRadius: 'var(--radius-md)',
