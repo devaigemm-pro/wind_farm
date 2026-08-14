@@ -67,12 +67,12 @@ export async function generateDefectsXLSX(data: DefectDashboardRow[]): Promise<B
   if (logoBuffer) {
     const logoId = workbook.addImage({ buffer: logoBuffer, extension: 'png' });
     sheet.addImage(logoId, {
-      tl: { col: 0.2, row: 0.1 },
-      ext: { width: 300, height: 60 },
+      tl: { col: 0.2, row: 0.2 },
+      ext: { width: 240, height: 80 },
     });
   }
 
-  sheet.getRow(1).height = 35;
+  sheet.getRow(1).height = 45;
   sheet.getRow(2).height = 30;
   sheet.addRow([]);
   sheet.addRow([]);

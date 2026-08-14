@@ -613,19 +613,18 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   // Merge cells for logo area so image doesn't split across column borders
   sheet.mergeCells('A1:K2');
 
-  // Add logo at the top (rendered as PNG for consistent formatting)
+  // Add logo at the top (loaded from core-insight-logo3.png)
   const logoBuffer = await renderLogoPng();
   if (logoBuffer) {
     const logoId = workbook.addImage({ buffer: logoBuffer, extension: 'png' });
-    // Use tl/br anchoring to fit within merged area
     sheet.addImage(logoId, {
-      tl: { col: 0.2, row: 0.1 },
-      ext: { width: 300, height: 60 },
+      tl: { col: 0.2, row: 0.2 },
+      ext: { width: 240, height: 80 },
     });
   }
 
   // Set row heights for logo area
-  sheet.getRow(1).height = 35;
+  sheet.getRow(1).height = 45;
   sheet.getRow(2).height = 30;
 
   // Row 3: spacing
