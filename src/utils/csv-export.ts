@@ -40,92 +40,12 @@ async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; e
   }
 }
 
-/** Render the CORE Insight logo as a PNG buffer using canvas */
+/** Load the CORE Insight logo PNG for embedding in XLSX */
 async function renderLogoPng(): Promise<ArrayBuffer | null> {
   try {
-    const canvas = document.createElement('canvas');
-    const w = 900, h = 180;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    const bgColor = '#0B2545';
-    const radius = 16;
-    ctx.fillStyle = bgColor;
-    ctx.beginPath();
-    ctx.moveTo(radius, 0);
-    ctx.lineTo(w - radius, 0);
-    ctx.arcTo(w, 0, w, radius, radius);
-    ctx.lineTo(w, h - radius);
-    ctx.arcTo(w, h, w - radius, h, radius);
-    ctx.lineTo(radius, h);
-    ctx.arcTo(0, h, 0, h - radius, radius);
-    ctx.lineTo(0, radius);
-    ctx.arcTo(0, 0, radius, 0, radius);
-    ctx.closePath();
-    ctx.fill();
-
-    const cy = h / 2;
-    const green = '#4CAF50';
-
-    // Eye icon
-    const eyeCx = 110;
-    const eyeCy = cy;
-    const eyeW = 50;
-    const eyeH = 28;
-    ctx.strokeStyle = green;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(eyeCx - eyeW, eyeCy);
-    ctx.quadraticCurveTo(eyeCx, eyeCy - eyeH * 1.8, eyeCx + eyeW, eyeCy);
-    ctx.quadraticCurveTo(eyeCx, eyeCy + eyeH * 1.8, eyeCx - eyeW, eyeCy);
-    ctx.closePath();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(eyeCx, eyeCy, 18, 0, Math.PI * 2);
-    ctx.strokeStyle = green;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    ctx.fillStyle = green;
-    ctx.beginPath();
-    ctx.arc(eyeCx, eyeCy, 7, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(eyeCx, eyeCy);
-    ctx.lineTo(eyeCx, eyeCy - 16);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(eyeCx, eyeCy);
-    ctx.lineTo(eyeCx + 14, eyeCy + 8);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(eyeCx, eyeCy);
-    ctx.lineTo(eyeCx - 14, eyeCy + 8);
-    ctx.stroke();
-
-    // CORE text
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
-    ctx.textBaseline = 'middle';
-    const textStartX = 190;
-    ctx.fillText('CORE', textStartX, cy);
-
-    // Insight text
-    const coreWidth = ctx.measureText('CORE').width;
-    ctx.font = '300 60px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.fillText('Insight', textStartX + coreWidth + 30, cy);
-
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) return null;
-    return await blob.arrayBuffer();
+    const resp = await fetch('/core-insight-logo3.png');
+    if (!resp.ok) return null;
+    return await resp.arrayBuffer();
   } catch {
     return null;
   }
@@ -161,7 +81,7 @@ export async function generateDefectsXLSX(data: DefectDashboardRow[]): Promise<B
 
   // Title
   const titleRow = sheet.addRow(['Defects Export - All Wind Farms']);
-  titleRow.font = { bold: true, size: 13, color: { argb: 'FF1B2B4B' } };
+  titleRow.font = { bold: true, size: 13, color: { argb: 'FF5A8F5A' } };
   titleRow.height = 22;
   sheet.addRow([]);
 
@@ -184,7 +104,7 @@ export async function generateDefectsXLSX(data: DefectDashboardRow[]): Promise<B
   const headerRow = sheet.addRow(headers);
   headerRow.height = 20;
   headerRow.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2B4B' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5A8F5A' } };
     cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
     cell.alignment = { vertical: 'middle', horizontal: 'center' };
     cell.border = {};
