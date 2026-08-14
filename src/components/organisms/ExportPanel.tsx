@@ -800,6 +800,7 @@ export function ExportPanel({
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
   const [typesInitialized, setTypesInitialized] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingXlsx, setIsGeneratingXlsx] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
@@ -1787,10 +1788,15 @@ export function ExportPanel({
   };
 
   const handleDownloadCSV = async () => {
-    const blob = await generateXLSX(defects, windFarmName, turbineName);
-    // Save XLSX to IndexedDB for retrieval from CampaignResults
-    if (blob) {
-      try { await savePdfBlob(`xlsx-${inspectionId}`, blob); } catch { /* ignore */ }
+    setIsGeneratingXlsx(true);
+    try {
+      const blob = await generateXLSX(defects, windFarmName, turbineName);
+      // Save XLSX to IndexedDB for retrieval from CampaignResults
+      if (blob) {
+        try { await savePdfBlob(`xlsx-${inspectionId}`, blob); } catch { /* ignore */ }
+      }
+    } finally {
+      setIsGeneratingXlsx(false);
     }
   };
 
@@ -1972,9 +1978,18 @@ export function ExportPanel({
         </div>
 
         <div style={actionRowStyle}>
-          <button style={downloadCsvBtnStyle} onClick={handleDownloadCSV}>
-            <Download size={14} />
-            XLSX
+          <button style={downloadCsvBtnStyle} onClick={handleDownloadCSV} disabled={isGeneratingXlsx}>
+            {isGeneratingXlsx ? (
+              <>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download size={14} />
+                XLSX
+              </>
+            )}
           </button>
         </div>
         <p style={csvNoteStyle}>Filters do not apply to XLSX</p>
