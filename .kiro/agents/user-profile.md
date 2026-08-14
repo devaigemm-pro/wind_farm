@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 95
+- **Sesiones analizadas**: 97
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -947,3 +947,24 @@
   - `core-insight-logo3.png` es un nuevo asset en `/public/` (2172x724px, ratio 3:1) — el usuario lo colocó manualmente.
   - Modo compañero activo toda la sesión. Interrumpió la primera delegación por interpretación incorrecta (UI vs contenido de documentos).
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, corrección directa sin drama, colabora con assets binarios (confianza máxima), ajuste iterativo visual, #5A8F5A como color de informes
+
+### Sesión 97 - 2026-08-13
+- **Tarea principal**: (1) Homologar tipografía de /inspections/reports y /inspections/upload al estilo de /inspections/new (Inter, tokens CSS, colores). (2) Aplicar #5A8F5A a botones de upload (cambió --color-primary-500 global). (3) Aplicar #5A8F5A a iconos/botones de reports. (4) Botón Apply en upload con override #5A8F5A. (5) Aplicar #5A8F5A a toda la ventana Export del step 4 RESULTS (switch, checkboxes, botones grupo, Generate/Download PDF/CSV).
+- **Observaciones nuevas**:
+  - "aplicar lo mismo a la pagina [URL]" — extiende tarea a otra pantalla sin repetir instrucción. Contexto implícito total.
+  - Interrumpió primera invocación (context-gatherer lento) — no le gusta esperar cuando la tarea es directa.
+  - "los mismo para los botones de reports" — 7 palabras, sin URL. Referencia implícita a pantalla ya discutida.
+  - "el boton Apply de upload tambien" — nombra botón por label visible.
+  - "la ventana export que se encuentra en 4.RESULTS" — ubica componentes por step label + nombre de feature.
+  - "botones, checkbox, etc" — "etc" = TODO elemento interactivo con color de acento en ese componente. Hacer auditoría exhaustiva.
+  - Sesión con 5 instrucciones secuenciales sobre el mismo tema (#5A8F5A) — barrido de unificación cromática continúa.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "aplicar lo mismo en [URL]" = extender tarea, referencia implícita, nombra por label/step, "etc" = auditoría exhaustiva de ese componente, #5A8F5A como acento único global, barrido visual por pantalla
+
+### Sesión 96 - 2026-08-13
+- **Tarea principal**: Fix error "Maximum call stack size exceeded" al presionar generar PDF en 4.RESULTS del workflow
+- **Observaciones nuevas**:
+  - Activa modo compañero con "compañero" al inicio + descripción del error en una frase — patrón clásico de reporte de bug
+  - No da URL ni contexto adicional — sabe que "4.RESULTS" es suficiente referencia para que el agente ubique la pantalla
+  - Bug técnico resuelto al primer intento sin correcciones — diagnóstico correcto (drawArc generaba polígono de 122 puntos causando stack overflow en jsPDF 4.x)
+  - Sesión ultra-corta: un solo bug, diagnóstico + fix + deploy
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, reporta bugs por error exacto sin contexto extra, confía en diagnóstico técnico del agente

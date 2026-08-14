@@ -967,7 +967,12 @@ export function ExportPanel({
       // Logo in top-left corner
       const logoPng = await renderLogoPng();
       if (logoPng) {
-        const logoBase64 = 'data:image/png;base64,' + btoa(String.fromCharCode(...new Uint8Array(logoPng)));
+        const bytes = new Uint8Array(logoPng);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]!);
+        }
+        const logoBase64 = 'data:image/png;base64,' + btoa(binary);
         doc.addImage(logoBase64, 'PNG', margin, 15, 60, 12);
       }
 
