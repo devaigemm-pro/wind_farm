@@ -857,3 +857,11 @@
   - Colores reemplazados en esta sesión: `#4CAF50`, `#00A6FF`, `rgb(25,118,210)`, `rgb(76,175,80)`, `var(--color-primary-500)`, `#222` (step activo) → todos a `#5A8F5A`.
   - **REGLA CONSOLIDADA**: El color de acento ÚNICO es `#5A8F5A`. Todo nuevo componente o botón que se cree debe usar este color. Excepciones: category badges (semánticos), danger/warning, toggle switches.
 - **Patrones confirmados**: español, directo, alta autonomía, "todas las vistas" = auditoría cross-app exhaustiva, #5A8F5A como acento único global, sesiones dedicadas a QA visual, DOM como spec (confianza: muy alta)
+
+### Sesión 93 - 2026-08-13
+- **Tarea principal**: (1) Cambiar colores azules (#0288D1, #2196F3) a #5A8F5A en DefectDetailSidebar y DefectDetailPanel (título, ExternalLink, Pencil, Maximize2 icons). (2) Zoom buttons en DefectDetailPanel (rgb(25,118,210)→#5A8F5A). (3) Renombrar header "Action" → "Recommended action" en tabla Defect Categories (BladesDiagram).
+- **Observaciones nuevas**:
+  - "cambiar la columna action por recommended action" — instrucción de renaming de texto de header. Simple y directa.
+  - Cuando no sabía en qué componente estaba, el usuario pegó el HTML completo del modal Defect Categories. Patrón: si el agente no encuentra el componente correcto, el usuario pega DOM como pista.
+  - El usuario cambia de tema de color a contenido textual sin transición — sesión multiobjetivo (visual + contenido).
+- **Patrones confirmados**: español, directo, alta autonomía, DOM como spec, pega HTML para ubicar componentes que el agente no encuentra, sesión multiobjetivo sin transiciones

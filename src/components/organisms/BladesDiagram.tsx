@@ -143,10 +143,10 @@ export function BladesDiagram({
             <table style={catTableStyle}>
               <thead>
                 <tr style={catTheadRowStyle}>
-                  <th style={{ ...catThStyle, width: 80 }}>Category</th>
-                  <th style={{ ...catThStyle, width: 140 }}>Damage</th>
-                  <th style={catThStyle}>Recommended action</th>
-                  <th style={{ ...catThStyle, width: 100 }}>Next step</th>
+                  <th style={{ ...catThStyle, width: 80 }}>{t('bladeCat.colCategory')}</th>
+                  <th style={{ ...catThStyle, width: 140 }}>{t('bladeCat.colDamage')}</th>
+                  <th style={catThStyle}>{t('bladeCat.colAction')}</th>
+                  <th style={{ ...catThStyle, width: 100 }}>{t('bladeCat.colNextStep')}</th>
                 </tr>
               </thead>
               <tbody>

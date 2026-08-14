@@ -13,7 +13,7 @@ export function ExportButton({ onClick, loading = false }: ExportButtonProps) {
     alignItems: 'center',
     gap: 'var(--space-2)',
     padding: 'var(--space-2) var(--space-4)',
-    backgroundColor: loading ? '#1E8449' : '#27AE60',
+    backgroundColor: loading ? '#4A7A4A' : '#5A8F5A',
     color: '#FFFFFF',
     border: 'none',
     borderRadius: 'var(--radius-md)',
@@ -36,10 +36,10 @@ export function ExportButton({ onClick, loading = false }: ExportButtonProps) {
       disabled={loading}
       aria-label={t('misc.exportDefects')}
       onMouseEnter={(e) => {
-        if (!loading) (e.currentTarget as HTMLElement).style.backgroundColor = '#1E8449';
+        if (!loading) (e.currentTarget as HTMLElement).style.backgroundColor = '#4A7A4A';
       }}
       onMouseLeave={(e) => {
-        if (!loading) (e.currentTarget as HTMLElement).style.backgroundColor = '#27AE60';
+        if (!loading) (e.currentTarget as HTMLElement).style.backgroundColor = '#5A8F5A';
       }}
     >
       {loading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
