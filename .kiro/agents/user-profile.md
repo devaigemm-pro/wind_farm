@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 86
+- **Sesiones analizadas**: 87
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -874,3 +874,22 @@
   - El bug de traducción (headers hardcoded) lo reporta simplemente como "no está traducida cuando se cambia a español" — da el síntoma, no la causa.
   - **REGLA AMPLIADA colores**: También `#27AE60` y `#1E8449` (verdes Bootstrap/Emerald) deben ser `#5A8F5A`. Lista completa de colores de acento a unificar: `#4CAF50`, `#27AE60`, `#1E8449`, `#00A6FF`, `#0288D1`, `#2196F3`, `rgb(25,118,210)`, `var(--color-primary-500)` → todos `#5A8F5A`.
 - **Patrones confirmados**: español, directo, alta autonomía, revisa app pantalla por pantalla, reporta bugs de i18n por síntoma, ruta relativa + tab como referencia, unificación cromática exhaustiva
+
+### Sesión 95 - 2026-08-13
+- **Tarea principal**: (1) Traducir cabeceras tabla Defect Categories. (2) ExportButton a #5A8F5A. (3) Aumentar logo sidebar a 40px → corregido a 35px.
+- **Observaciones nuevas**:
+  - "aumentar el tamaño" sin dar valor → el agente elige 40px. "bajarlo a 35 px" — ajuste iterativo de tamaño. Patrón: prueba visual, ajuste fino con valor exacto en siguiente turno.
+  - "bajarlo" = referencia implícita al cambio del turno anterior. No repite qué elemento ni qué archivo.
+  - Corrección rápida, sin drama, un solo dato numérico.
+- **Patrones confirmados**: español, directo, alta autonomía, ajuste iterativo de valores visuales (prueba → corrección con valor exacto), referencia implícita al turno anterior, corrección sin drama
+
+### Sesión 95 - 2026-08-13
+- **Tarea principal**: (1) Homologar tipografía de /inspections/reports y /inspections/upload al estilo de /inspections/new (fuente Inter, tamaños con tokens CSS, colores). (2) Aplicar #5A8F5A a botones de /inspections/upload (cambió --color-primary-500 global de #4A4A4A→#5A8F5A). (3) Aplicar #5A8F5A a iconos/botones de /inspections/reports (Download, hover rows). (4) Botón Apply en upload con override #5A8F5A.
+- **Observaciones nuevas**:
+  - "aplicar lo mismo a la pagina [URL]" — extiende la tarea anterior a otra página en un mensaje separado. Contexto implícito total, no repite la instrucción.
+  - Interrumpió la primera invocación (context-gatherer tardaba) y mandó segundo mensaje inmediatamente — no le gusta esperar, prefiere ir directo al resultado.
+  - "los mismo para los botones de reports" — instrucción de 7 palabras, sin URL. Referencia implícita a la pantalla y color ya discutido.
+  - "el boton Apply de upload tambien" — nombra el botón por su label visible. Patrón repetido: nombra elementos por lo que dice en pantalla.
+  - Sesión con 4 micro-cambios secuenciales en misma sesión: tipografía reports + tipografía upload + color buttons upload + color buttons reports + Apply button — barrido visual clásico.
+  - Cambiar `--color-primary-500` global fue correcto — si es el acento único, el token CSS debería reflejarlo.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "aplicar lo mismo en [URL]" = extender tarea, referencia implícita sin repetir URL, nombra botones por label, barrido visual por pantalla, #5A8F5A como acento único global, modo compañero implícito

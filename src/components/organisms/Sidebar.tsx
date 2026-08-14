@@ -177,7 +177,7 @@ export function Sidebar({
   return (
     <aside style={sidebarStyle} aria-label="Main navigation">
       <div style={logoAreaStyle}>
-        {!isCollapsed && <img src="/coretec-wordmark.svg" height="35" alt="CORE Insight" style={{ flexShrink: 0 }} />}
+        {!isCollapsed && <img src="/coretec-insight-dark.svg" height="35" alt="CORE Insight" style={{ flexShrink: 0 }} />}
         {isCollapsed && <img src="/coretec-logo.svg" width="32" height="32" alt="CORE Insight" style={{ borderRadius: 'var(--radius-md)', flexShrink: 0 }} />}
       </div>
 
