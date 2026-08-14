@@ -814,3 +814,11 @@
   - Confirma que "todos los botones de esa pantalla" incluye componentes hijos anidados (DocumentDropbox está dentro de WindFarmDetail). No limitarse al archivo principal.
   - **REGLA REFORZADA**: Cuando dice "todos los de esa pantalla", rastrear el árbol completo de componentes renderizados (incluidos organisms anidados como DocumentDropbox, CampaignsPanel, SubassetsTable, DetailsBlock).
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, corrección sin drama, "faltó X" = corregir sin reexplicar, auditoría exhaustiva de árbol de componentes completo
+
+### Sesión 87 - 2026-08-13
+- **Tarea principal**: Cambiar botones Compare y Zoom (DefectImageViewer) a verde #4CAF50 en la pantalla WindFarmDetail.
+- **Observaciones nuevas**:
+  - "los botones compare y zoom tambien deben tener ese color" — nombra los botones por su label visible, sin dar archivos ni componentes. El agente debe buscar en el árbol.
+  - "también" indica que es continuación del cambio anterior — el usuario extiende la tarea, no crea una nueva.
+  - Cambio aceptado al primer intento sin correcciones.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, nombra elementos por su label visible, "también" = extender tarea anterior, barrido visual exhaustivo por pantalla

@@ -53,7 +53,7 @@ export function DetailsBlock({ detail, isLoading, onPlanInspection }: DetailsBlo
         </div>
       </div>
       {role !== 'supervisor' && (
-        <Button variant="primary" icon={Plus} onClick={onPlanInspection} style={{ width: '100%', marginTop: 'var(--space-4)', backgroundColor: '#4CAF50' }}>
+        <Button variant="primary" icon={Plus} onClick={onPlanInspection} style={{ width: '100%', marginTop: 'var(--space-4)', backgroundColor: '#5A8F5A' }}>
           {t('details.planInspection')}
         </Button>
       )}

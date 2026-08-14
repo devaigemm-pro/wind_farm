@@ -66,8 +66,8 @@ export function DefectImageViewer({
   const compareBtnStyle: React.CSSProperties = {
     padding: '6px 16px',
     backgroundColor: 'transparent',
-    color: '#4CAF50',
-    border: '1px solid #4CAF50',
+    color: '#5A8F5A',
+    border: '1px solid #5A8F5A',
     borderRadius: '4px',
     fontSize: '12px',
     fontWeight: 700,
@@ -80,7 +80,7 @@ export function DefectImageViewer({
   const zoomGroupStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    border: '1px solid #4CAF50',
+    border: '1px solid #5A8F5A',
     borderRadius: '4px',
     overflow: 'hidden',
   };
@@ -88,9 +88,9 @@ export function DefectImageViewer({
   const zoomBtnStyle: React.CSSProperties = {
     padding: '4px 10px',
     backgroundColor: 'transparent',
-    color: '#4CAF50',
+    color: '#5A8F5A',
     border: 'none',
-    borderRight: '1px solid #4CAF50',
+    borderRight: '1px solid #5A8F5A',
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',

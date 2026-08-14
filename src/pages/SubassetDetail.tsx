@@ -164,7 +164,7 @@ export function SubassetDetail() {
                   variant="primary"
                   icon={Plus}
                   onClick={handlePlanInspection}
-                  style={{ width: '100%', marginTop: 'var(--space-4)', backgroundColor: '#4CAF50' }}
+                  style={{ width: '100%', marginTop: 'var(--space-4)', backgroundColor: '#5A8F5A' }}
                 >
                   {t('button.planInspection')}
                 </Button>
