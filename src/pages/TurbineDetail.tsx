@@ -480,7 +480,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
               <span style={bcSepSt}>&gt;</span>
               <a onClick={() => { if (windFarmId && turbineId) navigate(`/assets-wind/${windFarmId}/subasset/${turbineId}`); }} style={bcLinkSt}>{turbineName}</a>
               <span style={bcSepSt}>&gt;</span>
-              <span style={{ ...bcLinkSt, color: '#555', cursor: 'default' }}>{inspectionDate}</span>
+              <span style={{ ...bcLinkSt, cursor: 'default' }}>{inspectionDate}</span>
             </div>
           </div>
           <div style={toolbarCenterSt}>

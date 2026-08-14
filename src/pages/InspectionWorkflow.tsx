@@ -263,7 +263,7 @@ const pageTitleSt: React.CSSProperties = {
 };
 
 const linkStyle: React.CSSProperties = {
-  color: '#00A6FF',
+  color: '#5A8F5A',
   cursor: 'pointer',
   textDecoration: 'none',
   fontSize: 14,
