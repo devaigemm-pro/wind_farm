@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 88
+- **Sesiones analizadas**: 89
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -893,3 +893,12 @@
   - Sesión con 4 micro-cambios secuenciales en misma sesión: tipografía reports + tipografía upload + color buttons upload + color buttons reports + Apply button — barrido visual clásico.
   - Cambiar `--color-primary-500` global fue correcto — si es el acento único, el token CSS debería reflejarlo.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "aplicar lo mismo en [URL]" = extender tarea, referencia implícita sin repetir URL, nombra botones por label, barrido visual por pantalla, #5A8F5A como acento único global, modo compañero implícito
+
+### Sesión 97 - 2026-08-13
+- **Tarea principal**: Reemplazar logo sidebar por la imagen exacta "CORE | Insight" proporcionada por el usuario. Múltiples intentos: (1) Logo agrandado 28→40→35px. (2) SVG generado por agente. (3) Usuario insiste en usar SU imagen exacta, no una recreación.
+- **Observaciones nuevas**:
+  - "necesito que pongas la imagen que te envié, no otra version" — corrección fuerte. El usuario NO quiere una recreación/interpretación del logo. Quiere la imagen EXACTA que él proporcionó.
+  - **LIMITACIÓN TÉCNICA**: No puedo guardar imágenes binarias (PNG) desde el chat. Solo texto. El usuario necesita guardarla manualmente o enviar el SVG como texto.
+  - "es la imagen que mas me gusta no modificar su estructura" — la preferencia estética del usuario es inamovible. No reinterpretar, no recrear.
+  - **CORRECCIÓN al agente**: Cuando el usuario envía una imagen para usar como asset, NO recrearla como SVG aproximado. Pedir que la guarde en el proyecto directamente o que pegue el código SVG como texto.
+- **Patrones confirmados**: español, directo, alta autonomía, quiere la imagen EXACTA no aproximaciones, "no modificar estructura" = usar tal cual sin reinterpretar, corrección directa cuando el agente no cumple
