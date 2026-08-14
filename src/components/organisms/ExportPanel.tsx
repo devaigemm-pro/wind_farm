@@ -179,9 +179,15 @@ function drawArc(
   endDeg: number,
   color: [number, number, number],
 ) {
+  // Guard against degenerate cases
+  if (startDeg === endDeg || isNaN(startDeg) || isNaN(endDeg)) return;
+  if (!isFinite(startDeg) || !isFinite(endDeg)) return;
+
   doc.setFillColor(...color);
-  // Approximate arc with a polygon of small segments
-  const segments = 60;
+  doc.setDrawColor(...color);
+
+  // Use fewer segments to avoid jsPDF stack overflow with large polygons
+  const segments = 24;
   const startRad = (startDeg * Math.PI) / 180;
   const endRad = (endDeg * Math.PI) / 180;
   const step = (endRad - startRad) / segments;
@@ -199,11 +205,10 @@ function drawArc(
     innerPoints.push([cx + innerR * Math.cos(angle), cy + innerR * Math.sin(angle)]);
   }
 
-  // Draw as filled polygon using triangle fan approach (lines)
   const allPoints = [...outerPoints, ...innerPoints];
   if (allPoints.length < 3) return;
 
-  // Use doc.lines to draw the filled shape
+  // Build moves array for doc.lines
   const startPoint = allPoints[0]!;
   const moves: [number, number][] = [];
   for (let i = 1; i < allPoints.length; i++) {
@@ -212,7 +217,6 @@ function drawArc(
   // Close the shape
   moves.push([startPoint[0] - allPoints[allPoints.length - 1]![0], startPoint[1] - allPoints[allPoints.length - 1]![1]]);
 
-  doc.setDrawColor(...color);
   doc.lines(moves, startPoint[0], startPoint[1], [1, 1], 'F', true);
 }
 
@@ -1821,7 +1825,7 @@ export function ExportPanel({
             }
           }}
         >
-          <div style={{ ...switchTrackStyle, backgroundColor: includeDetails ? '#4CAF50' : '#CCC' }}>
+          <div style={{ ...switchTrackStyle, backgroundColor: includeDetails ? '#5A8F5A' : '#CCC' }}>
             <div style={{ ...switchThumbStyle, left: includeDetails ? '18px' : '2px' }} />
           </div>
           <span style={switchLabelStyle}>Include defects details and photos</span>
@@ -2116,9 +2120,9 @@ const groupBtnStyle: CSSProperties = {
 };
 
 const groupBtnActiveStyle: CSSProperties = {
-  backgroundColor: '#4CAF50',
+  backgroundColor: '#5A8F5A',
   color: 'white',
-  borderColor: '#4CAF50',
+  borderColor: '#5A8F5A',
 };
 
 const categoryRowStyle: CSSProperties = {
@@ -2144,7 +2148,7 @@ const checkboxStyle: CSSProperties = {
   width: '14px',
   height: '14px',
   cursor: 'pointer',
-  accentColor: '#4CAF50',
+  accentColor: '#5A8F5A',
 };
 
 const typeGridStyle: CSSProperties = {
@@ -2198,9 +2202,9 @@ const generatePdfBtnStyle: CSSProperties = {
   gap: '6px',
   padding: '7px 14px',
   borderRadius: '6px',
-  border: '1.5px solid #4CAF50',
+  border: '1.5px solid #5A8F5A',
   background: 'transparent',
-  color: '#4CAF50',
+  color: '#5A8F5A',
   fontSize: '12px',
   fontWeight: 600,
   cursor: 'pointer',

@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 94
+- **Sesiones analizadas**: 95
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -937,3 +937,13 @@
   - Tamaño final logo: 45px. Archivo: `/public/core-insight-logo.png`.
   - **REGLA FINAL COLORES**: Todo color de acento es `#5A8F5A`. Lista completa reemplazada: `#4CAF50`, `#27AE60`, `#1E8449`, `#00A6FF`, `#0288D1`, `#2196F3`, `rgb(25,118,210)`, `rgb(76,175,80)`, `rgb(39,174,96)`, `var(--color-primary-500)`.
 - **Patrones confirmados**: español, directo, alta autonomía, "he actualizado" = redesplegar (confianza: muy alta), ajuste iterativo visual, QA visual exhaustivo, #5A8F5A acento único global, DOM como spec, colabora con assets binarios
+
+### Sesión 102 - 2026-08-13
+- **Tarea principal**: (1) Aplicar color #5A8F5A a cabeceras, portada, índice y títulos en el CONTENIDO de los informes PDF y XLSX generados desde 4.RESULTS. (2) Reemplazar logo canvas-rendered en XLSX por la imagen real `core-insight-logo3.png`. (3) Ajustar tamaño del logo en XLSX para visualización homogénea.
+- **Observaciones nuevas**:
+  - "me refiero a los colores que debe tener los informes en su contenido" — corrección cuando el agente confundió cambio de UI con cambio de contenido de documentos exportados. El usuario diferencia claramente entre la app y los documentos que genera.
+  - "para el xlsx reemplazar la imagen usada por core-insight-logo3.png" — instrucción de 1 frase, nombra archivo exacto. No da contexto extra porque sabe que el agente ya lo tiene.
+  - "no se vee prolija, dejar el tamaño correcto para una visualizacion homogenea" — describe el problema visual sin dar valores técnicos (px, ratio). Confía en que el agente determine el tamaño correcto.
+  - `core-insight-logo3.png` es un nuevo asset en `/public/` (2172x724px, ratio 3:1) — el usuario lo colocó manualmente.
+  - Modo compañero activo toda la sesión. Interrumpió la primera delegación por interpretación incorrecta (UI vs contenido de documentos).
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, corrección directa sin drama, colabora con assets binarios (confianza máxima), ajuste iterativo visual, #5A8F5A como color de informes
