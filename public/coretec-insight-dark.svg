@@ -1,23 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" width="160" height="40">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 56" width="320" height="56">
   <!-- Eye/turbine icon -->
-  <g transform="translate(4, 6)">
-    <!-- Outer eye shape -->
-    <path d="M0 14 Q14 2 28 14 Q14 26 0 14 Z" fill="none" stroke="#5A8F5A" stroke-width="2"/>
-    <!-- Inner eye shape (smaller) -->
-    <path d="M4 14 Q14 6 24 14 Q14 22 4 14 Z" fill="none" stroke="#5A8F5A" stroke-width="1.2"/>
-    <!-- Iris circle -->
-    <circle cx="14" cy="14" r="5" fill="none" stroke="#5A8F5A" stroke-width="1.5"/>
-    <!-- Hub -->
-    <circle cx="14" cy="14" r="1.8" fill="#5A8F5A"/>
+  <g transform="translate(4, 4)">
+    <!-- Outer eye shape (two leaves) -->
+    <path d="M0 24 C8 6, 28 0, 40 24 C28 48, 8 42, 0 24 Z" fill="none" stroke="#5A8F5A" stroke-width="3.5" stroke-linejoin="round"/>
+    <!-- Inner circle (iris ring) -->
+    <circle cx="20" cy="24" r="9" fill="none" stroke="#5A8F5A" stroke-width="2"/>
+    <!-- Hub center -->
+    <circle cx="20" cy="24" r="2.5" fill="#5A8F5A"/>
     <!-- Blade up -->
-    <line x1="14" y1="14" x2="14" y2="6" stroke="#5A8F5A" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- Blade lower-right -->
-    <line x1="14" y1="14" x2="20" y2="20" stroke="#5A8F5A" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="20" y1="24" x2="20" y2="8" stroke="white" stroke-width="2" stroke-linecap="round"/>
     <!-- Blade lower-left -->
-    <line x1="14" y1="14" x2="8" y2="20" stroke="#5A8F5A" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="20" y1="24" x2="10" y2="35" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <!-- Blade lower-right -->
+    <line x1="20" y1="24" x2="30" y2="35" stroke="white" stroke-width="2" stroke-linecap="round"/>
   </g>
-  <!-- Vertical separator -->
-  <line x1="80" y1="8" x2="80" y2="32" stroke="#5A8F5A" stroke-width="1.5"/>
+  <!-- CORE text -->
+  <text x="58" y="37" font-family="Inter, system-ui, Arial, sans-serif" font-size="26" font-weight="800" fill="white" letter-spacing="1.5">CORE</text>
+  <!-- Green vertical separator -->
+  <line x1="164" y1="12" x2="164" y2="44" stroke="#5A8F5A" stroke-width="2"/>
   <!-- Insight text -->
-  <text x="90" y="26" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="400" fill="rgba(255,255,255,0.8)" letter-spacing="0.5">Insight</text>
+  <text x="174" y="37" font-family="Inter, system-ui, Arial, sans-serif" font-size="22" font-weight="400" fill="#999999" letter-spacing="0.5">Insight</text>
 </svg>
