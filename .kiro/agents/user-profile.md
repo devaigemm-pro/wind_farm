@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 82
+- **Sesiones analizadas**: 85
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -865,3 +865,12 @@
   - Cuando no sabía en qué componente estaba, el usuario pegó el HTML completo del modal Defect Categories. Patrón: si el agente no encuentra el componente correcto, el usuario pega DOM como pista.
   - El usuario cambia de tema de color a contenido textual sin transición — sesión multiobjetivo (visual + contenido).
 - **Patrones confirmados**: español, directo, alta autonomía, DOM como spec, pega HTML para ubicar componentes que el agente no encuentra, sesión multiobjetivo sin transiciones
+
+### Sesión 94 - 2026-08-13
+- **Tarea principal**: Sesión extensa de unificación cromática y correcciones: (1) Colores azules (#0288D1, #2196F3) a #5A8F5A en DefectDetail. (2) Zoom buttons en DefectDetailPanel. (3) Renombrar "Action" → "Recommended action" en tabla Defect Categories. (4) Traducir cabeceras de Defect Categories al español. (5) ExportButton (/assets-wind defects) de #27AE60 a #5A8F5A.
+- **Observaciones nuevas**:
+  - "la pantalla /assets-wind defects" — describe ruta + tab sin dar URL completa. Usa "/" relativo.
+  - Encuentra otro verde que faltaba (#27AE60 en ExportButton atom) — el usuario revisa exhaustivamente la app pantalla por pantalla.
+  - El bug de traducción (headers hardcoded) lo reporta simplemente como "no está traducida cuando se cambia a español" — da el síntoma, no la causa.
+  - **REGLA AMPLIADA colores**: También `#27AE60` y `#1E8449` (verdes Bootstrap/Emerald) deben ser `#5A8F5A`. Lista completa de colores de acento a unificar: `#4CAF50`, `#27AE60`, `#1E8449`, `#00A6FF`, `#0288D1`, `#2196F3`, `rgb(25,118,210)`, `var(--color-primary-500)` → todos `#5A8F5A`.
+- **Patrones confirmados**: español, directo, alta autonomía, revisa app pantalla por pantalla, reporta bugs de i18n por síntoma, ruta relativa + tab como referencia, unificación cromática exhaustiva

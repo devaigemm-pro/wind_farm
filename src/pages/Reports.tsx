@@ -236,7 +236,7 @@ export function Reports() {
                       onClick={() => handleRowClick(row)}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLElement).style.backgroundColor =
-                          'rgba(76, 175, 80, 0.04)';
+                          'rgba(90, 143, 90, 0.04)';
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
@@ -257,9 +257,9 @@ export function Reports() {
                             aria-label={t('reports.downloadReport')}
                           >
                             {downloadingId === row.id ? (
-                              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#4CAF50' }} />
+                              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: '#5A8F5A' }} />
                             ) : (
-                              <Download size={18} color="#4CAF50" />
+                              <Download size={18} color="#5A8F5A" />
                             )}
                           </button>
                           {role !== 'supervisor' && (
