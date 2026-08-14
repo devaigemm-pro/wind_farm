@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 76
+- **Sesiones analizadas**: 77
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -806,3 +806,11 @@
   - Barrido de 6 micro-cambios visuales en una sesión sobre 3 pantallas — patrón de QA visual completo
   - El usuario espera que "el mismo cambio" se aplique exhaustivamente, no conservadoramente
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, barrido de calidad visual transversal, "mismo cambio en pantalla X" = TODOS los botones/elementos afectables (NO solo el equivalente directo), referencia implícita a contexto previo
+
+### Sesión 86 - 2026-08-13
+- **Tarea principal**: Continuación de sesión 85 — cambiar TODOS los botones de WindFarmDetail a verde #4CAF50. Faltó "Add document" (DocumentDropbox).
+- **Observaciones nuevas**:
+  - "falto add document button" — corrección directa, sin drama, sin repetir explicación. Da solo el nombre del botón que faltó.
+  - Confirma que "todos los botones de esa pantalla" incluye componentes hijos anidados (DocumentDropbox está dentro de WindFarmDetail). No limitarse al archivo principal.
+  - **REGLA REFORZADA**: Cuando dice "todos los de esa pantalla", rastrear el árbol completo de componentes renderizados (incluidos organisms anidados como DocumentDropbox, CampaignsPanel, SubassetsTable, DetailsBlock).
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, corrección sin drama, "faltó X" = corregir sin reexplicar, auditoría exhaustiva de árbol de componentes completo
