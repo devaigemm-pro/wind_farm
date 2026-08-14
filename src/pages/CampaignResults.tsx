@@ -201,7 +201,7 @@ export function CampaignResults() {
       <div style={pageContainer}>
         <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-neutral-500)' }}>
           <p>{t('campaign.notFound')}</p>
-          <Link to="/" style={{ color: 'var(--color-primary-500)' }}>{t('general.back')}</Link>
+          <Link to="/" style={{ color: '#5A8F5A' }}>{t('general.back')}</Link>
         </div>
       </div>
     );
@@ -252,7 +252,7 @@ export function CampaignResults() {
       {turbineResults.length === 0 ? (
         <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-neutral-500)' }}>
           <p>{t('campaign.noInspections')}</p>
-          <Link to={`/assets-wind/${campaign.windFarmId}`} style={{ color: 'var(--color-primary-500)' }}>
+          <Link to={`/assets-wind/${campaign.windFarmId}`} style={{ color: '#5A8F5A' }}>
             {t('campaign.goToWindFarm')}
           </Link>
         </div>
@@ -474,7 +474,7 @@ const breadcrumbRow: React.CSSProperties = {
 };
 
 const breadcrumbLink: React.CSSProperties = {
-  color: 'var(--color-primary-500)',
+  color: '#5A8F5A',
   textDecoration: 'none',
   fontWeight: 500,
 };
@@ -493,12 +493,12 @@ const subtitleStyle: React.CSSProperties = {
 const toolbarRight: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'center' };
 
 const outlinedBtn: React.CSSProperties = {
-  border: '1px solid var(--color-primary-500)',
+  border: '1px solid #5A8F5A',
   borderRadius: 'var(--radius-sm)',
   background: 'transparent',
   padding: '6px 10px',
   cursor: 'pointer',
-  color: 'var(--color-primary-500)',
+  color: '#5A8F5A',
   display: 'flex',
   alignItems: 'center',
 };
@@ -506,7 +506,7 @@ const outlinedBtn: React.CSSProperties = {
 const primaryBtn: React.CSSProperties = {
   border: 'none',
   borderRadius: 'var(--radius-sm)',
-  backgroundColor: '#4CAF50',
+  backgroundColor: '#5A8F5A',
   color: 'white',
   padding: '7px 14px',
   cursor: 'pointer',
@@ -519,7 +519,7 @@ const primaryBtn: React.CSSProperties = {
 
 const shareBtn: React.CSSProperties = {
   ...primaryBtn,
-  backgroundColor: '#4CAF50',
+  backgroundColor: '#5A8F5A',
 };
 
 const mainContent: React.CSSProperties = {

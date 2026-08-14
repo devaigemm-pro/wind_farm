@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 77
+- **Sesiones analizadas**: 79
 - **Última actualización**: 2026-08-13
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
