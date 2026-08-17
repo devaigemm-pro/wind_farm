@@ -1035,7 +1035,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       }}
                       style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#00A6FF' }}
                     >LE</button>
-                    <img src="/airfoil.svg" alt="blade" style={{ width: 140, height: 56, objectFit: 'contain', pointerEvents: 'none' }} />
+                    <img src="/airfoil.png" alt="blade" style={{ width: 140, height: 56, objectFit: 'contain', pointerEvents: 'none' }} />
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
