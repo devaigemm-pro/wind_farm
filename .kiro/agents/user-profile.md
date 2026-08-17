@@ -968,3 +968,13 @@
   - Bug técnico resuelto al primer intento sin correcciones — diagnóstico correcto (drawArc generaba polígono de 122 puntos causando stack overflow en jsPDF 4.x)
   - Sesión ultra-corta: un solo bug, diagnóstico + fix + deploy
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, reporta bugs por error exacto sin contexto extra, confía en diagnóstico técnico del agente
+
+### Sesión 100 - 2026-08-17
+- **Tarea principal**: Fix "change vertical blade" en step 2 ANNOTATE — al cambiar la pala vertical, el contenedor de imágenes (thumbnails sidebar) se reordenaba y NO debía hacerlo
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio + descripción del comportamiento incorrecto en una frase
+  - Instrucción ultra-clara: "esta acción no debe ordenar el contenedor de imágenes" — describe exactamente qué NO debe pasar
+  - Sesión ultra-corta: un solo fix, diagnóstico correcto al primer intento, deploy directo
+  - El fix fue mínimo (desacoplar `verticalBlade` del `bladeOrder` en `groupedThumbnails`) — exactamente lo que la regla "mínimo cambio necesario" exige
+  - No necesitó correcciones — aceptado implícitamente
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, describe comportamiento incorrecto sin dar contexto técnico, mínimo cambio necesario (confianza MUY alta), confía en diagnóstico del agente
