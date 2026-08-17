@@ -59,9 +59,9 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
   }, [photos]);
 
   const photoLookup = useMemo(() => {
-    const map: Record<string, { blade: string; face: string }> = {};
+    const map: Record<string, { blade: string; face: string; bladeRootDistance: number | null; distanceToBlade: number | null }> = {};
     for (const photo of photos) {
-      map[photo.id] = { blade: bladePositionMap[photo.bladeId] ?? 'A', face: getFaceShort(photo.face) };
+      map[photo.id] = { blade: bladePositionMap[photo.bladeId] ?? 'A', face: getFaceShort(photo.face), bladeRootDistance: photo.bladeRootDistance, distanceToBlade: photo.distanceToBlade };
     }
     return map;
   }, [photos, bladePositionMap]);
@@ -97,7 +97,15 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
       const derived = deriveBladeFace(annotation.thumbnailId);
       const blade = derived.blade;
       const face = annotation.side || derived.face;
-      const root = Math.round(annotation.y * 0.43 * 10) / 10;
+      const photo = photoLookup[annotation.thumbnailId];
+      let root: number;
+      if (photo && photo.bladeRootDistance != null && photo.bladeRootDistance > 0) {
+        const dtb = photo.distanceToBlade || 5;
+        const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
+        root = Math.round((photo.bladeRootDistance + (annotation.y / 100) * vertCov) * 10) / 10;
+      } else {
+        root = Math.round(annotation.y * 0.43 * 10) / 10;
+      }
 
       results.push({
         id: `D${counter}`,

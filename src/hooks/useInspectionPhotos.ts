@@ -19,6 +19,10 @@ export interface InspectionPhotoRow {
   isViewed: boolean;
   /** Pre-generated thumbnail signed URL (thumb_ prefixed file). Falls back to transform URL. */
   thumbnailUrl: string;
+  /** Distance from blade root in meters (from metadata JSONB) */
+  bladeRootDistance: number | null;
+  /** Distance from drone to blade surface in meters (from metadata JSONB) */
+  distanceToBlade: number | null;
 }
 
 const FACE_SHORT: Record<BladeFace, string> = {
@@ -78,6 +82,8 @@ async function fetchInspectionPhotos(
     isTagged: ((row.metadata as Record<string, unknown>)?.tagged as boolean) ?? false,
     isViewed: ((row.metadata as Record<string, unknown>)?.viewed as boolean) ?? false,
     thumbnailUrl: '', // Will be populated below for imported photos
+    bladeRootDistance: (row.metadata as Record<string, unknown>)?.blade_root_distance != null ? Number((row.metadata as Record<string, unknown>).blade_root_distance) : null,
+    distanceToBlade: (row.metadata as Record<string, unknown>)?.distance_to_blade != null ? Number((row.metadata as Record<string, unknown>).distance_to_blade) : null,
   })).sort((a, b) => a.bladePosition - b.bladePosition || a.flightPlanOrder - b.flightPlanOrder);
 
   // For imported photos, generate signed URLs for both original and pre-generated thumbnails.

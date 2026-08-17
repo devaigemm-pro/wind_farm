@@ -148,8 +148,16 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     if (inspectionPhotos.length === 0) return {};
     const map: Record<string, string> = {};
     for (const photo of inspectionPhotos) {
-      // Use full resolution (no transform) for RESULTS - maximum quality
       map[photo.id] = getPhotoPublicUrl(photo.storagePath, 'full');
+    }
+    return map;
+  }, [inspectionPhotos]);
+
+  // Build photo.id → distance metadata for root distance calculation
+  const photoDistMap = useMemo<Record<string, { brd: number | null; dtb: number | null }>>(() => {
+    const map: Record<string, { brd: number | null; dtb: number | null }> = {};
+    for (const photo of inspectionPhotos) {
+      map[photo.id] = { brd: photo.bladeRootDistance, dtb: photo.distanceToBlade };
     }
     return map;
   }, [inspectionPhotos]);
@@ -197,7 +205,15 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
         cat: a.category,
         blade,
         side: face,
-        root: Math.round(a.y * 0.43 * 10) / 10,
+        root: (() => {
+          const pd = photoDistMap[a.thumbnailId];
+          if (pd && pd.brd != null && pd.brd > 0) {
+            const dtb = pd.dtb || 5;
+            const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
+            return Math.round((pd.brd + (a.y / 100) * vertCov) * 10) / 10;
+          }
+          return Math.round(a.y * 0.43 * 10) / 10;
+        })(),
         size: `${Math.round(a.w)} x ${Math.round(a.h)}`,
         description: a.note,
         resolved: false,

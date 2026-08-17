@@ -93,9 +93,15 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
 
   // Build a photo lookup map: photoId → { blade, face }
   const photoLookup = useMemo(() => {
-    const map: Record<string, { blade: string; face: string; storagePath: string }> = {};
+    const map: Record<string, { blade: string; face: string; storagePath: string; bladeRootDistance: number | null; distanceToBlade: number | null }> = {};
     for (const photo of photos) {
-      map[photo.id] = { blade: bladePositionMap[photo.bladeId] ?? 'A', face: getFaceShort(photo.face), storagePath: photo.storagePath };
+      map[photo.id] = {
+        blade: bladePositionMap[photo.bladeId] ?? 'A',
+        face: getFaceShort(photo.face),
+        storagePath: photo.storagePath,
+        bladeRootDistance: photo.bladeRootDistance,
+        distanceToBlade: photo.distanceToBlade,
+      };
     }
     return map;
   }, [photos, bladePositionMap]);
@@ -124,7 +130,16 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         cat: a.category,
         blade,
         face,
-        root: Math.round(a.y * 0.43 * 10) / 10,
+        root: (() => {
+          const ph = photoLookup[a.thumbnailId];
+          if (ph && ph.bladeRootDistance != null && ph.bladeRootDistance > 0) {
+            const dtb = ph.distanceToBlade || 5;
+            const vertCoverage = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
+            const offset = (a.y / 100) * vertCoverage;
+            return Math.round((ph.bladeRootDistance + offset) * 10) / 10;
+          }
+          return Math.round(a.y * 0.43 * 10) / 10;
+        })(),
         size: `${Math.round(a.w)} x ${Math.round(a.h)} cm`,
         note: a.note,
         rootCause: a.rootCause || '',
@@ -228,7 +243,18 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     setSaveStatus('saving');
     try {
       const rootDistNum = parseFloat(rootDistance) || 0;
-      const yFromRoot = rootDistNum / 0.43;
+      // Reverse: from root distance back to annotation Y
+      const selectedAnn = (dbAnnotations ?? []).find(a => a.id === selectedDefectId);
+      const ph = selectedAnn ? photoLookup[selectedAnn.thumbnailId] : null;
+      let yFromRoot: number;
+      if (ph && ph.bladeRootDistance != null && ph.bladeRootDistance > 0) {
+        const dtb = ph.distanceToBlade || 5;
+        const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
+        const offset = rootDistNum - ph.bladeRootDistance;
+        yFromRoot = vertCov > 0 ? (offset / vertCov) * 100 : 0;
+      } else {
+        yFromRoot = rootDistNum / 0.43;
+      }
       // Update the annotation fields
       await updateAnnotation.mutateAsync({
         id: selectedDefectId,
