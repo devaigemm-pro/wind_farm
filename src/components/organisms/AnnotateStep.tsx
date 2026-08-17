@@ -187,6 +187,30 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [drawWidth, setDrawWidth] = useState(3); // perpendicular width in % units
   const [drawShape, setDrawShape] = useState<'rect' | 'oval'>('rect');
   const isMouseDownRef = useRef(false);
+  const viewerImgRef = useRef<HTMLImageElement | null>(null);
+
+  // Helper: compute the actual image content rect within the container (accounting for objectFit: contain letterboxing)
+  const getImageRect = useCallback((containerRect: DOMRect) => {
+    const img = viewerImgRef.current;
+    if (!img || !img.naturalWidth || !img.naturalHeight) {
+      return { offsetX: 0, offsetY: 0, width: containerRect.width, height: containerRect.height };
+    }
+    const containerAR = containerRect.width / containerRect.height;
+    const imageAR = img.naturalWidth / img.naturalHeight;
+    let imgWidth: number, imgHeight: number, offsetX: number, offsetY: number;
+    if (imageAR > containerAR) {
+      imgWidth = containerRect.width;
+      imgHeight = containerRect.width / imageAR;
+      offsetX = 0;
+      offsetY = (containerRect.height - imgHeight) / 2;
+    } else {
+      imgHeight = containerRect.height;
+      imgWidth = containerRect.height * imageAR;
+      offsetX = (containerRect.width - imgWidth) / 2;
+      offsetY = 0;
+    }
+    return { offsetX, offsetY, width: imgWidth, height: imgHeight };
+  }, []);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
   const [editSide, setEditSide] = useState('LE');
@@ -199,6 +223,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // ─── Image transition: show thumbnail as placeholder while full-res loads ──
   const [viewerLoaded, setViewerLoaded] = useState(false);
+  const [imgContentStyle, setImgContentStyle] = useState<{ top: string; left: string; width: string; height: string }>({ top: '0', left: '0', width: '100%', height: '100%' });
   const prevThumbRef = useRef<string>('');
 
   // ─── Image zoom & pan ───────────────────────────────────────────────────────
@@ -795,10 +820,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             if (e.button !== 0) return;
             if (role === 'supervisor') return;
             const rect = e.currentTarget.getBoundingClientRect();
+            const imgRect = getImageRect(rect);
             const rawX = e.clientX - rect.left;
             const rawY = e.clientY - rect.top;
-            const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
-            const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
+            const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
+            const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
 
             if (drawPhase === 'expanding') {
               // Click confirms the width → open popover
@@ -825,10 +851,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               return;
             }
             const rect = e.currentTarget.getBoundingClientRect();
+            const imgRect = getImageRect(rect);
             const rawX = e.clientX - rect.left;
             const rawY = e.clientY - rect.top;
-            const imgX = ((rawX - rect.width / 2 - panOffset.x) / zoomLevel + rect.width / 2) / rect.width * 100;
-            const imgY = ((rawY - rect.height / 2 - panOffset.y) / zoomLevel + rect.height / 2) / rect.height * 100;
+            const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
+            const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
 
             if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current) {
               // Phase 1: update line endpoint as user drags (only while button held)
@@ -908,7 +935,25 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 key={currentThumb.id}
                 src={currentThumb.viewerSrc}
                 alt="inspection view"
-                onLoad={() => setViewerLoaded(true)}
+                onLoad={(e) => {
+                  setViewerLoaded(true);
+                  const img = e.currentTarget;
+                  viewerImgRef.current = img;
+                  const container = img.parentElement;
+                  if (container && img.naturalWidth && img.naturalHeight) {
+                    const cw = container.clientWidth;
+                    const ch = container.clientHeight;
+                    const containerAR = cw / ch;
+                    const imageAR = img.naturalWidth / img.naturalHeight;
+                    let iw: number, ih: number, ox: number, oy: number;
+                    if (imageAR > containerAR) {
+                      iw = cw; ih = cw / imageAR; ox = 0; oy = (ch - ih) / 2;
+                    } else {
+                      ih = ch; iw = ch * imageAR; ox = (cw - iw) / 2; oy = 0;
+                    }
+                    setImgContentStyle({ top: `${oy}px`, left: `${ox}px`, width: `${iw}px`, height: `${ih}px` });
+                  }
+                }}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -1030,37 +1075,56 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           {/* ─── Annotation Layer (syncs with image zoom/pan) ─────────────── */}
           <div style={{
             position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
+            top: imgContentStyle.top,
+            left: imgContentStyle.left,
+            width: imgContentStyle.width,
+            height: imgContentStyle.height,
             transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
             transformOrigin: 'center',
             pointerEvents: 'none',
             zIndex: 5,
           }}>
-          {(savedAnnotations[selectedThumbnail] || []).map((ann, idx) => (
-            <div key={idx} style={{ position: 'absolute', left: `${ann.x}%`, top: `${ann.y}%`, width: `${ann.w}%`, height: `${ann.h}%`, transform: `translate(-50%, -50%) rotate(${ann.angle}deg)`, transformOrigin: 'center', pointerEvents: 'none' }}>
-              {/* Label with type + edit button */}
-              <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto' }}>
+          {(savedAnnotations[selectedThumbnail] || []).map((ann, idx) => {
+            // Reconstruct start/end points from center + angle + width
+            const rad = (ann.angle || 0) * (Math.PI / 180);
+            const halfW = ann.w / 2;
+            const startX = ann.x - halfW * Math.cos(rad);
+            const startY = ann.y - halfW * Math.sin(rad);
+            const endX = ann.x + halfW * Math.cos(rad);
+            const endY = ann.y + halfW * Math.sin(rad);
+            const halfH = ann.h / 2;
+            const nx = -Math.sin(rad);
+            const ny = Math.cos(rad);
+            const p1x = startX + nx * halfH;
+            const p1y = startY + ny * halfH;
+            const p2x = endX + nx * halfH;
+            const p2y = endY + ny * halfH;
+            const p3x = endX - nx * halfH;
+            const p3y = endY - ny * halfH;
+            const p4x = startX - nx * halfH;
+            const p4y = startY - ny * halfH;
+            const minX = Math.min(p1x, p2x, p3x, p4x);
+            const minY = Math.min(p1y, p2y, p3y, p4y);
+            const maxY = Math.max(p1y, p2y, p3y, p4y);
+
+            return (
+            <div key={idx} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+              {/* Label */}
+              <div style={{ position: 'absolute', left: `${minX}%`, top: `${minY}%`, transform: 'translateY(-100%)', marginTop: -4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto', zIndex: 1 }}>
                 <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 4, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#333', whiteSpace: 'nowrap' }}>{ann.type}</span>
                   {role !== 'supervisor' && (
                   <button onClick={() => {
-                    
                     setAnnotationType(ann.type);
                     setAnnotationCategory(ann.category);
                     setAnnotationNote(ann.note.replace('[oval]', ''));
                     setDrawShape(ann.note.startsWith('[oval]') ? 'oval' : 'rect');
-                    // Reconstruct drawStart/drawEnd from center + angle + width
-                    const rad = (ann.angle || 0) * (Math.PI / 180);
-                    const halfW = ann.w / 2;
-                    setDrawStart({ x: ann.x - halfW * Math.cos(rad), y: ann.y - halfW * Math.sin(rad) });
-                    setDrawEnd({ x: ann.x + halfW * Math.cos(rad), y: ann.y + halfW * Math.sin(rad) });
+                    setDrawStart({ x: startX, y: startY });
+                    setDrawEnd({ x: endX, y: endY });
                     setDrawWidth(ann.h);
                     setDrawConfirmed(true);
                     setEditingAnnotationId(ann.id);
                     setShowAnnotationPopover(true);
-                    // Also load into right panel
                     setRightPanelType(ann.type);
                     setRightPanelCategory(ann.category);
                     setRightPanelRootDistance(Math.round(ann.y * 0.43 * 10) / 10);
@@ -1075,14 +1139,33 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   )}
                 </div>
               </div>
-              {/* Rectangle or oval border */}
-              <div style={{ width: '100%', height: '100%', border: '2.5px solid #FF6600', background: 'rgba(255, 102, 0, 0.08)', borderRadius: ann.note.startsWith('[oval]') ? '50%' : 0 }} />
-              {/* Size label below */}
-              <span style={{ position: 'absolute', top: '100%', left: 0, marginTop: 2, fontSize: 13, fontWeight: 600, color: '#fff', fontStyle: 'italic', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                {Math.round(ann.w * 1.5)} x {Math.round(ann.h * 1.3)} cm
-              </span>
+              {/* SVG shape */}
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                {ann.note.startsWith('[oval]') ? (
+                  <ellipse
+                    cx={`${ann.x}%`} cy={`${ann.y}%`}
+                    rx={`${halfW}%`} ry={`${halfH}%`}
+                    fill="rgba(255, 102, 0, 0.08)" stroke="#FF6600" strokeWidth="2.5"
+                    style={{ transformOrigin: `${ann.x}% ${ann.y}%`, transform: `rotate(${ann.angle}deg)` }}
+                  />
+                ) : (
+                  <>
+                    <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF6600" strokeWidth="2.5" />
+                    <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF6600" strokeWidth="2.5" />
+                    <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF6600" strokeWidth="2.5" />
+                    <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF6600" strokeWidth="2.5" />
+                  </>
+                )}
+              </svg>
+              {/* Size label */}
+              <div style={{ position: 'absolute', left: `${minX}%`, top: `${maxY}%`, marginTop: 2, pointerEvents: 'none' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', fontStyle: 'italic', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                  {Math.round(ann.w * 1.5)} x {Math.round(ann.h * 1.3)} cm
+                </span>
+              </div>
             </div>
-          ))}
+            );
+          })}
 
           {/* Current drawing — line + expanding rectangle */}
           {drawStart && (() => {
