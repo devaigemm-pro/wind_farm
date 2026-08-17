@@ -1035,7 +1035,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       }}
                       style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#00A6FF' }}
                     >LE</button>
-                    <img src="/blade.svg" alt="blade" style={{ width: 140, height: 56, objectFit: 'contain', pointerEvents: 'none', transform: 'rotate(-90deg)' }} />
+                    <svg width="140" height="56" viewBox="0 0 300 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ pointerEvents: 'none' }}>
+                      <path d="M40 60C40 30 55 12 80 12C110 12 160 18 220 35C260 46 295 58 295 60C295 60 260 68 220 78C160 93 100 105 70 105C50 105 40 90 40 60Z" stroke="#111" strokeWidth="6" strokeLinejoin="round" fill="white"/>
+                    </svg>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
