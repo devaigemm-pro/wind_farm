@@ -196,18 +196,22 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     if (!img || !img.naturalWidth || !img.naturalHeight) {
       return { offsetX: 0, offsetY: 0, width: containerRect.width, height: containerRect.height };
     }
-    const containerAR = containerRect.width / containerRect.height;
+    // Use clientWidth/clientHeight for consistency with imgContentStyle calculation
+    const container = viewerContainerRef.current;
+    const cw = container ? container.clientWidth : containerRect.width;
+    const ch = container ? container.clientHeight : containerRect.height;
+    const containerAR = cw / ch;
     const imageAR = img.naturalWidth / img.naturalHeight;
     let imgWidth: number, imgHeight: number, offsetX: number, offsetY: number;
     if (imageAR > containerAR) {
-      imgWidth = containerRect.width;
-      imgHeight = containerRect.width / imageAR;
+      imgWidth = cw;
+      imgHeight = cw / imageAR;
       offsetX = 0;
-      offsetY = (containerRect.height - imgHeight) / 2;
+      offsetY = (ch - imgHeight) / 2;
     } else {
-      imgHeight = containerRect.height;
-      imgWidth = containerRect.height * imageAR;
-      offsetX = (containerRect.width - imgWidth) / 2;
+      imgHeight = ch;
+      imgWidth = ch * imageAR;
+      offsetX = (cw - imgWidth) / 2;
       offsetY = 0;
     }
     return { offsetX, offsetY, width: imgWidth, height: imgHeight };
@@ -226,6 +230,24 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [viewerLoaded, setViewerLoaded] = useState(false);
   const [imgContentStyle, setImgContentStyle] = useState<{ top: string; left: string; width: string; height: string }>({ top: '0', left: '0', width: '100%', height: '100%' });
   const prevThumbRef = useRef<string>('');
+
+  // Recalculate imgContentStyle whenever viewer is loaded or container resizes
+  const recalcImgContentStyle = useCallback(() => {
+    const img = viewerImgRef.current;
+    const container = viewerContainerRef.current;
+    if (!img || !container || !img.naturalWidth || !img.naturalHeight) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const containerAR = cw / ch;
+    const imageAR = img.naturalWidth / img.naturalHeight;
+    let iw: number, ih: number, ox: number, oy: number;
+    if (imageAR > containerAR) {
+      iw = cw; ih = cw / imageAR; ox = 0; oy = (ch - ih) / 2;
+    } else {
+      ih = ch; iw = ch * imageAR; ox = (cw - iw) / 2; oy = 0;
+    }
+    setImgContentStyle({ top: `${oy}px`, left: `${ox}px`, width: `${iw}px`, height: `${ih}px` });
+  }, []);
 
   // ─── Image zoom & pan ───────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(1.0);
@@ -270,23 +292,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     const container = viewerContainerRef.current;
     if (!container) return;
     const observer = new ResizeObserver(() => {
-      const img = viewerImgRef.current;
-      if (!img || !img.naturalWidth || !img.naturalHeight) return;
-      const cw = container.clientWidth;
-      const ch = container.clientHeight;
-      const containerAR = cw / ch;
-      const imageAR = img.naturalWidth / img.naturalHeight;
-      let iw: number, ih: number, ox: number, oy: number;
-      if (imageAR > containerAR) {
-        iw = cw; ih = cw / imageAR; ox = 0; oy = (ch - ih) / 2;
-      } else {
-        ih = ch; iw = ch * imageAR; ox = (cw - iw) / 2; oy = 0;
-      }
-      setImgContentStyle({ top: `${oy}px`, left: `${ox}px`, width: `${iw}px`, height: `${ih}px` });
+      recalcImgContentStyle();
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [recalcImgContentStyle]);
 
   // Preload adjacent images for instant transitions
   const preloadCache = useRef<Set<string>>(new Set());
@@ -958,20 +968,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   setViewerLoaded(true);
                   const img = e.currentTarget;
                   viewerImgRef.current = img;
-                  const container = img.parentElement;
-                  if (container && img.naturalWidth && img.naturalHeight) {
-                    const cw = container.clientWidth;
-                    const ch = container.clientHeight;
-                    const containerAR = cw / ch;
-                    const imageAR = img.naturalWidth / img.naturalHeight;
-                    let iw: number, ih: number, ox: number, oy: number;
-                    if (imageAR > containerAR) {
-                      iw = cw; ih = cw / imageAR; ox = 0; oy = (ch - ih) / 2;
-                    } else {
-                      ih = ch; iw = ch * imageAR; ox = (cw - iw) / 2; oy = 0;
-                    }
-                    setImgContentStyle({ top: `${oy}px`, left: `${ox}px`, width: `${iw}px`, height: `${ih}px` });
-                  }
+                  recalcImgContentStyle();
                 }}
                 style={{
                   width: '100%',
