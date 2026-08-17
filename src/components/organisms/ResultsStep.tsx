@@ -99,7 +99,7 @@ export function ResultsStep({ inspectionId, inspection, campaignId: propCampaign
       const face = annotation.side || derived.face;
       const photo = photoLookup[annotation.thumbnailId];
       let root: number;
-      if (photo && photo.bladeRootDistance != null && photo.bladeRootDistance > 0) {
+      if (photo && photo.bladeRootDistance != null) {
         const dtb = photo.distanceToBlade || 5;
         const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
         root = Math.round((photo.bladeRootDistance + (annotation.y / 100) * vertCov) * 10) / 10;

@@ -132,7 +132,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         face,
         root: (() => {
           const ph = photoLookup[a.thumbnailId];
-          if (ph && ph.bladeRootDistance != null && ph.bladeRootDistance > 0) {
+          if (ph && ph.bladeRootDistance != null) {
             const dtb = ph.distanceToBlade || 5;
             const vertCoverage = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
             const offset = (a.y / 100) * vertCoverage;
@@ -247,7 +247,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
       const selectedAnn = (dbAnnotations ?? []).find(a => a.id === selectedDefectId);
       const ph = selectedAnn ? photoLookup[selectedAnn.thumbnailId] : null;
       let yFromRoot: number;
-      if (ph && ph.bladeRootDistance != null && ph.bladeRootDistance > 0) {
+      if (ph && ph.bladeRootDistance != null) {
         const dtb = ph.distanceToBlade || 5;
         const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
         const offset = rootDistNum - ph.bladeRootDistance;

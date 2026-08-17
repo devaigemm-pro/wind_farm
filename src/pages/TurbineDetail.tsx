@@ -207,7 +207,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
         side: face,
         root: (() => {
           const pd = photoDistMap[a.thumbnailId];
-          if (pd && pd.brd != null && pd.brd > 0) {
+          if (pd && pd.brd != null) {
             const dtb = pd.dtb || 5;
             const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
             return Math.round((pd.brd + (a.y / 100) * vertCov) * 10) / 10;
