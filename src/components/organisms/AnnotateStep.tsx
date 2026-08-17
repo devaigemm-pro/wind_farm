@@ -188,6 +188,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [drawShape, setDrawShape] = useState<'rect' | 'oval'>('rect');
   const isMouseDownRef = useRef(false);
   const viewerImgRef = useRef<HTMLImageElement | null>(null);
+  const viewerContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Helper: compute the actual image content rect within the container (accounting for objectFit: contain letterboxing)
   const getImageRect = useCallback((containerRect: DOMRect) => {
@@ -263,6 +264,29 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       prevThumbRef.current = selectedThumbnail;
     }
   }, [selectedThumbnail]);
+
+  // Keep imgContentStyle in sync with container size (resize, layout shift)
+  useEffect(() => {
+    const container = viewerContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => {
+      const img = viewerImgRef.current;
+      if (!img || !img.naturalWidth || !img.naturalHeight) return;
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const containerAR = cw / ch;
+      const imageAR = img.naturalWidth / img.naturalHeight;
+      let iw: number, ih: number, ox: number, oy: number;
+      if (imageAR > containerAR) {
+        iw = cw; ih = cw / imageAR; ox = 0; oy = (ch - ih) / 2;
+      } else {
+        ih = ch; iw = ch * imageAR; ox = (cw - iw) / 2; oy = 0;
+      }
+      setImgContentStyle({ top: `${oy}px`, left: `${ox}px`, width: `${iw}px`, height: `${ih}px` });
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // Preload adjacent images for instant transitions
   const preloadCache = useRef<Set<string>>(new Set());
@@ -787,6 +811,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
         {/* Image viewer with click-to-mark annotation (2 points define rectangle) */}
         <div
+          ref={viewerContainerRef}
           style={{ ...mainViewerStyle, cursor: drawPhase === 'expanding' ? 'ns-resize' : 'crosshair', position: 'relative' }}
           onWheel={(e) => {
             e.preventDefault();
@@ -1075,7 +1100,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             pointerEvents: 'none',
             zIndex: 5,
           }}>
-          {(savedAnnotations[selectedThumbnail] || []).map((ann, idx) => {
+          {viewerLoaded && (savedAnnotations[selectedThumbnail] || []).map((ann, idx) => {
             // Reconstruct start/end points from center + angle + width
             const rad = (ann.angle || 0) * (Math.PI / 180);
             const halfW = ann.w / 2;
