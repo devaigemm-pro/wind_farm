@@ -728,7 +728,13 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
                     </select>
                   </div>
                 </div>
-                <DetailsTable defects={filteredDefects} selectedId={selectedDefectId} onSelect={setSelectedDefectId} onEdit={(id) => navigate(`/inspections/${inspectionData?.inspectionId ?? id}/workflow?step=3`)} resolvedMap={resolvedMap} onResolvedToggle={handleResolvedToggle} readonly={isSharedView || role === 'supervisor'} />
+                <DetailsTable defects={filteredDefects} selectedId={selectedDefectId} onSelect={setSelectedDefectId} onEdit={(id) => {
+                  const defect = defects.find(d => d.id === id);
+                  // In Path 1 (annotation defects), d.id IS the annotation ID.
+                  // In Path 2/3, d.description stores the annotation ID.
+                  const annotationId = defect?.description || defect?.id || id;
+                  navigate(`/inspections/${inspectionData?.inspectionId ?? id}/workflow?step=3&defectId=${annotationId}`);
+                }} resolvedMap={resolvedMap} onResolvedToggle={handleResolvedToggle} readonly={isSharedView || role === 'supervisor'} />
               </div>
             </div>
             {selectedDefectId && (

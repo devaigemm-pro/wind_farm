@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { BarChart2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/components/design-system';
@@ -14,6 +14,7 @@ export interface AnalyzeStepProps {
   inspectionId: string;
   inspection?: Inspection;
   campaignId?: string | null;
+  preselectedDefectId?: string;
   onOpenPhoto?: (photoId: string, blade: string) => void;
 }
 
@@ -60,7 +61,7 @@ function deriveBladeFaceLegacy(thumbnailId: string): { blade: string; face: stri
   return { blade: '?', face: '?' };
 }
 
-export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaignId, onOpenPhoto }: AnalyzeStepProps) {
+export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaignId, preselectedDefectId, onOpenPhoto }: AnalyzeStepProps) {
   // Auth role for supervisor restrictions
   const { role } = useAuth();
   const { t } = useLanguage();
@@ -236,6 +237,17 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     setNextStep('');
     setSelectedDefectId(null);
   }, []);
+
+  // Preselect defect from step 4 edit navigation
+  useEffect(() => {
+    if (preselectedDefectId && defectsFromDb.length > 0) {
+      const defect = defectsFromDb.find(d => d.annotationId === preselectedDefectId);
+      if (defect) {
+        handleDefectSelect(defect);
+        setSelectedBlade(defect.blade);
+      }
+    }
+  }, [preselectedDefectId, defectsFromDb, handleDefectSelect]);
 
   const handleSaveDefect = async () => {
     if (role === 'supervisor') return;
