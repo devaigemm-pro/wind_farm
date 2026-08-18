@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 145
+- **Sesiones analizadas**: 146
 - **Última actualización**: 2026-08-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1428,28 +1428,12 @@
   - Sesión ultra-corta: un solo bug, diagnóstico + fix + build + preview, sin iteraciones
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe bugs desde lo visual sin detalles técnicos, aprobación con 👍, confía en diagnóstico del agente
 
-### Sesión 143 - 2026-08-18
-- **Tarea principal**: Fix React error #310 (infinite re-render loop) en producción después del deploy — causado por `computeImageRect` como dependencia de `useMemo` en el `imgContentStyle` introducido esta misma sesión
+### Sesión 146 - 2026-08-18
+- **Tarea principal**: Fix jitter de anotaciones existentes durante draw (v2) — approach con useRef para cachear imgContentStyle en lugar de useMemo que causaba loop infinito
 - **Observaciones nuevas**:
-  - Reportó el error con el stack trace completo del minified React — patrón de dar información técnica exacta cuando la tiene
-  - El bug fue introducido por el fix anterior de esta misma sesión (memoizar imgContentStyle) — la dependencia `computeImageRect` en el useMemo causaba re-evaluación en cada render que triggereaba más renders
-  - Fix: eliminar `computeImageRect` de las deps del useMemo — `layoutTick` y `viewerLoaded` son suficientes
-  - Deploy directo con vercel CLI fue el único camino viable (GitHub Actions sigue con problema de token)
-  - **APRENDIZAJE**: Al usar `useMemo`, las funciones `useCallback` como dependencias pueden causar infinite loops si no son realmente estables. Preferir deps primitivas (numbers, booleans, strings) sobre funciones.
-- **Patrones confirmados**: español, directo, alta autonomía, reporta errores con stack trace exacto, confía en diagnóstico del agente, deploy directo cuando infra falla
-
-### Sesiones 138-145 - 2026-08-18
-- **Tarea principal**: Sesión larga con múltiples fixes en step 2 ANNOTATE + deploy issues:
-  (1) Blade face overlay bloqueaba draw — eliminado guard redundante
-  (2) Escape cancela drawing en progreso
-  (3) Fix jitter de anotaciones durante draw con useMemo — CAUSÓ React error #310 (infinite loop)
-  (4) Fix rootDistance missing en CreateAnnotationInput — causaba fallo de tsc en CI
-  (5) Deploy directo con vercel CLI (GitHub Actions fallaba por token inválido)
-  (6) Revert useMemo que causaba loop infinito — volvió al cálculo directo estable
-- **Observaciones nuevas**:
-  - El useMemo con layoutTick + ResizeObserver causa loop infinito en React. NO usar useMemo con deps que se actualizan por ResizeObserver.
-  - Múltiples deploys fallidos en una sesión generan frustración — priorizar que producción FUNCIONE antes de optimizar.
-  - Token Vercel: el primero fue inválido (vcp_8VAS...), el segundo funcionó (vcp_8Lmd...). Team: dev-ai2 (DEV AI).
-  - "el deploy fallo" x2 — reporta sin contexto, espera que el agente diagnostique y corrija rápido.
-  - Sesión de 8 turnos sobre el mismo tema (draw + deploy) — paciencia siempre que se avance.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, deploy directo cuando infra falla, confianza total con credenciales, prioriza producción funcionando, reporta errores con stack trace exacto
+  - Vuelve a pedir el mismo fix por segunda vez después de revertir useMemo — es importante para él, espera que se resuelva de verdad
+  - Approach exitoso: useRef para cachear rect + solo actualizar en resize/image-load. NO usar useMemo con layoutTick/ResizeObserver.
+  - Deploy directo con vercel CLI sigue siendo el path usado (GitHub Actions token inválido aún)
+  - Sesión ultra-corta: un solo cambio, build + deploy directo, sin iteraciones
+  - **APRENDIZAJE TÉCNICO**: Para evitar jitter en layers posicionados absolutamente que dependen de dimensiones del contenedor: usar useRef cache, actualizar solo en ResizeObserver/onLoad, leer ref en render. NO usar useMemo con deps que triggerea ResizeObserver.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, persistencia en pedir fixes que importan, deploy directo con vercel CLI

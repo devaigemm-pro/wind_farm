@@ -712,7 +712,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       </div>
 
       {/* ═══ MAIN VIEWER ═══ */}
-      <div className="annotate-viewer" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <div className="annotate-viewer" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', position: 'relative' }}>
         {/* Image toolbar bar */}
         <div style={imageBarStyle}>
           {/* Left: nav buttons + flag */}
@@ -1724,6 +1724,8 @@ const mainViewerStyle: React.CSSProperties = {
   justifyContent: 'center',
   background: '#1a1a1a',
   overflow: 'hidden',
+  minWidth: 600,
+  minHeight: 400,
 };
 
 const imageBarStyle: React.CSSProperties = {
