@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DefectsTable } from './DefectsTable';
 import { DefectDetailSidebar } from './DefectDetailSidebar';
-import { DefectCompareViewer } from './DefectCompareViewer';
 import { useLanguage } from '@/components/design-system';
 import { useDefectResolvedToggle } from '@/hooks/useDefectResolvedToggle';
 import { useDefectUpdate } from '@/hooks/useDefectUpdate';
 import { useDefectDelete } from '@/hooks/useDefectDelete';
 import { useAddDefectComment } from '@/hooks/useDefectComments';
+import { openCompare } from '@/utils/openCompare';
 import type { DefectSortField, DefectDashboardRow } from '@/types';
 
 export interface DefectsWindFarmTabProps {
@@ -20,7 +20,6 @@ export function DefectsWindFarmTab({ defects, isLoading }: DefectsWindFarmTabPro
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1.0);
-  const [showFullscreen, setShowFullscreen] = useState(false);
 
   const toggleResolved = useDefectResolvedToggle();
   const updateDefect = useDefectUpdate();
@@ -129,25 +128,22 @@ export function DefectsWindFarmTab({ defects, isLoading }: DefectsWindFarmTabPro
             zoomLevel={zoomLevel}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
-            onCompare={() => setShowFullscreen(true)}
+            onCompare={() => {
+              if (selectedDefect) {
+                openCompare({
+                  imageUrl: selectedDefect.imageUrl,
+                  type: selectedDefect.type,
+                  severity: selectedDefect.category,
+                  distance: selectedDefect.rootDistance,
+                  side: selectedDefect.side,
+                  blade: selectedDefect.bladePosition,
+                  bladeId: selectedDefect.bladeId,
+                  inspectionId: selectedDefect.inspectionId,
+                });
+              }
+            }}
           />
         </div>
-      )}
-
-      {/* Compare Viewer */}
-      {showFullscreen && selectedDefect && (
-        <DefectCompareViewer
-          onClose={() => setShowFullscreen(false)}
-          currentImage={selectedDefect.imageUrl ?? ''}
-          currentDate={new Date().toISOString()}
-          defectType={selectedDefect.type ?? ''}
-          defectSeverity={selectedDefect.category ?? 3}
-          distanceFromRoot={selectedDefect.rootDistance ?? 0}
-          side={selectedDefect.side ?? ''}
-          blade={selectedDefect.bladePosition ?? 'A'}
-          bladeId={selectedDefect.bladeId ?? ''}
-          inspectionId={selectedDefect.inspectionId ?? ''}
-        />
       )}
     </div>
   );

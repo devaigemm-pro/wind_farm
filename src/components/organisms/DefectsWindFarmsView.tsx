@@ -4,13 +4,13 @@ import { EmptyState } from '@/components/molecules';
 import { TablePagination } from '@/components/molecules/TablePagination';
 import { DefectsTable } from './DefectsTable';
 import { DefectDetailSidebar } from './DefectDetailSidebar';
-import { DefectCompareViewer } from './DefectCompareViewer';
 import { useLanguage } from '@/components/design-system';
 import { useDefectsDashboard } from '@/hooks/useDefectsDashboard';
 import { useDefectResolvedToggle } from '@/hooks/useDefectResolvedToggle';
 import { useDefectUpdate } from '@/hooks/useDefectUpdate';
 import { useDefectDelete } from '@/hooks/useDefectDelete';
 import { useAddDefectComment } from '@/hooks/useDefectComments';
+import { openCompare } from '@/utils/openCompare';
 import type { DefectSortField } from '@/types';
 
 export interface DefectsWindFarmsViewProps {
@@ -25,7 +25,6 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1.0);
-  const [showCompare, setShowCompare] = useState(false);
 
   // Map DefectSortField to RPC field names
   const sortFieldMap: Record<DefectSortField, string> = {
@@ -123,8 +122,19 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
   }, []);
 
   const handleCompare = useCallback(() => {
-    setShowCompare(true);
-  }, []);
+    if (selectedDefect) {
+      openCompare({
+        imageUrl: selectedDefect.imageUrl,
+        type: selectedDefect.type,
+        severity: selectedDefect.category,
+        distance: selectedDefect.rootDistance,
+        side: selectedDefect.side,
+        blade: selectedDefect.bladePosition,
+        bladeId: selectedDefect.bladeId,
+        inspectionId: selectedDefect.inspectionId,
+      });
+    }
+  }, [selectedDefect]);
 
   // Reset zoom when selecting a different defect
   useEffect(() => {
@@ -209,22 +219,6 @@ export function DefectsWindFarmsView({ searchQuery }: DefectsWindFarmsViewProps)
             onCompare={handleCompare}
           />
         </div>
-      )}
-
-      {/* Compare Viewer Overlay */}
-      {showCompare && selectedDefect && (
-        <DefectCompareViewer
-          onClose={() => setShowCompare(false)}
-          currentImage={selectedDefect.imageUrl || ''}
-          currentDate={new Date().toISOString()}
-          defectType={selectedDefect.type}
-          defectSeverity={selectedDefect.category}
-          distanceFromRoot={selectedDefect.rootDistance}
-          side={selectedDefect.side}
-          blade={selectedDefect.bladePosition}
-          bladeId={selectedDefect.bladeId}
-          inspectionId={selectedDefect.inspectionId}
-        />
       )}
     </div>
   );

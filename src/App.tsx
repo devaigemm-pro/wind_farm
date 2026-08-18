@@ -50,6 +50,9 @@ const ProfilePage = lazy(() =>
 const SharedResultsPage = lazy(() =>
   import('@/pages/SharedResults').then((m) => ({ default: m.SharedResults })),
 );
+const ComparePageLazy = lazy(() =>
+  import('@/pages/ComparePage').then((m) => ({ default: m.ComparePage })),
+);
 
 
 
@@ -109,6 +112,7 @@ function AppRoutes() {
       {/* Public routes - outside AuthGuard */}
       <Route path="/login" element={<Login />} />
       <Route path="/shared/:windFarmId/:turbineId" element={<SharedResultsPage />} />
+      <Route path="/compare" element={<ComparePageLazy />} />
 
       {/* All protected routes share one AuthGuard + Layout instance */}
       <Route
