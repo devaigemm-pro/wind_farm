@@ -395,6 +395,24 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     preloadImage(flatFilteredThumbs[next2Idx]?.viewerSrc ?? '');
   }, [currentThumbIndex, flatFilteredThumbs, preloadImage]);
 
+  // Escape key cancels in-progress drawing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (drawPhase !== 'idle' || drawStart || drawEnd) {
+          setDrawPhase('idle');
+          setDrawStart(null);
+          setDrawEnd(null);
+          setDrawConfirmed(false);
+          setDrawWidth(3);
+          isMouseDownRef.current = false;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [drawPhase, drawStart, drawEnd]);
+
   // Auto-scroll selected thumbnail into view in sidebar
   useEffect(() => {
     if (selectedThumbnail) {
