@@ -162,7 +162,6 @@ export default function Login() {
             <img src="/core-insight-eye.svg" height="64" alt="CORE Insight" />
           </div>
           <h1 style={styles.title}>CORE <span style={{ color: '#4CAF50', margin: '0 0.25rem' }}>|</span> Insight</h1>
-          <p style={styles.subtitle}>Inicia sesión</p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} style={styles.form} noValidate>
