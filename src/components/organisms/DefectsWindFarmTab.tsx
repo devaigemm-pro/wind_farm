@@ -19,6 +19,7 @@ export function DefectsWindFarmTab({ defects, isLoading }: DefectsWindFarmTabPro
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [showFullscreen, setShowFullscreen] = useState(false);
 
   const toggleResolved = useDefectResolvedToggle();
   const updateDefect = useDefectUpdate();
@@ -127,8 +128,18 @@ export function DefectsWindFarmTab({ defects, isLoading }: DefectsWindFarmTabPro
             zoomLevel={zoomLevel}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
-            onCompare={() => {}}
+            onCompare={() => setShowFullscreen(true)}
           />
+        </div>
+      )}
+
+      {/* Fullscreen overlay */}
+      {showFullscreen && selectedDefect?.imageUrl && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          onClick={() => setShowFullscreen(false)}
+        >
+          <img src={selectedDefect.imageUrl} alt="Defect fullscreen" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: '4px' }} />
         </div>
       )}
     </div>

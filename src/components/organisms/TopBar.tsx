@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, Bell, LogOut } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import { Avatar } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import type { Profile } from '@/types';
@@ -9,7 +9,6 @@ export interface TopBarProps {
   user: Profile | null;
   onLogout: () => void;
   onSearch: (query: string) => void;
-  notificationCount?: number;
 }
 
 export function TopBar({
@@ -17,7 +16,6 @@ export function TopBar({
   user,
   onLogout,
   onSearch,
-  notificationCount = 0,
 }: TopBarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const { locale, setLocale, t } = useLanguage();
@@ -54,38 +52,6 @@ export function TopBar({
     alignItems: 'center',
     gap: 'var(--space-2)',
     marginLeft: 'auto',
-  };
-
-  const iconButtonStyle: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    color: 'var(--color-neutral-500)',
-    cursor: 'pointer',
-    borderRadius: 'var(--radius-md)',
-  };
-
-  const badgeCountStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '4px',
-    right: '4px',
-    minWidth: '16px',
-    height: '16px',
-    padding: '0 4px',
-    fontSize: '10px',
-    fontWeight: 700,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 'var(--radius-full)',
-    backgroundColor: 'var(--color-danger-500)',
-    color: 'var(--color-neutral-0)',
-    fontFamily: 'var(--font-family-sans)',
   };
 
   const avatarButtonStyle: React.CSSProperties = {
@@ -187,19 +153,6 @@ export function TopBar({
           title={t('topbar.language')}
         >
           {locale.toUpperCase()}
-        </button>
-
-        <button
-          type="button"
-          style={iconButtonStyle}
-          aria-label={`${t('topbar.notifications')}${notificationCount > 0 ? `, ${notificationCount} unread` : ''}`}
-        >
-          <Bell size={20} aria-hidden="true" />
-          {notificationCount > 0 && (
-            <span style={badgeCountStyle} aria-hidden="true">
-              {notificationCount > 99 ? '99+' : notificationCount}
-            </span>
-          )}
         </button>
 
         <div style={{ position: 'relative' }}>

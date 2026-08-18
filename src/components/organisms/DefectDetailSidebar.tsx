@@ -84,7 +84,12 @@ export function DefectDetailSidebar({
         {/* Image section still visible below the form */}
         <div style={{ padding: '0 16px 16px', position: 'relative' }}>
           <div style={{ marginBottom: '4px' }}>
-            <Maximize2 size={18} color="#5A8F5A" style={{ cursor: 'pointer' }} />
+            <Maximize2
+              size={18}
+              color="#5A8F5A"
+              style={{ cursor: 'pointer' }}
+              onClick={() => { if (defect.imageUrl) window.open(defect.imageUrl, '_blank'); }}
+            />
           </div>
           <DefectImageViewer
             imageUrl={defect.imageUrl}
@@ -255,7 +260,12 @@ export function DefectDetailSidebar({
       <div style={{ position: 'relative', maxWidth: '90%' }}>
         {/* Fullscreen icon */}
         <div style={{ marginBottom: '4px' }}>
-          <Maximize2 size={18} color="#5A8F5A" style={{ cursor: 'pointer' }} />
+          <Maximize2
+            size={18}
+            color="#5A8F5A"
+            style={{ cursor: 'pointer' }}
+            onClick={() => { if (defect.imageUrl) window.open(defect.imageUrl, '_blank'); }}
+          />
         </div>
 
         {/* Image Viewer */}
