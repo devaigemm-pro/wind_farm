@@ -192,30 +192,17 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // ─── Image transition: show thumbnail as placeholder while full-res loads ──
   const [viewerLoaded, setViewerLoaded] = useState(false);
-  const [imgContentStyle, setImgContentStyle] = useState<{ top: string; left: string; width: string; height: string }>({ top: '0', left: '0', width: '100%', height: '100%' });
   const prevThumbRef = useRef<string>('');
 
-  // Helper: compute the actual image content rect within the container (accounting for objectFit: contain letterboxing)
-  // Uses the already-computed imgContentStyle values to guarantee consistency with the annotation layer.
-  const getImageRect = useCallback((_containerRect: DOMRect) => {
-    // Only use imgContentStyle if it has been computed (contains 'px' values, not initial '%' values)
-    const hasPixelValues = imgContentStyle.width.includes('px');
-
-    if (hasPixelValues) {
-      const top = parseFloat(imgContentStyle.top) || 0;
-      const left = parseFloat(imgContentStyle.left) || 0;
-      const width = parseFloat(imgContentStyle.width);
-      const height = parseFloat(imgContentStyle.height);
-      if (width > 0 && height > 0) {
-        return { offsetX: left, offsetY: top, width, height };
-      }
-    }
-
-    // Fallback: compute from image natural dimensions
+  // Compute the image content rect (accounting for objectFit:contain letterboxing).
+  // This is a pure computation — no state dependency — so it always returns fresh values.
+  const computeImageRect = useCallback(() => {
     const img = viewerImgRef.current;
     const container = viewerContainerRef.current;
     if (!img || !container || !img.naturalWidth || !img.naturalHeight) {
-      return { offsetX: 0, offsetY: 0, width: _containerRect.width, height: _containerRect.height };
+      const cw = container?.clientWidth || 1;
+      const ch = container?.clientHeight || 1;
+      return { offsetX: 0, offsetY: 0, width: cw, height: ch };
     }
     const cw = container.clientWidth;
     const ch = container.clientHeight;
@@ -228,7 +215,14 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       imgHeight = ch; imgWidth = ch * imageAR; offsetX = (cw - imgWidth) / 2; offsetY = 0;
     }
     return { offsetX, offsetY, width: imgWidth, height: imgHeight };
-  }, [imgContentStyle]);
+  }, []);
+
+  // State to force re-render when container resizes (so annotation layer repositions)
+  const [, setLayoutTick] = useState(0);
+
+  const getImageRect = useCallback((_containerRect: DOMRect) => {
+    return computeImageRect();
+  }, [computeImageRect]);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
   const [editSide, setEditSide] = useState('LE');
@@ -239,25 +233,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [metaRootDist, setMetaRootDist] = useState(15);
   const [metaDistBlade, setMetaDistBlade] = useState(6.9);
 
-  // Recalculate imgContentStyle whenever viewer is loaded or container resizes
+  // Recalculate annotation layer position on container resize
   const recalcImgContentStyle = useCallback(() => {
-    const img = viewerImgRef.current;
-    const container = viewerContainerRef.current;
-    if (!img || !container || !img.naturalWidth || !img.naturalHeight) return;
-    // Ensure the img element is still connected to the DOM (not stale from a previous key)
-    if (!img.isConnected) return;
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-    if (cw === 0 || ch === 0) return;
-    const containerAR = cw / ch;
-    const imageAR = img.naturalWidth / img.naturalHeight;
-    let iw: number, ih: number, ox: number, oy: number;
-    if (imageAR > containerAR) {
-      iw = cw; ih = cw / imageAR; ox = 0; oy = (ch - ih) / 2;
-    } else {
-      ih = ch; iw = ch * imageAR; ox = (cw - iw) / 2; oy = 0;
-    }
-    setImgContentStyle({ top: `${oy}px`, left: `${ox}px`, width: `${iw}px`, height: `${ih}px` });
+    setLayoutTick(t => t + 1);
   }, []);
 
   // ─── Image zoom & pan ───────────────────────────────────────────────────────
@@ -430,6 +408,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   // This shows the full UI structure (sidebar, viewer, panels) ready for when photos arrive.
 
   const annotsCount = thumbnails.filter(t => t.hasAnnotation || ((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
+
+  // Compute image rect for annotation layer positioning (recalculates on every render)
+  const imgRect = computeImageRect();
+  const imgContentStyle = {
+    top: `${imgRect.offsetY}px`,
+    left: `${imgRect.offsetX}px`,
+    width: `${imgRect.width}px`,
+    height: `${imgRect.height}px`,
+  };
   const taggedCount = thumbnails.filter(t => t.isTagged).length;
   const unseenCount = thumbnails.filter(t => !t.hasAnnotation && !t.isTagged && !((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
   const viewedCount = photos.filter(p => p.isViewed).length;
