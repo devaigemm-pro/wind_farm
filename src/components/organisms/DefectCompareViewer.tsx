@@ -23,7 +23,16 @@ export interface DefectCompareViewerProps {
   annotAngle?: number;
 }
 
-const FACE_ORDER = ['LE', 'TE', 'PS', 'SS'] as const;
+interface BladePhoto {
+  id: string;
+  face: string;
+  storagePath: string;
+  radialPosition: number;
+}
+
+const FACE_DB_TO_SHORT: Record<string, string> = {
+  leading_edge: 'LE', trailing_edge: 'TE', pressure_side: 'PS', suction_side: 'SS',
+};
 
 export function DefectCompareViewer({
   onClose,
@@ -49,59 +58,106 @@ export function DefectCompareViewer({
   const [activeSide, setActiveSide] = useState(side || 'LE');
   const [activeImage, setActiveImage] = useState(currentImage);
   const [activeDistance, setActiveDistance] = useState(distanceFromRoot);
+  const [bladePhotos, setBladePhotos] = useState<BladePhoto[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Blade photos for navigation
-  const [bladePhotos, setBladePhotos] = useState<Array<{ face: string; storagePath: string; radialPosition: number }>>([]);
-
+  // Load blade photos for navigation
   useEffect(() => {
-    if (!bladeId || !inspectionId) return;
+    if (!bladeId) return;
     (async () => {
       const db = supabase as any;
-      // Get campaign_id from inspection
-      const { data: inspData } = await db.from('inspection').select('campaign_id').eq('id', inspectionId).limit(1);
-      const campaignId = inspData?.[0]?.campaign_id;
-      if (!campaignId) return;
 
+      // Find all photos for this blade (regardless of campaign)
       const { data: photos } = await db
         .from('inspection_photo')
-        .select('face, storage_path, radial_position')
-        .eq('campaign_id', campaignId)
+        .select('id, face, storage_path, radial_position')
         .eq('blade_id', bladeId)
         .order('radial_position', { ascending: true });
 
-      if (photos) {
-        const faceMap: Record<string, string> = {
-          leading_edge: 'LE', trailing_edge: 'TE', pressure_side: 'PS', suction_side: 'SS',
-        };
+      if (photos && photos.length > 0) {
         setBladePhotos(photos.map((p: any) => ({
-          face: faceMap[p.face] || p.face,
+          id: p.id,
+          face: FACE_DB_TO_SHORT[p.face] || p.face,
           storagePath: p.storage_path,
           radialPosition: Number(p.radial_position),
         })));
       }
     })();
-  }, [bladeId, inspectionId]);
+  }, [bladeId]);
+
+  // Load the defect's annotation image (the photo from step 2 ANNOTATE)
+  useEffect(() => {
+    if (currentImage) return; // already have an image
+    if (!inspectionId) return;
+    // Try to load via defect → annotation → inspection_photo
+    (async () => {
+      const db = supabase as any;
+      // Find defects for this inspection that match our type/distance
+      const { data: defects } = await db
+        .from('defect')
+        .select('description')
+        .eq('inspection_id', inspectionId)
+        .not('description', 'is', null)
+        .limit(10);
+
+      if (!defects || defects.length === 0) return;
+
+      const annotIds = defects.map((d: any) => d.description).filter(Boolean);
+      if (annotIds.length === 0) return;
+
+      const { data: annotations } = await db
+        .from('annotation')
+        .select('id, thumbnail_id, x, y, w, h, angle')
+        .in('id', annotIds)
+        .limit(1);
+
+      if (!annotations || annotations.length === 0) return;
+
+      const ann = annotations[0];
+      const { data: photos } = await db
+        .from('inspection_photo')
+        .select('storage_path')
+        .eq('id', ann.thumbnail_id)
+        .limit(1);
+
+      if (!photos || photos.length === 0) return;
+
+      const { data: signedData } = await (supabase as any).storage
+        .from('inspection-imports')
+        .createSignedUrl(photos[0].storage_path, 3600);
+
+      if (signedData?.signedUrl) {
+        setActiveImage(signedData.signedUrl);
+      }
+    })();
+  }, [inspectionId, currentImage]);
+
+  const getSignedUrl = useCallback(async (storagePath: string): Promise<string | null> => {
+    const { data } = await (supabase as any).storage
+      .from('inspection-imports')
+      .createSignedUrl(storagePath, 3600);
+    return data?.signedUrl ?? null;
+  }, []);
 
   const navigateToFace = useCallback(async (targetFace: string) => {
-    // Find closest photo to current distance in target face
     const facePics = bladePhotos.filter((p) => p.face === targetFace);
     if (facePics.length === 0) return;
 
+    // Find closest to current radial distance
     const closest = facePics.reduce((best, p) =>
       Math.abs(p.radialPosition - activeDistance) < Math.abs(best.radialPosition - activeDistance) ? p : best
     );
 
-    // Get signed URL
-    const { data } = await (supabase as any).storage
-      .from('inspection-imports')
-      .createSignedUrl(closest.storagePath, 3600);
+    setLoading(true);
+    const url = await getSignedUrl(closest.storagePath);
+    setLoading(false);
 
-    if (data?.signedUrl) {
-      setActiveImage(data.signedUrl);
+    if (url) {
+      setActiveImage(url);
       setActiveSide(targetFace);
       setActiveDistance(closest.radialPosition);
     }
-  }, [bladePhotos, activeDistance]);
+  }, [bladePhotos, activeDistance, getSignedUrl]);
 
   const navigateHub = useCallback(async (direction: 'closer' | 'farther') => {
     const facePics = bladePhotos
@@ -111,24 +167,28 @@ export function DefectCompareViewer({
     if (facePics.length === 0) return;
 
     const currentIdx = facePics.findIndex((p) =>
-      Math.abs(p.radialPosition - activeDistance) < 0.5
+      Math.abs(p.radialPosition - activeDistance) < 1
     );
-    const nextIdx = direction === 'closer'
-      ? Math.max(0, (currentIdx >= 0 ? currentIdx : facePics.length) - 1)
-      : Math.min(facePics.length - 1, (currentIdx >= 0 ? currentIdx : -1) + 1);
+
+    let nextIdx: number;
+    if (direction === 'closer') {
+      nextIdx = currentIdx > 0 ? currentIdx - 1 : 0;
+    } else {
+      nextIdx = currentIdx < facePics.length - 1 ? currentIdx + 1 : facePics.length - 1;
+    }
 
     const target = facePics[nextIdx];
     if (!target) return;
 
-    const { data } = await (supabase as any).storage
-      .from('inspection-imports')
-      .createSignedUrl(target.storagePath, 3600);
+    setLoading(true);
+    const url = await getSignedUrl(target.storagePath);
+    setLoading(false);
 
-    if (data?.signedUrl) {
-      setActiveImage(data.signedUrl);
+    if (url) {
+      setActiveImage(url);
       setActiveDistance(target.radialPosition);
     }
-  }, [bladePhotos, activeSide, activeDistance]);
+  }, [bladePhotos, activeSide, activeDistance, getSignedUrl]);
 
   const { data } = useDefectHistory(bladeId, distanceFromRoot, inspectionId);
   const inspections = data?.inspections ?? [];
@@ -138,13 +198,8 @@ export function DefectCompareViewer({
     (d) => d.inspectionId === selectedInspectionId
   );
 
-  const handleZoomIn = useCallback(() => {
-    setZoomLevel((prev) => Math.min(prev + 0.25, 4.0));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoomLevel((prev) => Math.max(prev - 0.25, 0.5));
-  }, []);
+  const handleZoomIn = useCallback(() => setZoomLevel((p) => Math.min(p + 0.25, 4.0)), []);
+  const handleZoomOut = useCallback(() => setZoomLevel((p) => Math.max(p - 0.25, 0.5)), []);
 
   const hasAnnotation = annotX != null && annotY != null && annotW != null && annotH != null;
 
@@ -161,7 +216,6 @@ export function DefectCompareViewer({
     transformOrigin: 'top left',
   } : {};
 
-  const severityLabel = `Cat ${defectSeverity}`;
   const formattedDate = currentDate ? new Date(currentDate).toLocaleString() : 'N/A';
 
   return (
@@ -176,50 +230,48 @@ export function DefectCompareViewer({
           <div style={panelHeaderStyle}>
             <span style={{ color: '#5A8F5A' }}>{formattedDate}</span>
             <span style={{ textAlign: 'center', fontWeight: 700 }}>Selected</span>
-            <span style={{ textAlign: 'right' }}>{severityLabel}</span>
+            <span style={{ textAlign: 'right' }}>Cat {defectSeverity}</span>
           </div>
           <div style={imageContainerStyle}>
             {activeImage ? (
               <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img src={activeImage} alt="Current defect" style={{ ...imageStyle, transform: `scale(${zoomLevel})` }} crossOrigin="anonymous" />
+                <img src={activeImage} alt="Defect" style={{ ...imageStyle, transform: `scale(${zoomLevel})` }} crossOrigin="anonymous" />
                 {hasAnnotation && <div style={annotationStyle} />}
+                {loading && <div style={loadingOverlay}>Loading...</div>}
               </div>
             ) : (
               <span style={emptyText}>No image</span>
             )}
 
-            {/* Blade info */}
+            {/* Info top-left */}
             <div style={infoBlockStyle}>
               <div>Blade : {blade}</div>
               <div>Side : {activeSide}</div>
-              <div>Hub : {activeDistance}m</div>
+              <div>Hub : {activeDistance.toFixed(1)}m</div>
             </div>
 
-            {/* Navigation arrows - cross layout */}
+            {/* Navigation arrows - cross layout, bottom-left */}
             <div style={navContainerStyle}>
-              {/* SS up */}
-              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')} title="SS">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
-                <span style={navLabel}>SS</span>
+              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
+                <span style={navLabelStyle}>SS</span>
               </button>
-              {/* Middle row: ← Hub → */}
               <div style={navMiddleRow}>
-                <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')} title="Tip">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
+                <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
                 </button>
-                <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')} title="Hub">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
-                  <span style={navLabel}>Hub</span>
+                <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
+                  <span style={navLabelStyle}>Hub</span>
                 </button>
               </div>
-              {/* PS down */}
-              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')} title="PS">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
-                <span style={navLabel}>PS</span>
+              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
+                <span style={navLabelStyle}>PS</span>
               </button>
             </div>
 
-            {/* Zoom controls */}
+            {/* Zoom - bottom-right */}
             <div style={zoomGroupStyle}>
               <button type="button" style={zoomBtnStyle} onClick={handleZoomOut}>-</button>
               <span style={zoomLabelStyle}>x{zoomLevel.toFixed(2)}</span>
@@ -257,11 +309,7 @@ export function DefectCompareViewer({
         <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{defectType.replace(/_/g, ' ')}</span>
         <div style={toggleContainerStyle}>
           <span>{t('compare.compareMore')}</span>
-          <button
-            type="button"
-            style={{ ...toggleTrackBase, backgroundColor: compareMore ? '#5A8F5A' : '#555' }}
-            onClick={() => setCompareMore((p) => !p)}
-          >
+          <button type="button" style={{ ...toggleTrackBase, backgroundColor: compareMore ? '#5A8F5A' : '#555' }} onClick={() => setCompareMore((p) => !p)}>
             <span style={{ ...toggleKnobBase, left: compareMore ? '18px' : '2px' }} />
           </button>
         </div>
@@ -288,8 +336,9 @@ const zoomGroupStyle: React.CSSProperties = { position: 'absolute', bottom: '12p
 const zoomBtnStyle: React.CSSProperties = { padding: '4px 10px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRight: '1px solid #5A8F5A', fontSize: '13px', fontWeight: 600, cursor: 'pointer' };
 const zoomBtnLastStyle: React.CSSProperties = { ...zoomBtnStyle, borderRight: 'none' };
 const zoomLabelStyle: React.CSSProperties = { ...zoomBtnStyle, cursor: 'default', fontSize: '11px', textTransform: 'lowercase' };
-const infoBlockStyle: React.CSSProperties = { position: 'absolute', top: '12px', left: '12px', color: '#5A8F5A', fontSize: '12px', fontFamily: 'var(--font-family-sans)', lineHeight: '1.6' };
-const navContainerStyle: React.CSSProperties = { position: 'absolute', bottom: '12px', left: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' };
-const navMiddleRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '12px' };
-const navBtnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' };
-const navLabel: React.CSSProperties = { color: '#5A8F5A', fontSize: '10px', fontWeight: 600 };
+const infoBlockStyle: React.CSSProperties = { position: 'absolute', top: '12px', left: '12px', color: '#5A8F5A', fontSize: '13px', fontFamily: 'var(--font-family-sans)', lineHeight: '1.8', textShadow: '0 1px 3px rgba(0,0,0,0.8)' };
+const navContainerStyle: React.CSSProperties = { position: 'absolute', bottom: '16px', left: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' };
+const navMiddleRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '16px' };
+const navBtnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' };
+const navLabelStyle: React.CSSProperties = { color: '#5A8F5A', fontSize: '10px', fontWeight: 700 };
+const loadingOverlay: React.CSSProperties = { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '14px' };
