@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLanguage } from '@/components/design-system';
 
 interface Defect {
@@ -51,8 +51,26 @@ export function BladesDiagram({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);
+  const [dotsVisible, setDotsVisible] = useState(false);
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
+  const prevDefectsLen = useRef(0);
+
+  // Hide dots whenever defects change from 0 to N (data just arrived),
+  // then reveal after 2 animation frames to ensure layout is settled.
+  useEffect(() => {
+    if (defects.length > 0 && prevDefectsLen.current === 0) {
+      setDotsVisible(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setDotsVisible(true);
+        });
+      });
+    } else if (defects.length > 0) {
+      setDotsVisible(true);
+    }
+    prevDefectsLen.current = defects.length;
+  }, [defects]);
 
   const blades = ['A', 'B', 'C'] as const;
 
@@ -275,6 +293,7 @@ export function BladesDiagram({
                             background: color,
                             boxShadow: isSelected ? 'rgb(0, 166, 255) 0px 0px 0px 4px' : 'none',
                             opacity: 0.8,
+                            visibility: dotsVisible ? 'visible' : 'hidden',
                             zIndex: isSelected ? 4 : 3,
                             display: 'flex',
                             alignItems: 'center',
