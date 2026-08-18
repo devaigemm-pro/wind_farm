@@ -159,7 +159,7 @@ export default function Login() {
       <div style={styles.card}>
         <div style={styles.header}>
           <div style={styles.logo} aria-hidden="true">
-            <img src="/core-insight-eye.svg" height="64" alt="CORE Insight" />
+            <img src="/core-insight-eye.svg" height="80" alt="CORE Insight" />
           </div>
           <h1 style={styles.title}>CORE <span style={{ color: '#5A8F5A', margin: '0 0.25rem' }}>|</span> Insight</h1>
         </div>
