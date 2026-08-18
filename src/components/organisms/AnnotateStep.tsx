@@ -235,12 +235,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // State to force re-render when container resizes (so annotation layer repositions)
   const [, setLayoutTick] = useState(0);
-  // Cache the annotation layer rect to avoid jitter during drawing re-renders
-  const cachedImgRectRef = useRef<{ offsetX: number; offsetY: number; width: number; height: number } | null>(null);
-
-  const updateCachedImgRect = useCallback(() => {
-    cachedImgRectRef.current = computeImageRect();
-  }, [computeImageRect]);
 
   const getImageRect = useCallback((_containerRect: DOMRect) => {
     return computeImageRect();
