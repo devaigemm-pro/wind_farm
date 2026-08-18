@@ -159,7 +159,7 @@ export default function Login() {
       <div style={styles.card}>
         <div style={styles.header}>
           <div style={styles.logo} aria-hidden="true">
-            <img src="/core-insight-logo.png" height="50" alt="CORE Insight" />
+            <img src="/coretec-logo.svg" width="64" height="64" alt="CORE Insight" />
           </div>
           <h1 style={styles.title}>CORE Insight</h1>
           <p style={styles.subtitle}>Inicia sesión</p>
