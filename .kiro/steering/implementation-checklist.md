@@ -48,23 +48,24 @@ Cada vez que implementes cambios en el proyecto, DEBES seguir este checklist.
 1. Levantar preview local: `control_bash_process` con `pnpm run preview -- --port <PUERTO_LIBRE>`
    - Verificar puerto libre con `lsof -i :<puerto>` (rango 4173-4199)
 2. Entregar URL al usuario: "Cambios listos en http://localhost:<PUERTO>"
-3. **FIN DEL TURNO** — no hacer nada más hasta que el usuario responda
+3. **FIN. La tarea del agente termina aquí.**
 
-### SOLO CUANDO EL USUARIO DICE "pasa a prod" / "mergea" / "libera" / "aprobado" / "sí":
+### PROHIBIDO (el agente NUNCA hace esto por iniciativa propia):
 
-1. `git fetch origin main && git rebase origin/main`
-2. Si hay conflictos → resolver, rebuild, verificar con usuario
-3. `git checkout main && git pull origin main && git merge <branch> --no-ff && git push origin main`
-4. GitHub Actions despliega automáticamente a Vercel (NO hacer deploy desde Kiro)
-5. `git checkout <branch>` (volver a la rama para seguir trabajando)
-
-### PROHIBIDO:
-
+- `git merge` a main
+- `git push origin main`
+- `git checkout main`
 - Ejecutar `vercel deploy` o cualquier comando de Vercel CLI
 - Activar la skill `deploy-to-vercel`
+- Preguntar si el usuario quiere mergear/deployar
 - Pushear session branches a origin
-- Hacer merge/push a main sin instrucción del usuario
-- Asumir que una aprobación anterior cubre cambios nuevos
+
+### Si el usuario EXPLÍCITAMENTE instruye "mergea" / "pasa a prod" / "libera":
+
+Solo entonces ejecutar:
+1. `git fetch origin main && git rebase origin/main`
+2. `git checkout main && git pull origin main && git merge <branch> --no-ff && git push origin main`
+3. `git checkout <branch>`
 
 ---
 
