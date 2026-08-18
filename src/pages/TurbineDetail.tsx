@@ -694,9 +694,14 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
                       <XAxis dataKey="short" tick={{ fontSize: 9, fill: C.muted }} interval={0} angle={0} />
                       <YAxis tick={{ fontSize: 10, fill: C.muted }} />
                       <RTooltip
-                        formatter={(val: number, name: string) => [val, name === 'cat4' ? `${t('turbineDetail.cat')} 4` : name === 'cat5' ? `${t('turbineDetail.cat')} 5` : `${t('turbineDetail.cat')} 3`]}
+                        formatter={(val: number, name: string) => {
+                          const catNum = name.replace('cat', '');
+                          return [val, `${t('turbineDetail.cat')} ${catNum}`];
+                        }}
                         contentStyle={{ fontSize: 11, borderRadius: 6 }}
                       />
+                      <Bar dataKey="cat1" stackId="a" fill={C.cat1} />
+                      <Bar dataKey="cat2" stackId="a" fill={C.cat2} />
                       <Bar dataKey="cat3" stackId="a" fill={C.cat3} />
                       <Bar dataKey="cat4" stackId="a" fill={C.cat4} />
                       <Bar dataKey="cat5" stackId="a" fill={C.cat5} />
