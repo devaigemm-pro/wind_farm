@@ -27,6 +27,8 @@ interface ThumbnailData {
   face: string;     // SS, PS, LE, TE (short label)
   hasAnnotation: boolean; // derived from annotations
   isTagged: boolean;     // false by default (feature pending)
+  bladeRootDistance: number | null; // distance from blade root in meters
+  distanceToBlade: number | null;   // distance from drone to blade in meters
 }
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
@@ -96,6 +98,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       face: getFaceShort(photo.face),
       hasAnnotation: annotatedPhotoIds.has(photo.id),
       isTagged: taggedPhotos.has(photo.id),
+      bladeRootDistance: photo.bladeRootDistance,
+      distanceToBlade: photo.distanceToBlade,
     }));
   }, [photos, dbAnnotations, bladePositionMap, taggedPhotos]);
 
@@ -230,8 +234,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [editDistanceToBlade, setEditDistanceToBlade] = useState(4.2);
   const [metaBlade, setMetaBlade] = useState('A');
   const [metaSide, setMetaSide] = useState('LE');
-  const [metaRootDist, setMetaRootDist] = useState(15);
-  const [metaDistBlade, setMetaDistBlade] = useState(6.9);
+  const [metaRootDist, setMetaRootDist] = useState(0);
+  const [metaDistBlade, setMetaDistBlade] = useState(0);
 
   // Recalculate annotation layer position on container resize
   const recalcImgContentStyle = useCallback(() => {
@@ -339,6 +343,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       setSelectedDefectBlade(target.blade);
       setRightPanelBlade(target.blade);
       setRightPanelFace(target.face);
+      // Populate metadata bar with distance data from BD (round decimals)
+      if (target.bladeRootDistance != null) setMetaRootDist(Math.round(target.bladeRootDistance));
+      if (target.distanceToBlade != null) setMetaDistBlade(Math.round(target.distanceToBlade));
       onSelectionChange?.(target.id, target.blade);
       // Mark first photo as viewed so progress starts counting
       markViewed.mutate({ photoId: target.id, campaignId });
@@ -432,6 +439,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       setRightPanelBlade(thumb.blade);
       setRightPanelFace(thumb.face);
       setSelectedDefectBlade(thumb.blade);
+      // Update metadata bar with photo distance data from BD (round decimals)
+      if (thumb.bladeRootDistance != null) setMetaRootDist(Math.round(thumb.bladeRootDistance));
+      if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade));
       // Notify parent to persist selection across step changes
       onSelectionChange?.(thumbId, thumb.blade);
       // Check if there's a saved annotation for this thumbnail
