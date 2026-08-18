@@ -61,7 +61,7 @@ export function WindFarmsTable({
   };
 
   const thStyle: React.CSSProperties = {
-    textAlign: 'left',
+    textAlign: 'center',
     padding: 'var(--space-3) var(--space-4)',
     fontWeight: 600,
     fontSize: 'var(--text-xs)',
@@ -73,11 +73,16 @@ export function WindFarmsTable({
     whiteSpace: 'nowrap',
   };
 
+  const thStyleLeft: React.CSSProperties = { ...thStyle, textAlign: 'left' };
+
   const tdStyle: React.CSSProperties = {
     padding: 'var(--space-3) var(--space-4)',
     color: 'var(--color-neutral-800)',
     borderBottom: '1px solid #E5E7EB',
+    textAlign: 'center',
   };
+
+  const tdStyleLeft: React.CSSProperties = { ...tdStyle, textAlign: 'left' };
 
   const rowStyle: React.CSSProperties = {
     transition: 'background-color var(--duration-fast) var(--easing-default)',
@@ -107,7 +112,7 @@ export function WindFarmsTable({
             {COLS.map((col) => (
               <th
                 key={col.field}
-                style={thStyle}
+                style={col.field === 'name' ? thStyleLeft : thStyle}
                 onClick={() => onSort(col.field)}
                 aria-sort={
                   sortField === col.field
@@ -135,7 +140,7 @@ export function WindFarmsTable({
                 (e.currentTarget as HTMLElement).style.backgroundColor = '';
               }}
             >
-              <td style={{ ...tdStyle, color: 'var(--color-primary-500)', fontWeight: 500 }}>{row.name}</td>
+              <td style={{ ...tdStyleLeft, color: 'var(--color-primary-500)', fontWeight: 500 }}>{row.name}</td>
               <td style={tdStyle}>{row.subAssetsCount}</td>
               <td style={tdStyle}>{row.inspectionsCount}</td>
               <td style={tdStyle}>{formatPower(row.totalPower)}</td>

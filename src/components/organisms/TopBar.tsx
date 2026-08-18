@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, Bell, LogOut, Sun, Moon } from 'lucide-react';
+import { Menu, Bell, LogOut } from 'lucide-react';
 import { Avatar } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import type { Profile } from '@/types';
@@ -20,17 +20,7 @@ export function TopBar({
   notificationCount = 0,
 }: TopBarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [isDarkTheme, setIsDarkTheme] = useState(
-    () => document.documentElement.getAttribute('data-theme') === 'dark',
-  );
   const { locale, setLocale, t } = useLanguage();
-
-  const toggleTheme = () => {
-    const next = isDarkTheme ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    setIsDarkTheme(!isDarkTheme);
-  };
 
   const barStyle: React.CSSProperties = {
     display: 'flex',
@@ -234,15 +224,6 @@ export function TopBar({
                 <p style={dropdownNameStyle}>{user?.name ?? 'User'}</p>
                 <p style={dropdownRoleStyle}>{user?.role ?? 'user'}</p>
               </div>
-              <button
-                type="button"
-                style={dropdownItemStyle}
-                onClick={toggleTheme}
-                role="menuitem"
-              >
-                {isDarkTheme ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
-                {isDarkTheme ? t('topbar.lightMode') : t('topbar.darkMode')}
-              </button>
               <button
                 type="button"
                 style={dropdownItemStyle}

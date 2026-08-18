@@ -137,7 +137,10 @@ export function SharePopover({ anchorEl, open, onClose, shareKey, windFarmId, tu
     <>
       <div style={overlayStyle} onClick={onClose} />
       <div ref={popoverRef} style={popoverStyle}>
-        <h3 style={titleStyle}>Share results page</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={titleStyle}>Share results page</h3>
+          <button onClick={onClose} style={closeBtnStyle} aria-label="Close">×</button>
+        </div>
         <p style={subtitleStyle}>This page is shared in readonly with:</p>
         <div style={listStyle}>
           {emails.length === 0 && <p style={emptyStyle}>No users added yet.</p>}
@@ -175,3 +178,4 @@ const copyLinkBtn: React.CSSProperties = { backgroundColor: '#FFC107', color: '#
 const addRowStyle: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'center' };
 const inputStyle: React.CSSProperties = { border: '1px solid #ccc', borderRadius: '4px', padding: '6px 10px', fontSize: '12px', flex: 2, outline: 'none', fontFamily: 'inherit' };
 const addBtn: React.CSSProperties = { backgroundColor: '#5A8F5A', color: '#ffffff', fontSize: '12px', borderRadius: '4px', padding: '6px 12px', border: 'none', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' };
+const closeBtnStyle: React.CSSProperties = { background: 'none', border: 'none', fontSize: '20px', lineHeight: 1, cursor: 'pointer', color: '#64748b', padding: '2px 6px', borderRadius: '4px' };
