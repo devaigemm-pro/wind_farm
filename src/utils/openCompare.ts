@@ -11,6 +11,11 @@ export function openCompare(opts: {
   blade?: string;
   bladeId?: string;
   inspectionId?: string;
+  annotX?: number;
+  annotY?: number;
+  annotW?: number;
+  annotH?: number;
+  annotAngle?: number;
 }) {
   const params = new URLSearchParams();
   if (opts.imageUrl) params.set('image', opts.imageUrl);
@@ -22,6 +27,11 @@ export function openCompare(opts: {
   if (opts.blade) params.set('blade', opts.blade);
   if (opts.bladeId) params.set('bladeId', opts.bladeId);
   if (opts.inspectionId) params.set('inspectionId', opts.inspectionId);
+  if (opts.annotX != null) params.set('ax', String(opts.annotX));
+  if (opts.annotY != null) params.set('ay', String(opts.annotY));
+  if (opts.annotW != null) params.set('aw', String(opts.annotW));
+  if (opts.annotH != null) params.set('ah', String(opts.annotH));
+  if (opts.annotAngle != null) params.set('aa', String(opts.annotAngle));
 
   window.open(`/compare?${params.toString()}`, '_blank');
 }

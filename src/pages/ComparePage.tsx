@@ -16,6 +16,11 @@ export function ComparePage() {
   const blade = params.get('blade') ?? 'A';
   const bladeId = params.get('bladeId') ?? '';
   const inspectionId = params.get('inspectionId') ?? '';
+  const annotX = params.get('ax') ? Number(params.get('ax')) : undefined;
+  const annotY = params.get('ay') ? Number(params.get('ay')) : undefined;
+  const annotW = params.get('aw') ? Number(params.get('aw')) : undefined;
+  const annotH = params.get('ah') ? Number(params.get('ah')) : undefined;
+  const annotAngle = params.get('aa') ? Number(params.get('aa')) : undefined;
 
   return (
     <DefectCompareViewer
@@ -29,6 +34,11 @@ export function ComparePage() {
       blade={blade}
       bladeId={bladeId}
       inspectionId={inspectionId}
+      annotX={annotX}
+      annotY={annotY}
+      annotW={annotW}
+      annotH={annotH}
+      annotAngle={annotAngle}
     />
   );
 }
