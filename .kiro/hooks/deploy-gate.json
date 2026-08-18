@@ -2,13 +2,24 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Deploy Gate - Block deploy skill activation",
+      "name": "Deploy Gate - Block deploy skill",
       "trigger": "PreToolUse",
       "matcher": "disclose_context",
-      "description": "Forces IDE confirmation popup before activating any skill that might trigger deploy. The model cannot bypass this popup.",
+      "description": "Forces IDE popup when activating deploy-to-vercel skill.",
       "action": {
         "type": "command",
-        "command": "zsh -c 'INPUT=$(cat); SKILL=$(echo \"$INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"toolInput\\\",{}).get(\\\"name\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); if [[ \"$SKILL\" == \"deploy-to-vercel\" ]]; then echo \"{\\\"hookSpecificOutput\\\":{\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"⛔ Deploy a producción requiere tu aprobación. ¿Permitir deploy?\\\"}}\"; fi; exit 0'",
+        "command": "zsh -c 'INPUT=$(cat); SKILL=$(echo \"$INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"toolInput\\\",{}).get(\\\"name\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); if [[ \"$SKILL\" == \"deploy-to-vercel\" ]]; then echo \"{\\\"hookSpecificOutput\\\":{\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"⛔ Deploy a producción requiere tu aprobación. ¿Permitir?\\\"}}\"; fi; exit 0'",
+        "timeout": 10
+      }
+    },
+    {
+      "name": "Deploy Gate - Block vercel CLI and git push main",
+      "trigger": "PreToolUse",
+      "matcher": "execute_bash",
+      "description": "Forces IDE popup when running vercel deploy or git push to main.",
+      "action": {
+        "type": "command",
+        "command": "zsh -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"toolInput\\\",{}).get(\\\"command\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); if echo \"$CMD\" | grep -qE \"vercel deploy|vercel.*--prod|git push.*main|git merge.*main\"; then echo \"{\\\"hookSpecificOutput\\\":{\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"⛔ Este comando afecta producción/main. ¿Aprobar?\\\"}}\"; fi; exit 0'",
         "timeout": 10
       }
     }
