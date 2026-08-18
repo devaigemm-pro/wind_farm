@@ -1609,6 +1609,7 @@ const containerStyle: React.CSSProperties = {
   overflow: 'hidden',
   background: C.bgGray,
   position: 'relative',
+  minWidth: 1100,
 };
 
 const sidebarStyle: React.CSSProperties = {
