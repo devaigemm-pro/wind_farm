@@ -1350,3 +1350,12 @@
   - "si ves algo que se puede mejorar hazlo" — autonomía total para mejorar mientras replica. Se mejoró eliminando la query redundante a la DB (coords ahora viajan con la imagen).
   - Sesión ultra-corta: un solo feature, sin correcciones, implementación aceptada al primer intento.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, "usar el mismo método que X" (confianza MÁXIMA), URL como referencia, comunicación ultra-mínima, confía en mejoras del agente si no rompen nada
+
+### Sesión 128 - 2026-08-18
+- **Tarea principal**: Corregir que la aprobación de deploy debe pedirse CADA VEZ que se implementa un cambio, no solo la primera vez en la sesión
+- **Observaciones nuevas**:
+  - Reporta bug de flujo en otra sesión: "primera vez preguntó bien, segunda vez no preguntó" — el agente asumió que la primera aprobación cubría toda la sesión
+  - El usuario espera un ciclo de aprobación POR CADA cambio implementado, no por sesión
+  - Fix: agregar regla "CADA CAMBIO REQUIERE APROBACIÓN" — una aprobación anterior NO cubre cambios posteriores. Cada implementación es un ciclo independiente.
+  - Patrón de QA del agente: el usuario prueba el flujo en múltiples sesiones y reporta inconsistencias. Está verificando que las reglas se cumplan de verdad.
+- **Patrones confirmados**: español, directo, alta autonomía, cada cambio = ciclo independiente de aprobación (NUEVO, confianza alta), reporta inconsistencias del agente entre sesiones, verifica cumplimiento de reglas
