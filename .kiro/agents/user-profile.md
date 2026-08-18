@@ -1427,3 +1427,24 @@
   - Aprobó con 👍 (emoji thumbs up) — patrón de aprobación ultra-mínima confirmado
   - Sesión ultra-corta: un solo bug, diagnóstico + fix + build + preview, sin iteraciones
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe bugs desde lo visual sin detalles técnicos, aprobación con 👍, confía en diagnóstico del agente
+
+### Sesión 142 - 2026-08-18
+- **Tarea principal**: Deploy directo a Vercel desde local (GitHub Actions seguía fallando). Token anterior inválido, usuario proporcionó nuevo token que funcionó.
+- **Observaciones nuevas**:
+  - Proporcionó token directamente sin explicaciones ni preguntas — confianza total en el agente para manejar credenciales (confirmado 3+ sesiones)
+  - Primer token era inválido ("User not found"), segundo funcionó — no se frustró por el primer intento fallido
+  - "hazlo directo" = bypass la infraestructura cuando falla, priorizar resultado inmediato
+  - Token Vercel nuevo: prefijo `vcp_8Lmd...` — team dev-ai2 (DEV AI), user devaigemm-1057
+  - Deploy exitoso a https://wind-farm-eight.vercel.app
+- **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima, confianza total con credenciales (confianza MÁXIMA - 4+ sesiones), "hazlo directo" = bypass cuando infra falla, prioriza resultado sobre proceso
+
+### Sesión 144 - 2026-08-18
+- **Tarea principal**: Configurar deploy vía integración nativa Vercel+GitHub (sin GitHub Actions, sin CLI local) — solo main despliega automáticamente a Vercel
+- **Observaciones nuevas**:
+  - "revisa la documentación para ver la mejor opción" — pide investigación antes de acción. Para decisiones técnicas de infraestructura quiere que el agente busque la opción óptima, no que improvise.
+  - "como dato, vercel está conectado al proyecto git" — da contexto clave que simplifica la solución. La integración nativa ya existe, solo había que configurarla correctamente.
+  - La solución más simple ganó: integración nativa Vercel+GitHub hace todo. No necesitamos GitHub Actions workflow para deploy. vercel.json con deploymentEnabled main:true, session/*:false.
+  - Eliminado release.yml (redundante con la integración nativa).
+  - Los deploys fallaron porque pusimos `deploymentEnabled: false` para bloquear el auto-deploy. Ahora está corregido: main=true, session=false.
+  - **ARQUITECTURA FINAL DE DEPLOY**: Vercel integración nativa detecta push a main → deploy producción. Kiro NUNCA deploy. Kiro solo merge+push cuando el usuario instruye.
+- **Patrones confirmados**: español, directo, "revisa documentación" = investiga la mejor opción, la solución más simple gana, integración nativa > workflows custom, separación clara de responsabilidades

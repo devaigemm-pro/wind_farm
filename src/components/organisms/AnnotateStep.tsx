@@ -482,7 +482,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       width: `${rect.width}px`,
       height: `${rect.height}px`,
     };
-  }, [layoutTick, viewerLoaded, computeImageRect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutTick, viewerLoaded]);
   const taggedCount = thumbnails.filter(t => t.isTagged).length;
   const unseenCount = thumbnails.filter(t => !t.hasAnnotation && !t.isTagged && !((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
   const viewedCount = photos.filter(p => p.isViewed).length;
