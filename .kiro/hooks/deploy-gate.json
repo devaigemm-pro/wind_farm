@@ -2,13 +2,14 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Deploy Gate - Ask before deploy",
+      "name": "Deploy Gate - Block deploy skill activation",
       "trigger": "PreToolUse",
       "matcher": "disclose_context",
-      "description": "Asks user confirmation before activating deploy-to-vercel skill. Safety net to prevent auto-deploy without approval.",
+      "description": "Forces IDE confirmation popup before activating any skill that might trigger deploy. The model cannot bypass this popup.",
       "action": {
-        "type": "agent",
-        "prompt": "⛔ GATE DE DEPLOY: Antes de activar deploy-to-vercel, VERIFICA que el usuario haya dado aprobación EXPLÍCITA en este turno o el turno inmediatamente anterior. Si no hay aprobación clara del usuario (palabras como 'sí', 'dale', 'aprobado', 'mergea', 'libera'), NO procedas con el deploy. Pregunta primero."
+        "type": "command",
+        "command": "zsh -c 'INPUT=$(cat); SKILL=$(echo \"$INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"toolInput\\\",{}).get(\\\"name\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); if [[ \"$SKILL\" == \"deploy-to-vercel\" ]]; then echo \"{\\\"hookSpecificOutput\\\":{\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"⛔ Deploy a producción requiere tu aprobación. ¿Permitir deploy?\\\"}}\"; fi; exit 0'",
+        "timeout": 10
       }
     }
   ]
