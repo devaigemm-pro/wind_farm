@@ -70,13 +70,12 @@ export function useAuth() {
 
         if (event === 'INITIAL_SESSION') {
           sawInitialSession = true;
-          // Mark loading complete immediately once we know auth state.
-          // Profile loads in background — UI can render with session info
-          // while profile hydrates (prevents long spinner wait).
-          setLoading(false);
           if (newSession?.user) {
-            void loadProfile(newSession.user.id, event);
+            // Wait for profile before removing splash so the avatar
+            // renders with the real initials (avoids "U" flash).
+            await loadProfile(newSession.user.id, event);
           }
+          setLoading(false);
           return;
         }
 
