@@ -161,7 +161,7 @@ export default function Login() {
           <div style={styles.logo} aria-hidden="true">
             <img src="/core-insight-eye.svg" height="64" alt="CORE Insight" />
           </div>
-          <h1 style={styles.title}>CORE <span style={{ color: '#4CAF50', margin: '0 0.25rem' }}>|</span> Insight</h1>
+          <h1 style={styles.title}>CORE <span style={{ color: '#5A8F5A', margin: '0 0.25rem' }}>|</span> Insight</h1>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} style={styles.form} noValidate>
