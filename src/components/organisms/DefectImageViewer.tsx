@@ -7,6 +7,11 @@ export interface DefectImageViewerProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onCompare: () => void;
+  annotX?: number;
+  annotY?: number;
+  annotW?: number;
+  annotH?: number;
+  annotAngle?: number;
 }
 
 export function DefectImageViewer({
@@ -15,8 +20,15 @@ export function DefectImageViewer({
   onZoomIn,
   onZoomOut,
   onCompare,
+  annotX,
+  annotY,
+  annotW,
+  annotH,
+  annotAngle,
 }: DefectImageViewerProps) {
   const { t } = useLanguage();
+
+  const hasAnnotation = annotX != null && annotY != null && annotW != null && annotH != null;
 
   function handleWheel(e: React.WheelEvent) {
     // Don't call preventDefault to avoid passive event listener violation
@@ -113,7 +125,39 @@ export function DefectImageViewer({
     <div>
       <div style={containerStyle} onWheel={handleWheel}>
         {imageUrl ? (
-          <img src={imageUrl} alt="Defect photograph" style={imageStyle} crossOrigin="anonymous" />
+          <div style={{ position: 'relative', display: 'inline-block', width: '100%', height: '100%' }}>
+            <img src={imageUrl} alt="Defect photograph" style={imageStyle} crossOrigin="anonymous" />
+            {/* Annotation overlay - same SVG logic as DefectCompareViewer */}
+            {hasAnnotation && (() => {
+              const rad = (annotAngle || 0) * (Math.PI / 180);
+              const halfW = annotW! / 2;
+              const halfH = annotH! / 2;
+              const startX = annotX! - halfW * Math.cos(rad);
+              const startY = annotY! - halfW * Math.sin(rad);
+              const endX = annotX! + halfW * Math.cos(rad);
+              const endY = annotY! + halfW * Math.sin(rad);
+              const nx = -Math.sin(rad);
+              const ny = Math.cos(rad);
+              const p1x = startX + nx * halfH;
+              const p1y = startY + ny * halfH;
+              const p2x = endX + nx * halfH;
+              const p2y = endY + ny * halfH;
+              const p3x = endX - nx * halfH;
+              const p3y = endY - ny * halfH;
+              const p4x = startX - nx * halfH;
+              const p4y = startY - ny * halfH;
+              return (
+                <svg
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', transform: `scale(${zoomLevel})`, transformOrigin: 'center' }}
+                >
+                  <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                  <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                  <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                  <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                </svg>
+              );
+            })()}
+          </div>
         ) : (
           <div style={placeholderStyle}>
             <ImageIcon size={32} />

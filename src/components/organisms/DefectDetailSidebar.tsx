@@ -97,6 +97,11 @@ export function DefectDetailSidebar({
             onZoomIn={onZoomIn}
             onZoomOut={onZoomOut}
             onCompare={onCompare}
+            annotX={defect.annotX}
+            annotY={defect.annotY}
+            annotW={defect.annotW}
+            annotH={defect.annotH}
+            annotAngle={defect.annotAngle}
           />
         </div>
       </div>
@@ -275,6 +280,11 @@ export function DefectDetailSidebar({
           onZoomIn={onZoomIn}
           onZoomOut={onZoomOut}
           onCompare={onCompare}
+          annotX={defect.annotX}
+          annotY={defect.annotY}
+          annotW={defect.annotW}
+          annotH={defect.annotH}
+          annotAngle={defect.annotAngle}
         />
       </div>
     </div>

@@ -139,6 +139,11 @@ export function DefectsWindFarmTab({ defects, isLoading }: DefectsWindFarmTabPro
                   blade: selectedDefect.bladePosition,
                   bladeId: selectedDefect.bladeId,
                   inspectionId: selectedDefect.inspectionId,
+                  annotX: selectedDefect.annotX,
+                  annotY: selectedDefect.annotY,
+                  annotW: selectedDefect.annotW,
+                  annotH: selectedDefect.annotH,
+                  annotAngle: selectedDefect.annotAngle,
                 });
               }
             }}

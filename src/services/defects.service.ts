@@ -6,7 +6,16 @@ import { BLADE_POSITION_LABELS, DEFECT_TYPE_DISPLAY_LABELS } from '@/types';
 
 // ─── Fetch real photos for defects via annotation → inspection_photo ─────────
 
-export async function fetchDefectImageMap(defectIds: string[]): Promise<Record<string, string>> {
+export interface DefectImageData {
+  url: string;
+  annotX?: number;
+  annotY?: number;
+  annotW?: number;
+  annotH?: number;
+  annotAngle?: number;
+}
+
+export async function fetchDefectImageMap(defectIds: string[]): Promise<Record<string, DefectImageData>> {
   if (defectIds.length === 0) return {};
 
   // Get defects with their description (annotation ID)
@@ -24,10 +33,10 @@ export async function fetchDefectImageMap(defectIds: string[]): Promise<Record<s
 
   if (annotationIds.length === 0) return {};
 
-  // Get annotations with their thumbnail_id
+  // Get annotations with their thumbnail_id AND coordinates
   const { data: annotations } = await supabase
     .from('annotation')
-    .select('id, thumbnail_id')
+    .select('id, thumbnail_id, x, y, w, h, angle')
     .in('id', annotationIds);
 
   if (!annotations || annotations.length === 0) return {};
@@ -70,19 +79,26 @@ export async function fetchDefectImageMap(defectIds: string[]): Promise<Record<s
     }
   }
 
-  // Build annotation_id → photo URL map
-  const annotationPhotoMap: Record<string, string> = {};
+  // Build annotation_id → {url, coords} map
+  const annotationDataMap: Record<string, DefectImageData> = {};
   for (const ann of annotations) {
     if (ann.thumbnail_id && photoUrlMap[ann.thumbnail_id]) {
-      annotationPhotoMap[ann.id] = photoUrlMap[ann.thumbnail_id]!;
+      annotationDataMap[ann.id] = {
+        url: photoUrlMap[ann.thumbnail_id]!,
+        annotX: ann.x != null ? Number(ann.x) : undefined,
+        annotY: ann.y != null ? Number(ann.y) : undefined,
+        annotW: ann.w != null ? Number(ann.w) : undefined,
+        annotH: ann.h != null ? Number(ann.h) : undefined,
+        annotAngle: ann.angle != null ? Number(ann.angle) : undefined,
+      };
     }
   }
 
-  // Build defect_id → photo URL map
-  const result: Record<string, string> = {};
+  // Build defect_id → DefectImageData map
+  const result: Record<string, DefectImageData> = {};
   for (const d of defects) {
-    if (d.description && annotationPhotoMap[d.description]) {
-      result[d.id] = annotationPhotoMap[d.description]!;
+    if (d.description && annotationDataMap[d.description]) {
+      result[d.id] = annotationDataMap[d.description]!;
     }
   }
 
@@ -419,10 +435,18 @@ export const defectsService = {
     const imageMap = await fetchDefectImageMap(defectIds);
 
     return {
-      data: paginatedRows.map(r => ({
-        ...r,
-        imageUrl: imageMap[r.id] ?? null,
-      })) as DefectDashboardRow[],
+      data: paginatedRows.map(r => {
+        const imgData = imageMap[r.id];
+        return {
+          ...r,
+          imageUrl: imgData?.url ?? null,
+          annotX: imgData?.annotX,
+          annotY: imgData?.annotY,
+          annotW: imgData?.annotW,
+          annotH: imgData?.annotH,
+          annotAngle: imgData?.annotAngle,
+        };
+      }) as DefectDashboardRow[],
       totalCount,
     };
   },

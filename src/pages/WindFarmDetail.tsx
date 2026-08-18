@@ -34,7 +34,11 @@ export function WindFarmDetail() {
   const defectsWithImages = useMemo(() => {
     if (!windFarmDefects) return [];
     if (!defectImageMap) return windFarmDefects;
-    return windFarmDefects.map(d => ({ ...d, imageUrl: defectImageMap[d.id] ?? d.imageUrl }));
+    return windFarmDefects.map(d => {
+      const imgData = defectImageMap[d.id];
+      if (!imgData) return d;
+      return { ...d, imageUrl: imgData.url ?? d.imageUrl, annotX: imgData.annotX, annotY: imgData.annotY, annotW: imgData.annotW, annotH: imgData.annotH, annotAngle: imgData.annotAngle };
+    });
   }, [windFarmDefects, defectImageMap]);
 
   const [activeTab, setActiveTab] = useState('general');
