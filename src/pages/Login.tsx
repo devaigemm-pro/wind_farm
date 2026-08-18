@@ -11,7 +11,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: '1rem',
-    background: 'linear-gradient(135deg, #0B2545 0%, #1B4B7A 50%, #0F3A63 100%)',
+    background: 'linear-gradient(135deg, #2C2C2C 0%, #3A3A3A 50%, #2C2C2C 100%)',
   } as React.CSSProperties,
   card: {
     width: '100%',
@@ -76,7 +76,7 @@ const styles = {
   button: {
     width: '100%',
     padding: '0.75rem 1rem',
-    background: '#0B2545',
+    background: '#5A8F5A',
     color: '#ffffff',
     border: 'none',
     borderRadius: '8px',
@@ -159,7 +159,7 @@ export default function Login() {
       <div style={styles.card}>
         <div style={styles.header}>
           <div style={styles.logo} aria-hidden="true">
-            <img src="/coretec-logo.svg" width="48" height="48" alt="CORE Insight" />
+            <img src="/core-insight-logo.png" height="50" alt="CORE Insight" />
           </div>
           <h1 style={styles.title}>CORE Insight</h1>
           <p style={styles.subtitle}>Inicia sesión</p>
