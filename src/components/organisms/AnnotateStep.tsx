@@ -198,33 +198,36 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   // Helper: compute the actual image content rect within the container (accounting for objectFit: contain letterboxing)
   // Uses the already-computed imgContentStyle values to guarantee consistency with the annotation layer.
   const getImageRect = useCallback((_containerRect: DOMRect) => {
-    // Parse current imgContentStyle values (set by recalcImgContentStyle)
-    const top = parseFloat(imgContentStyle.top) || 0;
-    const left = parseFloat(imgContentStyle.left) || 0;
-    const width = parseFloat(imgContentStyle.width);
-    const height = parseFloat(imgContentStyle.height);
+    // Only use imgContentStyle if it has been computed (contains 'px' values, not initial '%' values)
+    const hasPixelValues = imgContentStyle.width.includes('px');
 
-    // If imgContentStyle hasn't been computed yet (still has '%' values), fallback to computation
-    if (isNaN(width) || isNaN(height) || width === 0 || height === 0) {
-      const img = viewerImgRef.current;
-      const container = viewerContainerRef.current;
-      if (!img || !container || !img.naturalWidth || !img.naturalHeight) {
-        return { offsetX: 0, offsetY: 0, width: _containerRect.width, height: _containerRect.height };
+    if (hasPixelValues) {
+      const top = parseFloat(imgContentStyle.top) || 0;
+      const left = parseFloat(imgContentStyle.left) || 0;
+      const width = parseFloat(imgContentStyle.width);
+      const height = parseFloat(imgContentStyle.height);
+      if (width > 0 && height > 0) {
+        return { offsetX: left, offsetY: top, width, height };
       }
-      const cw = container.clientWidth;
-      const ch = container.clientHeight;
-      const containerAR = cw / ch;
-      const imageAR = img.naturalWidth / img.naturalHeight;
-      let imgWidth: number, imgHeight: number, offsetX: number, offsetY: number;
-      if (imageAR > containerAR) {
-        imgWidth = cw; imgHeight = cw / imageAR; offsetX = 0; offsetY = (ch - imgHeight) / 2;
-      } else {
-        imgHeight = ch; imgWidth = ch * imageAR; offsetX = (cw - imgWidth) / 2; offsetY = 0;
-      }
-      return { offsetX, offsetY, width: imgWidth, height: imgHeight };
     }
 
-    return { offsetX: left, offsetY: top, width, height };
+    // Fallback: compute from image natural dimensions
+    const img = viewerImgRef.current;
+    const container = viewerContainerRef.current;
+    if (!img || !container || !img.naturalWidth || !img.naturalHeight) {
+      return { offsetX: 0, offsetY: 0, width: _containerRect.width, height: _containerRect.height };
+    }
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const containerAR = cw / ch;
+    const imageAR = img.naturalWidth / img.naturalHeight;
+    let imgWidth: number, imgHeight: number, offsetX: number, offsetY: number;
+    if (imageAR > containerAR) {
+      imgWidth = cw; imgHeight = cw / imageAR; offsetX = 0; offsetY = (ch - imgHeight) / 2;
+    } else {
+      imgHeight = ch; imgWidth = ch * imageAR; offsetX = (cw - imgWidth) / 2; offsetY = 0;
+    }
+    return { offsetX, offsetY, width: imgWidth, height: imgHeight };
   }, [imgContentStyle]);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
@@ -1132,8 +1135,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             return (
             <div key={idx} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-              {/* Label */}
-              <div style={{ position: 'absolute', left: `${minX}%`, top: `${minY}%`, transform: 'translateY(-100%)', marginTop: -4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto', zIndex: 1 }}>
+              {/* Label — positioned at the top-center of the annotation */}
+              <div style={{ position: 'absolute', left: `${ann.x}%`, top: `${minY}%`, transform: 'translate(-50%, -100%)', marginTop: -4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto', zIndex: 1 }}>
                 <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 4, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#333', whiteSpace: 'nowrap' }}>{ann.type}</span>
                   {role !== 'supervisor' && (
