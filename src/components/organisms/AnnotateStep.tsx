@@ -1718,7 +1718,7 @@ const thumbnailItem: React.CSSProperties = {
 };
 
 const mainViewerStyle: React.CSSProperties = {
-  flex: 1,
+  flex: '1 0 0',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
