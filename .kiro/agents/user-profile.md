@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 102
+- **Sesiones analizadas**: 107
 - **Última actualización**: 2026-08-17
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -978,3 +978,52 @@
   - El fix fue mínimo (desacoplar `verticalBlade` del `bladeOrder` en `groupedThumbnails`) — exactamente lo que la regla "mínimo cambio necesario" exige
   - No necesitó correcciones — aceptado implícitamente
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, describe comportamiento incorrecto sin dar contexto técnico, mínimo cambio necesario (confianza MUY alta), confía en diagnóstico del agente
+
+### Sesión 103 - 2026-08-17
+- **Tarea principal**: Fix annotation position drift en step 2 ANNOTATE — anotaciones cambiaban de posición al cerrar sesión y volver, y también al hacer zoom y reducirlo
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio + descripción del bug en una frase
+  - Agrega requerimiento adicional en segundo mensaje ("considerar adema el comportamiento del zoom") — extiende la tarea sin repetir contexto
+  - Pregunta "fue mergeado al main?" — le importa que los cambios lleguen a main, no solo a producción. Quiere consistencia git + deploy.
+  - "si" como confirmación — patrón de aprobación ultra-mínima (1 palabra)
+  - Sesión resuelta sin correcciones del usuario — fix aceptado implícitamente
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, confía en diagnóstico del agente, extiende tarea con requerimiento adicional sin repetir contexto, quiere merge a main después de deploy
+
+### Sesión 104 - 2026-08-17
+- **Tarea principal**: Fix annotation position drift en step 2 ANNOTATE — múltiples intentos. (1) Posición cambia al guardar como defecto. (2) Label tipo queda lejos de la zona. (3) "se siguen moviendo" = fixes anteriores no resolvieron.
+- **Observaciones nuevas**:
+  - "se siguen moviendo las anotaciones, todas. nuevas y antiguas" — frustración por fix no resuelto. "todas" = el problema es sistémico, no un edge case.
+  - Reporta bugs secuencialmente conforme los descubre: posición → label → "sigue sin funcionar"
+  - No da URL ni contexto extra — asume que el agente sabe que sigue en la misma pantalla (ANNOTATE step 2)
+  - "reparar" = instrucción directa sin preguntar ni dar opciones
+  - El fix requirió 3 iteraciones (approach anterior con imgContentStyle state era fundamentalmente incorrecto). Solución final: eliminar state intermediario, usar función pura computeImageRect() + position:absolute para imagen y annotation layer.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, frustración por fixes iterativos que no resuelven, "todas" = problema sistémico, reporta bugs secuencialmente, referencia implícita a contexto previo
+
+### Sesión 105 - 2026-08-17
+- **Tarea principal**: Continuación — "se siguen moviendo las anotaciones" después de 3 intentos de fix
+- **Observaciones nuevas**:
+  - El fix anterior (3er intento) tampoco resolvió el problema. Se preguntó al usuario cuándo exactamente cambia la posición (al guardar instantáneamente vs al recargar). Sesión cerrada esperando respuesta.
+  - **APRENDIZAJE CRÍTICO**: Cuando un fix de código no funciona después de 3+ iteraciones con análisis teórico, el approach debe cambiar radicalmente: agregar console.log/debugging en producción o pedir al usuario que describa el momento exacto del drift. No seguir haciendo parches basados en teoría.
+- **Patrones confirmados**: español, directo, alta autonomía, frustración escalada por fixes repetidos que no resuelven
+
+### Sesión 106 - 2026-08-17
+- **Tarea principal**: Continuación — "se siguen moviendo las anotaciones". El usuario clarificó: el drift ocurre DESPUÉS de guardar como defecto en step 3 (ANALYZE) y volver a step 2 (ANNOTATE).
+- **Observaciones nuevas**:
+  - La información del usuario ("despues que es analizado en la etapa 3.ANALIZE y guardarlo como defecto, luego vuelvo a la pagina 2.ANNOTATE y ya cambio su posicion") fue CLAVE para encontrar la causa real.
+  - La causa NO era el rendering/coordenadas del AnnotateStep — era que `handleSaveDefect` en AnalyzeStep SOBREESCRIBÍA `annotation.y` con un valor calculado de distancia a la raíz.
+  - **APRENDIZAJE CRÍTICO 2**: Cuando un bug "de posición" no se resuelve tocando el componente de renderizado, PREGUNTAR AL USUARIO sobre el flujo exacto que reproduce el bug. La respuesta "después de guardar como defecto en step 3" inmediatamente señaló al código de AnalyzeStep como culpable. Siempre preguntar primero el flujo de reproducción ANTES de hacer fixes teóricos.
+  - **REGLA**: No asumir que el bug está en el componente donde se manifiesta visualmente. Trazar el data flow completo (quién lee/escribe los datos).
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, la información del usuario sobre cuándo/cómo se reproduce es invaluable para el diagnóstico
+
+### Sesión 101 - 2026-08-17
+- **Tarea principal**: Eliminar repetidamente todos los defectos y anotaciones de FDM-T02 desde Supabase (operación ejecutada 4+ veces en la misma sesión)
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio — patrón habitual
+  - Tarea de operación de datos (DELETE en DB), no de código ni visual. Usa modo compañero también para operaciones de datos/DB directas.
+  - Instrucción ultra-mínima: "eliminar desde la base de datos todos los defectos asociados a la turbina FDM-T02". No da IDs, no da tabla, no da contexto técnico — confía en que el agente trace la relación de datos (inspection_id → defects/annotations).
+  - No pidió confirmación ni listado previo antes de eliminar — confianza total en operaciones destructivas.
+  - Repitió la misma operación 4+ veces con "volver a eliminar" — está iterando/testeando la creación de defectos en otra sesión y limpiando aquí. Patrón de testing manual.
+  - "esa turbina" — referencia implícita sin repetir nombre. Confía en que el agente mantiene contexto de sesión.
+  - No requiere deploy (operación de datos pura).
+  - Relación de datos FDM-T02: turbine_id `10000000-0002-4000-8000-000000000002` → inspection `abe05885-3c6c-45f1-8550-5006b16118e2` → defects/annotations vía inspection_id.
+- **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima, modo compañero, confianza total en operaciones destructivas sin confirmación, referencia implícita a contexto previo ("esa turbina"), usa modo compañero para operaciones de DB (confianza alta)
