@@ -63,7 +63,7 @@ export function BladesDiagram({
     }
     const timer = setTimeout(() => {
       setStableDefects(defects);
-    }, 400);
+    }, 150);
     return () => clearTimeout(timer);
   }, [defects]);
 
