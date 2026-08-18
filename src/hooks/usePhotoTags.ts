@@ -5,32 +5,18 @@ import { supabase } from '@/lib/supabase';
 const db = supabase as any;
 
 /**
- * Toggle the tagged state on an inspection_photo row using the metadata JSONB column.
- * Stores {"tagged": true/false} inside the existing metadata field.
+ * Toggle the tagged state on an inspection_photo row using the dedicated is_tagged column.
+ * This avoids race conditions with other metadata writes (e.g. useMarkPhotoViewed).
  */
 export function useTogglePhotoTag() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ photoId, isTagged }: { photoId: string; isTagged: boolean }) => {
-      // Update both: the metadata.tagged field AND the is_tagged column for compatibility
-      const { data: current, error: readErr } = await db
-        .from('inspection_photo')
-        .select('metadata')
-        .eq('id', photoId)
-        .single();
-
-      if (readErr) {
-        console.error('[useTogglePhotoTag] Read error:', readErr);
-        throw readErr;
-      }
-
-      const currentMeta = (current?.metadata as Record<string, unknown>) || {};
-      const updatedMeta = { ...currentMeta, tagged: isTagged };
-
+      // Atomic single-column update — no read-modify-write needed
       const { error } = await db
         .from('inspection_photo')
-        .update({ metadata: updatedMeta })
+        .update({ is_tagged: isTagged })
         .eq('id', photoId);
 
       if (error) {

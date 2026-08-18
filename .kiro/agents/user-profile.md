@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 136
+- **Sesiones analizadas**: 139
 - **Última actualización**: 2026-08-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1396,3 +1396,34 @@
   - Se preguntó clarificación — sesión cerrada sin respuesta del usuario
   - **APRENDIZAJE**: Cuando el usuario dice algo ambiguo en medio de una sesión de múltiples temas, PREGUNTAR es correcto. Pero mantener la pregunta ultra-breve.
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima (a veces demasiado breve para interpretar sin contexto), preguntar cuando realmente no hay forma de inferir
+
+### Sesión 137 - 2026-08-18
+- **Tarea principal**: Sexto reporte — "no funciona, la solución no me gusta". Desactivar TODO lo automático en producción: Vercel GitHub integration, release.yml, todo.
+- **Observaciones nuevas**:
+  - "la solucion no me gusta ya que propones detener el deploy a produccion" — NO quiere que se elimine la capacidad de deploy, quiere que se elimine lo AUTOMÁTICO. El deploy debe existir pero solo ejecutarse con su aprobación explícita.
+  - "modifica todo aquello que esta automatico en deploy a prod" — instrucción clara y exhaustiva. TODO lo automático debe desactivarse.
+  - Cambios pusheados a main: (1) vercel.json deploymentEnabled:false, (2) release.yml cambiado a workflow_dispatch con confirmación manual
+  - **CORRECCIÓN**: Los approaches anteriores intentaban "bloquear" el deploy con hooks/prompts. El usuario quiere algo más radical: que la infraestructura misma NO PUEDA desplegar automáticamente. Desactivar la capacidad, no intentar bloquearla.
+  - **REGLA**: Para operaciones críticas (deploy prod), el approach correcto es DESACTIVAR la automatización a nivel de infraestructura, no intentar bloquearla con prompts/hooks del agente. El agente no es confiable para auto-regularse.
+- **Patrones confirmados**: español, directo, frustración máxima por soluciones que no funcionan, desactivar > bloquear para operaciones críticas, el deploy DEBE existir pero SOLO manual, persistencia absoluta (6+ reportes), "modifica todo" = auditoría exhaustiva de todas las fuentes
+
+### Sesión 138 - 2026-08-18
+- **Tarea principal**: Unificar flujo de deploy — eliminar redundancia, simplificar a un solo flujo limpio (automático=local, manual=prod)
+- **Observaciones nuevas**:
+  - "quiero unificar un flujo, eliminar lo que está redundante" — pide simplificación activa. No quiere parches sobre parches, quiere un diseño limpio.
+  - El steering anterior se había vuelto un Frankenstein de iteraciones (notas, bloques ASCII, casos especiales). El usuario quiere limpieza.
+  - Se eliminó: deploy-gate.json, auto-activate-deploy-to-vercel.json, notas redundantes, sección "Si estás en main", bloque ASCII STOP
+  - Se dejó: flujo limpio en 2 partes (automático=preview local, manual=merge+deploy solo con instrucción)
+  - Release.yml cambiado a workflow_dispatch (manual) y Vercel deploymentEnabled:false pusheado a main
+  - **PATRÓN**: Cuando hay muchas iteraciones de parches que no funcionan, el usuario pide "unificar/limpiar" — quiere un rediseño desde cero, no más parches.
+- **Patrones confirmados**: español, directo, alta autonomía, "unificar" = rediseñar desde cero eliminando complejidad, prefiere simplicidad sobre defensas múltiples, flujo claro > flujo exhaustivo
+
+### Sesión 139 - 2026-08-18
+- **Tarea principal**: Fix tags que no persisten en workflow step 2 (ANNOTATE) — al cerrar sesión y volver, los tags desaparecían
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio + URL + descripción del bug en una frase — patrón clásico
+  - No necesitó correcciones — el diagnóstico fue correcto y se resolvió al primer intento
+  - Bug de race condition: read-modify-write en metadata JSONB entre useTogglePhotoTag y useMarkPhotoViewed. Fix: migrar tags a columna dedicada is_tagged (atómica, sin conflicto)
+  - Aprobó con 👍 (emoji thumbs up) — patrón de aprobación ultra-mínima confirmado
+  - Sesión ultra-corta: un solo bug, diagnóstico + fix + build + preview, sin iteraciones
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe bugs desde lo visual sin detalles técnicos, aprobación con 👍, confía en diagnóstico del agente
