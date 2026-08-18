@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLanguage } from '@/components/design-system';
 
 interface Defect {
@@ -51,10 +51,20 @@ export function BladesDiagram({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);
+  const [layoutReady, setLayoutReady] = useState(false);
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
 
   const blades = ['A', 'B', 'C'] as const;
+
+  // Delay showing defect dots until layout is stable (prevents flash of wrong positions)
+  useEffect(() => {
+    setLayoutReady(false);
+    const frame = requestAnimationFrame(() => {
+      setLayoutReady(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [defects]);
 
   // Generate meter marks dynamically based on bladeLength
   const numSegments = 9;
@@ -246,49 +256,48 @@ export function BladesDiagram({
               {blades.map((blade) => {
                 const bladeDefects = defects.filter((d) => d.blade === blade);
                 return (
-                  <div key={blade} style={{ flex: 1, position: 'relative', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
-                    <div style={{ position: 'relative', height: '100%', aspectRatio: '493.5 / 2338' }}>
-                      <img
-                        src="/blade.svg"
-                        alt={`Blade ${blade}`}
-                        style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none' }}
-                      />
-                      {bladeDefects.map((d, i) => {
-                        const isSS = d.side === 'SS' || d.side === 'TE';
-                        const color = CAT_COLORS[d.cat] ?? '#F29D00';
-                        const isSelected = d.id === selectedDefectId;
-                        return (
-                          <div
-                            key={d.id}
-                            onClick={() => onDefectClick?.(d.id)}
-                            style={{
-                              position: 'absolute',
-                              top: topPx(d.root),
-                              left: isSS ? '25%' : '75%',
-                              transform: 'translate(-50%, -50%)',
-                              fontSize: 10,
-                              width: 22,
-                              height: 22,
-                              borderRadius: 11,
-                              border: `2px solid ${color}`,
-                              background: color,
-                              boxShadow: isSelected ? 'rgb(0, 166, 255) 0px 0px 0px 4px' : 'none',
-                              opacity: 0.8,
-                              zIndex: isSelected ? 4 : 3,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                              whiteSpace: 'nowrap',
-                              cursor: 'pointer',
-                            }}
-                            title={`${d.id}: ${d.type} · ${d.root}m`}
-                          >
-                            {i + 1}
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div key={blade} style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+                    <img
+                      src="/blade.svg"
+                      alt={`Blade ${blade}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block', pointerEvents: 'none' }}
+                    />
+                    {bladeDefects.map((d, i) => {
+                      const isSS = d.side === 'SS' || d.side === 'TE';
+                      const color = CAT_COLORS[d.cat] ?? '#F29D00';
+                      const isSelected = d.id === selectedDefectId;
+                      return (
+                        <div
+                          key={d.id}
+                          onClick={() => onDefectClick?.(d.id)}
+                          style={{
+                            position: 'absolute',
+                            top: topPx(d.root),
+                            left: '50%',
+                            transform: `translate(${isSS ? '-130%' : '30%'}, -50%)`,
+                            fontSize: 10,
+                            width: 22,
+                            height: 22,
+                            borderRadius: 11,
+                            border: `2px solid ${color}`,
+                            background: color,
+                            boxShadow: isSelected ? 'rgb(0, 166, 255) 0px 0px 0px 4px' : 'none',
+                            opacity: layoutReady ? 0.8 : 0,
+                            transition: 'opacity 0.2s ease-in',
+                            zIndex: isSelected ? 4 : 3,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer',
+                          }}
+                          title={`${d.id}: ${d.type} · ${d.root}m`}
+                        >
+                          {i + 1}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
