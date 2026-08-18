@@ -1,9 +1,16 @@
 name: Release & Deploy
 
+# DISABLED: Auto-deploy on tags is disabled.
+# Deploy to production only happens manually via Vercel CLI after user approval.
+# To re-enable, change 'workflow_dispatch' back to push tags: ['v*']
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: 'Confirm production deploy'
+        required: true
+        type: boolean
+        default: false
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -13,6 +20,7 @@ jobs:
   validate:
     name: Validate Release
     runs-on: ubuntu-latest
+    if: ${{ inputs.confirm_deploy == true }}
     steps:
       - uses: actions/checkout@v4
 
