@@ -106,7 +106,7 @@ export function InspectionWorkflow() {
           onSelectionChange={(thumbId, blade) => { setAnnotateThumbId(thumbId); setAnnotateBlade(blade); }}
         />;
       case 3:
-        return <AnalyzeStep inspectionId={id ?? ''} inspection={inspection} campaignId={campaignId} onOpenPhoto={(photoId, blade) => {
+        return <AnalyzeStep inspectionId={id ?? ''} inspection={inspection} campaignId={campaignId} preselectedDefectId={searchParams.get('defectId') || undefined} onOpenPhoto={(photoId, blade) => {
           setAnnotateThumbId(photoId);
           setAnnotateBlade(blade);
           setCurrentStep(2);
