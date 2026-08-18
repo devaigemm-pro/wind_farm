@@ -267,12 +267,16 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         };
         // Try to create defect record (may fail due to RLS)
         try {
+          // Get annotation dimensions for defect size
+          const annotation = (dbAnnotations ?? []).find(a => a.id === selectedDefectId);
           await createDefect.mutateAsync({
             inspection_id: inspectionId,
             type: (defectTypeMap[defectType] || 'other') as DefectType,
             severity: (category || 3) as Severity,
             distance_from_root: rootDistNum,
             description: selectedDefectId, // stores annotationId for persistence
+            width_cm: annotation ? Math.round(annotation.w) : undefined,
+            height_cm: annotation ? Math.round(annotation.h) : undefined,
           });
         } catch {
           // RLS may block insert — fall through, is_defect flag on annotation is the backup
