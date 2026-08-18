@@ -2,24 +2,35 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Deploy Gate - Block deploy skill",
+      "name": "Deploy Gate - Block deploy skill activation",
       "trigger": "PreToolUse",
       "matcher": "disclose_context",
       "description": "Forces IDE popup when activating deploy-to-vercel skill.",
       "action": {
         "type": "command",
-        "command": "zsh -c 'INPUT=$(cat); SKILL=$(echo \"$INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"toolInput\\\",{}).get(\\\"name\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); if [[ \"$SKILL\" == \"deploy-to-vercel\" ]]; then echo \"{\\\"hookSpecificOutput\\\":{\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"⛔ Deploy a producción requiere tu aprobación. ¿Permitir?\\\"}}\"; fi; exit 0'",
+        "command": "zsh /Users/Apple/Documents/Kiro/wind_farm/scripts/deploy-gate-check.sh",
         "timeout": 10
       }
     },
     {
-      "name": "Deploy Gate - Block vercel CLI and git push main",
+      "name": "Deploy Gate - Block vercel and git push main",
       "trigger": "PreToolUse",
       "matcher": "execute_bash",
-      "description": "Forces IDE popup when running vercel deploy or git push to main.",
+      "description": "Forces IDE popup when running vercel deploy or git push/merge to main.",
       "action": {
         "type": "command",
-        "command": "zsh -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"toolInput\\\",{}).get(\\\"command\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); if echo \"$CMD\" | grep -qE \"vercel deploy|vercel.*--prod|git push.*main|git merge.*main\"; then echo \"{\\\"hookSpecificOutput\\\":{\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"⛔ Este comando afecta producción/main. ¿Aprobar?\\\"}}\"; fi; exit 0'",
+        "command": "zsh /Users/Apple/Documents/Kiro/wind_farm/scripts/deploy-gate-check.sh",
+        "timeout": 10
+      }
+    },
+    {
+      "name": "Deploy Gate - Block control_bash_process deploy",
+      "trigger": "PreToolUse",
+      "matcher": "control_bash_process",
+      "description": "Forces IDE popup if background process is vercel deploy.",
+      "action": {
+        "type": "command",
+        "command": "zsh /Users/Apple/Documents/Kiro/wind_farm/scripts/deploy-gate-check.sh",
         "timeout": 10
       }
     }

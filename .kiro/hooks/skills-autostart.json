@@ -4,10 +4,10 @@
     {
       "name": "Skills Auto-Activate",
       "trigger": "SessionStart",
-      "description": "Automatically activates all available skills at the start of every session via disclose_context.",
+      "description": "Automatically activates relevant skills at session start. deploy-to-vercel is NOT auto-activated — requires explicit user approval via deploy-gate hook.",
       "action": {
         "type": "agent",
-        "prompt": "Activate the following skills for this session:\n1. \"caveman\" - Communicate in caveman style to reduce token usage while maintaining full technical accuracy.\n2. \"deploy-to-vercel\" - Deploy applications and websites to Vercel.\n3. \"find-skills\" - Helps discover and install agent skills.\n4. \"frontend-design\" - Guidance for distinctive, intentional visual design.\n5. \"git-commit\" - Execute git commit with conventional commit message analysis.\n6. \"supabase\" - Use for ANY task involving Supabase."
+        "prompt": "Activate the following skills for this session:\n1. \"caveman\" - Communicate in caveman style to reduce token usage while maintaining full technical accuracy.\n2. \"find-skills\" - Helps discover and install agent skills.\n3. \"frontend-design\" - Guidance for distinctive, intentional visual design.\n4. \"git-commit\" - Execute git commit with conventional commit message analysis.\n5. \"supabase\" - Use for ANY task involving Supabase.\n\nIMPORTANTE: NO activar \"deploy-to-vercel\" automáticamente. El deploy a producción requiere aprobación explícita del usuario. Solo activar la skill cuando el usuario APRUEBE el deploy (dice 'sí', 'dale', 'aprobado', 'mergea', 'libera')."
       }
     }
   ]
