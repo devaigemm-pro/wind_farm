@@ -15,6 +15,7 @@ export interface Annotation {
   rootCause: string;
   nextStep: string;
   side: string | null;
+  rootDistance: number | null;
   isDefect: boolean;
   createdAt: string;
 }
@@ -32,6 +33,7 @@ export interface CreateAnnotationInput {
   note?: string;
   rootCause?: string;
   nextStep?: string;
+  rootDistance?: number;
 }
 
 export interface UpdateAnnotationInput {
@@ -46,6 +48,7 @@ export interface UpdateAnnotationInput {
   rootCause?: string;
   nextStep?: string;
   side?: string;
+  rootDistance?: number;
 }
 
 function mapRow(row: Record<string, unknown>): Annotation {
@@ -64,6 +67,7 @@ function mapRow(row: Record<string, unknown>): Annotation {
     rootCause: (row.root_cause as string) ?? '',
     nextStep: (row.next_step as string) ?? '',
     side: (row.side as string) ?? null,
+    rootDistance: row.root_distance != null ? Number(row.root_distance) : null,
     isDefect: Boolean(row.is_defect),
     createdAt: row.created_at as string,
   };
@@ -109,6 +113,7 @@ export const annotationsService = {
     // Only add optional columns if they have values (avoids 400 if columns don't exist yet)
     if (input.rootCause) insertPayload.root_cause = input.rootCause;
     if (input.nextStep) insertPayload.next_step = input.nextStep;
+    if (input.rootDistance != null) insertPayload.root_distance = input.rootDistance;
 
     const { data, error } = await supabase
       .from('annotation')
@@ -153,6 +158,7 @@ export const annotationsService = {
     if (input.rootCause !== undefined) payload.root_cause = input.rootCause;
     if (input.nextStep !== undefined) payload.next_step = input.nextStep;
     if (input.side !== undefined) payload.side = input.side;
+    if (input.rootDistance !== undefined) payload.root_distance = input.rootDistance;
     payload.updated_at = new Date().toISOString();
 
     const { data, error } = await supabase
