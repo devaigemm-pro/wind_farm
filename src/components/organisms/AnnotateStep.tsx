@@ -351,6 +351,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       setRightPanelBlade(target.blade);
       setRightPanelFace(target.face);
       onSelectionChange?.(target.id, target.blade);
+      // Mark first photo as viewed so progress starts counting
+      markViewed.mutate({ photoId: target.id, campaignId });
     }
   }, [thumbnails, groupedThumbnails]);
 
@@ -1041,7 +1043,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       const blade = currentThumb?.blade || 'A';
                       const target = thumbnails.find(t => t.face === 'SS' && t.blade === blade)
                         || thumbnails.find(t => t.face === 'SS');
-                      if (target) setSelectedThumbnail(target.id);
+                      if (target) handleThumbnailSelect(target.id);
                     }}
                     style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'SS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'SS' ? '#fff' : '#00A6FF' }}
                   >SS</button>
@@ -1053,7 +1055,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                         const blade = currentThumb?.blade || 'A';
                         const target = thumbnails.find(t => t.face === 'LE' && t.blade === blade)
                           || thumbnails.find(t => t.face === 'LE');
-                        if (target) setSelectedThumbnail(target.id);
+                        if (target) handleThumbnailSelect(target.id);
                       }}
                       style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#00A6FF' }}
                     >LE</button>
@@ -1064,7 +1066,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                         const blade = currentThumb?.blade || 'A';
                         const target = thumbnails.find(t => t.face === 'TE' && t.blade === blade)
                           || thumbnails.find(t => t.face === 'TE');
-                        if (target) setSelectedThumbnail(target.id);
+                        if (target) handleThumbnailSelect(target.id);
                       }}
                       style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'TE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'TE' ? '#fff' : '#00A6FF' }}
                     >TE</button>
@@ -1076,7 +1078,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       const blade = currentThumb?.blade || 'A';
                       const target = thumbnails.find(t => t.face === 'PS' && t.blade === blade)
                         || thumbnails.find(t => t.face === 'PS');
-                      if (target) setSelectedThumbnail(target.id);
+                      if (target) handleThumbnailSelect(target.id);
                     }}
                     style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'PS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'PS' ? '#fff' : '#00A6FF' }}
                   >PS</button>

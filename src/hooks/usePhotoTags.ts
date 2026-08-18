@@ -168,5 +168,10 @@ export function useMarkPhotoViewed() {
         console.error('[useMarkPhotoViewed] Failed to update viewed_percent:', e);
       }
     },
+    onSettled: () => {
+      // Re-sync cache after mutation completes to ensure progress bar stays in sync
+      // (covers edge case where cancelQueries killed an in-flight refetch)
+      queryClient.invalidateQueries({ queryKey: ['inspection-photos'] });
+    },
   });
 }
