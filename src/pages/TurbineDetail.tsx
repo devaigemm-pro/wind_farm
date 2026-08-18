@@ -135,7 +135,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     return [];
   }, [filterCampaignId, campaignInspIds, filterInspectionId, allTurbineInspIds, inspectionData]);
 
-  const { data: dbAnnotations = [] } = useMultiAnnotations(annotationInspectionIds);
+  const { data: dbAnnotations = [], isLoading: annotationsLoading } = useMultiAnnotations(annotationInspectionIds);
 
   // Load photo → blade_id (fast, no signed URLs — unblocks blade diagram)
   const { data: photoBladeRawMap = {}, isLoading: photoMapsLoading } = usePhotoBladeMap(filterCampaignId);
@@ -166,7 +166,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   // Wait for photoBladeMap when campaignId is present to avoid flash of all defects on blade A
   const annotationDefects = useMemo<TurbineDefect[]>(() => {
     if (!dbAnnotations || dbAnnotations.length === 0) return [];
-    if (filterCampaignId && photoMapsLoading) return [];
+    if (photoMapsLoading) return [];
     const inspToBladeMap = inspectionData?.inspectionToBladePosition ?? {};
 
     // Build blade_id (UUID) → position letter lookup from inspectionData.blades
@@ -266,6 +266,9 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   }, [confirmedDefectRecords, dbAnnotations]);
 
   const defects: TurbineDefect[] = useMemo(() => {
+    // Don't use fallback paths while annotations are still loading
+    if (annotationsLoading || photoMapsLoading) return [];
+
     // Path 1: If we have annotations (from annotation table), use them
     if (annotationDefects.length > 0) {
       // Filter by confirmed defects if available
@@ -335,7 +338,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     }
 
     return [];
-  }, [annotationDefects, confirmedAnnotationIds, confirmedDefectRecords, turbineLevelDefects, inspectionData]);
+  }, [annotationDefects, confirmedAnnotationIds, confirmedDefectRecords, turbineLevelDefects, inspectionData, annotationsLoading, photoMapsLoading]);
   const windFarmName = inspectionData?.windFarmName ?? '';
   const turbineName = inspectionData?.turbineName ?? '';
   const inspectionDate = inspectionData?.inspectionDate

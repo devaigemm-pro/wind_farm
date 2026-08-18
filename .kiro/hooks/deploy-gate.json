@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Deploy Gate - Ask before deploy",
+      "trigger": "PreToolUse",
+      "matcher": "disclose_context",
+      "description": "Asks user confirmation before activating deploy-to-vercel skill. Safety net to prevent auto-deploy without approval.",
+      "action": {
+        "type": "agent",
+        "prompt": "⛔ GATE DE DEPLOY: Antes de activar deploy-to-vercel, VERIFICA que el usuario haya dado aprobación EXPLÍCITA en este turno o el turno inmediatamente anterior. Si no hay aprobación clara del usuario (palabras como 'sí', 'dale', 'aprobado', 'mergea', 'libera'), NO procedas con el deploy. Pregunta primero."
+      }
+    }
+  ]
+}
