@@ -1971,6 +1971,29 @@ const hubDiagramContainer: React.CSSProperties = {
   paddingBottom: 16,
 };
 
+const accordionStyle: React.CSSProperties = {
+  borderTop: `1px solid ${C.borderLight}`,
+  background: C.bg,
+};
+
+const accordionHeaderStyle: React.CSSProperties = {
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '10px 16px',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  outline: 'none',
+};
+
+const turbineInfoRow: React.CSSProperties = {
+  fontSize: 13,
+  color: C.text,
+  margin: '4px 0',
+};
+
 const changeBladeAccordionStyle: React.CSSProperties = {
   borderTop: `1px solid ${C.borderLight}`,
   background: C.bg,
