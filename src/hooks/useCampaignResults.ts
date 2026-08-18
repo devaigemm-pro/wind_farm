@@ -7,12 +7,23 @@ import type { CampaignTurbineResult } from '@/types';
 // Map annotation type labels (stored in DB) to chart keys
 const ANNOTATION_TYPE_TO_CHART_KEY: Record<string, string> = {
   'LE EROSION': 'le_erosion',
+  'LE TAPE': 'le_erosion',
+  'TE EROSION': 'le_erosion',
   'LONGITUDINAL CRACKS ON LE OR TE BOND LINES': 'crack',
   'CRACK': 'crack',
+  'CRACK ON V-PROFILE': 'crack',
+  '45° CRACKS ON SURFACE (CUTTING FROM FACTORY)': 'crack',
+  'OTHER CRACKS ON SURFACE': 'crack',
+  'OPEN BOND LINE IN TE': 'crack',
   'VORTEX (MISSING PANELS)': 'vortex',
   'PAINT DAMAGES': 'paint_defect',
   'BLADES WITH HYDRAULIC OIL': 'oil',
   'OTHER ADD-ONS MISSING': 'other',
+  'OTHER': 'other',
+  'PINHOLES': 'other',
+  'VOIDS': 'other',
+  'BOLT LOOSE/MISSING': 'other',
+  'CLOGGED DRAIN HOLE': 'other',
   'DELAMINATION': 'delamination',
   'LIGHTNING DAMAGE': 'lightning_damage',
   // snake_case fallbacks (in case data was stored in this format)
