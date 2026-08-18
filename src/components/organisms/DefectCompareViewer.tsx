@@ -271,33 +271,31 @@ export function DefectCompareViewer({
               <div>Hub : {activeDistance.toFixed(1)}m</div>
             </div>
 
-            {/* Navigation arrows - cross layout, bottom-left */}
-            <div style={navContainerStyle}>
-              {/* SS label + up arrow */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={navLabelStyle}>SS</span>
-                <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')}>
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
-                </button>
-              </div>
-              {/* Middle row: ← and → Hub */}
-              <div style={navMiddleRow}>
-                <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
-                </button>
-                <button type="button" style={{ ...navBtnStyle, flexDirection: 'row', gap: '6px' }} onClick={() => navigateHub('closer')}>
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
-                  <span style={{ ...navLabelStyle, fontSize: '13px' }}>Hub</span>
-                </button>
-              </div>
-              {/* Down arrow + PS label */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')}>
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
-                </button>
-                <span style={navLabelStyle}>PS</span>
-              </div>
+            {/* Navigation arrows - grid cross layout, bottom-left */}
+            <div style={{ position: 'absolute', bottom: '16px', left: '16px', display: 'grid', gridTemplateColumns: '28px 28px 28px', gridTemplateRows: '28px 28px 28px', alignItems: 'center', justifyItems: 'center', gap: '2px' }}>
+              {/* Row 1: empty | SS | empty */}
+              <div />
+              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')}>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
+              </button>
+              <div style={{ fontSize: '11px', color: '#5A8F5A', fontWeight: 700, justifySelf: 'start', paddingLeft: '2px' }}>SS</div>
+              {/* Row 2: ← | (empty center) | → Hub */}
+              <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
+              </button>
+              <div />
+              <button type="button" style={{ ...navBtnStyle, flexDirection: 'row', gap: '4px' }} onClick={() => navigateHub('closer')}>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
+              </button>
+              {/* Row 3: empty | PS | empty */}
+              <div />
+              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')}>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
+              </button>
+              <div style={{ fontSize: '11px', color: '#5A8F5A', fontWeight: 700, justifySelf: 'start', paddingLeft: '2px' }}>PS</div>
             </div>
+            {/* Hub label - to the right of the grid */}
+            <div style={{ position: 'absolute', bottom: '44px', left: '106px', color: '#5A8F5A', fontSize: '13px', fontWeight: 700 }}>Hub</div>
 
             {/* Zoom - bottom-right */}
             <div style={zoomGroupStyle}>
@@ -365,8 +363,5 @@ const zoomBtnStyle: React.CSSProperties = { padding: '4px 10px', background: 'rg
 const zoomBtnLastStyle: React.CSSProperties = { ...zoomBtnStyle, borderRight: 'none' };
 const zoomLabelStyle: React.CSSProperties = { ...zoomBtnStyle, cursor: 'default', fontSize: '11px', textTransform: 'lowercase' };
 const infoBlockStyle: React.CSSProperties = { position: 'absolute', top: '12px', left: '12px', color: '#5A8F5A', fontSize: '13px', fontFamily: 'var(--font-family-sans)', lineHeight: '1.8', textShadow: '0 1px 3px rgba(0,0,0,0.8)' };
-const navContainerStyle: React.CSSProperties = { position: 'absolute', bottom: '16px', left: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' };
-const navMiddleRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '40px' };
-const navBtnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' };
-const navLabelStyle: React.CSSProperties = { color: '#5A8F5A', fontSize: '10px', fontWeight: 700 };
+const navBtnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' };
 const loadingOverlay: React.CSSProperties = { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '14px' };
