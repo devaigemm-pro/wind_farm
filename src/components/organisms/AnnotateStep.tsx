@@ -1447,48 +1447,47 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       {/* ═══ RIGHT PANEL ═══ */}
       <div style={rightPanelStyle}>
         <div style={rightPanelInner}>
-        </div>
+          {/* ─── Comparison accordion ─── */}
+          <div style={accordionStyle}>
+            <button style={accordionHeaderStyle} onClick={() => setComparisonExpanded(!comparisonExpanded)}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Comparison</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill={C.muted} style={{ transform: comparisonExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+            </button>
+            {comparisonExpanded && (
+              <div style={{ padding: '0 16px 12px' }}>
+                {turbineInspections.length === 0 ? (
+                  <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>No inspections found</p>
+                ) : (
+                  turbineInspections.map((insp) => (
+                    <div key={insp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                      <input type="checkbox" style={{ width: 16, height: 16, accentColor: C.primary }} defaultChecked={insp.id === inspectionId} />
+                      <span style={{ fontSize: 13, color: C.text, flex: 1 }}>
+                        {insp.scheduled_date ? new Date(insp.scheduled_date).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </span>
+                      <a href={`/inspections/${insp.id}/workflow?step=2`} target="_blank" rel="noopener noreferrer" style={{ color: C.primary, display: 'flex' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3z"/></svg>
+                      </a>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
-        {/* ─── Comparison accordion ─── */}
-        <div style={accordionStyle}>
-          <button style={accordionHeaderStyle} onClick={() => setComparisonExpanded(!comparisonExpanded)}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Comparison</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill={C.muted} style={{ transform: comparisonExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
-          </button>
-          {comparisonExpanded && (
-            <div style={{ padding: '0 16px 12px' }}>
-              {turbineInspections.length === 0 ? (
-                <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>No inspections found</p>
-              ) : (
-                turbineInspections.map((insp) => (
-                  <div key={insp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: C.primary }} defaultChecked={insp.id === inspectionId} />
-                    <span style={{ fontSize: 13, color: C.text, flex: 1 }}>
-                      {insp.scheduled_date ? new Date(insp.scheduled_date).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                    </span>
-                    <a href={`/inspections/${insp.id}/workflow?step=2`} target="_blank" rel="noopener noreferrer" style={{ color: C.primary, display: 'flex' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3z"/></svg>
-                    </a>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ─── Turbine Information accordion ─── */}
-        <div style={accordionStyle}>
-          <button style={accordionHeaderStyle} onClick={() => setTurbineInfoExpanded(!turbineInfoExpanded)}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Turbine information</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill={C.muted} style={{ transform: turbineInfoExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
-          </button>
-          {turbineInfoExpanded && (
-            <div style={{ padding: '0 16px 12px' }}>
-              <p style={turbineInfoRow}>Model: <b>{turbineModel}</b></p>
-              <p style={turbineInfoRow}>Power: <b>{turbinePower}</b></p>
-              <p style={turbineInfoRow}>Commissioning date: <b>{turbineCommissioning}</b></p>
-            </div>
-          )}
+          {/* ─── Turbine Information accordion ─── */}
+          <div style={accordionStyle}>
+            <button style={accordionHeaderStyle} onClick={() => setTurbineInfoExpanded(!turbineInfoExpanded)}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Turbine information</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill={C.muted} style={{ transform: turbineInfoExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+            </button>
+            {turbineInfoExpanded && (
+              <div style={{ padding: '0 16px 12px' }}>
+                <p style={turbineInfoRow}>Model: <b>{turbineModel}</b></p>
+                <p style={turbineInfoRow}>Power: <b>{turbinePower}</b></p>
+                <p style={turbineInfoRow}>Commissioning date: <b>{turbineCommissioning}</b></p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Change vertical blade accordion */}
