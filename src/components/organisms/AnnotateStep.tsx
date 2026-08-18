@@ -234,7 +234,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   }, []);
 
   // State to force re-render when container resizes (so annotation layer repositions)
-  const [, setLayoutTick] = useState(0);
+  const [layoutTick, setLayoutTick] = useState(0);
 
   const getImageRect = useCallback((_containerRect: DOMRect) => {
     return computeImageRect();
@@ -472,13 +472,17 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const annotsCount = thumbnails.filter(t => t.hasAnnotation || ((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
 
   // Compute image rect for annotation layer positioning (recalculates on every render)
-  const imgRect = computeImageRect();
-  const imgContentStyle = {
-    top: `${imgRect.offsetY}px`,
-    left: `${imgRect.offsetX}px`,
-    width: `${imgRect.width}px`,
-    height: `${imgRect.height}px`,
-  };
+  // Memoize annotation layer position — only recalculate on layout changes, not during drawing
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const imgContentStyle = useMemo(() => {
+    const rect = computeImageRect();
+    return {
+      top: `${rect.offsetY}px`,
+      left: `${rect.offsetX}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    };
+  }, [layoutTick, viewerLoaded, computeImageRect]);
   const taggedCount = thumbnails.filter(t => t.isTagged).length;
   const unseenCount = thumbnails.filter(t => !t.hasAnnotation && !t.isTagged && !((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
   const viewedCount = photos.filter(p => p.isViewed).length;
