@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useInspectionPhotos, getFaceShort, getPhotoPublicUrl } from '@/hooks/useInspectionPhotos';
 import { useDefects } from '@/hooks/useDefects';
 import { useCreateDefect } from '@/hooks/useDefectMutations';
+import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import { supabase } from '@/lib/supabase';
 import type { Inspection, DefectType, Severity } from '@/types';
 
@@ -160,6 +161,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
   // ─── Load confirmed defects from DB (persisted) ─────────────────────────
   const { data: savedDefects = [] } = useDefects(inspectionId);
   const createDefect = useCreateDefect();
+  const { data: annotationTypes = [] } = useAnnotationTypes();
 
   // Derive confirmedIds from saved defects (description field stores annotationId)
   // AND from annotations with is_defect = true (backup persistence method)
@@ -576,12 +578,9 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               <label style={labelStyle}>{t('analyze.type')}</label>
               <select style={selectInputStyle} value={defectType} onChange={(e) => setDefectType(e.target.value)}>
                 <option value="">{t('analyze.select')}</option>
-                <option value="LE EROSION">{t('defect.leErosion')}</option>
-                <option value="VORTEX (MISSING PANELS)">{t('defect.vortex')}</option>
-                <option value="PAINT DAMAGES">{t('defect.paintDamages')}</option>
-                <option value="OTHER ADD-ONS MISSING">{t('defect.addOnsMissing')}</option>
-                <option value="BLADES WITH HYDRAULIC OIL">{t('defect.hydraulicOil')}</option>
-                <option value="CRACK">{t('defect.crack')}</option>
+                {annotationTypes.map(at => (
+                  <option key={at.id} value={at.name}>{at.name}</option>
+                ))}
               </select>
             </div>
 

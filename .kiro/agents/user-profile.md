@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 146
+- **Sesiones analizadas**: 151
 - **Última actualización**: 2026-08-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1428,12 +1428,43 @@
   - Sesión ultra-corta: un solo bug, diagnóstico + fix + build + preview, sin iteraciones
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe bugs desde lo visual sin detalles técnicos, aprobación con 👍, confía en diagnóstico del agente
 
-### Sesión 146 - 2026-08-18
-- **Tarea principal**: Fix jitter de anotaciones existentes durante draw (v2) — approach con useRef para cachear imgContentStyle en lugar de useMemo que causaba loop infinito
+### Sesión 147 - 2026-08-18
+- **Tarea principal**: La imagen central del viewer step 2 no debe cambiar de tamaño al comprimir el navegador — agregar minWidth/minHeight al viewer container y overflow auto al padre
 - **Observaciones nuevas**:
-  - Vuelve a pedir el mismo fix por segunda vez después de revertir useMemo — es importante para él, espera que se resuelva de verdad
-  - Approach exitoso: useRef para cachear rect + solo actualizar en resize/image-load. NO usar useMemo con layoutTick/ResizeObserver.
-  - Deploy directo con vercel CLI sigue siendo el path usado (GitHub Actions token inválido aún)
-  - Sesión ultra-corta: un solo cambio, build + deploy directo, sin iteraciones
-  - **APRENDIZAJE TÉCNICO**: Para evitar jitter en layers posicionados absolutamente que dependen de dimensiones del contenedor: usar useRef cache, actualizar solo en ResizeObserver/onLoad, leer ref en render. NO usar useMemo con deps que triggerea ResizeObserver.
-- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, persistencia en pedir fixes que importan, deploy directo con vercel CLI
+  - Instrucción ultra-mínima: "cuando el navegador se comprime, la imagen central no debe cambiar su tamaño" — describe el resultado esperado sin dar solución técnica
+  - Sesión ultra-corta: un solo cambio, build + deploy directo, aceptado implícitamente
+  - Sigue en flujo continuo de fixes sobre step 2 ANNOTATE (barrido de calidad intenso)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, describe comportamiento desde UX sin contexto técnico, barrido de calidad por pantalla (step 2), deploy directo con vercel CLI
+
+### Sesión 148 - 2026-08-18
+- **Tarea principal**: Las anotaciones deben acompañar el movimiento de la imagen al comprimir browser — reemplazado cache ref stale por cálculo directo de posición
+- **Observaciones nuevas**:
+  - "ademas la anotacion debe acompañar el movimiento de la imagen, no debe abandonar su posicion" — extiende la tarea anterior con "ademas". Describe desde UX sin contexto técnico.
+  - El cachedImgRectRef podía quedar stale cuando aparecían scrollbars (cambiaba clientWidth sin trigger de resize). Solución: volver a cálculo directo que siempre es preciso. Con minWidth:600 en el viewer, no hay jitter durante draw porque el container no cambia.
+  - **APRENDIZAJE**: El approach de "cache ref para evitar jitter" fue incorrecto desde el inicio — la causa real del jitter era que el container cambiaba de tamaño (sin minWidth). Con minWidth fijo, el cálculo directo es estable Y preciso. Solución correcta = fijar las dimensiones del container, no cachear cálculos.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "ademas" = extender tarea, describe desde UX sin contexto técnico, barrido de calidad por pantalla (step 2)
+
+### Sesión 149 - 2026-08-18
+- **Tarea principal**: La imagen sigue cambiando de tamaño al comprimir — minWidth:600 no era suficiente porque flex:1 permitía shrink. Fix: flex:'1 0 0' (no-shrink) + padre overflow:auto
+- **Observaciones nuevas**:
+  - "sigue modificando su tamaño, esto no debe ocurrir" — persistencia cuando un fix no resolvió. Espera que se resuelva definitivamente, no parches parciales.
+  - El fix anterior (minWidth:600) solo limitaba el mínimo pero seguía permitiendo shrink entre el tamaño actual y 600. Con flex-shrink:0 el viewer NUNCA se encoge.
+  - Sesión ultra-corta: 1 cambio (flex property), build, deploy directo
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, persistencia en fixes que no resuelven, "esto no debe ocurrir" = el fix anterior fue insuficiente, deploy directo con vercel CLI
+
+### Sesión 150 - 2026-08-18
+- **Tarea principal**: Imagen SIGUE reduciéndose — el fix anterior (flex-shrink:0 en viewer) no bastó porque el contenedor RAÍZ se comprimía. Fix definitivo: minWidth:1100 en containerStyle del step 2 → browser hace scroll horizontal.
+- **Observaciones nuevas**:
+  - Tercer intento para resolver "imagen se reduce al comprimir". Cada vez el diagnóstico fue un nivel más arriba en la jerarquía de layout: (1) minWidth en viewer, (2) flex-shrink:0 en viewer, (3) minWidth en container raíz. El correcto siempre fue el más alto.
+  - "se debe mantener su tamaño maximo y aplicar scroll horizontal del browser" — describe exactamente el resultado técnico esperado. Cuando da la solución técnica explícita ("scroll horizontal del browser"), ACATAR.
+  - **APRENDIZAJE**: Cuando la imagen se encoge al comprimir browser, el fix SIEMPRE es minWidth en el contenedor MÁS EXTERNO de la jerarquía flex. No sirve ponerlo en hijos — los padres los comprimen igual. El scroll horizontal del browser solo aparece si el ROOT de la página tiene min-width > viewport.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, persistencia extrema hasta resolución real, da la solución técnica esperada cuando la tiene, deploy directo con vercel CLI
+
+### Sesión 151 - 2026-08-18
+- **Tarea principal**: Agregar opciones de tipo de anotación faltantes en pantalla 2.ANNOTATE, almacenándolas en BD para carga dinámica en combobox
+- **Observaciones nuevas**:
+  - Proporciona imagen de referencia (screenshot de Skyvisor) como spec para comparar opciones faltantes — patrón "imagen como spec" confirmado
+  - "dejar esos datos en la bd para ser cargados en el combobox" — quiere datos dinámicos desde BD, no hardcoded. Prefiere arquitectura mantenible donde agregar/quitar tipos no requiera tocar código.
+  - "agregar ademas la opcion other" — agrega requerimiento extra en mensaje corto separado, sin repetir contexto. Confía en que se entiende qué es "other" en este contexto.
+  - Sesión limpia sin correcciones — todos los cambios aceptados implícitamente
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, imagen como spec, prefiere datos dinámicos desde BD sobre hardcoded, extiende tarea con mensaje corto

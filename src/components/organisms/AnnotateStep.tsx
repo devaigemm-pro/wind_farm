@@ -7,6 +7,7 @@ import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampa
 import { useInspectionPhotos, getPhotoPublicUrl, getFaceShort } from '@/hooks/useInspectionPhotos';
 import { useUpdateVerticalBlade } from '@/hooks/useInspectionMutations';
 import { useTogglePhotoTag, useMarkPhotoViewed } from '@/hooks/usePhotoTags';
+import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import { supabase } from '@/lib/supabase';
 import type { Inspection } from '@/types';
 import { BLADE_POSITION_LABELS } from '@/types';
@@ -62,6 +63,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const createAnnotation = useCreateAnnotation();
   const updateAnnotation = useUpdateAnnotation(inspectionId);
   const deleteAnnotation = useDeleteAnnotation(inspectionId);
+  const { data: annotationTypes = [] } = useAnnotationTypes();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // ─── Fetch photos from inspection_photo table (ALL blades of the campaign) ─
@@ -235,12 +237,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // State to force re-render when container resizes (so annotation layer repositions)
   const [, setLayoutTick] = useState(0);
-  // Cache the annotation layer rect to avoid jitter during drawing re-renders
-  const cachedImgRectRef = useRef<{ offsetX: number; offsetY: number; width: number; height: number } | null>(null);
-
-  const updateCachedImgRect = useCallback(() => {
-    cachedImgRectRef.current = computeImageRect();
-  }, [computeImageRect]);
 
   const getImageRect = useCallback((_containerRect: DOMRect) => {
     return computeImageRect();
@@ -1326,13 +1322,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             <div style={{ marginBottom: 12 }}>
               <label style={{ fontSize: 12, color: C.muted, marginBottom: 4, display: 'block' }}>{t('annotate.type')}</label>
               <select style={{ ...selectStyle, background: 'var(--color-neutral-0)' }} value={annotationType} onChange={e => setAnnotationType(e.target.value)}>
-                <option value="LONGITUDINAL CRACKS ON LE OR TE BOND LINES">{t('defect.longitudinalCracks')}</option>
-                <option value="LE EROSION">{t('defect.leErosion')}</option>
-                <option value="VORTEX (MISSING PANELS)">{t('defect.vortex')}</option>
-                <option value="PAINT DAMAGES">{t('defect.paintDamages')}</option>
-                <option value="OTHER ADD-ONS MISSING">{t('defect.addOnsMissing')}</option>
-                <option value="BLADES WITH HYDRAULIC OIL">{t('defect.hydraulicOil')}</option>
-                <option value="CRACK">{t('defect.crack')}</option>
+                {annotationTypes.map(at => (
+                  <option key={at.id} value={at.name}>{at.name}</option>
+                ))}
+                {annotationTypes.length === 0 && (
+                  <option value="LE EROSION">LE EROSION</option>
+                )}
               </select>
             </div>
 
