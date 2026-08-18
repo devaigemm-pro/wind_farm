@@ -57,14 +57,12 @@ export function BladesDiagram({
 
   const blades = ['A', 'B', 'C'] as const;
 
-  // Delay showing defect dots until layout is stable (prevents flash of wrong positions)
+  // Mark layout ready after first paint (never resets)
   useEffect(() => {
-    setLayoutReady(false);
-    const frame = requestAnimationFrame(() => {
-      setLayoutReady(true);
-    });
+    if (layoutReady) return;
+    const frame = requestAnimationFrame(() => setLayoutReady(true));
     return () => cancelAnimationFrame(frame);
-  }, [defects]);
+  }, [layoutReady]);
 
   // Generate meter marks dynamically based on bladeLength
   const numSegments = 9;
@@ -283,7 +281,7 @@ export function BladesDiagram({
                             background: color,
                             boxShadow: isSelected ? 'rgb(0, 166, 255) 0px 0px 0px 4px' : 'none',
                             opacity: layoutReady ? 0.8 : 0,
-                            transition: 'opacity 0.2s ease-in',
+                            transition: 'opacity 0.1s',
                             zIndex: isSelected ? 4 : 3,
                             display: 'flex',
                             alignItems: 'center',
