@@ -77,7 +77,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
 
   // Fetch ALL inspection IDs for this turbine (blade path + direct path)
   // This is independent of useTurbineInspection to ensure annotations are always loaded
-  const { data: allTurbineInspIds = [] } = useQuery({
+  const { data: allTurbineInspIds = [], isLoading: turbineInspIdsLoading } = useQuery({
     queryKey: ['all-turbine-inspections', turbineId],
     queryFn: async () => {
       if (!turbineId) return [];
@@ -266,8 +266,8 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   }, [confirmedDefectRecords, dbAnnotations]);
 
   const defects: TurbineDefect[] = useMemo(() => {
-    // Don't use fallback paths while annotations are still loading
-    if (annotationsLoading || photoMapsLoading) return [];
+    // Don't render defects until annotation data pipeline is fully resolved
+    if (turbineInspIdsLoading || annotationsLoading || photoMapsLoading) return [];
 
     // Path 1: If we have annotations (from annotation table), use them
     if (annotationDefects.length > 0) {
@@ -338,7 +338,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     }
 
     return [];
-  }, [annotationDefects, confirmedAnnotationIds, confirmedDefectRecords, turbineLevelDefects, inspectionData, annotationsLoading, photoMapsLoading]);
+  }, [annotationDefects, confirmedAnnotationIds, confirmedDefectRecords, turbineLevelDefects, inspectionData, annotationsLoading, photoMapsLoading, turbineInspIdsLoading]);
   const windFarmName = inspectionData?.windFarmName ?? '';
   const turbineName = inspectionData?.turbineName ?? '';
   const inspectionDate = inspectionData?.inspectionDate
