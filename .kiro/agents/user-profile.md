@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 135
+- **Sesiones analizadas**: 136
 - **Última actualización**: 2026-08-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1368,3 +1368,23 @@
   - El usuario reporta bugs del flujo del agente con la misma persistencia que bugs de código — no para hasta que funcione de verdad
   - **LIMITACIÓN TÉCNICA reconocida**: steering es sugerencia, no bloqueo real. El enforcement técnico (hooks PreToolUse) es la única garantía en Autopilot.
 - **Patrones confirmados**: español, directo, alta autonomía, persistencia en reportar bugs del agente hasta resolución real, enforcement técnico > instrucciones textuales para reglas críticas, cada cambio = ciclo independiente de aprobación (confianza MÁXIMA)
+
+### Sesión 136 - 2026-08-18
+- **Tarea principal**: (1) Agregar overlay de anotación marcada (rectángulo rojo SVG) a la foto del defecto en /assets-wind defects tab y step 4 RESULTS. (2) Fix posición de defectos en BladesDiagram cuando viewport comprimido. (3) Fix flash de defectos en posición incorrecta al cargar.
+- **Observaciones nuevas**:
+  - "esto ya se implemento en la pantalla compare, revisa esa solucion" — patrón "usar el mismo método que X" una vez más. Revisó el compare viewer y replicó la lógica SVG.
+  - "el area marcada está en una posicion distinta" — corrección del primer intento (objectFit:cover distorsionaba coords). Fix: usar display:inline-block + maxWidth/maxHeight sin crop.
+  - "aplicar el mismo cambio a step 4" — extiende tarea a otra pantalla con una sola frase, contexto implícito.
+  - "al tener el navegador comprimido los defectos se ven desplazados" — bug visual de responsive. Fix final: width fijo en px calculado desde aspectRatio conocido del SVG.
+  - "sigue el mismo comportamiento" × 4 iteraciones — frustración por fixes parciales que no resolvían el problema REAL (la cadena de datos async). El root cause era turbineInspIdsLoading que no se verificaba, permitiendo fallthrough a Path 2 con blade='A' hardcoded.
+  - **APRENDIZAJE CRÍTICO**: En react-query, cuando una query dependiente tiene `enabled: false` porque su input aún no llegó, `isLoading` es `false` (no true). El guard debe verificar la query FUENTE (turbineInspIds), no solo las derivadas.
+  - **APRENDIZAJE**: Los rebases pueden perder fixes previos si hay conflictos resueltos con `--theirs`. Verificar siempre que el código en main incluye los cambios esperados ANTES de deployer.
+- **Patrones confirmados**: español, directo, alta autonomía, "usar el mismo método que X" (confianza MÁXIMA), "sigue el mismo comportamiento" = fix anterior no resolvió (diagnosticar más profundo), frustración escalada por iteraciones fallidas, screenshot como prueba, modo compañero implícito, corrección directa sin drama
+
+### Sesión 130 - 2026-08-18
+- **Tarea principal**: Confirmar que sesiones en curso no se actualizan con cambios de steering/hooks (solo aplica a sesiones nuevas)
+- **Observaciones nuevas**:
+  - "se debe a que ya está en curso?" — pregunta diagnóstica correcta. El usuario entendió la limitación técnica rápidamente.
+  - Acepta la explicación sin frustración — cuando la causa es una limitación técnica real (no un error del agente), lo acepta sin drama.
+  - **LIMITACIÓN APRENDIDA**: steering y hooks se cargan al inicio de sesión. Cambios mid-session no afectan sesiones activas. Solo sesiones nuevas.
+- **Patrones confirmados**: español, directo, acepta limitaciones técnicas reales sin frustración, diagnostica correctamente causas de comportamiento inesperado

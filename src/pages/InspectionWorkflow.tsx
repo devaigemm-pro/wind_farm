@@ -186,18 +186,6 @@ export function InspectionWorkflow() {
               >
                 {locale.toUpperCase()}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-                  document.documentElement.setAttribute('data-theme', next);
-                  localStorage.setItem('theme', next);
-                }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: 'none', backgroundColor: 'transparent', color: 'var(--color-neutral-500)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
-                title="Dark mode"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-              </button>
             </div>
           </div>
         </div>
