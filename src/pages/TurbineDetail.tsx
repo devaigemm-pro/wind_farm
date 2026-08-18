@@ -222,6 +222,11 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
         rootCause: a.rootCause,
         nextStep: a.nextStep,
         comments: [],
+        annotX: a.x,
+        annotY: a.y,
+        annotW: a.w,
+        annotH: a.h,
+        annotAngle: a.angle ?? 0,
       };
     });
   }, [dbAnnotations, inspectionData, photoBladeRawMap, photoPathMap, filterCampaignId, photoMapsLoading]);
@@ -1007,19 +1012,49 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
                   </svg>
                 </button>
               </div>
-              {/* Image */}
+              {/* Image with annotation overlay */}
               <div style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img
-                  src={img}
-                  alt={`Defect ${defect.displayId} image ${idx + 1}`}
-                  style={{
-                    width: '100%',
-                    height: 'auto',
-                    display: 'block',
-                    transform: `scale(${zoomLevels[idx] ?? 1})`,
-                    transition: 'transform 0.2s',
-                  }}
-                />
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img
+                    src={img}
+                    alt={`Defect ${defect.displayId} image ${idx + 1}`}
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
+                      transform: `scale(${zoomLevels[idx] ?? 1})`,
+                      transition: 'transform 0.2s',
+                    }}
+                  />
+                  {/* Annotation overlay - same SVG logic as DefectCompareViewer */}
+                  {idx === 0 && defect.annotX != null && defect.annotY != null && defect.annotW != null && defect.annotH != null && (() => {
+                    const rad = (defect.annotAngle || 0) * (Math.PI / 180);
+                    const halfW = defect.annotW! / 2;
+                    const halfH = defect.annotH! / 2;
+                    const startX = defect.annotX! - halfW * Math.cos(rad);
+                    const startY = defect.annotY! - halfW * Math.sin(rad);
+                    const endX = defect.annotX! + halfW * Math.cos(rad);
+                    const endY = defect.annotY! + halfW * Math.sin(rad);
+                    const nx = -Math.sin(rad);
+                    const ny = Math.cos(rad);
+                    const p1x = startX + nx * halfH;
+                    const p1y = startY + ny * halfH;
+                    const p2x = endX + nx * halfH;
+                    const p2y = endY + ny * halfH;
+                    const p3x = endX - nx * halfH;
+                    const p3y = endY - ny * halfH;
+                    const p4x = startX - nx * halfH;
+                    const p4y = startY - ny * halfH;
+                    return (
+                      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible', transform: `scale(${zoomLevels[idx] ?? 1})`, transformOrigin: 'center' }}>
+                        <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                        <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                        <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                        <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                      </svg>
+                    );
+                  })()}
+                </div>
               </div>
               {/* Zoom controls */}
               <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', zIndex: 2 }}>

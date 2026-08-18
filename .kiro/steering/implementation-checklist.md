@@ -120,6 +120,7 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
    - Si el usuario dice "sí", "dale", "aprobado", "mergea", "libera" o similar → proceder con paso 5
    - Si el usuario dice "no", pide correcciones, o reporta un problema → aplicar correcciones y volver al paso 1
    - **PROHIBIDO**: Preguntar Y ejecutar el merge/deploy en el mismo turno. Son dos turnos separados obligatoriamente.
+   - **CADA CAMBIO REQUIERE APROBACIÓN**: Si el usuario pide un segundo cambio en la misma sesión, el flujo completo (build → preview → pregunta → BLOQUEO → espera respuesta) se repite desde cero. Una aprobación anterior NO cubre cambios posteriores. CADA implementación es un ciclo independiente.
 5. **Si el usuario aprueba**: ejecuta merge a main + deploy a producción:
    - Primero **rebase sobre main** para resolver conflictos ANTES del merge:
      ```
