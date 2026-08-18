@@ -174,4 +174,4 @@ const emailTextStyle: React.CSSProperties = { fontSize: '12px', color: '#334155'
 const copyLinkBtn: React.CSSProperties = { backgroundColor: '#FFC107', color: '#ffffff', fontSize: '12px', borderRadius: '4px', padding: '4px 8px', border: 'none', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' };
 const addRowStyle: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'center' };
 const inputStyle: React.CSSProperties = { border: '1px solid #ccc', borderRadius: '4px', padding: '6px 10px', fontSize: '12px', flex: 2, outline: 'none', fontFamily: 'inherit' };
-const addBtn: React.CSSProperties = { backgroundColor: '#4CAF50', color: '#ffffff', fontSize: '12px', borderRadius: '4px', padding: '6px 12px', border: 'none', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' };
+const addBtn: React.CSSProperties = { backgroundColor: '#5A8F5A', color: '#ffffff', fontSize: '12px', borderRadius: '4px', padding: '6px 12px', border: 'none', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' };

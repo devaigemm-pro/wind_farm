@@ -23,7 +23,7 @@ const COLORS = {
 
 export function CampaignCategoryChart({ data }: CampaignCategoryChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={250}>
+    <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
         <XAxis
           dataKey="turbine"
