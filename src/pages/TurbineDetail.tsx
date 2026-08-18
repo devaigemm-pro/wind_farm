@@ -400,9 +400,8 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     const bladeLetters = ['A', 'B', 'C'];
     return bladeLetters.map((bl) => {
       const bladeDefects = defects.filter((d) => d.blade === bl);
-      const highSev = bladeDefects.filter((d) => d.cat >= 4).length;
-      const total = bladeDefects.length;
-      return { label: `Blade ${bl}`, orange: total > 0 ? Math.round((highSev / total) * 100) : 0 };
+      const series = [1, 2, 3, 4, 5].map((cat) => bladeDefects.filter((d) => Number(d.cat) === cat).length);
+      return { label: `Blade ${bl}`, series };
     });
   }, [defects]);
 
@@ -660,7 +659,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
               <h3 style={cardTitle}>{t('turbineDetail.breakdownByBlade')}</h3>
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-around', alignItems: 'center' }}>
                 {donutData.map((d) => (
-                  <Donut key={d.label} label={d.label} orange={d.orange} />
+                  <Donut key={d.label} label={d.label} series={d.series} />
                 ))}
               </div>
             </div>
@@ -1101,14 +1100,16 @@ function DefectDetailPanel({ defect }: { defect: TurbineDefect | null }) {
   );
 }
 
-// ─── Donut (Pure SVG – click to highlight segment) ──────────────────────────
-function Donut({ label, orange }: { label: string; orange: number }) {
+// ─── Donut (Pure SVG – 5 category slices per blade) ─────────────────────────
+const DONUT_COLORS = [C.cat1, C.cat2, C.cat3, C.cat4, C.cat5];
+
+function Donut({ label, series }: { label: string; series: number[] }) {
   const [active, setActive] = useState<number | null>(null);
   const size = 220;
   const cx = size / 2;
   const cy = size / 2;
   const outerR = 100;
-  const innerR = 72;
+  const innerR = 65;
 
   // Build arc path for a donut segment (clockwise from top)
   function arcPath(startAngle: number, endAngle: number, outer: number, inner: number) {
@@ -1131,15 +1132,28 @@ function Donut({ label, orange }: { label: string; orange: number }) {
     ].join(' ');
   }
 
-  const segments: { d: string; fill: string; pct: number; color: string }[] = [];
-  if (orange > 0) {
-    const orangeAngle = (orange / 100) * 360;
-    segments.push({ d: arcPath(0, orangeAngle, outerR, innerR), fill: C.orange, pct: orange, color: C.orange });
-    if (orangeAngle < 360) {
-      segments.push({ d: arcPath(orangeAngle, 360, outerR, innerR), fill: C.amber, pct: 100 - orange, color: C.amber });
-    }
+  const total = series.reduce((a, b) => a + b, 0);
+  const segments: { d: string; fill: string; pct: number; value: number }[] = [];
+
+  if (total > 0) {
+    let currentAngle = 0;
+    series.forEach((val, i) => {
+      if (val === 0) return;
+      const angle = (val / total) * 360;
+      const endAngle = currentAngle + angle;
+      // Handle full circle (single category has all defects)
+      const end = endAngle >= 360 ? 359.99 : endAngle;
+      segments.push({
+        d: arcPath(currentAngle, end, outerR, innerR),
+        fill: DONUT_COLORS[i] ?? C.cat3,
+        pct: Math.round((val / total) * 100),
+        value: val,
+      });
+      currentAngle = endAngle;
+    });
   } else {
-    segments.push({ d: arcPath(0, 359.99, outerR, innerR), fill: C.amber, pct: 100, color: C.amber });
+    // Empty state — full ring in muted color
+    segments.push({ d: arcPath(0, 359.99, outerR, innerR), fill: C.ring, pct: 0, value: 0 });
   }
 
   const handleClick = (idx: number) => {
@@ -1163,50 +1177,46 @@ function Donut({ label, orange }: { label: string; orange: number }) {
             key={i}
             d={s.d}
             fill={s.fill}
-            stroke="none"
+            stroke="#ffffff"
+            strokeWidth={2}
             style={{
-              cursor: 'pointer',
+              cursor: total > 0 ? 'pointer' : 'default',
               filter: active === i ? `url(#brightness-${label})` : 'none',
               opacity: active !== null && active !== i ? 0.5 : 1,
               transition: 'opacity 0.2s, filter 0.2s',
             }}
-            onClick={() => handleClick(i)}
+            onClick={() => total > 0 && handleClick(i)}
           />
         ))}
+        {/* Percentage labels on slices */}
+        {segments.map((s, i) => {
+          if (s.pct < 8 || total === 0) return null; // Skip label if too small
+          // Calculate midpoint angle for label placement
+          let angleSum = 0;
+          for (let j = 0; j < i; j++) angleSum += ((segments[j]?.value ?? 0) / total) * 360;
+          const midAngle = angleSum + ((s.value / total) * 360) / 2;
+          const labelR = (outerR + innerR) / 2;
+          const toRad = (a: number) => ((a - 90) * Math.PI) / 180;
+          const lx = cx + labelR * Math.cos(toRad(midAngle));
+          const ly = cy + labelR * Math.sin(toRad(midAngle));
+          return (
+            <text
+              key={`lbl-${i}`}
+              x={lx}
+              y={ly}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={10}
+              fontWeight={600}
+              fill="#ffffff"
+              style={{ pointerEvents: 'none' }}
+            >
+              {s.pct}%
+            </text>
+          );
+        })}
       </svg>
-      <div style={{ ...donutCenter, pointerEvents: 'none' }}>
-        {orange > 0 && (
-          <span
-            onClick={() => handleClick(0)}
-            style={{
-              fontSize: active === 0 ? 16 : 13,
-              color: C.orange,
-              fontWeight: 700,
-              cursor: 'pointer',
-              opacity: active !== null && active !== 0 ? 0.4 : 1,
-              transition: 'font-size 0.2s, opacity 0.2s',
-              pointerEvents: 'auto',
-            }}
-          >
-            {orange}%
-          </span>
-        )}
-        <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{label}</span>
-        <span
-          onClick={() => handleClick(segments.length - 1)}
-          style={{
-            fontSize: active === segments.length - 1 ? 16 : 13,
-            color: C.amber,
-            fontWeight: 700,
-            cursor: 'pointer',
-            opacity: active !== null && active !== segments.length - 1 ? 0.4 : 1,
-            transition: 'font-size 0.2s, opacity 0.2s',
-            pointerEvents: 'auto',
-          }}
-        >
-          {100 - orange}%
-        </span>
-      </div>
+      <p style={{ textAlign: 'center', margin: '4px 0 0', fontSize: 14, fontWeight: 500, color: C.text }}>{label}</p>
     </div>
   );
 }
