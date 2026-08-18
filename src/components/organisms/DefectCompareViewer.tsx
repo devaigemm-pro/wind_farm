@@ -209,19 +209,6 @@ export function DefectCompareViewer({
 
   const effectiveAnnot = (annotX != null && annotY != null) ? { x: annotX, y: annotY, w: annotW!, h: annotH!, angle: annotAngle || 0 } : loadedAnnot;
 
-  const annotationStyle: React.CSSProperties = hasAnnotation && effectiveAnnot ? {
-    position: 'absolute',
-    left: `${effectiveAnnot.x}%`,
-    top: `${effectiveAnnot.y}%`,
-    width: `${effectiveAnnot.w}%`,
-    height: `${effectiveAnnot.h}%`,
-    border: '2px solid #FF0000',
-    boxShadow: '0 0 6px rgba(255,0,0,0.5)',
-    pointerEvents: 'none',
-    transform: effectiveAnnot.angle ? `rotate(${effectiveAnnot.angle}deg)` : undefined,
-    transformOrigin: 'top left',
-  } : {};
-
   const formattedDate = currentDate ? new Date(currentDate).toLocaleString() : 'N/A';
 
   return (
@@ -240,9 +227,23 @@ export function DefectCompareViewer({
           </div>
           <div style={imageContainerStyle}>
             {activeImage ? (
-              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img src={activeImage} alt="Defect" style={{ ...imageStyle, transform: `scale(${zoomLevel})` }} crossOrigin="anonymous" />
-                {hasAnnotation && <div style={annotationStyle} />}
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img src={activeImage} alt="Defect" style={{ ...imageStyle, transform: `scale(${zoomLevel})`, maxWidth: '100%', maxHeight: 'calc(100vh - 120px)' }} crossOrigin="anonymous" />
+                {/* Annotation overlay - positioned relative to the image */}
+                {hasAnnotation && effectiveAnnot && (
+                  <div style={{
+                    position: 'absolute',
+                    left: `${effectiveAnnot.x}%`,
+                    top: `${effectiveAnnot.y}%`,
+                    width: `${effectiveAnnot.w}%`,
+                    height: `${effectiveAnnot.h}%`,
+                    border: '2px solid #FF0000',
+                    boxShadow: '0 0 6px rgba(255,0,0,0.5)',
+                    pointerEvents: 'none',
+                    transform: effectiveAnnot.angle ? `rotate(${effectiveAnnot.angle}deg)` : undefined,
+                    transformOrigin: 'top left',
+                  }} />
+                )}
                 {loading && <div style={loadingOverlay}>Loading...</div>}
               </div>
             ) : (
@@ -270,10 +271,10 @@ export function DefectCompareViewer({
                 <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
                 </button>
-                <button type="button" style={{ ...navBtnStyle, flexDirection: 'row', gap: '4px' }} onClick={() => navigateHub('closer')}>
+                <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')}>
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
-                  <span style={navLabelStyle}>Hub</span>
                 </button>
+                <span style={navLabelStyle}>Hub</span>
               </div>
               {/* Down arrow + PS label */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
