@@ -253,9 +253,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // Recalculate annotation layer position on container resize
   const recalcImgContentStyle = useCallback(() => {
-    updateCachedImgRect();
     setLayoutTick(t => t + 1);
-  }, [updateCachedImgRect]);
+  }, []);
 
   // ─── Image zoom & pan ───────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(1.0);
