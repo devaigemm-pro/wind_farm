@@ -13,9 +13,12 @@ test.describe('Smoke Tests @smoke', () => {
 
   test('static assets load correctly', async ({ page }) => {
     await page.goto('/')
-    // Verify favicon or logo loads
-    const favicon = page.locator('link[rel="icon"]')
-    await expect(favicon).toHaveCount(1)
+    // Verify the HTML head contains a favicon link (rel="icon")
+    const hasIcon = await page.evaluate(() => {
+      const link = document.querySelector('link[rel="icon"]');
+      return link !== null;
+    });
+    expect(hasIcon).toBe(true)
   })
 
   test('no critical JS errors on page load', async ({ page }) => {
