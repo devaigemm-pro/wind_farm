@@ -1040,3 +1040,16 @@
   - Iteración de 4 turnos para un cambio visual simple — la confusión fue sobre QUÉ icono usar (SVG genérico vs parte de la imagen real)
   - **APRENDIZAJE**: Cuando el usuario adjunta una imagen y dice "usar solo X de esta imagen", el agente debe CREAR un asset (SVG preferido) que replique esa parte. No pedir al usuario que haga trabajo manual. Si es posible recrear como SVG, hacerlo directamente.
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, imagen como spec, "hazlo tu mismo" = no delegar trabajo manual al usuario, iteración estética rápida, corrección directa sin drama
+
+### Sesión 110 - 2026-08-17
+- **Tarea principal**: Barrido visual en CampaignResults y toda la app: (1) Igualar height del gráfico "category repartition" al de "type repartition" (250→280px). (2) Cambiar color botón "Add user" en SharePopover de #4CAF50 a #5A8F5A. (3) Agregar barra verde separadora (border-left: 4px solid #5A8F5A) a TODOS los títulos de pantalla (12 pantallas). (4) Cambiar color del separador "|" en el login de #4CAF50 a #5A8F5A. (5) Merge a main + push.
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio + URL de la pantalla — patrón clásico
+  - "ajustar el grafico X a la misma dimensión que el grafico Y" — igualación visual sin dar valores técnicos
+  - "ademas..." en mensajes separados — extiende la tarea secuencialmente sin repetir contexto
+  - Proporciona imagen como spec visual para la barra separadora — patrón "imagen como spec" confirmado
+  - "en cada pantalla" = auditoría exhaustiva cross-app
+  - "el mismo color que usan los botones" = #5A8F5A (no necesita repetir el hex)
+  - "hacer merge con main" — instrucción directa, espera ejecución completa (commit + checkout main + merge + push + volver a branch)
+  - 5 micro-cambios secuenciales + merge en la misma sesión sin correcciones — todos aceptados al primer intento
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, imagen como spec, "ademas" = extender tarea, "en cada pantalla" = auditoría cross-app exhaustiva, #5A8F5A acento único global, URL como referencia, barrido visual por sesión, quiere merge a main después de completar
