@@ -55,16 +55,16 @@ Cada vez que implementes cambios en el proyecto, DEBES seguir este checklist.
 1. `git fetch origin main && git rebase origin/main`
 2. Si hay conflictos → resolver, rebuild, verificar con usuario
 3. `git checkout main && git pull origin main && git merge <branch> --no-ff && git push origin main`
-4. Activar skill `deploy-to-vercel` → deploy producción
+4. GitHub Actions despliega automáticamente a Vercel (NO hacer deploy desde Kiro)
 5. `git checkout <branch>` (volver a la rama para seguir trabajando)
 
 ### PROHIBIDO:
 
-- Desplegar a producción sin instrucción EXPLÍCITA del usuario
+- Ejecutar `vercel deploy` o cualquier comando de Vercel CLI
+- Activar la skill `deploy-to-vercel`
 - Pushear session branches a origin
 - Hacer merge/push a main sin instrucción del usuario
 - Asumir que una aprobación anterior cubre cambios nuevos
-- Activar deploy-to-vercel automáticamente al inicio de sesión
 
 ---
 
