@@ -235,6 +235,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // State to force re-render when container resizes (so annotation layer repositions)
   const [, setLayoutTick] = useState(0);
+  // Cache the annotation layer rect to avoid jitter during drawing re-renders
+  const cachedImgRectRef = useRef<{ offsetX: number; offsetY: number; width: number; height: number } | null>(null);
+
+  const updateCachedImgRect = useCallback(() => {
+    cachedImgRectRef.current = computeImageRect();
+  }, [computeImageRect]);
 
   const getImageRect = useCallback((_containerRect: DOMRect) => {
     return computeImageRect();
@@ -251,8 +257,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // Recalculate annotation layer position on container resize
   const recalcImgContentStyle = useCallback(() => {
+    updateCachedImgRect();
     setLayoutTick(t => t + 1);
-  }, []);
+  }, [updateCachedImgRect]);
 
   // ─── Image zoom & pan ───────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(1.0);
@@ -472,7 +479,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const annotsCount = thumbnails.filter(t => t.hasAnnotation || ((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
 
   // Compute image rect for annotation layer positioning (recalculates on every render)
-  const imgRect = computeImageRect();
+  const imgRect = cachedImgRectRef.current || computeImageRect();
   const imgContentStyle = {
     top: `${imgRect.offsetY}px`,
     left: `${imgRect.offsetX}px`,

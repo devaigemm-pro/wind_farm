@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 139
+- **Sesiones analizadas**: 145
 - **Última actualización**: 2026-08-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1428,23 +1428,28 @@
   - Sesión ultra-corta: un solo bug, diagnóstico + fix + build + preview, sin iteraciones
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe bugs desde lo visual sin detalles técnicos, aprobación con 👍, confía en diagnóstico del agente
 
-### Sesión 142 - 2026-08-18
-- **Tarea principal**: Deploy directo a Vercel desde local (GitHub Actions seguía fallando). Token anterior inválido, usuario proporcionó nuevo token que funcionó.
+### Sesión 143 - 2026-08-18
+- **Tarea principal**: Fix React error #310 (infinite re-render loop) en producción después del deploy — causado por `computeImageRect` como dependencia de `useMemo` en el `imgContentStyle` introducido esta misma sesión
 - **Observaciones nuevas**:
-  - Proporcionó token directamente sin explicaciones ni preguntas — confianza total en el agente para manejar credenciales (confirmado 3+ sesiones)
-  - Primer token era inválido ("User not found"), segundo funcionó — no se frustró por el primer intento fallido
-  - "hazlo directo" = bypass la infraestructura cuando falla, priorizar resultado inmediato
-  - Token Vercel nuevo: prefijo `vcp_8Lmd...` — team dev-ai2 (DEV AI), user devaigemm-1057
-  - Deploy exitoso a https://wind-farm-eight.vercel.app
-- **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima, confianza total con credenciales (confianza MÁXIMA - 4+ sesiones), "hazlo directo" = bypass cuando infra falla, prioriza resultado sobre proceso
+  - Reportó el error con el stack trace completo del minified React — patrón de dar información técnica exacta cuando la tiene
+  - El bug fue introducido por el fix anterior de esta misma sesión (memoizar imgContentStyle) — la dependencia `computeImageRect` en el useMemo causaba re-evaluación en cada render que triggereaba más renders
+  - Fix: eliminar `computeImageRect` de las deps del useMemo — `layoutTick` y `viewerLoaded` son suficientes
+  - Deploy directo con vercel CLI fue el único camino viable (GitHub Actions sigue con problema de token)
+  - **APRENDIZAJE**: Al usar `useMemo`, las funciones `useCallback` como dependencias pueden causar infinite loops si no son realmente estables. Preferir deps primitivas (numbers, booleans, strings) sobre funciones.
+- **Patrones confirmados**: español, directo, alta autonomía, reporta errores con stack trace exacto, confía en diagnóstico del agente, deploy directo cuando infra falla
 
-### Sesión 144 - 2026-08-18
-- **Tarea principal**: Configurar deploy vía integración nativa Vercel+GitHub (sin GitHub Actions, sin CLI local) — solo main despliega automáticamente a Vercel
+### Sesiones 138-145 - 2026-08-18
+- **Tarea principal**: Sesión larga con múltiples fixes en step 2 ANNOTATE + deploy issues:
+  (1) Blade face overlay bloqueaba draw — eliminado guard redundante
+  (2) Escape cancela drawing en progreso
+  (3) Fix jitter de anotaciones durante draw con useMemo — CAUSÓ React error #310 (infinite loop)
+  (4) Fix rootDistance missing en CreateAnnotationInput — causaba fallo de tsc en CI
+  (5) Deploy directo con vercel CLI (GitHub Actions fallaba por token inválido)
+  (6) Revert useMemo que causaba loop infinito — volvió al cálculo directo estable
 - **Observaciones nuevas**:
-  - "revisa la documentación para ver la mejor opción" — pide investigación antes de acción. Para decisiones técnicas de infraestructura quiere que el agente busque la opción óptima, no que improvise.
-  - "como dato, vercel está conectado al proyecto git" — da contexto clave que simplifica la solución. La integración nativa ya existe, solo había que configurarla correctamente.
-  - La solución más simple ganó: integración nativa Vercel+GitHub hace todo. No necesitamos GitHub Actions workflow para deploy. vercel.json con deploymentEnabled main:true, session/*:false.
-  - Eliminado release.yml (redundante con la integración nativa).
-  - Los deploys fallaron porque pusimos `deploymentEnabled: false` para bloquear el auto-deploy. Ahora está corregido: main=true, session=false.
-  - **ARQUITECTURA FINAL DE DEPLOY**: Vercel integración nativa detecta push a main → deploy producción. Kiro NUNCA deploy. Kiro solo merge+push cuando el usuario instruye.
-- **Patrones confirmados**: español, directo, "revisa documentación" = investiga la mejor opción, la solución más simple gana, integración nativa > workflows custom, separación clara de responsabilidades
+  - El useMemo con layoutTick + ResizeObserver causa loop infinito en React. NO usar useMemo con deps que se actualizan por ResizeObserver.
+  - Múltiples deploys fallidos en una sesión generan frustración — priorizar que producción FUNCIONE antes de optimizar.
+  - Token Vercel: el primero fue inválido (vcp_8VAS...), el segundo funcionó (vcp_8Lmd...). Team: dev-ai2 (DEV AI).
+  - "el deploy fallo" x2 — reporta sin contexto, espera que el agente diagnostique y corrija rápido.
+  - Sesión de 8 turnos sobre el mismo tema (draw + deploy) — paciencia siempre que se avance.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, deploy directo cuando infra falla, confianza total con credenciales, prioriza producción funcionando, reporta errores con stack trace exacto
