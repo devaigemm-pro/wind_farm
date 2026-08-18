@@ -101,22 +101,36 @@ Turno 3 (futuro): Usuario dice "agrega validación al otro form"
 
 ---
 
-## 5. Deploy a Producción
+## 5. Deploy según Branch
 
 Después de que los cambios pasen la verificación de concordancia y compilen sin errores:
 
+### Si estás en una rama de sesión (session/* o cualquier rama != main):
+
+1. **Ejecuta build**: `pnpm run build`
+2. **Levanta preview local**: `pnpm run preview` (Vite preview en puerto 4173)
+3. **Entrega la URL local al usuario**: `http://localhost:4173`
+4. **Espera la aprobación del usuario** antes de continuar
+5. **Si el usuario aprueba**: ejecuta merge a main + deploy a producción:
+   - `git checkout main && git merge <branch> && git push origin main`
+   - Activa la skill `deploy-to-vercel` y despliega a producción
+   - Vuelve a la rama de sesión: `git checkout <branch>`
+6. **Si el usuario pide correcciones**: aplica los cambios y vuelve al paso 1
+
+### Si estás en main (solo si el usuario lo indica explícitamente):
+
 1. **Activa la skill `deploy-to-vercel`** usando `disclose_context`
 2. **Sigue el flujo de la skill**: Gather Project State → Choose Deploy Method
-3. **Despliega a producción** — no a preview, a producción directamente (salvo que el usuario pida lo contrario)
-4. **Verifica que el deploy sea exitoso**: revisa la URL y confirma que no haya errores
-5. **Si el deploy falla**: corrige el error y reintenta
+3. **Despliega a producción**
+4. **Verifica que el deploy sea exitoso**
 
-### Cuándo NO desplegar:
+### Cuándo NO desplegar a producción:
+- Si estás en una rama de sesión y el usuario NO ha aprobado los cambios
 - Si los cambios son solo a archivos de configuración del agente (.kiro/agents/, .kiro/steering/, .kiro/hooks/)
 - Si el usuario explícitamente dice que no despliegue
 - Si los cambios no pasan la verificación de concordancia o el build falla
 
-### Regla: Todo cambio al código del proyecto que compile correctamente DEBE ir a producción automáticamente.
+### Regla: En ramas de sesión, SIEMPRE preview local primero. Solo main puede ir a producción Vercel. El usuario DEBE aprobar antes del merge.
 
 ---
 

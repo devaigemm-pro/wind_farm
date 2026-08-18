@@ -18,9 +18,17 @@ fi
 if git diff --quiet && git diff --cached --quiet; then
   echo "No changes to commit on $CURRENT"
 else
+  # Stage all changes EXCEPT learning profile files (those stay local only)
   git add -A
-  # Generate commit message from branch name
-  git commit -m "session: auto-commit changes from $CURRENT" --allow-empty 2>/dev/null || true
+  git reset -- .kiro/agents/user-profile.md 2>/dev/null || true
+  git reset -- .kiro/agents/ 2>/dev/null || true
+
+  # Only commit if there are staged changes after exclusions
+  if ! git diff --cached --quiet; then
+    git commit -m "session: auto-commit changes from $CURRENT" 2>/dev/null || true
+  else
+    echo "No non-profile changes to commit on $CURRENT"
+  fi
 fi
 
 # Push the branch (create remote if needed)

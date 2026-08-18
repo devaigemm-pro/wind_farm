@@ -28,6 +28,9 @@ dist-ssr
 !.kiro/tmp/.gitkeep
 !.kiro/tmp/README.md
 .kiro/.auth_queue/
+
+# Learning profile (local only, never push)
+.kiro/agents/user-profile.md
 .vercel
 .env*
 
