@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useLanguage } from '@/components/design-system';
 
 interface Defect {
@@ -51,18 +51,10 @@ export function BladesDiagram({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);
-  const [layoutReady, setLayoutReady] = useState(false);
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
 
   const blades = ['A', 'B', 'C'] as const;
-
-  // Mark layout ready after first paint (never resets)
-  useEffect(() => {
-    if (layoutReady) return;
-    const frame = requestAnimationFrame(() => setLayoutReady(true));
-    return () => cancelAnimationFrame(frame);
-  }, [layoutReady]);
 
   // Generate meter marks dynamically based on bladeLength
   const numSegments = 9;
@@ -280,8 +272,7 @@ export function BladesDiagram({
                             border: `2px solid ${color}`,
                             background: color,
                             boxShadow: isSelected ? 'rgb(0, 166, 255) 0px 0px 0px 4px' : 'none',
-                            opacity: layoutReady ? 0.8 : 0,
-                            transition: 'opacity 0.1s',
+                            opacity: 0.8,
                             zIndex: isSelected ? 4 : 3,
                             display: 'flex',
                             alignItems: 'center',
