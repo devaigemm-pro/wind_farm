@@ -167,6 +167,8 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   const annotationDefects = useMemo<TurbineDefect[]>(() => {
     if (!dbAnnotations || dbAnnotations.length === 0) return [];
     if (photoMapsLoading) return [];
+    // Wait for inspectionData.blades to be available (needed for blade letter derivation)
+    if (!inspectionData?.blades || inspectionData.blades.length === 0) return [];
     const inspToBladeMap = inspectionData?.inspectionToBladePosition ?? {};
 
     // Build blade_id (UUID) → position letter lookup from inspectionData.blades
@@ -266,7 +268,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
   }, [confirmedDefectRecords, dbAnnotations]);
 
   const defects: TurbineDefect[] = useMemo(() => {
-    // Don't render defects until annotation data pipeline is fully resolved
+    // Don't render defects until the full data pipeline is resolved.
     if (turbineInspIdsLoading || annotationsLoading || photoMapsLoading) return [];
 
     // Path 1: If we have annotations (from annotation table), use them
