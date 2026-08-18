@@ -105,6 +105,18 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     }));
   }, [photos, dbAnnotations, bladePositionMap, taggedPhotos]);
 
+  // ─── Helper: compute root distance from photo metadata + annotation Y ───
+  function computeRootDistance(thumbnailId: string, yPercent: number): number {
+    const thumb = thumbnails.find(t => t.id === thumbnailId);
+    if (thumb && thumb.bladeRootDistance != null) {
+      const dtb = thumb.distanceToBlade || 5;
+      const vertCoverage = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
+      const offset = (yPercent / 100) * vertCoverage;
+      return Math.round((thumb.bladeRootDistance + offset) * 10) / 10;
+    }
+    return Math.round(yPercent * 0.43 * 10) / 10;
+  }
+
   // Group DB annotations by thumbnail_id for rendering
   const savedAnnotations = useMemo(() => {
     const grouped: Record<string, { id: string; x: number; y: number; w: number; h: number; angle: number; type: string; category: number; note: string }[]> = {};
@@ -133,11 +145,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [selectedDefectBlade, setSelectedDefectBlade] = useState<string>(savedBlade || 'A');
   
   // Right panel state — empty until a defect is selected
-  const [rightPanelType, setRightPanelType] = useState('');
-  const [rightPanelCategory, setRightPanelCategory] = useState(0);
-  const [rightPanelRootDistance, setRightPanelRootDistance] = useState(0);
-  const [rightPanelFace, setRightPanelFace] = useState('');
-  const [rightPanelBlade, setRightPanelBlade] = useState('');
+  // Right panel state
   const [changeBladeExpanded, setChangeBladeExpanded] = useState(false);
   const [comparisonExpanded, setComparisonExpanded] = useState(true);
   const [turbineInfoExpanded, setTurbineInfoExpanded] = useState(true);
@@ -345,8 +353,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       const target = firstVisible || thumbnails[0]!;
       setSelectedThumbnail(target.id);
       setSelectedDefectBlade(target.blade);
-      setRightPanelBlade(target.blade);
-      setRightPanelFace(target.face);
       // Populate metadata bar with distance data from BD (round decimals)
       if (target.bladeRootDistance != null) setMetaRootDist(Math.round(target.bladeRootDistance));
       if (target.distanceToBlade != null) setMetaDistBlade(Math.round(target.distanceToBlade));
@@ -467,21 +473,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     markViewed.mutate({ photoId: thumbId, campaignId });
     const thumb = thumbnails.find(t => t.id === thumbId);
     if (thumb) {
-      setRightPanelBlade(thumb.blade);
-      setRightPanelFace(thumb.face);
       setSelectedDefectBlade(thumb.blade);
       // Update metadata bar with photo distance data from BD (round decimals)
       if (thumb.bladeRootDistance != null) setMetaRootDist(Math.round(thumb.bladeRootDistance));
       if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade));
       // Notify parent to persist selection across step changes
       onSelectionChange?.(thumbId, thumb.blade);
-      // Check if there's a saved annotation for this thumbnail
-      const thumbAnnotations = savedAnnotations[thumbId];
-      if (thumbAnnotations && thumbAnnotations.length > 0) {
-        const lastAnn = thumbAnnotations[thumbAnnotations.length - 1]!;
-        setRightPanelType(lastAnn.type);
-        setRightPanelCategory(lastAnn.category);
-      }
     }
   };
 
@@ -1177,14 +1174,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     setDrawConfirmed(true);
                     setEditingAnnotationId(ann.id);
                     setShowAnnotationPopover(true);
-                    setRightPanelType(ann.type);
-                    setRightPanelCategory(ann.category);
-                    setRightPanelRootDistance(Math.round(ann.y * 0.43 * 10) / 10);
-                    const thumb = thumbnails.find(t => t.id === selectedThumbnail);
-                    if (thumb) {
-                      setRightPanelFace(thumb.face);
-                      setRightPanelBlade(thumb.blade);
-                    }
                   }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                   </button>
@@ -1432,6 +1421,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       type: annotationType,
                       category: annotationCategory,
                       note: (drawShape === 'oval' ? '[oval]' : '') + annotationNote,
+                      rootDistance: computeRootDistance(selectedThumbnail, cy),
                     }, {
                       onError: (err) => {
                         setSaveError(err instanceof Error ? err.message : t('annotate.saveFailed'));
@@ -1457,90 +1447,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       {/* ═══ RIGHT PANEL ═══ */}
       <div style={rightPanelStyle}>
         <div style={rightPanelInner}>
-          {/* Defect type selector */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>{t('annotate.defectType')}</label>
-            <select style={selectStyle} value={rightPanelType} onChange={e => setRightPanelType(e.target.value)}>
-              <option value="LE EROSION">{t('defect.leErosion')}</option>
-              <option value="VORTEX (MISSING PANELS)">{t('defect.vortex')}</option>
-              <option value="PAINT DAMAGES">{t('defect.paintDamages')}</option>
-              <option value="OTHER ADD-ONS MISSING">{t('defect.addOnsMissing')}</option>
-              <option value="BLADES WITH HYDRAULIC OIL">{t('defect.hydraulicOil')}</option>
-              <option value="CRACK">{t('defect.crack')}</option>
-              <option value="LONGITUDINAL CRACKS ON LE OR TE BOND LINES">{t('defect.longitudinalCracks')}</option>
-            </select>
-          </div>
-
-          {/* Category */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>{t('annotate.category')}</label>
-            <div style={{ display: 'flex', gap: 0 }}>
-              {[1, 2, 3, 4, 5].map((c) => (
-                <button key={c} onClick={() => setRightPanelCategory(c)} style={{ ...catBtn, ...(c === rightPanelCategory ? catBtnActive : {}), borderRadius: c === 1 ? '4px 0 0 4px' : c === 5 ? '0 4px 4px 0' : 0 }}>
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Root distance */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>{t('annotate.rootDistance')}</label>
-            <input type="number" style={inputStyle} value={rightPanelRootDistance} onChange={e => setRightPanelRootDistance(Number(e.target.value))} step="0.1" min="0" />
-          </div>
-
-          {/* Blade face */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Blade face</label>
-            <select style={selectStyle} value={rightPanelFace} onChange={e => setRightPanelFace(e.target.value)}>
-              <option value="SS">SS</option>
-              <option value="PS">PS</option>
-              <option value="LE">LE</option>
-              <option value="TE">TE</option>
-            </select>
-          </div>
-
-          {/* Blade selector */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Blade</label>
-            <select style={selectStyle} value={rightPanelBlade} onChange={e => { setRightPanelBlade(e.target.value); setSelectedDefectBlade(e.target.value); }}>
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-            </select>
-          </div>
-
-          {/* Save button */}
-          {role !== 'supervisor' && (
-          <button style={{ ...saveBtnStyle, cursor: 'pointer', background: C.primary }} onClick={() => {
-            
-            if (drawStart && drawEnd) {
-              const dx = drawEnd.x - drawStart.x;
-              const dy = drawEnd.y - drawStart.y;
-              const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-              const cx = (drawStart.x + drawEnd.x) / 2;
-              const cy = (drawStart.y + drawEnd.y) / 2;
-              const w = Math.sqrt(dx * dx + dy * dy);
-              const h = drawWidth;
-              if (w > 0) {
-                createAnnotation.mutate({
-                  inspectionId,
-                  thumbnailId: selectedThumbnail,
-                  x: cx, y: cy, w, h,
-                  angle,
-                  type: rightPanelType,
-                  category: rightPanelCategory,
-                  note: drawShape === 'oval' ? '[oval]' : '',
-                });
-              }
-            }
-            setDrawStart(null);
-            setDrawEnd(null);
-            setDrawConfirmed(false);
-            setDrawPhase('idle');
-            setDrawWidth(3);
-          }}>{t('button.save')}</button>
-          )}
         </div>
 
         {/* ─── Comparison accordion ─── */}
