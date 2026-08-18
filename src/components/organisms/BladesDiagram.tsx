@@ -242,15 +242,17 @@ export function BladesDiagram({
             })}
 
             {/* Blade columns */}
-            <div style={{ display: 'flex', width: '100%', height: '100%', position: 'relative', zIndex: 2 }}>
+            <div style={{ display: 'flex', width: '100%', height: '100%', position: 'relative', zIndex: 2, justifyContent: 'space-evenly' }}>
               {blades.map((blade) => {
                 const bladeDefects = defects.filter((d) => d.blade === blade);
+                // Calculate blade wrapper width from known SVG aspect ratio (493.5:2338)
+                const bladeWidth = totalH * (493.5 / 2338);
                 return (
-                  <div key={blade} style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+                  <div key={blade} style={{ position: 'relative', width: bladeWidth, height: '100%', flexShrink: 0 }}>
                     <img
                       src="/blade.svg"
                       alt={`Blade ${blade}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block', pointerEvents: 'none' }}
+                      style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none' }}
                     />
                     {bladeDefects.map((d, i) => {
                       const isSS = d.side === 'SS' || d.side === 'TE';
@@ -263,8 +265,8 @@ export function BladesDiagram({
                           style={{
                             position: 'absolute',
                             top: topPx(d.root),
-                            left: '50%',
-                            transform: `translate(${isSS ? '-130%' : '30%'}, -50%)`,
+                            left: isSS ? '25%' : '75%',
+                            transform: 'translate(-50%, -50%)',
                             fontSize: 10,
                             width: 22,
                             height: 22,
