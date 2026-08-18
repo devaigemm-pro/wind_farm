@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLanguage } from '@/components/design-system';
 
 interface Defect {
@@ -51,8 +51,21 @@ export function BladesDiagram({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);
+  const [stableDefects, setStableDefects] = useState<Defect[]>([]);
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
+
+  // Debounce: only render defects after data is stable for 300ms.
+  // This prevents the flash of incorrect positions during async loading.
+  // The fade-in animation (CSS) makes the 300ms wait imperceptible.
+  useEffect(() => {
+    if (defects.length === 0) {
+      setStableDefects([]);
+      return;
+    }
+    const timer = setTimeout(() => setStableDefects(defects), 300);
+    return () => clearTimeout(timer);
+  }, [defects]);
 
   const blades = ['A', 'B', 'C'] as const;
 
@@ -107,6 +120,8 @@ export function BladesDiagram({
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
+      {/* Keyframe for dot fade-in */}
+      <style>{`@keyframes fadeInDot { from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } to { opacity: 0.8; transform: translate(-50%, -50%) scale(1); } }`}</style>
       {/* Info button - top right */}
       <button
         type="button"
@@ -244,7 +259,7 @@ export function BladesDiagram({
             {/* Blade columns */}
             <div style={{ display: 'flex', width: '100%', height: '100%', position: 'relative', zIndex: 2, justifyContent: 'space-evenly' }}>
               {blades.map((blade) => {
-                const bladeDefects = defects.filter((d) => d.blade === blade);
+                const bladeDefects = stableDefects.filter((d) => d.blade === blade);
                 // Calculate blade wrapper width from known SVG aspect ratio (493.5:2338)
                 const bladeWidth = totalH * (493.5 / 2338);
                 return (
@@ -275,6 +290,7 @@ export function BladesDiagram({
                             background: color,
                             boxShadow: isSelected ? 'rgb(0, 166, 255) 0px 0px 0px 4px' : 'none',
                             opacity: 0.8,
+                            animation: 'fadeInDot 0.25s ease-out',
                             zIndex: isSelected ? 4 : 3,
                             display: 'flex',
                             alignItems: 'center',
