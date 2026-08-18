@@ -876,7 +876,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           onContextMenu={(e) => { if (zoomLevel > 1) e.preventDefault(); }}
           onMouseDown={(e) => {
             if (showAnnotationPopover) return;
-            if (showBladeOverlay) return;
             // Middle mouse or right click = pan when zoomed
             if ((e.button === 1 || e.button === 2) && zoomLevel > 1) {
               e.preventDefault();
