@@ -57,7 +57,7 @@ async function fetchInspectionPhotos(
 
   let query = db
     .from('inspection_photo')
-    .select('id, campaign_id, blade_id, face, radial_position, flight_plan_order, storage_path, filename, metadata, blade:blade_id(position)')
+    .select('id, campaign_id, blade_id, face, radial_position, flight_plan_order, storage_path, filename, metadata, is_tagged, blade:blade_id(position)')
     .eq('campaign_id', campaignId)
     .order('flight_plan_order', { ascending: true });
 
@@ -79,7 +79,7 @@ async function fetchInspectionPhotos(
     flightPlanOrder: Number(row.flight_plan_order),
     storagePath: row.storage_path as string,
     filename: row.filename as string,
-    isTagged: ((row.metadata as Record<string, unknown>)?.tagged as boolean) ?? false,
+    isTagged: (row.is_tagged as boolean) ?? false,
     isViewed: ((row.metadata as Record<string, unknown>)?.viewed as boolean) ?? false,
     thumbnailUrl: '', // Will be populated below for imported photos
     bladeRootDistance: (row.metadata as Record<string, unknown>)?.blade_root_distance != null ? Number((row.metadata as Record<string, unknown>).blade_root_distance) : null,
