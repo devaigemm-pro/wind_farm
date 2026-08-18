@@ -103,18 +103,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     }));
   }, [photos, dbAnnotations, bladePositionMap, taggedPhotos]);
 
-  // ─── Helper: compute root distance from photo metadata + annotation Y ───
-  function computeRootDistance(thumbnailId: string, yPercent: number): number {
-    const thumb = thumbnails.find(t => t.id === thumbnailId);
-    if (thumb && thumb.bladeRootDistance != null) {
-      const dtb = thumb.distanceToBlade || 5;
-      const vertCoverage = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
-      const offset = (yPercent / 100) * vertCoverage;
-      return Math.round((thumb.bladeRootDistance + offset) * 10) / 10;
-    }
-    return Math.round(yPercent * 0.43 * 10) / 10;
-  }
-
   // Group DB annotations by thumbnail_id for rendering
   const savedAnnotations = useMemo(() => {
     const grouped: Record<string, { id: string; x: number; y: number; w: number; h: number; angle: number; type: string; category: number; note: string }[]> = {};
@@ -882,11 +870,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setDrawConfirmed(true);
               setDrawPhase('idle');
               setShowAnnotationPopover(true);
-              // Auto-fill root distance from photo metadata + annotation center Y
-              if (drawStart && drawEnd) {
-                const cy = (drawStart.y + drawEnd.y) / 2;
-                setRightPanelRootDistance(computeRootDistance(selectedThumbnail, cy));
-              }
             } else {
               // Start drawing a new line (Phase 1)
               isMouseDownRef.current = true;
@@ -1165,7 +1148,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     setShowAnnotationPopover(true);
                     setRightPanelType(ann.type);
                     setRightPanelCategory(ann.category);
-                    setRightPanelRootDistance(computeRootDistance(selectedThumbnail, ann.y));
+                    setRightPanelRootDistance(Math.round(ann.y * 0.43 * 10) / 10);
                     const thumb = thumbnails.find(t => t.id === selectedThumbnail);
                     if (thumb) {
                       setRightPanelFace(thumb.face);
@@ -1418,7 +1401,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       type: annotationType,
                       category: annotationCategory,
                       note: (drawShape === 'oval' ? '[oval]' : '') + annotationNote,
-                      rootDistance: computeRootDistance(selectedThumbnail, cy),
                     }, {
                       onError: (err) => {
                         setSaveError(err instanceof Error ? err.message : t('annotate.saveFailed'));
@@ -1518,7 +1500,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   type: rightPanelType,
                   category: rightPanelCategory,
                   note: drawShape === 'oval' ? '[oval]' : '',
-                  rootDistance: rightPanelRootDistance || computeRootDistance(selectedThumbnail, cy),
                 });
               }
             }
