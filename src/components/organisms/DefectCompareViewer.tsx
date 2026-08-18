@@ -60,6 +60,7 @@ export function DefectCompareViewer({
   const [activeDistance, setActiveDistance] = useState(distanceFromRoot);
   const [bladePhotos, setBladePhotos] = useState<BladePhoto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadedAnnot, setLoadedAnnot] = useState<{ x: number; y: number; w: number; h: number; angle: number } | null>(null);
 
   // Load blade photos for navigation
   useEffect(() => {
@@ -85,49 +86,52 @@ export function DefectCompareViewer({
     })();
   }, [bladeId]);
 
-  // Load the defect's annotation image (the photo from step 2 ANNOTATE)
+  // Load the defect's annotation (coords + photo) from step 2 ANNOTATE
   useEffect(() => {
-    if (currentImage) return; // already have an image
     if (!inspectionId) return;
-    // Try to load via defect → annotation → inspection_photo
     (async () => {
       const db = supabase as any;
-      // Find defects for this inspection that match our type/distance
-      const { data: defects } = await db
+      // Find defects for this inspection
+      const { data: defectRows } = await db
         .from('defect')
         .select('description')
         .eq('inspection_id', inspectionId)
         .not('description', 'is', null)
-        .limit(10);
+        .limit(20);
 
-      if (!defects || defects.length === 0) return;
+      if (!defectRows || defectRows.length === 0) return;
 
-      const annotIds = defects.map((d: any) => d.description).filter(Boolean);
+      const annotIds = defectRows.map((d: any) => d.description).filter(Boolean);
       if (annotIds.length === 0) return;
 
       const { data: annotations } = await db
         .from('annotation')
         .select('id, thumbnail_id, x, y, w, h, angle')
-        .in('id', annotIds)
-        .limit(1);
+        .in('id', annotIds);
 
       if (!annotations || annotations.length === 0) return;
 
+      // Use the first annotation (or match by type if possible)
       const ann = annotations[0];
-      const { data: photos } = await db
-        .from('inspection_photo')
-        .select('storage_path')
-        .eq('id', ann.thumbnail_id)
-        .limit(1);
+      setLoadedAnnot({ x: Number(ann.x), y: Number(ann.y), w: Number(ann.w), h: Number(ann.h), angle: Number(ann.angle || 0) });
 
-      if (!photos || photos.length === 0) return;
+      // If we don't have an image yet, load it from the annotation's photo
+      if (!currentImage) {
+        const { data: photos } = await db
+          .from('inspection_photo')
+          .select('storage_path')
+          .eq('id', ann.thumbnail_id)
+          .limit(1);
 
-      const { data: signedData } = await (supabase as any).storage
-        .from('inspection-imports')
-        .createSignedUrl(photos[0].storage_path, 3600);
+        if (photos && photos.length > 0) {
+          const { data: signedData } = await (supabase as any).storage
+            .from('inspection-imports')
+            .createSignedUrl(photos[0].storage_path, 3600);
 
-      if (signedData?.signedUrl) {
-        setActiveImage(signedData.signedUrl);
+          if (signedData?.signedUrl) {
+            setActiveImage(signedData.signedUrl);
+          }
+        }
       }
     })();
   }, [inspectionId, currentImage]);
@@ -201,18 +205,20 @@ export function DefectCompareViewer({
   const handleZoomIn = useCallback(() => setZoomLevel((p) => Math.min(p + 0.25, 4.0)), []);
   const handleZoomOut = useCallback(() => setZoomLevel((p) => Math.max(p - 0.25, 0.5)), []);
 
-  const hasAnnotation = annotX != null && annotY != null && annotW != null && annotH != null;
+  const hasAnnotation = (annotX != null && annotY != null && annotW != null && annotH != null) || loadedAnnot != null;
 
-  const annotationStyle: React.CSSProperties = hasAnnotation ? {
+  const effectiveAnnot = (annotX != null && annotY != null) ? { x: annotX, y: annotY, w: annotW!, h: annotH!, angle: annotAngle || 0 } : loadedAnnot;
+
+  const annotationStyle: React.CSSProperties = hasAnnotation && effectiveAnnot ? {
     position: 'absolute',
-    left: `${annotX}%`,
-    top: `${annotY}%`,
-    width: `${annotW}%`,
-    height: `${annotH}%`,
+    left: `${effectiveAnnot.x}%`,
+    top: `${effectiveAnnot.y}%`,
+    width: `${effectiveAnnot.w}%`,
+    height: `${effectiveAnnot.h}%`,
     border: '2px solid #FF0000',
     boxShadow: '0 0 6px rgba(255,0,0,0.5)',
     pointerEvents: 'none',
-    transform: annotAngle ? `rotate(${annotAngle}deg)` : undefined,
+    transform: effectiveAnnot.angle ? `rotate(${effectiveAnnot.angle}deg)` : undefined,
     transformOrigin: 'top left',
   } : {};
 
