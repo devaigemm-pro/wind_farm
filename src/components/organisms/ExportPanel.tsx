@@ -726,8 +726,15 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   return blob;
 }
 
-/** Try to load an image from URL as base64 data URI */
-async function loadImageAsBase64(url: string): Promise<string | null> {
+/** Image data with dimensions for proper aspect ratio rendering in PDF */
+interface ImageWithDims {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/** Try to load an image from URL as base64 data URI with its dimensions */
+async function loadImageAsBase64(url: string): Promise<ImageWithDims | null> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -761,7 +768,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
           ctx.drawImage(img, 0, 0, w, h);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           URL.revokeObjectURL(blobUrl);
-          resolve(dataUrl);
+          resolve({ dataUrl, width: w, height: h });
         } catch {
           URL.revokeObjectURL(blobUrl);
           resolve(null);
@@ -1548,7 +1555,7 @@ export function ExportPanel({
       // ═══════════════════════════════════════════════════════════════════════
       if (includeDetails) {
         // Pre-load defect images: fetch signed URLs from DB in batch, then download in parallel
-        const imageCache: Record<string, string> = {};
+        const imageCache: Record<string, ImageWithDims> = {};
         try {
           const annotIds = filtered.map(d => d.id).filter(Boolean);
           if (annotIds.length > 0) {
@@ -1597,8 +1604,8 @@ export function ExportPanel({
                   if (entries.length > 0) {
                     await Promise.race([
                       Promise.allSettled(entries.map(async ([annotId, url]) => {
-                        const base64 = await loadImageAsBase64(url);
-                        if (base64) imageCache[annotId] = base64;
+                        const imgData = await loadImageAsBase64(url);
+                        if (imgData) imageCache[annotId] = imgData;
                       })),
                       new Promise(resolve => setTimeout(resolve, 30000)),
                     ]);
@@ -1615,8 +1622,8 @@ export function ExportPanel({
         for (const d of filtered) {
           if (!imageCache[d.id] && d.images && d.images.length > 0 && d.images[0]!.startsWith('http')) {
             try {
-              const base64 = await loadImageAsBase64(d.images[0]!);
-              if (base64) imageCache[d.id] = base64;
+              const imgData = await loadImageAsBase64(d.images[0]!);
+              if (imgData) imageCache[d.id] = imgData;
             } catch { /* skip */ }
           }
         }
@@ -1708,14 +1715,18 @@ export function ExportPanel({
           // Use pre-loaded image from cache
           const cachedImg = imageCache[d.id];
           if (cachedImg) {
-            // Use landscape aspect ratio matching drone photos (4:3)
-            const imgW = contentW * 0.7;
-            const imgH = imgW * 0.56; // ~16:9 aspect from drone
+            // Calculate dimensions preserving aspect ratio within a bounding box
+            const maxImgW = contentW * 0.7;
+            const maxImgH = 80; // max height in mm
+            const aspectRatio = cachedImg.width / cachedImg.height;
+            let imgW = maxImgW;
+            let imgH = imgW / aspectRatio;
+            if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * aspectRatio; }
             const imgX = margin + (contentW - imgW) / 2;
             if (y + imgH > pageH - 20) { newPage(); y = 28; }
             doc.setDrawColor(200, 200, 200);
             doc.roundedRect(imgX - 1, y - 1, imgW + 2, imgH + 2, 2, 2, 'S');
-            doc.addImage(cachedImg, 'JPEG', imgX, y, imgW, imgH);
+            doc.addImage(cachedImg.dataUrl, 'JPEG', imgX, y, imgW, imgH);
             y += imgH + 5;
           }
 
