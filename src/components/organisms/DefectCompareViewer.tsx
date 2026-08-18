@@ -107,7 +107,7 @@ export function DefectCompareViewer({
 
   const annotationBoxStyle: React.CSSProperties = {
     position: 'absolute',
-    border: '2px solid red',
+    border: '2px solid #5A8F5A',
     width: '60%',
     height: '40%',
     top: '30%',
@@ -122,7 +122,7 @@ export function DefectCompareViewer({
     transform: 'translateX(-50%)',
     display: 'flex',
     gap: 0,
-    border: '1px solid rgba(255,255,255,0.3)',
+    border: '1px solid #5A8F5A',
     borderRadius: '4px',
     overflow: 'hidden',
   };
@@ -132,7 +132,7 @@ export function DefectCompareViewer({
     background: 'rgba(0,0,0,0.5)',
     color: 'white',
     border: 'none',
-    borderRight: '1px solid rgba(255,255,255,0.2)',
+    borderRight: '1px solid #5A8F5A',
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -197,7 +197,7 @@ export function DefectCompareViewer({
   const selectStyle: React.CSSProperties = {
     background: '#3d3d5c',
     color: 'white',
-    border: '1px solid rgba(255,255,255,0.3)',
+    border: '1px solid #5A8F5A',
     borderRadius: '4px',
     padding: '4px 8px',
     fontSize: '12px',
@@ -216,7 +216,7 @@ export function DefectCompareViewer({
     width: '36px',
     height: '20px',
     borderRadius: '10px',
-    backgroundColor: compareMore ? '#1976D2' : '#555',
+    backgroundColor: compareMore ? '#5A8F5A' : '#555',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
     border: 'none',
