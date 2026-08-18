@@ -252,23 +252,30 @@ export function DefectCompareViewer({
 
             {/* Navigation arrows - cross layout, bottom-left */}
             <div style={navContainerStyle}>
-              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
+              {/* SS label + up arrow */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span style={navLabelStyle}>SS</span>
-              </button>
+                <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')}>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
+                </button>
+              </div>
+              {/* Middle row: ← and → Hub */}
               <div style={navMiddleRow}>
                 <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
                 </button>
-                <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
+                <button type="button" style={{ ...navBtnStyle, flexDirection: 'row', gap: '4px' }} onClick={() => navigateHub('closer')}>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
                   <span style={navLabelStyle}>Hub</span>
                 </button>
               </div>
-              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
+              {/* Down arrow + PS label */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')}>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
+                </button>
                 <span style={navLabelStyle}>PS</span>
-              </button>
+              </div>
             </div>
 
             {/* Zoom - bottom-right */}
