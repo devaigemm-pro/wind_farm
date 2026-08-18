@@ -1120,8 +1120,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             return (
             <div key={idx} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-              {/* Label — positioned at the top-center of the annotation */}
-              <div style={{ position: 'absolute', left: `${ann.x}%`, top: `${minY}%`, transform: 'translate(-50%, -100%)', marginTop: -4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto', zIndex: 1 }}>
+              {/* Label — positioned at the top of the annotation's center axis */}
+              <div style={{ position: 'absolute', left: `${ann.x}%`, top: `${Math.min(startY, endY)}%`, transform: 'translate(-50%, -100%)', marginTop: -4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto', zIndex: 1 }}>
                 <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 4, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#333', whiteSpace: 'nowrap' }}>{ann.type}</span>
                   {role !== 'supervisor' && (
