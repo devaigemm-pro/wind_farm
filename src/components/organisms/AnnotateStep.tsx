@@ -479,7 +479,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const annotsCount = thumbnails.filter(t => t.hasAnnotation || ((thumbnailAnnotations[t.id] ?? 0) > 0)).length;
 
   // Compute image rect for annotation layer positioning (recalculates on every render)
-  const imgRect = cachedImgRectRef.current || computeImageRect();
+  const imgRect = computeImageRect();
   const imgContentStyle = {
     top: `${imgRect.offsetY}px`,
     left: `${imgRect.offsetX}px`,
