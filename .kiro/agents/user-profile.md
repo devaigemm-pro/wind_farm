@@ -1027,3 +1027,16 @@
   - No requiere deploy (operación de datos pura).
   - Relación de datos FDM-T02: turbine_id `10000000-0002-4000-8000-000000000002` → inspection `abe05885-3c6c-45f1-8550-5006b16118e2` → defects/annotations vía inspection_id.
 - **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima, modo compañero, confianza total en operaciones destructivas sin confirmación, referencia implícita a contexto previo ("esa turbina"), usa modo compañero para operaciones de DB (confianza alta)
+
+### Sesión 108 - 2026-08-17
+- **Tarea principal**: Rediseñar pantalla de login: (1) Cambiar fondo a color grafito del menú (#2C2C2C). (2) Cambiar icono del ojo SVG genérico por uno basado en la imagen real del logo (solo la parte del ojo verde con turbina). (3) Botón Sign In a verde #5A8F5A. (4) Quitar texto "CORE Insight" / "Inicia sesión" del header.
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio — patrón habitual
+  - "usar el mismo color que tiene el menu" = extraer el color exacto del sidebar (#2C2C2C) y aplicarlo al login
+  - "usar el mismo color verde que usan los botones" = #5A8F5A (el acento global)
+  - "usar solo el ojo de esta imagen" + imagen adjunta — quiere que se extraiga un ELEMENTO PARCIAL de una imagen, no la imagen completa. El agente debe poder crear el asset (SVG) basándose en la referencia visual.
+  - "me referia solo al ojo de esta imagen. revertir y usar lo que te digo" — corrección cuando el agente usó el SVG genérico en vez de interpretar la imagen proporcionada
+  - "hazlo tu mismo" — NO quiere hacer pasos manuales (guardar imagen). Quiere que el agente cree el asset directamente (en este caso un SVG que replique el ojo de la imagen).
+  - Iteración de 4 turnos para un cambio visual simple — la confusión fue sobre QUÉ icono usar (SVG genérico vs parte de la imagen real)
+  - **APRENDIZAJE**: Cuando el usuario adjunta una imagen y dice "usar solo X de esta imagen", el agente debe CREAR un asset (SVG preferido) que replique esa parte. No pedir al usuario que haga trabajo manual. Si es posible recrear como SVG, hacerlo directamente.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, imagen como spec, "hazlo tu mismo" = no delegar trabajo manual al usuario, iteración estética rápida, corrección directa sin drama

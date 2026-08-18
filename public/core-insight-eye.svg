@@ -1,24 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" width="200" height="120">
-  <!-- Outer eye shape - green -->
-  <path d="M10 60 Q100 5 190 60 Q100 115 10 60 Z" fill="none" stroke="#4CAF50" stroke-width="6" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 50" width="80" height="50">
+  <!-- Outer eye shape - dark green outline -->
+  <path d="M5 25 Q40 3 75 25 Q40 47 5 25 Z" fill="none" stroke="#2E7D32" stroke-width="3" stroke-linejoin="round"/>
   
-  <!-- Inner eye fill -->
-  <path d="M20 60 Q100 15 180 60 Q100 105 20 60 Z" fill="rgba(76,175,80,0.08)"/>
+  <!-- Inner eye shape - lighter green fill -->
+  <path d="M12 25 Q40 8 68 25 Q40 42 12 25 Z" fill="rgba(76,175,80,0.12)" stroke="#4CAF50" stroke-width="1.5"/>
   
-  <!-- Iris outer ring -->
-  <circle cx="100" cy="60" r="32" fill="none" stroke="#4CAF50" stroke-width="3"/>
-  
-  <!-- Iris inner ring -->
-  <circle cx="100" cy="60" r="22" fill="rgba(76,175,80,0.15)" stroke="#4CAF50" stroke-width="2"/>
+  <!-- Iris circle -->
+  <circle cx="40" cy="25" r="12" fill="white" stroke="#2E7D32" stroke-width="2"/>
   
   <!-- Hub center -->
-  <circle cx="100" cy="60" r="5" fill="#4CAF50"/>
-  <circle cx="100" cy="60" r="2.5" fill="white"/>
+  <circle cx="40" cy="25" r="3" fill="#2E7D32"/>
   
   <!-- Turbine blade 1 - top -->
-  <path d="M100 55 C99 48, 98.5 40, 99 32 C99.3 30, 100.7 30, 101 32 C101.5 40, 101 48, 100 55" fill="#4CAF50"/>
+  <path d="M40 22 L39.5 14 C39.5 13 40.5 13 40.5 14 L40 22" fill="#2E7D32" stroke="#2E7D32" stroke-width="0.8"/>
   <!-- Turbine blade 2 - bottom-right -->
-  <path d="M103 62 C108 66, 114 72, 119 76 C120.5 77, 120 78.5, 118.5 77.5 C113 73, 107 67, 103 62" fill="#4CAF50"/>
+  <path d="M42 26.5 L48 31 C48.8 31.5 48.3 32.3 47.5 31.8 L42 26.5" fill="#2E7D32" stroke="#2E7D32" stroke-width="0.8"/>
   <!-- Turbine blade 3 - bottom-left -->
-  <path d="M97 62 C92 66, 86 72, 81 76 C79.5 77, 80 78.5, 81.5 77.5 C87 73, 93 67, 97 62" fill="#4CAF50"/>
+  <path d="M38 26.5 L32 31 C31.2 31.5 31.7 32.3 32.5 31.8 L38 26.5" fill="#2E7D32" stroke="#2E7D32" stroke-width="0.8"/>
 </svg>
