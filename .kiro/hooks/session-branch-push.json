@@ -2,9 +2,9 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Push session branch",
+      "name": "Session cleanup (commit local, no push)",
       "trigger": "Stop",
-      "description": "At session end: auto-commits pending changes and pushes the session branch to origin. Does not auto-merge to main.",
+      "description": "At session end: kills preview, commits locally (no push). Push only happens on user-approved merge to main. This prevents Vercel auto-deploy of session branches.",
       "action": {
         "type": "command",
         "command": "zsh /Users/Apple/Documents/Kiro/wind_farm/scripts/session-branch-push.sh",

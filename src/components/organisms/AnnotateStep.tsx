@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/components/design-system';
 import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
 import { useInspectionPhotos, getPhotoPublicUrl, getFaceShort } from '@/hooks/useInspectionPhotos';
 import { useUpdateVerticalBlade } from '@/hooks/useInspectionMutations';
 import { useTogglePhotoTag, useMarkPhotoViewed } from '@/hooks/usePhotoTags';
+import { supabase } from '@/lib/supabase';
 import type { Inspection } from '@/types';
 import { BLADE_POSITION_LABELS } from '@/types';
 
@@ -149,6 +151,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [rightPanelFace, setRightPanelFace] = useState('');
   const [rightPanelBlade, setRightPanelBlade] = useState('');
   const [changeBladeExpanded, setChangeBladeExpanded] = useState(false);
+  const [comparisonExpanded, setComparisonExpanded] = useState(true);
+  const [turbineInfoExpanded, setTurbineInfoExpanded] = useState(true);
   const [showBladeConfirm, setShowBladeConfirm] = useState(false);
   const storageKey = `vertical-blade-${inspectionId}`;
   const [verticalBlade, setVerticalBlade] = useState<string>(() => {
@@ -409,6 +413,33 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     // Use the serial numbers from the combobox (same source)
     return { A: '82518', B: '82517', C: '82509' };
   }, []);
+
+  // ─── Turbine info derived from inspection ─────────────────────────────────
+  const turbine = inspection?.blade?.turbine ?? inspection?.turbine;
+  const turbineId = turbine?.id ?? (inspection as any)?.turbine_id ?? null;
+  const turbineModel = (turbine as any)?.model ?? '—';
+  const turbinePower = (turbine as any)?.power_kw ? `${(turbine as any).power_kw} kW` : '—';
+  const turbineCommissioning = (turbine as any)?.powering_date
+    ? new Date((turbine as any).powering_date).toLocaleDateString()
+    : '—';
+
+  // ─── Comparison: other inspections of the same turbine ─────────────────────
+  const { data: turbineInspections = [] } = useQuery({
+    queryKey: ['turbine-inspections-comparison', turbineId],
+    queryFn: async () => {
+      if (!turbineId) return [];
+      const { data, error } = await supabase
+        .from('inspection')
+        .select('id, scheduled_date, status, campaign_id')
+        .or(`turbine_id.eq.${turbineId}`)
+        .order('scheduled_date', { ascending: false })
+        .limit(10);
+      if (error || !data) return [];
+      return data as { id: string; scheduled_date: string; status: string; campaign_id: string | null }[];
+    },
+    enabled: !!turbineId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Loading state while checking photos and annotations
   if (photosLoading || annotationsLoading) {
@@ -1528,6 +1559,48 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             setDrawPhase('idle');
             setDrawWidth(3);
           }}>{t('button.save')}</button>
+          )}
+        </div>
+
+        {/* ─── Comparison accordion ─── */}
+        <div style={accordionStyle}>
+          <button style={accordionHeaderStyle} onClick={() => setComparisonExpanded(!comparisonExpanded)}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Comparison</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill={C.muted} style={{ transform: comparisonExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+          </button>
+          {comparisonExpanded && (
+            <div style={{ padding: '0 16px 12px' }}>
+              {turbineInspections.length === 0 ? (
+                <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>No inspections found</p>
+              ) : (
+                turbineInspections.map((insp) => (
+                  <div key={insp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: C.primary }} defaultChecked={insp.id === inspectionId} />
+                    <span style={{ fontSize: 13, color: C.text, flex: 1 }}>
+                      {insp.scheduled_date ? new Date(insp.scheduled_date).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </span>
+                    <a href={`/inspections/${insp.id}/workflow?step=2`} target="_blank" rel="noopener noreferrer" style={{ color: C.primary, display: 'flex' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3z"/></svg>
+                    </a>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ─── Turbine Information accordion ─── */}
+        <div style={accordionStyle}>
+          <button style={accordionHeaderStyle} onClick={() => setTurbineInfoExpanded(!turbineInfoExpanded)}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Turbine information</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill={C.muted} style={{ transform: turbineInfoExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+          </button>
+          {turbineInfoExpanded && (
+            <div style={{ padding: '0 16px 12px' }}>
+              <p style={turbineInfoRow}>Model: <b>{turbineModel}</b></p>
+              <p style={turbineInfoRow}>Power: <b>{turbinePower}</b></p>
+              <p style={turbineInfoRow}>Commissioning date: <b>{turbineCommissioning}</b></p>
+            </div>
           )}
         </div>
 

@@ -150,11 +150,14 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
    - Si no hay conflictos (o ya se resolvieron): proceder con el merge:
      ```
      git checkout main
+     git pull origin main
      git merge <branch> --no-ff
      git push origin main
      ```
    - Activa la skill `deploy-to-vercel` y despliega a producción
    - Vuelve a la rama de sesión: `git checkout <branch>`
+
+> **IMPORTANTE**: La rama de sesión NUNCA se pushea directamente a origin. Solo main se pushea, y solo después de la aprobación del usuario. Esto previene que Vercel GitHub integration haga auto-deploy de session branches.
 6. **Si el usuario pide correcciones**: aplica los cambios y vuelve al paso 1
 
 > **NOTA sesiones paralelas**: Múltiples sesiones pueden estar corriendo preview simultáneamente. Cada una DEBE usar un puerto diferente. Verificar con `lsof -i :<puerto>` antes de levantar. El proceso de preview debe iniciarse con `control_bash_process` (background) para no bloquear la sesión.
