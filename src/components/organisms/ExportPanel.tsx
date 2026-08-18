@@ -595,7 +595,7 @@ async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; e
 /** Load the CORE Insight logo PNG for embedding in XLSX */
 async function renderLogoPng(): Promise<ArrayBuffer | null> {
   try {
-    const resp = await fetch('/core-insight-logo3.png');
+    const resp = await fetch('/core-insight-logo.png');
     if (!resp.ok) return null;
     return await resp.arrayBuffer();
   } catch {
@@ -617,7 +617,7 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   // Merge cells for logo area so image doesn't split across column borders
   sheet.mergeCells('A1:K2');
 
-  // Add logo at the top (loaded from core-insight-logo3.png)
+  // Add logo at the top (loaded from core-insight-logo.png)
   const logoBuffer = await renderLogoPng();
   if (logoBuffer) {
     const logoId = workbook.addImage({ buffer: logoBuffer, extension: 'png' });
@@ -981,7 +981,7 @@ export function ExportPanel({
           binary += String.fromCharCode(bytes[i]!);
         }
         const logoBase64 = 'data:image/png;base64,' + btoa(binary);
-        doc.addImage(logoBase64, 'PNG', margin, 15, 60, 12);
+        doc.addImage(logoBase64, 'PNG', margin, 15, 60, 20);
       }
 
       // (Cover decoration removed for clean minimalist style)
