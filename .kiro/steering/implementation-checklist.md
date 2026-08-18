@@ -133,6 +133,12 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
 
 > **NOTA sesiones paralelas**: Múltiples sesiones pueden estar corriendo preview simultáneamente. Cada una DEBE usar un puerto diferente. Verificar con `lsof -i :<puerto>` antes de levantar. El proceso de preview debe iniciarse con `control_bash_process` (background) para no bloquear la sesión.
 
+> **NOTA build desactualizado**: Si otra sesión mergea a main mientras esta tiene preview levantado, la preview ya no refleja main. Esto no es problema porque el rebase al momento de merge actualiza todo. Pero si el usuario reporta discrepancias, re-build después del rebase.
+
+> **NOTA env vars**: El preview local usa `.env.local`. Si las variables difieren de producción Vercel (ej: distinta Supabase URL), el comportamiento puede variar. Verificar que `.env.local` apunte a los mismos servicios que producción.
+
+> **NOTA push retry**: Si `git push` falla (porque otra sesión actualizó el remote), reintentar hasta 3 veces. El script `session-branch-push.sh` ya maneja esto.
+
 ### Si estás en main (solo si el usuario lo indica explícitamente):
 
 1. **Activa la skill `deploy-to-vercel`** usando `disclose_context`
