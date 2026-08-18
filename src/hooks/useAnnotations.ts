@@ -54,6 +54,7 @@ export function useCreateAnnotation() {
         rootCause: input.rootCause ?? '',
         nextStep: input.nextStep ?? '',
         side: null,
+        rootDistance: input.rootDistance ?? null,
         isDefect: false,
         createdAt: new Date().toISOString(),
       };

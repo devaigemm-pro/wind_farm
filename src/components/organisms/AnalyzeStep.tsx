@@ -132,6 +132,8 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         blade,
         face,
         root: (() => {
+          // Use stored root_distance if available (set during annotation creation in step 2)
+          if (a.rootDistance != null) return a.rootDistance;
           const ph = photoLookup[a.thumbnailId];
           if (ph && ph.bladeRootDistance != null) {
             const dtb = ph.distanceToBlade || 5;
