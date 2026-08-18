@@ -619,19 +619,13 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
       <div style={body}>
         {/* ── Column 1: Blades + stats (matching Skyvisor layout) ── */}
         <div style={col1}>
-          {defects.length === 0 && (turbineInspIdsLoading || annotationsLoading) ? (
-            <div style={{ height: 620, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 13 }}>
-              {t('turbineDetail.loadingData')}
-            </div>
-          ) : (
-            <BladesDiagram
-              defects={diagramDefects}
-              bladeSerials={bladeSerials}
-              bladeLength={bladeLength}
-              selectedDefectId={selectedDefectId}
-              onDefectClick={handleDefectClick}
-            />
-          )}
+          <BladesDiagram
+            defects={diagramDefects}
+            bladeSerials={bladeSerials}
+            bladeLength={bladeLength}
+            selectedDefectId={selectedDefectId}
+            onDefectClick={handleDefectClick}
+          />
           {/* Counters row: defects | resolved */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={counterCard}>
