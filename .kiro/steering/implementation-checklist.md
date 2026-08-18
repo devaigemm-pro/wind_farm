@@ -108,14 +108,19 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
 ### Si estás en una rama de sesión (session/* o cualquier rama != main):
 
 1. **Ejecuta build**: `pnpm run build`
-2. **Levanta preview local**: `pnpm run preview` (Vite preview en puerto 4173)
-3. **Entrega la URL local al usuario**: `http://localhost:4173`
+2. **Levanta preview local en puerto dinámico** (para evitar conflictos con sesiones paralelas):
+   - Usa `pnpm run preview -- --port <PUERTO>` donde PUERTO = 4173 + hash de los últimos 4 chars del branch name (rango 4173-4199)
+   - Alternativa simple: usa `control_bash_process` con `pnpm run preview -- --port 0` (Vite auto-asigna puerto libre)
+   - Si el puerto está ocupado, incrementar hasta encontrar uno libre
+3. **Entrega la URL local al usuario**: `http://localhost:<PUERTO>`
 4. **Espera la aprobación del usuario** antes de continuar
 5. **Si el usuario aprueba**: ejecuta merge a main + deploy a producción:
    - `git checkout main && git merge <branch> && git push origin main`
    - Activa la skill `deploy-to-vercel` y despliega a producción
    - Vuelve a la rama de sesión: `git checkout <branch>`
 6. **Si el usuario pide correcciones**: aplica los cambios y vuelve al paso 1
+
+> **NOTA sesiones paralelas**: Múltiples sesiones pueden estar corriendo preview simultáneamente. Cada una DEBE usar un puerto diferente. Verificar con `lsof -i :<puerto>` antes de levantar. El proceso de preview debe iniciarse con `control_bash_process` (background) para no bloquear la sesión.
 
 ### Si estás en main (solo si el usuario lo indica explícitamente):
 
