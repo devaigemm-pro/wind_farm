@@ -242,7 +242,7 @@ export function BladesDiagram({
             })}
 
             {/* Blade columns */}
-            <div style={{ display: 'flex', width: '100%', height: '100%', position: 'relative', zIndex: 2, gap: 16 }}>
+            <div style={{ display: 'flex', width: '100%', height: '100%', position: 'relative', zIndex: 2 }}>
               {blades.map((blade) => {
                 const bladeDefects = defects.filter((d) => d.blade === blade);
                 return (
@@ -263,8 +263,8 @@ export function BladesDiagram({
                           style={{
                             position: 'absolute',
                             top: topPx(d.root),
-                            left: isSS ? '36%' : '64%',
-                            transform: 'translate(-50%, -50%)',
+                            left: '50%',
+                            transform: `translate(${isSS ? '-130%' : '30%'}, -50%)`,
                             fontSize: 10,
                             width: 22,
                             height: 22,
