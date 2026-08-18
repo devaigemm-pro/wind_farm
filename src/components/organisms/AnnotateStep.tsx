@@ -970,11 +970,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   recalcImgContentStyle();
                 }}
                 style={{
-                  position: 'absolute',
-                  top: imgContentStyle.top,
-                  left: imgContentStyle.left,
-                  width: imgContentStyle.width,
-                  height: imgContentStyle.height,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
                   pointerEvents: 'none',
                   userSelect: 'none',
                   filter: `contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,

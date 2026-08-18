@@ -243,24 +243,11 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     setSaveStatus('saving');
     try {
       const rootDistNum = parseFloat(rootDistance) || 0;
-      // Reverse: from root distance back to annotation Y
-      const selectedAnn = (dbAnnotations ?? []).find(a => a.id === selectedDefectId);
-      const ph = selectedAnn ? photoLookup[selectedAnn.thumbnailId] : null;
-      let yFromRoot: number;
-      if (ph && ph.bladeRootDistance != null) {
-        const dtb = ph.distanceToBlade || 5;
-        const vertCov = 2 * dtb * Math.tan((56.7 * Math.PI / 180) / 2) / 6;
-        const offset = rootDistNum - ph.bladeRootDistance;
-        yFromRoot = vertCov > 0 ? (offset / vertCov) * 100 : 0;
-      } else {
-        yFromRoot = rootDistNum / 0.43;
-      }
-      // Update the annotation fields
+      // Update the annotation fields (preserve original x/y position — never overwrite drawing coords)
       await updateAnnotation.mutateAsync({
         id: selectedDefectId,
         type: defectType,
         category: category,
-        y: yFromRoot,
         note: note,
         rootCause: rootCause,
         nextStep: nextStep,
