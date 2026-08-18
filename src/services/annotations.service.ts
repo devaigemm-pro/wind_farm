@@ -30,6 +30,7 @@ export interface CreateAnnotationInput {
   type: string;
   category: number;
   note?: string;
+  rootDistance?: number;
   rootCause?: string;
   nextStep?: string;
 }
@@ -107,6 +108,7 @@ export const annotationsService = {
       note: input.note ?? '',
     };
     // Only add optional columns if they have values (avoids 400 if columns don't exist yet)
+    if (input.rootDistance != null) insertPayload.root_distance = input.rootDistance;
     if (input.rootCause) insertPayload.root_cause = input.rootCause;
     if (input.nextStep) insertPayload.next_step = input.nextStep;
 
