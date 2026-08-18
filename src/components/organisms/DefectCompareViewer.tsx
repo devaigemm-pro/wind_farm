@@ -285,6 +285,7 @@ export function DefectCompareViewer({
                 <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
                 </button>
+                <div style={{ width: '8px' }} />
                 <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')}>
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
                 </button>
