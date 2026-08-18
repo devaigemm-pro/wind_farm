@@ -285,7 +285,6 @@ export function DefectCompareViewer({
                 <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')}>
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
                 </button>
-                <div style={{ width: '8px' }} />
                 <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')}>
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
                 </button>
@@ -367,7 +366,7 @@ const zoomBtnLastStyle: React.CSSProperties = { ...zoomBtnStyle, borderRight: 'n
 const zoomLabelStyle: React.CSSProperties = { ...zoomBtnStyle, cursor: 'default', fontSize: '11px', textTransform: 'lowercase' };
 const infoBlockStyle: React.CSSProperties = { position: 'absolute', top: '12px', left: '12px', color: '#5A8F5A', fontSize: '13px', fontFamily: 'var(--font-family-sans)', lineHeight: '1.8', textShadow: '0 1px 3px rgba(0,0,0,0.8)' };
 const navContainerStyle: React.CSSProperties = { position: 'absolute', bottom: '16px', left: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' };
-const navMiddleRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '16px' };
+const navMiddleRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '24px' };
 const navBtnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' };
 const navLabelStyle: React.CSSProperties = { color: '#5A8F5A', fontSize: '10px', fontWeight: 700 };
 const loadingOverlay: React.CSSProperties = { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '14px' };
