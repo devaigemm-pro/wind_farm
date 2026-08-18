@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" width="200" height="120">
+  <!-- Outer eye shape - green -->
+  <path d="M10 60 Q100 5 190 60 Q100 115 10 60 Z" fill="none" stroke="#4CAF50" stroke-width="6" stroke-linejoin="round"/>
+  
+  <!-- Inner eye fill -->
+  <path d="M20 60 Q100 15 180 60 Q100 105 20 60 Z" fill="rgba(76,175,80,0.08)"/>
+  
+  <!-- Iris outer ring -->
+  <circle cx="100" cy="60" r="32" fill="none" stroke="#4CAF50" stroke-width="3"/>
+  
+  <!-- Iris inner ring -->
+  <circle cx="100" cy="60" r="22" fill="rgba(76,175,80,0.15)" stroke="#4CAF50" stroke-width="2"/>
+  
+  <!-- Hub center -->
+  <circle cx="100" cy="60" r="5" fill="#4CAF50"/>
+  <circle cx="100" cy="60" r="2.5" fill="white"/>
+  
+  <!-- Turbine blade 1 - top -->
+  <path d="M100 55 C99 48, 98.5 40, 99 32 C99.3 30, 100.7 30, 101 32 C101.5 40, 101 48, 100 55" fill="#4CAF50"/>
+  <!-- Turbine blade 2 - bottom-right -->
+  <path d="M103 62 C108 66, 114 72, 119 76 C120.5 77, 120 78.5, 118.5 77.5 C113 73, 107 67, 103 62" fill="#4CAF50"/>
+  <!-- Turbine blade 3 - bottom-left -->
+  <path d="M97 62 C92 66, 86 72, 81 76 C79.5 77, 80 78.5, 81.5 77.5 C87 73, 93 67, 97 62" fill="#4CAF50"/>
+</svg>
