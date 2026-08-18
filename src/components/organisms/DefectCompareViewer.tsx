@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useDefectHistory } from '@/hooks/useDefectHistory';
+import { supabase } from '@/lib/supabase';
 import type { HistoricalDefect } from '@/hooks/useDefectHistory';
 
 export interface DefectCompareViewerProps {
@@ -21,6 +22,8 @@ export interface DefectCompareViewerProps {
   annotH?: number;
   annotAngle?: number;
 }
+
+const FACE_ORDER = ['LE', 'TE', 'PS', 'SS'] as const;
 
 export function DefectCompareViewer({
   onClose,
@@ -43,6 +46,89 @@ export function DefectCompareViewer({
   const { t } = useLanguage();
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [compareMore, setCompareMore] = useState(false);
+  const [activeSide, setActiveSide] = useState(side || 'LE');
+  const [activeImage, setActiveImage] = useState(currentImage);
+  const [activeDistance, setActiveDistance] = useState(distanceFromRoot);
+
+  // Blade photos for navigation
+  const [bladePhotos, setBladePhotos] = useState<Array<{ face: string; storagePath: string; radialPosition: number }>>([]);
+
+  useEffect(() => {
+    if (!bladeId || !inspectionId) return;
+    (async () => {
+      const db = supabase as any;
+      // Get campaign_id from inspection
+      const { data: inspData } = await db.from('inspection').select('campaign_id').eq('id', inspectionId).limit(1);
+      const campaignId = inspData?.[0]?.campaign_id;
+      if (!campaignId) return;
+
+      const { data: photos } = await db
+        .from('inspection_photo')
+        .select('face, storage_path, radial_position')
+        .eq('campaign_id', campaignId)
+        .eq('blade_id', bladeId)
+        .order('radial_position', { ascending: true });
+
+      if (photos) {
+        const faceMap: Record<string, string> = {
+          leading_edge: 'LE', trailing_edge: 'TE', pressure_side: 'PS', suction_side: 'SS',
+        };
+        setBladePhotos(photos.map((p: any) => ({
+          face: faceMap[p.face] || p.face,
+          storagePath: p.storage_path,
+          radialPosition: Number(p.radial_position),
+        })));
+      }
+    })();
+  }, [bladeId, inspectionId]);
+
+  const navigateToFace = useCallback(async (targetFace: string) => {
+    // Find closest photo to current distance in target face
+    const facePics = bladePhotos.filter((p) => p.face === targetFace);
+    if (facePics.length === 0) return;
+
+    const closest = facePics.reduce((best, p) =>
+      Math.abs(p.radialPosition - activeDistance) < Math.abs(best.radialPosition - activeDistance) ? p : best
+    );
+
+    // Get signed URL
+    const { data } = await (supabase as any).storage
+      .from('inspection-imports')
+      .createSignedUrl(closest.storagePath, 3600);
+
+    if (data?.signedUrl) {
+      setActiveImage(data.signedUrl);
+      setActiveSide(targetFace);
+      setActiveDistance(closest.radialPosition);
+    }
+  }, [bladePhotos, activeDistance]);
+
+  const navigateHub = useCallback(async (direction: 'closer' | 'farther') => {
+    const facePics = bladePhotos
+      .filter((p) => p.face === activeSide)
+      .sort((a, b) => a.radialPosition - b.radialPosition);
+
+    if (facePics.length === 0) return;
+
+    const currentIdx = facePics.findIndex((p) =>
+      Math.abs(p.radialPosition - activeDistance) < 0.5
+    );
+    const nextIdx = direction === 'closer'
+      ? Math.max(0, (currentIdx >= 0 ? currentIdx : facePics.length) - 1)
+      : Math.min(facePics.length - 1, (currentIdx >= 0 ? currentIdx : -1) + 1);
+
+    const target = facePics[nextIdx];
+    if (!target) return;
+
+    const { data } = await (supabase as any).storage
+      .from('inspection-imports')
+      .createSignedUrl(target.storagePath, 3600);
+
+    if (data?.signedUrl) {
+      setActiveImage(data.signedUrl);
+      setActiveDistance(target.radialPosition);
+    }
+  }, [bladePhotos, activeSide, activeDistance]);
 
   const { data } = useDefectHistory(bladeId, distanceFromRoot, inspectionId);
   const inspections = data?.inspections ?? [];
@@ -76,20 +162,16 @@ export function DefectCompareViewer({
   } : {};
 
   const severityLabel = `Cat ${defectSeverity}`;
-  const formattedDate = currentDate
-    ? new Date(currentDate).toLocaleString()
-    : 'N/A';
+  const formattedDate = currentDate ? new Date(currentDate).toLocaleString() : 'N/A';
 
   return (
     <div style={overlayStyle}>
-      {/* Close button */}
-      <button type="button" style={closeBtnStyle} onClick={onClose} aria-label="Close compare view">
+      <button type="button" style={closeBtnStyle} onClick={onClose} aria-label="Close">
         <X size={24} />
       </button>
 
-      {/* Main grid */}
       <div style={gridStyle}>
-        {/* LEFT panel - current inspection */}
+        {/* LEFT panel */}
         <div style={panelStyle}>
           <div style={panelHeaderStyle}>
             <span style={{ color: '#5A8F5A' }}>{formattedDate}</span>
@@ -97,90 +179,73 @@ export function DefectCompareViewer({
             <span style={{ textAlign: 'right' }}>{severityLabel}</span>
           </div>
           <div style={imageContainerStyle}>
-            {currentImage ? (
+            {activeImage ? (
               <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img
-                  src={currentImage}
-                  alt="Current defect"
-                  style={{ ...imageStyle, transform: `scale(${zoomLevel})` }}
-                  crossOrigin="anonymous"
-                />
-                {/* Annotation overlay */}
+                <img src={activeImage} alt="Current defect" style={{ ...imageStyle, transform: `scale(${zoomLevel})` }} crossOrigin="anonymous" />
                 {hasAnnotation && <div style={annotationStyle} />}
               </div>
             ) : (
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>No image</span>
+              <span style={emptyText}>No image</span>
             )}
 
-            {/* Blade info - bottom left */}
+            {/* Blade info */}
             <div style={infoBlockStyle}>
               <div>Blade : {blade}</div>
-              <div>Side : {side}</div>
-              <div>Hub : {distanceFromRoot}m</div>
+              <div>Side : {activeSide}</div>
+              <div>Hub : {activeDistance}m</div>
             </div>
 
-            {/* Navigation arrows - bottom left below info */}
-            <div style={navArrowsStyle}>
-              <div style={arrowGroupStyle}>
-                <div style={arrowItemStyle}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
-                  <span style={arrowLabelStyle}>SS</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* Navigation arrows - cross layout */}
+            <div style={navContainerStyle}>
+              {/* SS up */}
+              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('SS')} title="SS">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 0.5l-7.5 7.5h4.5v8h6v-8h4.5z" /></svg>
+                <span style={navLabel}>SS</span>
+              </button>
+              {/* Middle row: ← Hub → */}
+              <div style={navMiddleRow}>
+                <button type="button" style={navBtnStyle} onClick={() => navigateHub('farther')} title="Tip">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M0.5 8l7.5 7.5v-4.5h8v-6h-8v-4.5z" /></svg>
+                </button>
+                <button type="button" style={navBtnStyle} onClick={() => navigateHub('closer')} title="Hub">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M15.5 8l-7.5-7.5v4.5h-8v6h8v4.5z" /></svg>
-                  <span style={arrowLabelStyle}>Hub</span>
-                </div>
-                <div style={arrowItemStyle}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
-                  <span style={arrowLabelStyle}>PS</span>
-                </div>
+                  <span style={navLabel}>Hub</span>
+                </button>
               </div>
+              {/* PS down */}
+              <button type="button" style={navBtnStyle} onClick={() => navigateToFace('PS')} title="PS">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="#5A8F5A"><path d="M8 15.5l7.5-7.5h-4.5v-8h-6v8h-4.5z" /></svg>
+                <span style={navLabel}>PS</span>
+              </button>
             </div>
 
-            {/* Zoom controls - bottom right */}
+            {/* Zoom controls */}
             <div style={zoomGroupStyle}>
-              <button type="button" style={zoomBtnStyle} onClick={handleZoomOut} aria-label="Zoom out">-</button>
+              <button type="button" style={zoomBtnStyle} onClick={handleZoomOut}>-</button>
               <span style={zoomLabelStyle}>x{zoomLevel.toFixed(2)}</span>
-              <button type="button" style={zoomBtnLastStyle} onClick={handleZoomIn} aria-label="Zoom in">+</button>
+              <button type="button" style={zoomBtnLastStyle} onClick={handleZoomIn}>+</button>
             </div>
           </div>
         </div>
 
-        {/* RIGHT panel - historical comparison */}
+        {/* RIGHT panel */}
         <div style={panelStyle}>
           <div style={panelHeaderStyle}>
-            <select
-              style={selectStyle}
-              value={selectedInspectionId}
-              onChange={(e) => setSelectedInspectionId(e.target.value)}
-              aria-label={t('compare.selectInspection')}
-            >
+            <select style={selectStyle} value={selectedInspectionId} onChange={(e) => setSelectedInspectionId(e.target.value)}>
               <option value="">{t('compare.selectInspection')}</option>
               {inspections.map((insp) => (
-                <option key={insp.id} value={insp.id}>
-                  {insp.label}
-                </option>
+                <option key={insp.id} value={insp.id}>{insp.label}</option>
               ))}
             </select>
             <span style={{ textAlign: 'center', fontWeight: 700 }}>Compare 1</span>
-            <span style={{ textAlign: 'right' }}>
-              {selectedDefect ? `Cat ${selectedDefect.severity}` : ''}
-            </span>
+            <span style={{ textAlign: 'right' }}>{selectedDefect ? `Cat ${selectedDefect.severity}` : ''}</span>
           </div>
           <div style={imageContainerStyle}>
             {selectedDefect ? (
-              <img
-                src={selectedDefect.imageUrl}
-                alt="Historical defect"
-                style={{ ...imageStyle, transform: `scale(${zoomLevel})` }}
-                crossOrigin="anonymous"
-              />
+              <img src={selectedDefect.imageUrl} alt="Historical" style={{ ...imageStyle, transform: `scale(${zoomLevel})` }} crossOrigin="anonymous" />
             ) : (
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
-                {inspections.length === 0
-                  ? t('compare.noHistorical')
-                  : t('compare.selectInspection')}
+              <span style={emptyText}>
+                {inspections.length === 0 ? t('compare.noHistorical') : t('compare.selectInspection')}
               </span>
             )}
           </div>
@@ -189,19 +254,15 @@ export function DefectCompareViewer({
 
       {/* Bottom bar */}
       <div style={bottomBarStyle}>
-        <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>
-          {defectType.replace(/_/g, ' ')}
-        </span>
+        <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{defectType.replace(/_/g, ' ')}</span>
         <div style={toggleContainerStyle}>
           <span>{t('compare.compareMore')}</span>
           <button
             type="button"
-            style={{ ...toggleTrackStyle, backgroundColor: compareMore ? '#5A8F5A' : '#555' }}
-            onClick={() => setCompareMore((prev) => !prev)}
-            aria-label={t('compare.compareMore')}
-            aria-pressed={compareMore}
+            style={{ ...toggleTrackBase, backgroundColor: compareMore ? '#5A8F5A' : '#555' }}
+            onClick={() => setCompareMore((p) => !p)}
           >
-            <span style={{ ...toggleKnobStyle, left: compareMore ? '18px' : '2px' }} />
+            <span style={{ ...toggleKnobBase, left: compareMore ? '18px' : '2px' }} />
           </button>
         </div>
       </div>
@@ -210,25 +271,25 @@ export function DefectCompareViewer({
 }
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
-
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 2000, background: '#1a1a1a', display: 'flex', flexDirection: 'column' };
 const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', flex: 1, gap: '2px', minHeight: 0 };
 const panelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', overflow: 'hidden' };
 const panelHeaderStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '8px 12px', background: '#2C2C2C', color: 'white', fontSize: '12px', fontFamily: 'var(--font-family-sans)', alignItems: 'center' };
 const imageContainerStyle: React.CSSProperties = { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden', background: '#111' };
 const imageStyle: React.CSSProperties = { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transformOrigin: 'center', transition: 'transform 0.2s ease' };
+const emptyText: React.CSSProperties = { color: 'rgba(255,255,255,0.5)', fontSize: '13px' };
 const closeBtnStyle: React.CSSProperties = { position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '24px', zIndex: 10 };
 const bottomBarStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '10px 16px', background: '#2C2C2C', color: 'white', fontSize: '12px', fontFamily: 'var(--font-family-sans)' };
 const selectStyle: React.CSSProperties = { background: '#2C2C2C', color: 'white', border: '1px solid #5A8F5A', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', fontFamily: 'var(--font-family-sans)', cursor: 'pointer' };
 const toggleContainerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '8px' };
-const toggleTrackStyle: React.CSSProperties = { position: 'relative', width: '36px', height: '20px', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s', border: 'none', padding: 0 };
-const toggleKnobStyle: React.CSSProperties = { position: 'absolute', top: '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' };
-const zoomGroupStyle: React.CSSProperties = { position: 'absolute', bottom: '12px', right: '12px', display: 'flex', gap: 0, border: '1px solid #5A8F5A', borderRadius: '4px', overflow: 'hidden' };
-const zoomBtnStyle: React.CSSProperties = { padding: '4px 10px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRight: '1px solid #5A8F5A', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family-sans)' };
+const toggleTrackBase: React.CSSProperties = { position: 'relative', width: '36px', height: '20px', borderRadius: '10px', cursor: 'pointer', border: 'none', padding: 0 };
+const toggleKnobBase: React.CSSProperties = { position: 'absolute', top: '2px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' };
+const zoomGroupStyle: React.CSSProperties = { position: 'absolute', bottom: '12px', right: '12px', display: 'flex', border: '1px solid #5A8F5A', borderRadius: '4px', overflow: 'hidden' };
+const zoomBtnStyle: React.CSSProperties = { padding: '4px 10px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRight: '1px solid #5A8F5A', fontSize: '13px', fontWeight: 600, cursor: 'pointer' };
 const zoomBtnLastStyle: React.CSSProperties = { ...zoomBtnStyle, borderRight: 'none' };
 const zoomLabelStyle: React.CSSProperties = { ...zoomBtnStyle, cursor: 'default', fontSize: '11px', textTransform: 'lowercase' };
-const infoBlockStyle: React.CSSProperties = { position: 'absolute', bottom: '80px', left: '12px', color: '#5A8F5A', fontSize: '12px', fontFamily: 'var(--font-family-sans)', lineHeight: '1.6' };
-const navArrowsStyle: React.CSSProperties = { position: 'absolute', bottom: '12px', left: '12px' };
-const arrowGroupStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' };
-const arrowItemStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' };
-const arrowLabelStyle: React.CSSProperties = { color: '#5A8F5A', fontSize: '10px', fontWeight: 600, fontFamily: 'var(--font-family-sans)' };
+const infoBlockStyle: React.CSSProperties = { position: 'absolute', top: '12px', left: '12px', color: '#5A8F5A', fontSize: '12px', fontFamily: 'var(--font-family-sans)', lineHeight: '1.6' };
+const navContainerStyle: React.CSSProperties = { position: 'absolute', bottom: '12px', left: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' };
+const navMiddleRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '12px' };
+const navBtnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' };
+const navLabel: React.CSSProperties = { color: '#5A8F5A', fontSize: '10px', fontWeight: 600 };

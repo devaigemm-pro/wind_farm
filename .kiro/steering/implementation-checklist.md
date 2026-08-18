@@ -115,7 +115,18 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
 3. **Entrega la URL local al usuario**: `http://localhost:<PUERTO>`
 4. **Espera la aprobación del usuario** antes de continuar
 5. **Si el usuario aprueba**: ejecuta merge a main + deploy a producción:
-   - `git checkout main && git merge <branch> && git push origin main`
+   - Primero **rebase sobre main** para resolver conflictos ANTES del merge:
+     ```
+     git fetch origin main
+     git rebase origin/main
+     ```
+   - Si hay conflictos: resolverlos, hacer `git rebase --continue`, re-build y re-verificar con el usuario
+   - Si no hay conflictos (o ya se resolvieron): proceder con el merge:
+     ```
+     git checkout main
+     git merge <branch> --no-ff
+     git push origin main
+     ```
    - Activa la skill `deploy-to-vercel` y despliega a producción
    - Vuelve a la rama de sesión: `git checkout <branch>`
 6. **Si el usuario pide correcciones**: aplica los cambios y vuelve al paso 1
