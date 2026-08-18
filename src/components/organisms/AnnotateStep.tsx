@@ -190,32 +190,42 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const viewerImgRef = useRef<HTMLImageElement | null>(null);
   const viewerContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // ─── Image transition: show thumbnail as placeholder while full-res loads ──
+  const [viewerLoaded, setViewerLoaded] = useState(false);
+  const [imgContentStyle, setImgContentStyle] = useState<{ top: string; left: string; width: string; height: string }>({ top: '0', left: '0', width: '100%', height: '100%' });
+  const prevThumbRef = useRef<string>('');
+
   // Helper: compute the actual image content rect within the container (accounting for objectFit: contain letterboxing)
-  const getImageRect = useCallback((containerRect: DOMRect) => {
-    const img = viewerImgRef.current;
-    if (!img || !img.naturalWidth || !img.naturalHeight) {
-      return { offsetX: 0, offsetY: 0, width: containerRect.width, height: containerRect.height };
+  // Uses the already-computed imgContentStyle values to guarantee consistency with the annotation layer.
+  const getImageRect = useCallback((_containerRect: DOMRect) => {
+    // Parse current imgContentStyle values (set by recalcImgContentStyle)
+    const top = parseFloat(imgContentStyle.top) || 0;
+    const left = parseFloat(imgContentStyle.left) || 0;
+    const width = parseFloat(imgContentStyle.width);
+    const height = parseFloat(imgContentStyle.height);
+
+    // If imgContentStyle hasn't been computed yet (still has '%' values), fallback to computation
+    if (isNaN(width) || isNaN(height) || width === 0 || height === 0) {
+      const img = viewerImgRef.current;
+      const container = viewerContainerRef.current;
+      if (!img || !container || !img.naturalWidth || !img.naturalHeight) {
+        return { offsetX: 0, offsetY: 0, width: _containerRect.width, height: _containerRect.height };
+      }
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const containerAR = cw / ch;
+      const imageAR = img.naturalWidth / img.naturalHeight;
+      let imgWidth: number, imgHeight: number, offsetX: number, offsetY: number;
+      if (imageAR > containerAR) {
+        imgWidth = cw; imgHeight = cw / imageAR; offsetX = 0; offsetY = (ch - imgHeight) / 2;
+      } else {
+        imgHeight = ch; imgWidth = ch * imageAR; offsetX = (cw - imgWidth) / 2; offsetY = 0;
+      }
+      return { offsetX, offsetY, width: imgWidth, height: imgHeight };
     }
-    // Use clientWidth/clientHeight for consistency with imgContentStyle calculation
-    const container = viewerContainerRef.current;
-    const cw = container ? container.clientWidth : containerRect.width;
-    const ch = container ? container.clientHeight : containerRect.height;
-    const containerAR = cw / ch;
-    const imageAR = img.naturalWidth / img.naturalHeight;
-    let imgWidth: number, imgHeight: number, offsetX: number, offsetY: number;
-    if (imageAR > containerAR) {
-      imgWidth = cw;
-      imgHeight = cw / imageAR;
-      offsetX = 0;
-      offsetY = (ch - imgHeight) / 2;
-    } else {
-      imgHeight = ch;
-      imgWidth = ch * imageAR;
-      offsetX = (cw - imgWidth) / 2;
-      offsetY = 0;
-    }
-    return { offsetX, offsetY, width: imgWidth, height: imgHeight };
-  }, []);
+
+    return { offsetX: left, offsetY: top, width, height };
+  }, [imgContentStyle]);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [editBlade, setEditBlade] = useState('B');
   const [editSide, setEditSide] = useState('LE');
@@ -226,18 +236,16 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [metaRootDist, setMetaRootDist] = useState(15);
   const [metaDistBlade, setMetaDistBlade] = useState(6.9);
 
-  // ─── Image transition: show thumbnail as placeholder while full-res loads ──
-  const [viewerLoaded, setViewerLoaded] = useState(false);
-  const [imgContentStyle, setImgContentStyle] = useState<{ top: string; left: string; width: string; height: string }>({ top: '0', left: '0', width: '100%', height: '100%' });
-  const prevThumbRef = useRef<string>('');
-
   // Recalculate imgContentStyle whenever viewer is loaded or container resizes
   const recalcImgContentStyle = useCallback(() => {
     const img = viewerImgRef.current;
     const container = viewerContainerRef.current;
     if (!img || !container || !img.naturalWidth || !img.naturalHeight) return;
+    // Ensure the img element is still connected to the DOM (not stale from a previous key)
+    if (!img.isConnected) return;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
+    if (cw === 0 || ch === 0) return;
     const containerAR = cw / ch;
     const imageAR = img.naturalWidth / img.naturalHeight;
     let iw: number, ih: number, ox: number, oy: number;
@@ -950,7 +958,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   width: '100%',
                   height: '100%',
                   objectFit: 'contain',
-                  background: '#1a1a1a',
                   pointerEvents: 'none',
                   userSelect: 'none',
                   filter: `blur(2px) contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
@@ -973,10 +980,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   recalcImgContentStyle();
                 }}
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  background: '#1a1a1a',
+                  position: 'absolute',
+                  top: imgContentStyle.top,
+                  left: imgContentStyle.left,
+                  width: imgContentStyle.width,
+                  height: imgContentStyle.height,
                   pointerEvents: 'none',
                   userSelect: 'none',
                   filter: `contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
