@@ -56,7 +56,7 @@ export function DefectCompareViewer({
     position: 'fixed',
     inset: 0,
     zIndex: 2000,
-    background: '#1a1a2e',
+    background: '#1a1a1a',
     display: 'flex',
     flexDirection: 'column',
   };
@@ -79,7 +79,7 @@ export function DefectCompareViewer({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr 1fr',
     padding: '8px 12px',
-    background: '#2d2d44',
+    background: '#2C2C2C',
     color: 'white',
     fontSize: '12px',
     fontFamily: 'var(--font-family-sans)',
@@ -188,14 +188,14 @@ export function DefectCompareViewer({
     justifyContent: 'center',
     gap: '16px',
     padding: '10px 16px',
-    background: '#2d2d44',
+    background: '#2C2C2C',
     color: 'white',
     fontSize: '12px',
     fontFamily: 'var(--font-family-sans)',
   };
 
   const selectStyle: React.CSSProperties = {
-    background: '#3d3d5c',
+    background: '#2C2C2C',
     color: 'white',
     border: '1px solid #5A8F5A',
     borderRadius: '4px',

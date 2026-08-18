@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DefectsTable } from './DefectsTable';
 import { DefectDetailSidebar } from './DefectDetailSidebar';
+import { DefectCompareViewer } from './DefectCompareViewer';
 import { useLanguage } from '@/components/design-system';
 import { useDefectResolvedToggle } from '@/hooks/useDefectResolvedToggle';
 import { useDefectUpdate } from '@/hooks/useDefectUpdate';
@@ -133,14 +134,20 @@ export function DefectsWindFarmTab({ defects, isLoading }: DefectsWindFarmTabPro
         </div>
       )}
 
-      {/* Fullscreen overlay */}
-      {showFullscreen && selectedDefect?.imageUrl && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-          onClick={() => setShowFullscreen(false)}
-        >
-          <img src={selectedDefect.imageUrl} alt="Defect fullscreen" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: '4px' }} />
-        </div>
+      {/* Compare Viewer */}
+      {showFullscreen && selectedDefect && (
+        <DefectCompareViewer
+          onClose={() => setShowFullscreen(false)}
+          currentImage={selectedDefect.imageUrl ?? ''}
+          currentDate={new Date().toISOString()}
+          defectType={selectedDefect.type ?? ''}
+          defectSeverity={selectedDefect.category ?? 3}
+          distanceFromRoot={selectedDefect.rootDistance ?? 0}
+          side={selectedDefect.side ?? ''}
+          blade={selectedDefect.bladePosition ?? 'A'}
+          bladeId={selectedDefect.bladeId ?? ''}
+          inspectionId={selectedDefect.inspectionId ?? ''}
+        />
       )}
     </div>
   );
