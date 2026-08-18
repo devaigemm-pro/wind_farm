@@ -4,6 +4,9 @@
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": {
+      "main": true,
+      "session/*": false
+    }
   }
 }
