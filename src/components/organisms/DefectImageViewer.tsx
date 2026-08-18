@@ -31,7 +31,6 @@ export function DefectImageViewer({
   const hasAnnotation = annotX != null && annotY != null && annotW != null && annotH != null;
 
   function handleWheel(e: React.WheelEvent) {
-    // Don't call preventDefault to avoid passive event listener violation
     if (e.deltaY < 0) {
       onZoomIn();
     } else {
@@ -49,15 +48,6 @@ export function DefectImageViewer({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-  };
-
-  const imageStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    transform: `scale(${zoomLevel})`,
-    transformOrigin: 'center',
-    transition: 'transform 0.2s ease',
   };
 
   const placeholderStyle: React.CSSProperties = {
@@ -125,8 +115,20 @@ export function DefectImageViewer({
     <div>
       <div style={containerStyle} onWheel={handleWheel}>
         {imageUrl ? (
-          <div style={{ position: 'relative', display: 'inline-block', width: '100%', height: '100%' }}>
-            <img src={imageUrl} alt="Defect photograph" style={imageStyle} crossOrigin="anonymous" />
+          <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%' }}>
+            <img
+              src={imageUrl}
+              alt="Defect photograph"
+              style={{
+                display: 'block',
+                maxWidth: '100%',
+                maxHeight: '250px',
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'center',
+                transition: 'transform 0.2s ease',
+              }}
+              crossOrigin="anonymous"
+            />
             {/* Annotation overlay - same SVG logic as DefectCompareViewer */}
             {hasAnnotation && (() => {
               const rad = (annotAngle || 0) * (Math.PI / 180);
@@ -148,7 +150,7 @@ export function DefectImageViewer({
               const p4y = startY - ny * halfH;
               return (
                 <svg
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', transform: `scale(${zoomLevel})`, transformOrigin: 'center' }}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible', transform: `scale(${zoomLevel})`, transformOrigin: 'center' }}
                 >
                   <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF0000" strokeWidth="2.5" />
                   <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF0000" strokeWidth="2.5" />
