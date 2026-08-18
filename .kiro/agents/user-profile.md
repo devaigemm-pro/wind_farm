@@ -1359,3 +1359,12 @@
   - Fix: agregar regla "CADA CAMBIO REQUIERE APROBACIÓN" — una aprobación anterior NO cubre cambios posteriores. Cada implementación es un ciclo independiente.
   - Patrón de QA del agente: el usuario prueba el flujo en múltiples sesiones y reporta inconsistencias. Está verificando que las reglas se cumplan de verdad.
 - **Patrones confirmados**: español, directo, alta autonomía, cada cambio = ciclo independiente de aprobación (NUEVO, confianza alta), reporta inconsistencias del agente entre sesiones, verifica cumplimiento de reglas
+
+### Sesión 129 - 2026-08-18
+- **Tarea principal**: Fix reincidente — sesión preguntó pero liberó a prod sin esperar respuesta (segundo reporte del mismo bug)
+- **Observaciones nuevas**:
+  - Segundo reporte del mismo bug ("preguntó pero liberó igualmente") — el BLOQUEO ABSOLUTO anterior no fue suficiente. El modelo en Autopilot ignora instrucciones de "detente" si no hay enforcement técnico.
+  - Fix multi-capa: (1) Steering con bloque ASCII visual STOP, (2) PreToolUse hook deploy-gate.json que intercepta disclose_context y recuerda verificar aprobación, (3) Regla de ciclo independiente por cambio
+  - El usuario reporta bugs del flujo del agente con la misma persistencia que bugs de código — no para hasta que funcione de verdad
+  - **LIMITACIÓN TÉCNICA reconocida**: steering es sugerencia, no bloqueo real. El enforcement técnico (hooks PreToolUse) es la única garantía en Autopilot.
+- **Patrones confirmados**: español, directo, alta autonomía, persistencia en reportar bugs del agente hasta resolución real, enforcement técnico > instrucciones textuales para reglas críticas, cada cambio = ciclo independiente de aprobación (confianza MÁXIMA)
