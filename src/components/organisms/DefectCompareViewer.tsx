@@ -229,21 +229,35 @@ export function DefectCompareViewer({
             {activeImage ? (
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <img src={activeImage} alt="Defect" style={{ ...imageStyle, transform: `scale(${zoomLevel})`, maxWidth: '100%', maxHeight: 'calc(100vh - 120px)' }} crossOrigin="anonymous" />
-                {/* Annotation overlay - positioned relative to the image */}
-                {hasAnnotation && effectiveAnnot && (
-                  <div style={{
-                    position: 'absolute',
-                    left: `${effectiveAnnot.x}%`,
-                    top: `${effectiveAnnot.y}%`,
-                    width: `${effectiveAnnot.w}%`,
-                    height: `${effectiveAnnot.h}%`,
-                    border: '2px solid #FF0000',
-                    boxShadow: '0 0 6px rgba(255,0,0,0.5)',
-                    pointerEvents: 'none',
-                    transform: effectiveAnnot.angle ? `rotate(${effectiveAnnot.angle}deg)` : undefined,
-                    transformOrigin: 'top left',
-                  }} />
-                )}
+                {/* Annotation overlay - same logic as AnnotateStep */}
+                {hasAnnotation && effectiveAnnot && (() => {
+                  const ann = effectiveAnnot;
+                  const rad = (ann.angle || 0) * (Math.PI / 180);
+                  const halfW = ann.w / 2;
+                  const halfH = ann.h / 2;
+                  const startX = ann.x - halfW * Math.cos(rad);
+                  const startY = ann.y - halfW * Math.sin(rad);
+                  const endX = ann.x + halfW * Math.cos(rad);
+                  const endY = ann.y + halfW * Math.sin(rad);
+                  const nx = -Math.sin(rad);
+                  const ny = Math.cos(rad);
+                  const p1x = startX + nx * halfH;
+                  const p1y = startY + ny * halfH;
+                  const p2x = endX + nx * halfH;
+                  const p2y = endY + ny * halfH;
+                  const p3x = endX - nx * halfH;
+                  const p3y = endY - ny * halfH;
+                  const p4x = startX - nx * halfH;
+                  const p4y = startY - ny * halfH;
+                  return (
+                    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                      <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                      <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                      <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                      <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF0000" strokeWidth="2.5" />
+                    </svg>
+                  );
+                })()}
                 {loading && <div style={loadingOverlay}>Loading...</div>}
               </div>
             ) : (
