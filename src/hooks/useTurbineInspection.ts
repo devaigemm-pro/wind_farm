@@ -17,6 +17,11 @@ export interface TurbineDefect {
   rootCause: string | null;
   nextStep: string | null;
   comments?: { author: string; date: string; text: string }[];
+  annotX?: number;
+  annotY?: number;
+  annotW?: number;
+  annotH?: number;
+  annotAngle?: number;
 }
 
 export interface TurbineInspectionData {
