@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useLanguage } from '@/components/design-system';
 
 interface Defect {
@@ -51,21 +51,8 @@ export function BladesDiagram({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [showCategories, setShowCategories] = useState(false);
-  const [stableDefects, setStableDefects] = useState<Defect[]>([]);
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
-
-  // Debounce defects to avoid rendering with intermediate/incorrect positions
-  useEffect(() => {
-    if (defects.length === 0) {
-      setStableDefects([]);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setStableDefects(defects);
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [defects]);
 
   const blades = ['A', 'B', 'C'] as const;
 
@@ -257,7 +244,7 @@ export function BladesDiagram({
             {/* Blade columns */}
             <div style={{ display: 'flex', width: '100%', height: '100%', position: 'relative', zIndex: 2, justifyContent: 'space-evenly' }}>
               {blades.map((blade) => {
-                const bladeDefects = stableDefects.filter((d) => d.blade === blade);
+                const bladeDefects = defects.filter((d) => d.blade === blade);
                 // Calculate blade wrapper width from known SVG aspect ratio (493.5:2338)
                 const bladeWidth = totalH * (493.5 / 2338);
                 return (

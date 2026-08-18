@@ -1388,3 +1388,11 @@
   - Acepta la explicación sin frustración — cuando la causa es una limitación técnica real (no un error del agente), lo acepta sin drama.
   - **LIMITACIÓN APRENDIDA**: steering y hooks se cargan al inicio de sesión. Cambios mid-session no afectan sesiones activas. Solo sesiones nuevas.
 - **Patrones confirmados**: español, directo, acepta limitaciones técnicas reales sin frustración, diagnostica correctamente causas de comportamiento inesperado
+
+### Sesión 131 - 2026-08-18
+- **Tarea principal**: "sigue lento debe ser más rápido" — ambiguo, se pidió clarificación
+- **Observaciones nuevas**:
+  - Primera vez en la sesión que la instrucción es ambigua sin contexto suficiente — "sigue lento" podría referirse a: (1) tiempo de respuesta del agente, (2) la otra sesión que sigue sin respetar el bloqueo, (3) algo de la app
+  - Se preguntó clarificación — sesión cerrada sin respuesta del usuario
+  - **APRENDIZAJE**: Cuando el usuario dice algo ambiguo en medio de una sesión de múltiples temas, PREGUNTAR es correcto. Pero mantener la pregunta ultra-breve.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima (a veces demasiado breve para interpretar sin contexto), preguntar cuando realmente no hay forma de inferir
