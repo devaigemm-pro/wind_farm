@@ -292,6 +292,8 @@ const breadcrumbStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 'var(--space-2)',
   fontSize: 'var(--text-base)',
+  borderLeft: '4px solid #5A8F5A',
+  paddingLeft: '12px',
 };
 
 const bcLinkStyle: React.CSSProperties = {

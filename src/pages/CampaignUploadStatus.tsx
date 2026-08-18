@@ -362,6 +362,8 @@ const pageStyles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-neutral-900)',
     margin: 0,
+    borderLeft: '4px solid #5A8F5A',
+    paddingLeft: '12px',
   },
   statusBadge: {
     fontSize: '0.7rem',

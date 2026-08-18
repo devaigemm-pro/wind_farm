@@ -352,6 +352,8 @@ const titleStyle: React.CSSProperties = {
   color: 'var(--color-neutral-900, #0f172a)',
   whiteSpace: 'nowrap',
   letterSpacing: '-0.02em',
+  borderLeft: '4px solid #5A8F5A',
+  paddingLeft: '12px',
 };
 
 const toggleContainer: React.CSSProperties = {

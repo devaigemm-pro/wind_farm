@@ -230,6 +230,8 @@ export function Assets() {
     fontSize: 'var(--text-xl)',
     fontWeight: 600,
     color: 'var(--color-neutral-900)',
+    borderLeft: '4px solid #5A8F5A',
+    paddingLeft: '12px',
   };
 
   const headerActionsStyle: React.CSSProperties = {

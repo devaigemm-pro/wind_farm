@@ -204,7 +204,7 @@ export function WindFarmDetail() {
 
 const pageStyle: React.CSSProperties = { height: '100%', display: 'flex', flexDirection: 'column' };
 const headerStyle: React.CSSProperties = { padding: 'var(--space-4) var(--space-4) 0' };
-const pageTitleStyle: React.CSSProperties = { fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-neutral-900)', margin: 0 };
+const pageTitleStyle: React.CSSProperties = { fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-neutral-900)', margin: 0, borderLeft: '4px solid #5A8F5A', paddingLeft: '12px' };
 const contentStyle: React.CSSProperties = { display: 'flex', flex: 1, overflow: 'hidden' };
 const leftColStyle: React.CSSProperties = { width: '35%', minWidth: '300px', overflowY: 'auto', borderRight: '1px solid var(--color-neutral-200)' };
 const rightColStyle: React.CSSProperties = { flex: 1, overflowY: 'auto' };

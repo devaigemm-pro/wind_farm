@@ -471,6 +471,8 @@ const breadcrumbRow: React.CSSProperties = {
   alignItems: 'center',
   gap: '6px',
   fontSize: '1rem',
+  borderLeft: '4px solid #5A8F5A',
+  paddingLeft: '12px',
 };
 
 const breadcrumbLink: React.CSSProperties = {

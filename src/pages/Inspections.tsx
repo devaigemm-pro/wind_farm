@@ -164,6 +164,8 @@ export function Inspections() {
     fontSize: 'var(--text-xl)',
     fontWeight: 700,
     color: '#111827',
+    borderLeft: '4px solid #5A8F5A',
+    paddingLeft: '12px',
   };
 
   const filterBarStyle: React.CSSProperties = {

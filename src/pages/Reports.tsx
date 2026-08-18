@@ -348,6 +348,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 'var(--text-xl)',
     fontWeight: 700,
     color: '#111827',
+    borderLeft: '4px solid #5A8F5A',
+    paddingLeft: '12px',
   },
   searchContainer: {
     display: 'flex',
