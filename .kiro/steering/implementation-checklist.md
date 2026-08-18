@@ -115,12 +115,31 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
    - Alternativa simple: usa `control_bash_process` con `pnpm run preview -- --port 0` (Vite auto-asigna puerto libre)
    - Si el puerto está ocupado, incrementar hasta encontrar uno libre
 3. **Entrega la URL local al usuario**: `http://localhost:<PUERTO>`
-4. **Pregunta EXPLÍCITAMENTE al usuario**: "Los cambios están listos en http://localhost:<PUERTO>. ¿Apruebas para mergear a main y desplegar a producción?"
-   - **BLOQUEO ABSOLUTO**: DETENTE AQUÍ. No ejecutes NINGÚN paso adicional. No hagas merge, no hagas deploy, no hagas push. Tu turno TERMINA con la pregunta. El siguiente paso SOLO puede ejecutarse en un turno posterior DESPUÉS de que el usuario haya respondido afirmativamente.
-   - Si el usuario dice "sí", "dale", "aprobado", "mergea", "libera" o similar → proceder con paso 5
-   - Si el usuario dice "no", pide correcciones, o reporta un problema → aplicar correcciones y volver al paso 1
-   - **PROHIBIDO**: Preguntar Y ejecutar el merge/deploy en el mismo turno. Son dos turnos separados obligatoriamente.
-   - **CADA CAMBIO REQUIERE APROBACIÓN**: Si el usuario pide un segundo cambio en la misma sesión, el flujo completo (build → preview → pregunta → BLOQUEO → espera respuesta) se repite desde cero. Una aprobación anterior NO cubre cambios posteriores. CADA implementación es un ciclo independiente.
+4. **⛔ GATE DE APROBACIÓN — BLOQUEO ABSOLUTO ⛔**
+   
+   Pregunta al usuario: "Los cambios están listos en http://localhost:<PUERTO>. ¿Apruebas para mergear a main y desplegar a producción?"
+
+   ```
+   ╔══════════════════════════════════════════════════════════════╗
+   ║  STOP. TU TURNO TERMINA AQUÍ. NO EJECUTES NADA MÁS.       ║
+   ║                                                              ║
+   ║  - No hagas git merge                                        ║
+   ║  - No hagas git push                                         ║
+   ║  - No hagas deploy                                           ║
+   ║  - No invoques deploy-to-vercel                              ║
+   ║  - No ejecutes vercel CLI                                    ║
+   ║                                                              ║
+   ║  ESPERA al siguiente mensaje del usuario.                    ║
+   ║  SOLO si dice "sí/dale/aprobado/mergea/libera"               ║
+   ║  puedes proceder con el paso 5.                              ║
+   ║                                                              ║
+   ║  CADA cambio en la sesión repite este gate desde cero.       ║
+   ║  Aprobación anterior ≠ aprobación para cambio nuevo.         ║
+   ╚══════════════════════════════════════════════════════════════╝
+   ```
+   
+   - Si el usuario aprueba → paso 5
+   - Si el usuario pide correcciones → volver al paso 1
 5. **Si el usuario aprueba**: ejecuta merge a main + deploy a producción:
    - Primero **rebase sobre main** para resolver conflictos ANTES del merge:
      ```
