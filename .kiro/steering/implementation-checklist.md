@@ -116,9 +116,10 @@ Después de que los cambios pasen la verificación de concordancia y compilen si
    - Si el puerto está ocupado, incrementar hasta encontrar uno libre
 3. **Entrega la URL local al usuario**: `http://localhost:<PUERTO>`
 4. **Pregunta EXPLÍCITAMENTE al usuario**: "Los cambios están listos en http://localhost:<PUERTO>. ¿Apruebas para mergear a main y desplegar a producción?"
-   - NO proceder sin respuesta afirmativa del usuario
+   - **BLOQUEO ABSOLUTO**: DETENTE AQUÍ. No ejecutes NINGÚN paso adicional. No hagas merge, no hagas deploy, no hagas push. Tu turno TERMINA con la pregunta. El siguiente paso SOLO puede ejecutarse en un turno posterior DESPUÉS de que el usuario haya respondido afirmativamente.
    - Si el usuario dice "sí", "dale", "aprobado", "mergea", "libera" o similar → proceder con paso 5
    - Si el usuario dice "no", pide correcciones, o reporta un problema → aplicar correcciones y volver al paso 1
+   - **PROHIBIDO**: Preguntar Y ejecutar el merge/deploy en el mismo turno. Son dos turnos separados obligatoriamente.
 5. **Si el usuario aprueba**: ejecuta merge a main + deploy a producción:
    - Primero **rebase sobre main** para resolver conflictos ANTES del merge:
      ```

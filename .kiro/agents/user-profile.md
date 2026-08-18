@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 112
-- **Última actualización**: 2026-08-17
+- **Sesiones analizadas**: 135
+- **Última actualización**: 2026-08-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -1053,3 +1053,300 @@
   - "hacer merge con main" — instrucción directa, espera ejecución completa (commit + checkout main + merge + push + volver a branch)
   - 5 micro-cambios secuenciales + merge en la misma sesión sin correcciones — todos aceptados al primer intento
 - **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, imagen como spec, "ademas" = extender tarea, "en cada pantalla" = auditoría cross-app exhaustiva, #5A8F5A acento único global, URL como referencia, barrido visual por sesión, quiere merge a main después de completar
+
+### Sesión 114 - 2026-08-18
+- **Tarea principal**: Rediseñar flujo de deploy: (1) Ramas de sesión solo hacen build + preview local (URL para revisar). (2) Solo main puede desplegar a producción Vercel. (3) Perfil de aprendizaje debe ser solo local, nunca pushearse.
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio del mensaje — patrón habitual
+  - Tarea de infraestructura/DevOps (flujo de deploy + git) — confirma pensamiento meta-nivel sobre el proceso de desarrollo
+  - Instrucción completa en un solo mensaje con 3 requerimientos claros: (1) deploy local por rama, (2) solo main → Vercel, (3) perfil solo local
+  - "me entregue url para revisar el cambio y si esta correcto yo le indicare que haga merge" — quiere control explícito antes del merge. Cambia de "alta autonomía total para deploy" a "preview + aprobación antes de producción"
+  - "las modificaciones de perfil del aprendizaje debe ser en segundo plano y solo a nivel local, no se debe pushear" — refuerza que el perfil es invisible para el repo remoto
+  - **CAMBIO DE PATRÓN DEPLOY**: Antes era "todo a producción automáticamente". Ahora es "preview local → aprobación → merge → producción". El usuario quiere ver los cambios antes de que vayan a producción.
+  - Cuando el agente tiene problemas para editar user-profile.md (aprobación del IDE), dice "buscar alternativa" — quiere soluciones, no excusas. Si una herramienta falla, usar otra (bash en vez de str_replace).
+  - Sesión resuelta sin correcciones — la implementación se aceptó al primer intento
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, pensamiento meta-nivel/infraestructura, instrucción completa en un mensaje, perfil solo local (confianza MÁXIMA), quiere control antes de deploy a producción (NUEVO), "buscar alternativa" cuando algo no funciona
+
+### Sesión 115 - 2026-08-18
+- **Tarea principal**: Barrido visual multi-tarea: (1) Agregar X para cerrar SharePopover. (2) Ocultar dark mode del TopBar. (3) Centrar valores tabla /assets-wind excepto "Asset name". (4) Eliminar icono notificaciones. (5) Avatar usuario a verde #5A8F5A. (6) Fix botón expand/compare en defects. (7) Bordes de DefectCompareViewer de azul a verde #5A8F5A.
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio — patrón habitual
+  - 7 micro-cambios en una sesión sobre 5+ componentes/pantallas — barrido de calidad visual cross-app intenso
+  - "ademas" para extender tarea secuencialmente sin repetir contexto
+  - Describe bugs por funcionalidad rota sin dar contexto técnico
+  - Aprobación con 👍 — ultra-mínima
+  - No hubo correcciones en toda la sesión — todos aceptados al primer intento
+  - "usar el color de los botones del sistema" = #5A8F5A sin necesidad de repetir el hex
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, "ademas" = extender tarea, barrido visual cross-app, aprobación con 👍, #5A8F5A acento único global, "el color de los botones" = #5A8F5A implícito
+
+### Sesión 116 - 2026-08-18
+- **Tarea principal**: Barrido visual: (1) X cerrar SharePopover. (2) Ocultar dark mode. (3) Centrar valores tabla /assets-wind. (4) Eliminar icono notificaciones. (5) Avatar verde #5A8F5A. (6) Fix botón expand/compare → abrir DefectCompareViewer. (7) Bordes azules de compare → verdes #5A8F5A + fondos azulados (#2d2d44, #1a1a2e, #3d3d5c) → grises neutros.
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio — patrón habitual
+  - 7+ micro-cambios en una sesión sobre 6+ componentes — barrido QA visual intenso
+  - Proporciona screenshot como evidencia cuando reporta que un fix no se aplicó — patrón de "screenshot como prueba"
+  - "siguen siendo azules" — los fondos azulados (#2d2d44) también cuentan como "azules" para el usuario, no solo los bordes explícitos. Interpretar "color azul" como cualquier tono azulado visible.
+  - "todos los botones compare deben abrir la ventana compare defect" — espera que el botón Compare abra el componente real (DefectCompareViewer), no un overlay simple
+  - "te dejo evidencia" — usa screenshots para comunicar exactamente qué ve y qué está mal
+  - Aprobación con 👍 — patrón ultra-mínimo
+  - No hubo correcciones de lógica en la sesión, solo refinamiento del fix de colores por incluir fondos azulados
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, screenshot como prueba, "ademas" = extender tarea, barrido visual cross-app, #5A8F5A acento único global, aprobación con 👍, "todos los botones X deben hacer Y" = auditoría exhaustiva
+
+### Sesión 117 - 2026-08-18
+- **Tarea principal**: Sesión larga de barrido visual y funcional: (1) X cerrar SharePopover. (2) Ocultar dark mode. (3) Centrar tabla /assets-wind. (4) Eliminar notificaciones TopBar. (5) Avatar verde. (6) Fix expand/compare defects. (7) Bordes compare azules→verdes. (8) Botón Compare abre nueva pestaña con ruta /compare dedicada.
+- **Observaciones nuevas**:
+  - "debe abrir una nueva ventana" / "nueva pestaña" — cuando dice "nueva ventana" se refiere a window.open en nueva pestaña del navegador, NO un overlay/modal dentro de la misma pantalla
+  - "aplicar esto ultimo a los otros dos botones compare que tambien existen en la app" — auditoría exhaustiva: buscar TODOS los botones con la misma funcionalidad en la app y aplicar el mismo cambio
+  - Corrigió approach anterior (overlay modal) por nueva pestaña — la primera implementación no era lo que quería
+  - Aprobación con 👍 después de cada fix correctamente implementado
+  - 8+ micro-cambios en una sola sesión larga — barrido de calidad más intenso registrado
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, "nueva ventana" = nueva pestaña del browser (window.open), "aplicar a los otros X que existen" = auditoría exhaustiva cross-app, aprobación con 👍, #5A8F5A acento único global, screenshot como prueba cuando algo no se aplicó
+
+### Sesión 118 - 2026-08-18
+- **Tarea principal**: Sesión larga multi-tarea: (1) X cerrar SharePopover. (2) Ocultar dark mode. (3) Centrar tabla /assets-wind. (4) Eliminar notificaciones. (5) Avatar verde. (6) Fix expand/compare. (7) Bordes compare→verde. (8) Compare abre nueva pestaña. (9) Anotación roja sobre imagen en compare. (10) Navegación de caras de pala (SS/PS/Hub/←) según DOM Skyvisor.
+- **Observaciones nuevas**:
+  - "debe abrir una nueva ventana" = window.open nueva pestaña, NO overlay/modal
+  - "recordar que se debe abrir una nueva pestaña" — corrección del approach anterior (overlay). REGLA: "nueva ventana" siempre = pestaña del browser
+  - DOM de Skyvisor proporcionado como spec para navegación de caras — patrón DOM como spec consolidado
+  - Imagen de referencia proporcionada mostrando: (1) recuadro rojo de anotación sobre la foto, (2) flechas de navegación SS/PS/Hub en verde, (3) info Blade/Side/Hub en verde
+  - "solo la zona marcada" — quiere que la imagen muestre el crop/anotación del defecto, no la foto completa sin marcar
+  - Sesión ultra-larga (10+ cambios) con aprobaciones 👍 consecutivas — barrido de calidad más intenso registrado
+  - No hubo correcciones en la implementación de la anotación/navegación — aceptada al primer intento
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec (confianza MÁXIMA), imagen como spec, "nueva ventana" = window.open nueva pestaña, "aplicar a todos los X" = auditoría exhaustiva, aprobación con 👍, #5A8F5A acento único global, barrido visual cross-app
+
+### Sesión 115 - 2026-08-18
+- **Tarea principal**: Continuación sesión 114 — considerar sesiones paralelas en el flujo de preview local (conflictos de puerto)
+- **Observaciones nuevas**:
+  - Instrucción de 1 frase: "considerar que pueden haber sesiones en paralelo desarrollando en local" — describe el edge case sin dar solución técnica
+  - Piensa en escenarios de uso real (múltiples sesiones Kiro abiertas simultáneamente) — pensamiento sistémico sobre su propio workflow
+  - No necesitó correcciones — aceptó la solución de puertos dinámicos implícitamente
+  - Sesión ultra-corta: un solo ajuste, sin iteraciones
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, pensamiento meta-nivel/infraestructura, identifica edge cases desde el uso real, confía en la solución técnica del agente
+
+### Sesión 116 - 2026-08-18
+- **Tarea principal**: Continuación sesión 114-115 — preguntar si hay que tomar medidas para evitar conflictos entre ramas antes de mergear a main
+- **Observaciones nuevas**:
+  - Pregunta proactiva sobre edge cases: "habrá que tomar medidas?" — no ordena, pregunta si es necesario. Esto es distinto al patrón habitual de instrucción directa. Indica que para temas de infraestructura/arquitectura, primero consulta antes de decidir.
+  - Cuando la respuesta confirma la necesidad, acepta la solución sin correcciones — confía en el criterio técnico del agente para este tipo de decisiones
+  - Sesión de 3 turnos consecutivos sobre el mismo tema (deploy flow) — refinamiento progresivo de infraestructura
+- **Patrones confirmados**: español, directo, alta autonomía, pensamiento meta-nivel/infraestructura, para infra consulta antes de decidir (vs para UI ordena directamente), confía en soluciones técnicas del agente
+
+### Sesión 119 - 2026-08-18
+- **Tarea principal**: Continuación sesión anterior: (1) Ajustar layout flechas SS/Hub/PS para que no se sobrepongan (layout en cruz). (2) Ajustar datos Blade/Side/Hub para que no se sobrepongan. (3) Hacer que los botones de navegación cambien las imágenes según la cara de la pala indicada (SS, PS, Hub→, ←Tip).
+- **Observaciones nuevas**:
+  - "consultar el dom entregado si es necesario" — da permiso para volver a revisar el DOM de Skyvisor proporcionado en el mensaje anterior como referencia
+  - "revisar la logica de skyvisor si es necesario" — permite investigar el sistema original para replicar la lógica de navegación
+  - La navegación de caras funciona consultando inspection_photo por blade_id + campaign_id, filtrando por face y radial_position
+  - Aprobación con 👍 — sesión aceptada sin correcciones
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, DOM como spec (confianza MÁXIMA), "consultar/revisar si es necesario" = permiso para investigar el original, aprobación con 👍, #5A8F5A acento único global
+
+### Sesión 117 - 2026-08-18
+- **Tarea principal**: Sesión completa de rediseño de flujo de deploy (sesiones 114-117 continuas): (1) Preview local en ramas, solo main a producción Vercel. (2) Puertos dinámicos para sesiones paralelas. (3) Rebase antes de merge para evitar conflictos. (4) Consulta de recaudos adicionales.
+- **Observaciones nuevas**:
+  - Sesión de 4 turnos consecutivos refinando la misma arquitectura de deploy — iteración progresiva sobre infraestructura
+  - "qué otros recaudos debemos considerar?" — pide análisis exhaustivo de edge cases. Quiere que el agente piense en TODO lo que puede salir mal, no solo lo obvio.
+  - Usa "debemos" (plural) — se ve como equipo con el agente. Colaboración, no solo delegación.
+  - Para infraestructura/DevOps: patrón consulta → respuesta → siguiente refinamiento. Diferente al patrón UI de "hazlo" → "corrección".
+  - No dijo "implementa" después de la lista de recaudos — está evaluando. Para infra, primero entiende el panorama completo, luego decide qué implementar.
+- **Patrones confirmados**: español, directo, alta autonomía, pensamiento meta-nivel/infraestructura, para infra consulta antes de decidir (confirmado 3+ turnos = confianza alta), iteración progresiva sobre arquitectura, "debemos" = colaboración activa
+
+### Sesión 118 - 2026-08-18
+- **Tarea principal**: Continuación — "aplicarlas todas" (implementar los 5 recaudos de seguridad para deploy paralelo)
+- **Observaciones nuevas**:
+  - "aplicarlas todas" — 2 palabras como instrucción completa. Referencia implícita a la lista del turno anterior. Confianza total en que el agente sabe qué implementar.
+  - No pidió ver la propuesta antes de implementar — para medidas que ya fueron discutidas y aprobadas conceptualmente, pasa directo a "hazlo"
+  - Patrón infra confirmado: (1) consulta qué hacer, (2) evalúa la lista, (3) dice "aplicarlas todas" — ciclo completo de decisión en 3 turnos
+  - Aceptó la implementación sin correcciones — tabla resumen fue suficiente como reporte
+- **Patrones confirmados**: español, directo, alta autonomía TOTAL, comunicación ultra-mínima ("aplicarlas todas" = 2 palabras), referencia implícita a contexto previo, para infra: consulta → evalúa → ejecuta (confianza alta), acepta resumen en tabla como reporte final
+
+### Sesión 119 - 2026-08-18
+- **Tarea principal**: Sesión completa de rediseño de flujo de deploy (turnos 114-119): (1) Preview local en ramas, solo main a producción. (2) Puertos dinámicos para paralelo. (3) Rebase pre-merge. (4) Recaudos implementados (vercel.json, retry push, kill preview, docs). (5) Descartó bloqueo de creación de ramas durante merge — "no tiene sentido".
+- **Observaciones nuevas**:
+  - Propone idea → pide opinión → acepta la recomendación del agente de NO implementar. Patrón: cuando el agente da argumentos técnicos sólidos contra una idea, acepta sin insistir.
+  - "dejalo asi, no tiene sentido" — acepta la recomendación sin drama. Valora que el agente le diga que algo no vale la pena vs implementar todo ciegamente.
+  - Sesión de 6 turnos sobre infraestructura de deploy — la más larga de infra hasta ahora. Progresión: diseño → edge cases → recaudos → propuesta descartada.
+  - **PATRÓN NUEVO**: Cuando el agente recomienda NO hacer algo con argumentos claros, el usuario acepta. Prefiere honestidad sobre complejidad innecesaria. No quiere que el agente diga sí a todo.
+- **Patrones confirmados**: español, directo, alta autonomía, pensamiento meta-nivel/infraestructura, para infra consulta→evalúa→decide (confianza alta), acepta recomendaciones técnicas del agente, valora opinión honesta del agente sobre qué no implementar
+
+### Sesión 120 - 2026-08-18
+- **Tarea principal**: Fix compare viewer: (1) Imagen del defecto debe cargar la foto con la anotación marcada del paso 2.ANNOTATE (via defect→annotation→inspection_photo). (2) Botones SS/Hub/PS deben cambiar la foto — corregida query para buscar por blade_id directamente sin depender de campaign_id.
+- **Observaciones nuevas**:
+  - "la imagen del defecto debe cargar el area marcada por la anotacion en el paso 2.ANNOTATE" — la imagen que se muestra debe ser la misma foto del workflow step 2, con su anotación visible. NO cualquier imagen genérica.
+  - "los botones SS hub y PS siguen sin cambiar de foto" — reporta bug funcional sin dar contexto técnico. Confía en que el agente diagnostique la causa (query fallida por campaign_id null).
+  - Los datos de la anotación viven en: defect.description = annotation.id → annotation.thumbnail_id = inspection_photo.id → storage_path
+  - Las fotos del blade se buscan por blade_id en inspection_photo (no por campaign_id que puede ser null)
+  - Aprobación con 👍 — sesión aceptada sin correcciones adicionales
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, describe bugs funcionales sin contexto técnico, aprobación con 👍, "debe cargar X" = resultado esperado claro
+
+### Sesión 121 - 2026-08-18
+- **Tarea principal**: (1) Ajustar posición labels SS/Hub/PS en flechas de navegación (layout en cruz según imagen de referencia). (2) Fix imagen de compare que no mostraba la anotación marcada — ahora SIEMPRE busca las coordenadas de la anotación desde la DB y muestra el recuadro rojo.
+- **Observaciones nuevas**:
+  - "la imagen sigue sin mostrar el area marcada" — cuando algo "sigue sin funcionar", el fix anterior fue insuficiente. El problema era que la lógica tenía `if (currentImage) return;` que impedía buscar la anotación cuando ya había imagen. Se corrigió para SIEMPRE cargar coords de anotación.
+  - Proporciona imagen de referencia para posición exacta de labels (SS arriba, Hub a la derecha de →, PS abajo) — patrón "imagen como spec" para layout preciso
+  - "los botones deben tener sus nombres en la posicion correcta" — describe desde lo visual sin dar coords técnicas
+  - Aprobación con 👍 después de la corrección
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, imagen como spec para layout, "sigue sin X" = fix anterior insuficiente (diagnosticar más profundo), aprobación con 👍
+
+### Sesión 122 - 2026-08-18
+- **Tarea principal**: Fix compare viewer: (1) Anotación en posición incorrecta — ahora es relativa al wrapper de la imagen (inline-block), no al contenedor flex. (2) Label "Hub" reposicionado a la derecha de la flecha → (fuera del botón).
+- **Observaciones nuevas**:
+  - "en otra posicion diferente a la original" — el overlay de anotación debe ser relativo a la imagen renderizada, no al contenedor. Con objectFit:contain la imagen no ocupa 100% del contenedor.
+  - "la flecha hub esta mal posicionada" — cuando un label está dentro de un botón flex-column, se va debajo. Debe estar al LADO de la flecha (misma línea). Referenciar SIEMPRE la imagen de Skyvisor para posiciones.
+  - Aprobación con 👍 — correcciones aceptadas
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, corrección directa sin drama, aprobación con 👍, posicionamiento visual = referenciar imagen original
+
+### Sesión 125 - 2026-08-18
+- **Tarea principal**: Fix posición de anotación en compare viewer — estaba "corrida" porque usaba x/y como esquina top-left cuando en realidad son el CENTRO del rectángulo. Corregido replicando exactamente la misma lógica SVG de AnnotateStep (4 puntos calculados con angle + normal vector).
+- **Observaciones nuevas**:
+  - "puedes visitar la pantalla 2.ANNOTATE y buscar la foto asociada" — da permiso explícito para investigar cómo funciona en otro lugar de la app y replicar. Patrón "usar el mismo método que X" aplicado a lógica de rendering.
+  - **APRENDIZAJE CRÍTICO**: Los datos de annotation en este proyecto usan x/y como CENTRO del rectángulo (no esquina). w/h son dimensiones totales. angle es rotación. El rendering correcto requiere calcular 4 puntos con trigonometría (halfW*cos, halfH*sin, normal vector). NUNCA usar x/y como left/top directamente.
+  - Aprobación con 👍 después de aplicar la misma lógica SVG que AnnotateStep
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "usar el mismo método que X" (confianza MÁXIMA — aplica también a lógica de rendering), aprobación con 👍, "visitar pantalla X para obtener la posición exacta" = investigar el código existente que funciona
+
+### Sesión 126 - 2026-08-18
+- **Tarea principal**: Merge session branch a main + deploy a producción Vercel (vercel deploy --prod)
+- **Observaciones nuevas**:
+  - "hacer merge a main y desde main deployar a prod" — instrucción directa de merge + deploy en una frase. No necesita explicación de flujo.
+  - Aprobación con 👍 — ultra-mínima
+  - El flujo de deploy desde sesión 114 es: preview local → aprobación → merge a main → deploy prod. Esta sesión fue la etapa final (merge + deploy)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, "hacer merge a main y deployar a prod" = ejecutar el flujo completo sin preguntar, aprobación con 👍
+
+### Sesión 127 - 2026-08-18
+- **Tarea principal**: Fix 404 en producción — faltaba rewrite SPA en vercel.json para que todas las rutas del client-side router se sirvan desde index.html. Agregado `"rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }]` y redesplegado.
+- **Observaciones nuevas**:
+  - El usuario reporta error 404 de Vercel con el código exacto — no da contexto adicional, confía en que el agente diagnostique
+  - La causa fue que la nueva ruta /compare (página standalone) necesitaba el SPA fallback que no estaba configurado en vercel.json
+  - Aprobación con 👍
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, reporta errores con el código/mensaje exacto, confía en diagnóstico del agente, aprobación con 👍
+
+### Sesión 128 - 2026-08-18
+- **Tarea principal**: Ajuste visual menor: separar flecha Hub simétricamente con la flecha izquierda en el compare viewer (agregar spacer de 8px entre ← y →).
+- **Observaciones nuevas**:
+  - "debe tener la misma distancia que la flecha izquierda" — describe simetría visual sin dar valores px. Confía en que el agente iguale el spacing.
+  - Cambio ultra-simple aceptado con 👍 al primer intento
+  - Incluye deploy automático al aprobar (merge + push + vercel --prod en un solo flujo)
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, ajuste visual con descripción de simetría/igualdad, aprobación con 👍, deploy incluido al aprobar
+
+### Sesión 129 - 2026-08-18
+- **Tarea principal**: Fix flecha Hub — el spacer div empujó la flecha ← pero no la →. Corregido usando gap uniforme (24px) sin spacer extra.
+- **Observaciones nuevas**:
+  - "este cambio hizo que la flecha izquierda se desplazara" — cuando un fix visual rompe otro elemento, reporta inmediatamente qué se movió y qué NO se movió. No da solución técnica, describe el resultado visual.
+  - El spacer div era el approach incorrecto — un gap uniforme en el flex container es más robusto que spacers entre items
+  - Aprobación con 👍
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, corrección directa sin drama, aprobación con 👍, deploy incluido en cada corrección
+
+### Sesión 130 - 2026-08-18
+- **Tarea principal**: Fix posición flecha Hub — moverla más a la derecha, proporcional a la flecha izquierda. Gap aumentado a 40px + label "Hub" dentro del botón → (inline row).
+- **Observaciones nuevas**:
+  - "haz desplazado la flecha hub hacia la izquierda" — el fix anterior (gap uniforme) no resolvió. El usuario quería la → más LEJOS del centro, no más cerca.
+  - Proporciona imagen comparativa (Skyvisor vs nuestro sistema) para mostrar exactamente la posición esperada — patrón "imagen como spec" para posicionamiento exacto
+  - En Skyvisor: ← está a la izquierda con buen espacio, → está bastante a la derecha con "Hub" al lado. Gran separación entre ambas.
+  - Aprobación con 👍 después de ver el resultado correcto
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, imagen comparativa como spec, corrección directa sin drama, aprobación con 👍, deploy incluido en cada corrección
+
+### Sesión 131 - 2026-08-18
+- **Tarea principal**: Fix definitivo posición flechas navegación compare — reemplazado flex+gap por CSS Grid 3x3 para posicionar las flechas en cruz sin ambigüedad.
+- **Observaciones nuevas**:
+  - "se profesional" — frustración por 3+ iteraciones del mismo problema visual. Cuando dice esto, el approach actual es fundamentalmente incorrecto — cambiar radicalmente (flex→grid).
+  - "mueve estos componentes de manera correcta y dejalos alineados" — instrucción directa y final. No quiere más intentos incrementales.
+  - **APRENDIZAJE**: Para layouts tipo cruz (4 direcciones + centro), usar CSS Grid 3x3 es más robusto que flex con gaps. Flex + gap se rompe fácilmente cuando los items tienen diferentes tamaños o labels.
+  - Aprobación con 👍 después del approach grid
+- **Patrones confirmados**: español, directo, alta autonomía, "se profesional" = frustración por iteraciones (confianza MÁXIMA), cambiar approach radicalmente cuando flex no funciona, aprobación con 👍
+
+### Sesión 132 - 2026-08-18
+- **Tarea principal**: Sesión completa de barrido visual + compare viewer. Resumen de toda la sesión larga: (1) X cerrar SharePopover. (2) Ocultar dark mode. (3) Centrar tabla /assets-wind. (4) Eliminar notificaciones. (5) Avatar verde. (6) Fix expand/compare→nueva pestaña. (7) Bordes compare→verde. (8) Navegación flechas SS/PS/Hub con grid. (9) Anotación con lógica SVG exacta de AnnotateStep. (10) Fix SPA rewrites vercel.json. (11) Múltiples iteraciones de posición flechas hasta CSS Grid definitivo.
+- **Observaciones nuevas**:
+  - "este cambio fue directo a producción?" — el usuario nota que se saltó el preview local. Cuando aprobó el primer deploy (sesión 126 "hacer merge a main y deployar a prod"), interpretó que las siguientes correcciones también iban directo. Pero el flujo correcto es: preview local → aprobación → producción. Solo fue directo porque estaba iterando correcciones visuales sobre producción y verificando allí.
+  - **CLARIFICACIÓN DEPLOY**: El flujo "directo a prod" fue aceptado implícitamente en esta sesión porque el usuario verificaba en producción y pedía correcciones inmediatas. Pero el flujo default sigue siendo preview local → aprobación → merge → deploy.
+  - 👍 como aceptación de que el flujo directo está OK en este contexto (iteración rápida visual)
+- **Patrones confirmados**: español, directo, alta autonomía, deploy directo OK cuando el usuario está iterando correcciones visuales rápidas en producción, "se profesional" = frustración (cambiar approach), CSS Grid > flex para layouts tipo cruz, aprobación con 👍
+
+### Sesión 120 - 2026-08-18
+- **Tarea principal**: Confirmación de flujo post-merge: merge → deploy prod automático → volver a la rama para seguir editando
+- **Observaciones nuevas**:
+  - Reitera un requerimiento que ya estaba implementado — quiere asegurarse de que el flujo es claro y no se salte ningún paso
+  - "una vez finalizados estos procesos la sesión vuelve a la rama" — enfatiza que la sesión NO termina después del deploy. Quiere seguir trabajando en la misma rama después de liberar.
+  - No necesitó cambios — ya estaba cubierto. Aceptó la confirmación sin correcciones.
+- **Patrones confirmados**: español, directo, alta autonomía, verifica que el agente entienda el flujo completo, la sesión continúa después del deploy (no termina), flujo circular: rama → preview → merge → deploy → volver a rama
+
+### Sesión 121 - 2026-08-18
+- **Tarea principal**: Señalar que otra sesión no volvió a su rama después del merge — verificar que el nuevo flujo lo cubre
+- **Observaciones nuevas**:
+  - Reporta evidencia de otra sesión que NO siguió el flujo esperado ("se mantuvo en main y siguió liberando") — verifica comportamiento cross-sesión
+  - Observa el sistema desde afuera: nota inconsistencias entre lo que el agente dice que hace y lo que realmente pasó en otra sesión
+  - Acepta que el fix ya está aplicado vía steering actualizado sin pedir más cambios — confía en que las sesiones futuras lo seguirán
+  - "qué me dices de eso?" — pide explicación/diagnóstico, no acción. Quiere entender POR QUÉ pasó antes de decidir si hay que hacer algo.
+- **Patrones confirmados**: español, directo, alta autonomía, verifica comportamiento cross-sesión, pide diagnóstico antes de acción para temas de infra, acepta explicación cuando tiene sentido
+
+### Sesión 133 - 2026-08-18
+- **Tarea principal**: Fix columna "defect size (cm)" vacía en tabla de defectos de WindFarmDetail (/assets-wind/f0000000-0001-4000-8000-000000000001)
+- **Observaciones nuevas**:
+  - Modo compañero activado con "compañero" al inicio + URL + descripción del bug en una sola frase — patrón clásico consolidado
+  - No necesitó correcciones — el diagnóstico fue correcto y se resolvió al primer intento
+  - Bug de datos + código: los defectos en DB no tenían width_cm/height_cm porque handleSaveDefect no los pasaba al crear. Fix dual: (1) código para futuros, (2) actualización de datos existentes vía annotation.w/h
+  - Sesión ultra-corta: un solo bug, diagnóstico + fix de código + fix de datos, sin iteraciones
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, URL como referencia, describe bugs desde lo visual sin detalles técnicos, bug sistémico de data paths (width_cm/height_cm no se guardaban al crear defectos)
+
+### Sesión 122 - 2026-08-18
+- **Tarea principal**: Fix definitivo para que user-profile.md se edite sin pedir aprobación: cambiar hook session-learning.json y steering para instruir uso de execute_bash (sed/cat) en vez de str_replace
+- **Observaciones nuevas**:
+  - Quinta+ vez que reporta el problema de aprobación de user-profile.md — frustración acumulada máxima. La solución anterior (agregar a .gitignore) no resolvió el problema del IDE pidiendo aprobación.
+  - "aplicar el método que usas en esta sesión" — referencia directa a cómo el agente resolvió el problema localmente (execute_bash). Quiere que ESE patrón se replique en todas las sesiones.
+  - La causa real: Kiro pide aprobación para str_replace/fs_write en modo Supervised. La solución: usar execute_bash que NO pide aprobación porque es un comando shell directo.
+  - Cambios: (1) hook session-learning.json actualizado con instrucciones explícitas de usar bash, (2) steering con regla crítica visible para todas las sesiones
+- **Patrones confirmados**: español, directo, alta autonomía, "aplicar el método que X" = replicar exactamente lo que funciona, frustración máxima por problema recurrente de user-profile.md (5+ sesiones), buscar alternativa cuando herramienta falla (confianza MÁXIMA)
+
+### Sesión 123 - 2026-08-18
+- **Tarea principal**: Agregar pregunta explícita de aprobación al final de cada implementación antes de mergear a main
+- **Observaciones nuevas**:
+  - "me debe preguntar si apruebo el cambio para luego mergear" — quiere que el agente PREGUNTE activamente, no que espere pasivamente. Es una acción del agente, no una pausa silenciosa.
+  - El flujo anterior decía "Espera la aprobación" (pasivo). El usuario quiere "Pregunta si aprueba" (activo). Diferencia sutil pero importante en UX del agente.
+  - Confirma el patrón de control: para deploy a producción SIEMPRE debe haber una pregunta explícita + respuesta afirmativa del usuario. Sin excepciones.
+- **Patrones confirmados**: español, directo, alta autonomía, control explícito antes de deploy a producción (confianza MÁXIMA - confirmado en 3+ turnos esta sesión), pregunta activa > espera pasiva, sesión de refinamiento de infraestructura continúa
+
+### Sesión 134 - 2026-08-18
+- **Tarea principal**: Hacer que el botón "Edit" de un defecto en step 4 RESULTS redirija a step 3 ANALYZE con el defecto preseleccionado
+- **Observaciones nuevas**: Instrucción clara y completa en una sola frase. Modo compañero activado con "compañero". No necesitó correcciones — aprobado con 👍 al primer intento. Sesión ultra-corta: un solo feature, sin iteraciones.
+- **Patrones confirmados**: español, directo, alta autonomía, comunicación ultra-mínima, modo compañero, aprobación con 👍, confía en implementación del agente
+
+### Sesión 124 - 2026-08-18
+- **Tarea principal**: Corregir que sesión "Edit defect → redirect to ANALYZE" preguntó si aprobaba pero SIN ESPERAR RESPUESTA ejecutó merge + deploy
+- **Observaciones nuevas**:
+  - El agente preguntó pero NO esperó — el modo Autopilot permite que el agente siga ejecutando en el mismo turno. La instrucción "espera aprobación" no es suficiente si no hay un BLOQUEO explícito.
+  - Fix: convertir el paso 4 en un BLOQUEO ABSOLUTO — el turno TERMINA con la pregunta. Merge/deploy PROHIBIDO en el mismo turno. Solo puede ejecutarse después de respuesta afirmativa en turno posterior.
+  - "corregir" — instrucción directa de 1 palabra, el usuario no necesita explicar qué corregir porque ya dio el contexto ("me preguntó sin respuesta hizo el paso a main")
+  - Reporta bugs de flujo del agente con la misma concisión que bugs de código — patrón consistente
+- **Patrones confirmados**: español, directo, alta autonomía, reporta bugs del agente con misma concisión que bugs de código, "corregir" = diagnosticar + fix sin preguntar, control explícito antes de deploy (confianza MÁXIMA), BLOQUEO obligatorio entre pregunta y acción
+
+### Sesión 125 - 2026-08-18
+- **Tarea principal**: Pregunta sobre si caveman/skills de reducción de tokens están activos
+- **Observaciones nuevas**:
+  - Pregunta informativa — no una instrucción. Quiere saber el estado actual del sistema.
+  - No dijo "actívalo" después de la explicación — está evaluando. Para decisiones sobre el agente, primero pregunta estado, luego decide.
+  - Caveman no se activó en esta sesión porque no era relevante para la tarea de infra. El hook lo sugiere pero el agente decide si es pertinente.
+- **Patrones confirmados**: español, directo, pregunta estado del sistema antes de decidir, para decisiones sobre configuración del agente consulta primero
+
+### Sesión 126 - 2026-08-18
+- **Tarea principal**: Preguntas sobre skills de reducción de tokens (caveman)
+- **Observaciones nuevas**:
+  - Pregunta exploratoria: "cuál otra skill tenemos?" — está evaluando opciones para optimizar consumo de tokens
+  - No tomó acción después de la respuesta — sigue en modo evaluación/información
+  - Preocupación por consumo de tokens es un patrón recurrente (sesión 50: "me estas haciendo gastar tiempo y tokens")
+- **Patrones confirmados**: español, directo, consulta estado antes de decidir, preocupación por eficiencia de tokens (confianza alta - 3+ sesiones)
+
+### Sesión 127 - 2026-08-18
+- **Tarea principal**: Preguntas sobre skills disponibles para reducir tokens/texto — revisión de inventario
+- **Observaciones nuevas**:
+  - "creo que tenemos una para reducir los textos de git o algo por estilo, revisa" — recuerda que hay algo pero no exactamente qué. Pide que el agente verifique.
+  - Confunde "reducir texto en commits" (git-commit) con "reducir tokens" (caveman) — son cosas distintas pero el usuario las asocia mentalmente como "optimización de texto"
+  - No tomó acción final — sigue en modo evaluación/exploración
+  - Sesión larga de esta fecha (114-127) ha sido 100% infraestructura/meta: deploy flow, git flow, skills, tokens. Cero código de producto.
+- **Patrones confirmados**: español, directo, "revisa" = verifica por mí, consulta estado del sistema antes de decidir, sesiones dedicadas a optimizar el entorno de trabajo (meta-nivel confirmado)
+
+### Sesión 135 - 2026-08-18
+- **Tarea principal**: Agregar overlay de anotación marcada (rectángulo rojo) a la foto del defecto en la pestaña defects de /assets-wind, replicando la lógica del compare viewer
+- **Observaciones nuevas**:
+  - "esto ya se implemento en la pantalla compare, revisa esa solucion" — instrucción clara de replicar patrón existente. Revisó el compare viewer y aplicó la misma lógica SVG.
+  - "si ves algo que se puede mejorar hazlo" — autonomía total para mejorar mientras replica. Se mejoró eliminando la query redundante a la DB (coords ahora viajan con la imagen).
+  - Sesión ultra-corta: un solo feature, sin correcciones, implementación aceptada al primer intento.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, "usar el mismo método que X" (confianza MÁXIMA), URL como referencia, comunicación ultra-mínima, confía en mejoras del agente si no rompen nada

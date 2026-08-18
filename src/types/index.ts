@@ -195,6 +195,11 @@ export interface DefectDashboardRow {
   resolved: boolean;
   inspectionId: string;
   bladeId: string;
+  annotX?: number;
+  annotY?: number;
+  annotW?: number;
+  annotH?: number;
+  annotAngle?: number;
 }
 
 /** Comment on a defect */

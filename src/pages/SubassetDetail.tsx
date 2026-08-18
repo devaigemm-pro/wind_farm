@@ -43,10 +43,11 @@ export function SubassetDetail() {
   const defectsWithImages = useMemo(() => {
     if (!defects) return [];
     if (!defectImageMap) return defects;
-    return defects.map(d => ({
-      ...d,
-      imageUrl: defectImageMap[d.id] ?? d.imageUrl,
-    }));
+    return defects.map(d => {
+      const imgData = defectImageMap[d.id];
+      if (!imgData) return d;
+      return { ...d, imageUrl: imgData.url ?? d.imageUrl, annotX: imgData.annotX, annotY: imgData.annotY, annotW: imgData.annotW, annotH: imgData.annotH, annotAngle: imgData.annotAngle };
+    });
   }, [defects, defectImageMap]);
 
   const [activeTab, setActiveTab] = useState('general');
