@@ -604,7 +604,7 @@ async function renderLogoPng(): Promise<ArrayBuffer | null> {
 }
 
 /** Generate XLSX with embedded images */
-async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turbineName: string) {
+async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turbineName: string, includePhotos = true) {
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Defects');
@@ -615,7 +615,7 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   const origin = window.location.origin;
 
   // Merge cells for logo area so image doesn't split across column borders
-  sheet.mergeCells('A1:K2');
+  sheet.mergeCells(includePhotos ? 'A1:K2' : 'A1:J2');
 
   // Add logo at the top (loaded from core-insight-logo.png)
   const logoBuffer = await renderLogoPng();
@@ -654,10 +654,12 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   sheet.getColumn(8).width = 11;
   sheet.getColumn(9).width = 9;
   sheet.getColumn(10).width = 35;
-  sheet.getColumn(11).width = 28;
+  if (includePhotos) sheet.getColumn(11).width = 28;
 
   // Header row (row 6)
-  const headers = ['ID', 'Type', 'Category', 'Blade', 'Side', 'Distance (m)', 'Width (cm)', 'Height (cm)', 'Resolved', 'Description', 'Photo'];
+  const headers = includePhotos
+    ? ['ID', 'Type', 'Category', 'Blade', 'Side', 'Distance (m)', 'Width (cm)', 'Height (cm)', 'Resolved', 'Description', 'Photo']
+    : ['ID', 'Type', 'Category', 'Blade', 'Side', 'Distance (m)', 'Width (cm)', 'Height (cm)', 'Resolved', 'Description'];
   const headerRow = sheet.addRow(headers);
   headerRow.height = 20;
   headerRow.eachCell((cell) => {
@@ -671,7 +673,7 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   const dataStartRow = sheet.rowCount + 1;
   for (let i = 0; i < defects.length; i++) {
     const d = defects[i]!;
-    const row = sheet.addRow([
+    const rowData = [
       d.displayId,
       d.type,
       d.severity,
@@ -682,23 +684,26 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
       d.heightCm ?? '',
       d.resolved ? 'Yes' : 'No',
       d.description ?? '',
-      '',
-    ]);
-    row.height = 75;
+    ];
+    if (includePhotos) rowData.push('');
+    const row = sheet.addRow(rowData);
+    row.height = includePhotos ? 75 : 22;
     row.alignment = { vertical: 'middle' };
     // No borders on cells
     row.eachCell((cell) => { cell.border = {}; });
 
     // Fetch and embed defect image
-    const imgPath = d.images?.[0] ?? null;
-    const imgData = imgPath ? await fetchImageAsBuffer(imgPath) : null;
-    if (imgData) {
-      const imageId = workbook.addImage({ buffer: imgData.buffer, extension: imgData.extension });
-      const rowIdx = dataStartRow + i - 1;
-      sheet.addImage(imageId, {
-        tl: { col: 10, row: rowIdx },
-        ext: { width: 150, height: 90 },
-      });
+    if (includePhotos) {
+      const imgPath = d.images?.[0] ?? null;
+      const imgData = imgPath ? await fetchImageAsBuffer(imgPath) : null;
+      if (imgData) {
+        const imageId = workbook.addImage({ buffer: imgData.buffer, extension: imgData.extension });
+        const rowIdx = dataStartRow + i - 1;
+        sheet.addImage(imageId, {
+          tl: { col: 10, row: rowIdx },
+          ext: { width: 150, height: 90 },
+        });
+      }
     }
   }
 
@@ -706,7 +711,8 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
   // Only UNLOCK cells from row 8 onwards (data rows) so they can be edited
   for (let r = 8; r <= sheet.rowCount; r++) {
     const row = sheet.getRow(r);
-    for (let c = 1; c <= 11; c++) {
+    const colCount = includePhotos ? 11 : 10;
+    for (let c = 1; c <= colCount; c++) {
       row.getCell(c).protection = { locked: false };
     }
   }
@@ -1801,7 +1807,7 @@ export function ExportPanel({
   const handleDownloadCSV = async () => {
     setIsGeneratingXlsx(true);
     try {
-      const blob = await generateXLSX(defects, windFarmName, turbineName);
+      const blob = await generateXLSX(defects, windFarmName, turbineName, includeDetails);
       // Save XLSX to IndexedDB for retrieval from CampaignResults
       if (blob) {
         try { await savePdfBlob(`xlsx-${inspectionId}`, blob); } catch { /* ignore */ }
