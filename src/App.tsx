@@ -5,48 +5,83 @@ import { ThemeProvider, LanguageProvider } from '@/components/design-system';
 import { AuthGuard } from '@/components/AuthGuard';
 import { RoleGuard } from '@/components/RoleGuard';
 import { Layout } from '@/components/organisms';
+import { AppLayout } from '@/components/layout/app-layout';
+import { getFeatureFlags } from '@/lib/feature-flags';
 import { ToastContainer } from '@/components/organisms';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSplash } from '@/components/atoms/LoadingSplash';
 
-const Login = lazy(() => import('@/pages/Login'));
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Login = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout ? import('@/pages/LoginV2') : import('@/pages/Login');
+});
+const Dashboard = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout ? import('@/pages/DashboardV2') : import('@/pages/Dashboard');
+});
 const AssetsPage = lazy(() =>
   import('@/pages/Assets').then((m) => ({ default: m.Assets })),
 );
-const InspectionsPage = lazy(() =>
-  import('@/pages/Inspections').then((m) => ({ default: m.Inspections })),
-);
-const NewInspectionPage = lazy(() =>
-  import('@/pages/NewInspection').then((m) => ({ default: m.NewInspection })),
-);
-const InspectionWorkflowPage = lazy(() =>
-  import('@/pages/InspectionWorkflow').then((m) => ({ default: m.InspectionWorkflow })),
-);
-const ReportsPage = lazy(() =>
-  import('@/pages/Reports').then((m) => ({ default: m.Reports })),
-);
-const WindFarmsDashboardPage = lazy(() =>
-  import('@/pages/WindFarmsDashboard').then((m) => ({ default: m.WindFarmsDashboard })),
-);
-const WindFarmDetailPage = lazy(() =>
-  import('@/pages/WindFarmDetail').then((m) => ({ default: m.WindFarmDetail })),
-);
-const SubassetDetailPage = lazy(() =>
-  import('@/pages/SubassetDetail').then((m) => ({ default: m.SubassetDetail })),
-);
+const InspectionsPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/InspectionsV2').then((m) => ({ default: m.InspectionsV2 }))
+    : import('@/pages/Inspections').then((m) => ({ default: m.Inspections }));
+});
+const NewInspectionPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/NewInspectionV2').then((m) => ({ default: m.NewInspectionV2 }))
+    : import('@/pages/NewInspection').then((m) => ({ default: m.NewInspection }));
+});
+const InspectionWorkflowPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/InspectionWorkflowV2').then((m) => ({ default: m.InspectionWorkflowV2 }))
+    : import('@/pages/InspectionWorkflow').then((m) => ({ default: m.InspectionWorkflow }));
+});
+const ReportsPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/ReportsV2').then((m) => ({ default: m.ReportsV2 }))
+    : import('@/pages/Reports').then((m) => ({ default: m.Reports }));
+});
+const WindFarmsDashboardPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/WindFarmsDashboardV2').then((m) => ({ default: m.WindFarmsDashboardV2 }))
+    : import('@/pages/WindFarmsDashboard').then((m) => ({ default: m.WindFarmsDashboard }));
+});
+const WindFarmDetailPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/WindFarmDetailV2').then((m) => ({ default: m.WindFarmDetailV2 }))
+    : import('@/pages/WindFarmDetail').then((m) => ({ default: m.WindFarmDetail }));
+});
+const SubassetDetailPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/SubassetDetailV2').then((m) => ({ default: m.SubassetDetailV2 }))
+    : import('@/pages/SubassetDetail').then((m) => ({ default: m.SubassetDetail }));
+});
 const CampaignResultsPage = lazy(() =>
   import('@/pages/CampaignResults').then((m) => ({ default: m.CampaignResults })),
 );
 const CampaignUploadStatusPage = lazy(() =>
   import('@/pages/CampaignUploadStatus').then((m) => ({ default: m.CampaignUploadStatus })),
 );
-const OngoingInspectionsPage = lazy(() =>
-  import('@/pages/OngoingInspections').then((m) => ({ default: m.OngoingInspections })),
-);
-const ProfilePage = lazy(() =>
-  import('@/pages/Profile').then((m) => ({ default: m.Profile })),
-);
+const OngoingInspectionsPage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/OngoingInspectionsV2').then((m) => ({ default: m.OngoingInspectionsV2 }))
+    : import('@/pages/OngoingInspections').then((m) => ({ default: m.OngoingInspections }));
+});
+const ProfilePage = lazy(() => {
+  const { newLayout } = getFeatureFlags();
+  return newLayout
+    ? import('@/pages/ProfileV2').then((m) => ({ default: m.ProfileV2 }))
+    : import('@/pages/Profile').then((m) => ({ default: m.Profile }));
+});
 const SharedResultsPage = lazy(() =>
   import('@/pages/SharedResults').then((m) => ({ default: m.SharedResults })),
 );
@@ -76,6 +111,18 @@ const queryClient = new QueryClient({
  */
 function AuthenticatedShell() {
   const { user, logout } = useAuth();
+  const { newLayout } = getFeatureFlags();
+
+  if (newLayout) {
+    return (
+      <AppLayout user={user} onLogout={logout}>
+        <Suspense fallback={<LoadingSplash />}>
+          <Outlet />
+        </Suspense>
+      </AppLayout>
+    );
+  }
+
   return (
     <Layout user={user} onLogout={logout}>
       <Suspense fallback={<LoadingSplash />}>

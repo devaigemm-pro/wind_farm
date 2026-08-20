@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent-50: #f0f7f0;
+  --color-accent-100: #d9edd9;
+  --color-accent-200: #b3dbb3;
+  --color-accent-300: #8dc98d;
+  --color-accent-400: #6bb06b;
+  --color-accent-500: #5A8F5A;
+  --color-accent-600: #4a7a4a;
+  --color-accent-700: #3b633b;
+  --color-accent-800: #2c4c2c;
+  --color-accent-900: #1d351d;
+
+  --color-surface-900: #1A1A1A;
+  --color-surface-800: #2C2C2C;
+  --color-surface-700: #333333;
+  --color-surface-600: #404040;
+
+  --color-page: #F7F8FA;
+  --color-card: #FFFFFF;
+  --color-card-hover: #FAFBFC;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+
+  --font-display: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-md: 0 4px 8px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.02);
+  --shadow-lg: 0 12px 24px rgba(0,0,0,0.06), 0 4px 8px rgba(0,0,0,0.03);
+}
