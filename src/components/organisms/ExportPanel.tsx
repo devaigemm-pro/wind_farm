@@ -1030,7 +1030,7 @@ export function ExportPanel({
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = pageH * 0.5;
+      let titleY = pageH * 0.6;
       for (const line of titleLines) {
         doc.text(line, pageW - margin, titleY, { align: 'right' });
         titleY += 14;
@@ -1044,19 +1044,14 @@ export function ExportPanel({
       doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 24, { align: 'right' });
       doc.text(dateStr, pageW - margin, titleY + 36, { align: 'right' });
 
-      // Footer section (white area)
-      const footerStartY = pageH * 0.7 + 20;
+      // Footer section — white text on the green/image background
+      const footerStartY = pageH - 40;
       doc.setFontSize(11);
-      doc.setTextColor(...PDF_COLORS.mutedText);
+      doc.setTextColor(...PDF_COLORS.white);
       doc.text(t.generatedBy, margin + 10, footerStartY);
       doc.text(windFarmName, margin + 10, footerStartY + 5);
       doc.text(t.withTech, pageW - margin - 10, footerStartY, { align: 'right' });
       doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
-
-      // Env note at bottom
-      doc.setFontSize(7);
-      doc.setTextColor(...PDF_COLORS.mutedText);
-      doc.text(t.envNote, pageW / 2, pageH - 10, { align: 'center' });
 
       // ═══════════════════════════════════════════════════════════════════════
       // PAGE 2: Table of Contents
@@ -1417,22 +1412,23 @@ export function ExportPanel({
       y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
 
       // 3.2 Report Details
-      // Get current user's full name
+      // Get current user's full name from auth metadata
       let userFullName = 'Inspector';
       try {
         const { data: authUser } = await supabase.auth.getUser();
-        if (authUser?.user?.id) {
-          const { data: profile } = await (supabase as any)
-            .from('profile')
-            .select('first_name, last_name')
-            .eq('id', authUser.user.id)
-            .single();
-          if (profile?.first_name || profile?.last_name) {
-            userFullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
-          } else if (authUser.user.user_metadata?.full_name) {
-            userFullName = authUser.user.user_metadata.full_name;
-          } else if (authUser.user.email) {
-            userFullName = authUser.user.email;
+        if (authUser?.user) {
+          const meta = authUser.user.user_metadata || {};
+          // Try full_name, then name, then construct from first/last
+          if (meta.full_name) {
+            userFullName = meta.full_name;
+          } else if (meta.name) {
+            userFullName = meta.name;
+          } else if (meta.first_name || meta.last_name) {
+            userFullName = `${meta.first_name || ''} ${meta.last_name || ''}`.trim();
+          }
+          // Only fall back to email if nothing else available
+          if (userFullName === 'Inspector' && authUser.user.email) {
+            userFullName = authUser.user.email.split('@')[0] || authUser.user.email;
           }
         }
       } catch { /* fallback to 'Inspector' */ }
@@ -1503,33 +1499,63 @@ export function ExportPanel({
       y = subTitle(locationTitle, y);
       const mapH = 55;
       if (windFarmCoords) {
-        // Use OpenStreetMap static tile as terrain map
-        const mapZoom = 12;
-        const mapW_px = 600;
-        const mapH_px = 300;
-        const mapUrl = `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=${mapW_px}&height=${mapH_px}&center=lonlat:${windFarmCoords.lon},${windFarmCoords.lat}&zoom=${mapZoom}&marker=lonlat:${windFarmCoords.lon},${windFarmCoords.lat};color:%235A8F5A;size:medium&apiKey=demo`;
-        // Try loading the map image
+        // Generate a terrain map by compositing OSM tiles on canvas
         let mapLoaded = false;
         try {
-          const mapImg = new Image();
-          mapImg.crossOrigin = 'anonymous';
-          const loaded = await new Promise<boolean>((resolve) => {
-            mapImg.onload = () => resolve(true);
-            mapImg.onerror = () => resolve(false);
-            // Use a simple OSM-based static map URL (no API key needed)
-            mapImg.src = `https://staticmap.openstreetmap.de/staticmap.php?center=${windFarmCoords.lat},${windFarmCoords.lon}&zoom=${mapZoom}&size=${mapW_px}x${mapH_px}&maptype=mapnik&markers=${windFarmCoords.lat},${windFarmCoords.lon},red-pushpin`;
-          });
-          if (loaded && mapImg.naturalWidth > 0) {
-            const canvas = document.createElement('canvas');
-            canvas.width = mapImg.naturalWidth;
-            canvas.height = mapImg.naturalHeight;
-            const ctx = canvas.getContext('2d')!;
-            ctx.drawImage(mapImg, 0, 0);
-            const mapBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          const zoom = 11;
+          const lat = windFarmCoords.lat;
+          const lon = windFarmCoords.lon;
+          // Convert lat/lon to tile coords
+          const n = Math.pow(2, zoom);
+          const xtile = Math.floor((lon + 180) / 360 * n);
+          const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+          
+          // Load a 3x2 grid of tiles for a wider view
+          const tileSize = 256;
+          const gridW = 3;
+          const gridH = 2;
+          const canvas = document.createElement('canvas');
+          canvas.width = tileSize * gridW;
+          canvas.height = tileSize * gridH;
+          const ctx = canvas.getContext('2d')!;
+          
+          const tilePromises: Promise<void>[] = [];
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = 0; dy <= 1; dy++) {
+              const tx = xtile + dx;
+              const ty = ytile + dy;
+              const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+              tilePromises.push(new Promise<void>((resolve) => {
+                const tileImg = new Image();
+                tileImg.crossOrigin = 'anonymous';
+                tileImg.onload = () => {
+                  ctx.drawImage(tileImg, (dx + 1) * tileSize, dy * tileSize);
+                  resolve();
+                };
+                tileImg.onerror = () => resolve();
+                tileImg.src = tileUrl;
+              }));
+            }
+          }
+          await Promise.race([Promise.all(tilePromises), new Promise(r => setTimeout(r, 8000))]);
+          
+          // Draw marker at center
+          const markerX = canvas.width / 2;
+          const markerY = canvas.height / 2;
+          ctx.beginPath();
+          ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
+          ctx.fillStyle = '#5A8F5A';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          
+          const mapBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          if (canvas.width > 100) {
             doc.addImage(mapBase64, 'JPEG', margin, y, contentW, mapH);
             mapLoaded = true;
           }
-        } catch { /* fallback to placeholder */ }
+        } catch { /* fallback */ }
         if (!mapLoaded) {
           drawMapPlaceholder(doc, margin, y, contentW, mapH, windFarmName, windFarmCoords);
         }
@@ -1842,8 +1868,8 @@ export function ExportPanel({
           const cachedImg = imageCache[d.id];
           if (cachedImg) {
             // Calculate dimensions preserving aspect ratio within a bounding box
-            const maxImgW = contentW * 0.7;
-            const maxImgH = 80; // max height in mm
+            const maxImgW = contentW * 0.9;
+            const maxImgH = 120; // max height in mm
             const aspectRatio = cachedImg.width / cachedImg.height;
             let imgW = maxImgW;
             let imgH = imgW / aspectRatio;
@@ -1902,22 +1928,25 @@ export function ExportPanel({
                       } catch { /* skip */ }
                     } else {
                       // Rectangle annotation: draw rotated rect
+                      // x,y = center in %, w = line length in %, h = perpendicular width in %
                       const rad = (annData.angle || 0) * (Math.PI / 180);
-                      const halfW = annData.w / 2;
-                      const halfH = (annData.h || 3) / 2;
-                      const cx = annData.x / 100 * cw;
-                      const cy = annData.y / 100 * ch;
-                      const startX = cx - (halfW / 100 * cw) * Math.cos(rad);
-                      const startY = cy - (halfW / 100 * cw) * Math.sin(rad);
-                      const endX = cx + (halfW / 100 * cw) * Math.cos(rad);
-                      const endY = cy + (halfW / 100 * cw) * Math.sin(rad);
+                      const halfW = (annData.w / 2 / 100) * cw;
+                      const halfH = ((annData.h || 3) / 2 / 100) * ch;
+                      const centerX = (annData.x / 100) * cw;
+                      const centerY = (annData.y / 100) * ch;
+                      // Start and end points along the line direction
+                      const startX = centerX - halfW * Math.cos(rad);
+                      const startY = centerY - halfW * Math.sin(rad);
+                      const endX = centerX + halfW * Math.cos(rad);
+                      const endY = centerY + halfW * Math.sin(rad);
+                      // Normal vector (perpendicular)
                       const nx = -Math.sin(rad);
                       const ny = Math.cos(rad);
-                      const hh = halfH / 100 * ch;
-                      const p1x = startX + nx * hh; const p1y = startY + ny * hh;
-                      const p2x = endX + nx * hh; const p2y = endY + ny * hh;
-                      const p3x = endX - nx * hh; const p3y = endY - ny * hh;
-                      const p4x = startX - nx * hh; const p4y = startY - ny * hh;
+                      // 4 corners
+                      const p1x = startX + nx * halfH; const p1y = startY + ny * halfH;
+                      const p2x = endX + nx * halfH; const p2y = endY + ny * halfH;
+                      const p3x = endX - nx * halfH; const p3y = endY - ny * halfH;
+                      const p4x = startX - nx * halfH; const p4y = startY - ny * halfH;
                       ctx.beginPath();
                       ctx.moveTo(p1x, p1y);
                       ctx.lineTo(p2x, p2y);
