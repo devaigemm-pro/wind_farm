@@ -1017,8 +1017,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setDrawPhase('idle');
               return;
             }
-            // End of line drawing → transition to expanding phase
-            if (drawPhase === 'drawing-line' && drawStart && drawEnd) {
+            // End of line drawing → transition to expanding phase (only for rect/oval)
+            if (drawShape !== 'pencil' && drawPhase === 'drawing-line' && drawStart && drawEnd) {
               const dx = drawEnd.x - drawStart.x;
               const dy = drawEnd.y - drawStart.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1332,8 +1332,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             );
           })}
 
-          {/* Current drawing — line + expanding rectangle */}
-          {drawStart && (() => {
+          {/* Current drawing — line + expanding rectangle (not for pencil mode) */}
+          {drawShape !== 'pencil' && drawStart && (() => {
             if (!drawEnd) {
               return null;
             }
