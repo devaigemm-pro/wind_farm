@@ -1030,7 +1030,7 @@ export function ExportPanel({
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = pageH * 0.80;
+      let titleY = pageH * 0.62;
       for (const line of titleLines) {
         doc.text(line, pageW - margin, titleY, { align: 'right' });
         titleY += 11;
@@ -1293,14 +1293,19 @@ export function ExportPanel({
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.darkText);
       const softwareText = language === 'es'
-        ? 'CORE Insight es una plataforma de software para la inspección digital de palas de aerogeneradores que utiliza inteligencia artificial para detectar y clasificar defectos automáticamente.'
-        : 'CORE Insight is a software platform for digital wind turbine blade inspection that uses artificial intelligence to detect and classify defects automatically.';
+        ? 'CORE Insight es una plataforma de software para la inspección digital de palas de aerogeneradores que utiliza drones para detecta defectos estructurales.'
+        : 'CORE Insight is a software platform for digital wind turbine blade inspection that uses drones to detect structural defects.';
       const lines1 = doc.splitTextToSize(softwareText, contentW);
       doc.text(lines1, margin, y);
       y += lines1.length * 4.5 + 6;
 
       // 2.2
-      y = subTitle(t.methodAcquisition, y);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...PDF_COLORS.darkText);
+      doc.text(t.methodAcquisition, margin, y);
+      y += 7;
+      doc.setFontSize(9);
       const acqText = language === 'es'
         ? 'Los datos se adquieren mediante vuelos de dron planificados con rutas de vuelo optimizadas para capturar todas las superficies de las palas con alta resolución.'
         : 'Data is acquired through planned drone flights with optimized flight paths to capture all blade surfaces at high resolution.';
@@ -1309,10 +1314,15 @@ export function ExportPanel({
       y += lines2.length * 4.5 + 6;
 
       // 2.3
-      y = subTitle(t.methodProcessing, y);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...PDF_COLORS.darkText);
+      doc.text(t.methodProcessing, margin, y);
+      y += 7;
+      doc.setFontSize(9);
       const procText = language === 'es'
-        ? 'El procesamiento de datos incluye la detección automática de defectos mediante redes neuronales, seguida de revisión y validación por parte de ingenieros certificados.'
-        : 'Data processing includes automatic defect detection using neural networks, followed by review and validation by certified engineers.';
+        ? 'El procesamiento de datos incluye la detección de defectos mediante inspección, revisión y validación por parte de ingenieros certificados.'
+        : 'Data processing includes defect detection through inspection, review and validation by certified engineers.';
       const lines3 = doc.splitTextToSize(procText, contentW);
       doc.text(lines3, margin, y);
       y += lines3.length * 4.5 + 8;
