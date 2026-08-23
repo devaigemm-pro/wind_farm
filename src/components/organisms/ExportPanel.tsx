@@ -1030,7 +1030,7 @@ export function ExportPanel({
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = pageH * 0.64;
+      let titleY = pageH * 0.80;
       for (const line of titleLines) {
         doc.text(line, pageW - margin, titleY, { align: 'right' });
         titleY += 11;
@@ -1044,8 +1044,8 @@ export function ExportPanel({
       doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 14, { align: 'right' });
       doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
-      // Footer section — white text on the green/image background
-      const footerStartY = pageH - 40;
+      // Footer section — white text at page bottom
+      const footerStartY = pageH - 15;
       doc.setFontSize(11);
       doc.setTextColor(...PDF_COLORS.white);
       doc.text(t.generatedBy, margin + 10, footerStartY);
@@ -1377,20 +1377,29 @@ export function ExportPanel({
         didParseCell: (data: any) => {
           if (data.section === 'body') {
             const catNum = parseInt(data.row.raw[0] as string, 10);
-            // Full row background color matching the reference image
+            // Row colors from reference image: teal 1-2, amber 3, orange 4, red 5
             const rowColors: Record<number, [number, number, number]> = {
-              1: [144, 238, 144],  // green
-              2: [144, 238, 144],  // green
-              3: [255, 193, 7],    // amber/yellow
-              4: [255, 167, 120],  // orange
-              5: [255, 80, 80],    // red
+              1: [0, 139, 148],    // teal/cyan
+              2: [0, 139, 148],    // teal/cyan
+              3: [255, 179, 0],    // amber/gold
+              4: [255, 140, 0],    // orange
+              5: [255, 0, 0],      // red
             };
             if (rowColors[catNum]) {
               data.cell.styles.fillColor = rowColors[catNum];
+              data.cell.styles.textColor = [255, 255, 255];
             }
             if (data.column.index === 0) {
               data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fontSize = 14;
             }
+            if (data.column.index === 1) {
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+          if (data.section === 'head') {
+            data.cell.styles.fillColor = [160, 160, 160];
+            data.cell.styles.textColor = [255, 255, 255];
           }
         },
         margin: { left: margin, right: margin },
