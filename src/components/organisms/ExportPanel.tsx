@@ -1494,15 +1494,15 @@ export function ExportPanel({
       });
       y = (doc as any).lastAutoTable?.finalY + 12 || y + 50;
 
-      // 4.2 Location (terrain map)
+      // 4.2 Location (terrain map with turbine icon + Google Maps link)
       const locationTitle = language === 'es' ? '4.2 Ubicación' : '4.2 Location';
       y = subTitle(locationTitle, y);
-      const mapH = 55;
+      const mapH = 65;
       if (windFarmCoords) {
         // Generate a terrain map by compositing OSM tiles on canvas
         let mapLoaded = false;
         try {
-          const zoom = 11;
+          const zoom = 13;
           const lat = windFarmCoords.lat;
           const lon = windFarmCoords.lon;
           // Convert lat/lon to tile coords
@@ -1510,18 +1510,18 @@ export function ExportPanel({
           const xtile = Math.floor((lon + 180) / 360 * n);
           const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
           
-          // Load a 3x2 grid of tiles for a wider view
+          // Load a 4x3 grid of tiles for a wider terrain view
           const tileSize = 256;
-          const gridW = 3;
-          const gridH = 2;
+          const gridW = 4;
+          const gridH = 3;
           const canvas = document.createElement('canvas');
           canvas.width = tileSize * gridW;
           canvas.height = tileSize * gridH;
           const ctx = canvas.getContext('2d')!;
           
           const tilePromises: Promise<void>[] = [];
-          for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = 0; dy <= 1; dy++) {
+          for (let dx = -2; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
               const tx = xtile + dx;
               const ty = ytile + dy;
               const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
@@ -1529,7 +1529,7 @@ export function ExportPanel({
                 const tileImg = new Image();
                 tileImg.crossOrigin = 'anonymous';
                 tileImg.onload = () => {
-                  ctx.drawImage(tileImg, (dx + 1) * tileSize, dy * tileSize);
+                  ctx.drawImage(tileImg, (dx + 2) * tileSize, (dy + 1) * tileSize);
                   resolve();
                 };
                 tileImg.onerror = () => resolve();
@@ -1537,20 +1537,40 @@ export function ExportPanel({
               }));
             }
           }
-          await Promise.race([Promise.all(tilePromises), new Promise(r => setTimeout(r, 8000))]);
+          await Promise.race([Promise.all(tilePromises), new Promise(r => setTimeout(r, 10000))]);
           
-          // Draw marker at center
-          const markerX = canvas.width / 2;
-          const markerY = canvas.height / 2;
+          // Draw wind turbine icon at center
+          const cx = canvas.width / 2;
+          const cy = canvas.height / 2;
+          const turbineScale = 2.5;
+          ctx.save();
+          ctx.translate(cx, cy);
+          // Tower
+          ctx.strokeStyle = '#1565C0';
+          ctx.lineWidth = 3 * turbineScale;
           ctx.beginPath();
-          ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
-          ctx.fillStyle = '#5A8F5A';
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 3;
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, 18 * turbineScale);
           ctx.stroke();
+          // Hub
+          ctx.fillStyle = '#1565C0';
+          ctx.beginPath();
+          ctx.arc(0, 0, 3 * turbineScale, 0, Math.PI * 2);
+          ctx.fill();
+          // 3 blades (120° apart)
+          ctx.strokeStyle = '#1565C0';
+          ctx.lineWidth = 2.5 * turbineScale;
+          ctx.lineCap = 'round';
+          for (let i = 0; i < 3; i++) {
+            const angle = (i * 120 - 90) * Math.PI / 180;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(angle) * 16 * turbineScale, Math.sin(angle) * 16 * turbineScale);
+            ctx.stroke();
+          }
+          ctx.restore();
           
-          const mapBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          const mapBase64 = canvas.toDataURL('image/jpeg', 0.88);
           if (canvas.width > 100) {
             doc.addImage(mapBase64, 'JPEG', margin, y, contentW, mapH);
             mapLoaded = true;
@@ -1559,10 +1579,22 @@ export function ExportPanel({
         if (!mapLoaded) {
           drawMapPlaceholder(doc, margin, y, contentW, mapH, windFarmName, windFarmCoords);
         }
+        y += mapH + 3;
+        // Google Maps clickable link
+        const gmapsUrl = `https://www.google.com/maps?q=${windFarmCoords.lat},${windFarmCoords.lon}&z=14&t=k`;
+        const linkLabel = language === 'es' ? 'Ver ubicación en Google Maps' : 'View location on Google Maps';
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 100, 200);
+        doc.text(linkLabel, margin, y);
+        const linkW = doc.getTextWidth(linkLabel);
+        doc.link(margin, y - 4, linkW, 5, { url: gmapsUrl });
+        doc.setTextColor(...PDF_COLORS.darkText);
+        y += 10;
       } else {
         drawMapPlaceholder(doc, margin, y, contentW, mapH, windFarmName, null);
+        y += mapH + 10;
       }
-      y += mapH + 10;
 
       // 4.3 Blade Details
       y = subTitle(t.bladeDetails, y);
