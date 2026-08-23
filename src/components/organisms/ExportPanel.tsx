@@ -1030,19 +1030,19 @@ export function ExportPanel({
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = pageH * 0.6;
+      let titleY = pageH * 0.64;
       for (const line of titleLines) {
         doc.text(line, pageW - margin, titleY, { align: 'right' });
-        titleY += 14;
+        titleY += 11;
       }
 
-      // Subtitle info — right-aligned below title
+      // Subtitle info — right-aligned, tight below title
       doc.setFontSize(14);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.white);
-      doc.text(windFarmName, pageW - margin, titleY + 12, { align: 'right' });
-      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 24, { align: 'right' });
-      doc.text(dateStr, pageW - margin, titleY + 36, { align: 'right' });
+      doc.text(windFarmName, pageW - margin, titleY + 6, { align: 'right' });
+      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 14, { align: 'right' });
+      doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
       // Footer section — white text on the green/image background
       const footerStartY = pageH - 40;
@@ -1373,13 +1373,24 @@ export function ExportPanel({
         body: catRows,
         styles: { fontSize: 8, cellPadding: 2.5 },
         headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
-        bodyStyles: { textColor: PDF_COLORS.darkText },
+        bodyStyles: { textColor: [0, 0, 0] },
         didParseCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 0) {
-            const catNum = parseInt(data.cell.raw as string, 10);
-            data.cell.styles.fillColor = catColor(catNum);
-            data.cell.styles.textColor = [255, 255, 255];
-            data.cell.styles.fontStyle = 'bold';
+          if (data.section === 'body') {
+            const catNum = parseInt(data.row.raw[0] as string, 10);
+            // Full row background color matching the reference image
+            const rowColors: Record<number, [number, number, number]> = {
+              1: [144, 238, 144],  // green
+              2: [144, 238, 144],  // green
+              3: [255, 193, 7],    // amber/yellow
+              4: [255, 167, 120],  // orange
+              5: [255, 80, 80],    // red
+            };
+            if (rowColors[catNum]) {
+              data.cell.styles.fillColor = rowColors[catNum];
+            }
+            if (data.column.index === 0) {
+              data.cell.styles.fontStyle = 'bold';
+            }
           }
         },
         margin: { left: margin, right: margin },
