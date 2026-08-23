@@ -974,36 +974,39 @@ export function ExportPanel({
       // PAGE 1: Cover
       // ═══════════════════════════════════════════════════════════════════════
       pageNum = 1;
-      // Cover background: portada.jpeg as full-page background image + green overlay
+      // Cover background: portada.jpeg as full-page background + green overlay
       let coverImageLoaded = false;
       try {
-        const portadaResp = await fetch('/portada.jpeg');
-        if (portadaResp.ok) {
-          const portadaBlob = await portadaResp.blob();
-          const portadaBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(portadaBlob);
-          });
-          // Add image as full page background
-          doc.addImage(portadaBase64, 'JPEG', 0, 0, pageW, pageH);
+        const portadaImg = new Image();
+        portadaImg.crossOrigin = 'anonymous';
+        const portadaLoaded = await new Promise<boolean>((resolve) => {
+          portadaImg.onload = () => resolve(true);
+          portadaImg.onerror = () => resolve(false);
+          portadaImg.src = '/portada.jpeg';
+        });
+        if (portadaLoaded && portadaImg.naturalWidth > 0) {
+          // Draw image to canvas with green overlay baked in
+          const canvas = document.createElement('canvas');
+          canvas.width = portadaImg.naturalWidth;
+          canvas.height = portadaImg.naturalHeight;
+          const ctx = canvas.getContext('2d')!;
+          // Draw the original image
+          ctx.drawImage(portadaImg, 0, 0);
+          // Apply green overlay with opacity
+          ctx.fillStyle = 'rgba(90, 143, 90, 0.55)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // Convert to JPEG base64
+          const coverBase64 = canvas.toDataURL('image/jpeg', 0.92);
+          // Add as full cover page background
+          doc.addImage(coverBase64, 'JPEG', 0, 0, pageW, pageH);
           coverImageLoaded = true;
         }
       } catch (e) {
         console.warn('[ExportPanel] Could not load portada.jpeg:', e);
       }
 
-      // Green semi-transparent overlay (covers full page like the reference)
-      // Use GState for opacity
-      const overlayGState = (doc as any).GState({ opacity: 0.7 });
-      doc.saveGraphicsState();
-      doc.setGState(overlayGState);
-      doc.setFillColor(...PDF_COLORS.coverBg);
-      doc.rect(0, 0, pageW, pageH * 0.7, 'F');
-      doc.restoreGraphicsState();
-
       if (!coverImageLoaded) {
-        // Fallback: solid color if image failed to load
+        // Fallback: solid green color
         doc.setFillColor(...PDF_COLORS.coverBg);
         doc.rect(0, 0, pageW, pageH * 0.7, 'F');
       }
