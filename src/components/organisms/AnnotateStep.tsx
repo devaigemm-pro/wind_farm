@@ -203,7 +203,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   // drawPhase: 'idle' → 'drawing-line' (mousedown+drag) → 'expanding' (after mouseup, move to set width) → 'idle' (click confirms)
   const [drawPhase, setDrawPhase] = useState<'idle' | 'drawing-line' | 'expanding'>('idle');
   const [drawWidth, setDrawWidth] = useState(3); // perpendicular width in % units
-  const [drawShape, setDrawShape] = useState<'rect' | 'oval'>('rect');
+  const [drawShape, setDrawShape] = useState<'rect' | 'oval' | 'pencil'>('rect');
   const isMouseDownRef = useRef(false);
   const viewerImgRef = useRef<HTMLImageElement | null>(null);
   const viewerContainerRef = useRef<HTMLDivElement | null>(null);
@@ -401,19 +401,21 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (drawPhase !== 'idle' || drawStart || drawEnd) {
+        if (drawPhase !== 'idle' || drawStart || drawEnd || isDrawing) {
           setDrawPhase('idle');
           setDrawStart(null);
           setDrawEnd(null);
           setDrawConfirmed(false);
           setDrawWidth(3);
+          setDrawingPoints([]);
+          setIsDrawing(false);
           isMouseDownRef.current = false;
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [drawPhase, drawStart, drawEnd]);
+  }, [drawPhase, drawStart, drawEnd, isDrawing]);
 
   // Auto-scroll selected thumbnail into view in sidebar
   useEffect(() => {
@@ -734,6 +736,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               <button onClick={() => setDrawShape('oval')} style={{ padding: '4px 8px', background: drawShape === 'oval' ? C.primary : 'transparent', border: 'none', borderLeft: `1px solid ${C.primary}`, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title={t('annotate.oval')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill={drawShape === 'oval' ? '#fff' : C.primary}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>
               </button>
+              <button onClick={() => setDrawShape('pencil')} style={{ padding: '4px 8px', background: drawShape === 'pencil' ? C.primary : 'transparent', border: 'none', borderLeft: `1px solid ${C.primary}`, cursor: 'pointer', display: 'flex', alignItems: 'center' }} title={t('annotate.pencil')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={drawShape === 'pencil' ? '#fff' : C.primary}><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+              </button>
             </div>
             )}
           </div>
@@ -917,6 +922,13 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setDrawConfirmed(true);
               setDrawPhase('idle');
               setShowAnnotationPopover(true);
+            } else if (drawShape === 'pencil') {
+              // Pencil mode: start collecting points
+              isMouseDownRef.current = true;
+              setDrawingPoints([{ x: imgX, y: imgY }]);
+              setIsDrawing(true);
+              setDrawPhase('drawing-line');
+              setShowEditPopover(false);
             } else {
               // Start drawing a new line (Phase 1)
               isMouseDownRef.current = true;
@@ -943,7 +955,16 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
             const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
 
-            if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current) {
+            if (drawShape === 'pencil' && isDrawing && isMouseDownRef.current) {
+              // Pencil mode: add point (with min distance threshold to avoid too many points)
+              const lastPt = drawingPoints[drawingPoints.length - 1];
+              if (lastPt) {
+                const dist = Math.sqrt((imgX - lastPt.x) ** 2 + (imgY - lastPt.y) ** 2);
+                if (dist > 0.5) { // min 0.5% distance between points
+                  setDrawingPoints(pts => [...pts, { x: imgX, y: imgY }]);
+                }
+              }
+            } else if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current) {
               // Phase 1: update line endpoint as user drags (only while button held)
               setDrawEnd({ x: imgX, y: imgY });
             } else if (drawPhase === 'expanding' && drawStart && drawEnd) {
@@ -969,6 +990,31 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             if (isPanning) {
               setIsPanning(false);
               panStartRef.current = null;
+              return;
+            }
+            // Pencil mode: finish polyline and open popover
+            if (drawShape === 'pencil' && isDrawing && drawingPoints.length >= 2) {
+              setIsDrawing(false);
+              setDrawPhase('idle');
+              // Compute bounding box for storage (x,y = center, w,h = bounding dims)
+              const xs = drawingPoints.map(p => p.x);
+              const ys = drawingPoints.map(p => p.y);
+              const minX = Math.min(...xs);
+              const maxX = Math.max(...xs);
+              const minY = Math.min(...ys);
+              const maxY = Math.max(...ys);
+              const cx = (minX + maxX) / 2;
+              const cy = (minY + maxY) / 2;
+              setDrawStart({ x: minX, y: minY });
+              setDrawEnd({ x: maxX, y: maxY });
+              setDrawConfirmed(true);
+              setShowAnnotationPopover(true);
+              return;
+            } else if (drawShape === 'pencil' && isDrawing) {
+              // Too few points, cancel
+              setIsDrawing(false);
+              setDrawingPoints([]);
+              setDrawPhase('idle');
               return;
             }
             // End of line drawing → transition to expanding phase
@@ -1153,6 +1199,65 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             zIndex: 5,
           }}>
           {viewerLoaded && (savedAnnotations[selectedThumbnail] || []).map((ann, idx) => {
+            // Check if this is a pencil annotation
+            if (ann.note.startsWith('[pencil]')) {
+              try {
+                const pointsJson = ann.note.replace('[pencil]', '').split('|||')[0] || '[]';
+                const points: { x: number; y: number }[] = JSON.parse(pointsJson);
+                const userNote = ann.note.split('|||')[1] || '';
+                // Compute bounding box top for label
+                const ys = points.map(p => p.y);
+                const xs = points.map(p => p.x);
+                const minY = Math.min(...ys);
+                const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+
+                return (
+                  <div key={idx} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                    {/* Label */}
+                    <div style={{ position: 'absolute', left: `${cx}%`, top: `${minY}%`, transform: 'translate(-50%, -100%)', marginTop: -4, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'auto', zIndex: 1 }}>
+                      <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 4, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#333', whiteSpace: 'nowrap' }}>{ann.type}</span>
+                        {role !== 'supervisor' && (
+                        <button onClick={() => {
+                          setAnnotationType(ann.type);
+                          setAnnotationCategory(ann.category);
+                          setAnnotationNote(userNote);
+                          setDrawShape('pencil');
+                          setDrawingPoints(points);
+                          const bxs = points.map(p => p.x);
+                          const bys = points.map(p => p.y);
+                          setDrawStart({ x: Math.min(...bxs), y: Math.min(...bys) });
+                          setDrawEnd({ x: Math.max(...bxs), y: Math.max(...bys) });
+                          setDrawConfirmed(true);
+                          setEditingAnnotationId(ann.id);
+                          setShowAnnotationPopover(true);
+                        }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                        </button>
+                        )}
+                      </div>
+                    </div>
+                    {/* SVG polyline */}
+                    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                      <polyline
+                        points={points.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                        fill="none"
+                        stroke="#FF6600"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {points.map((p, i) => (
+                        <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="2.5" fill="#FF6600" opacity="0.7" />
+                      ))}
+                    </svg>
+                  </div>
+                );
+              } catch {
+                return null; // malformed pencil data
+              }
+            }
+
             // Reconstruct start/end points from center + angle + width
             const rad = (ann.angle || 0) * (Math.PI / 180);
             const halfW = ann.w / 2;
@@ -1185,8 +1290,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   <button onClick={() => {
                     setAnnotationType(ann.type);
                     setAnnotationCategory(ann.category);
-                    setAnnotationNote(ann.note.replace('[oval]', ''));
-                    setDrawShape(ann.note.startsWith('[oval]') ? 'oval' : 'rect');
+                    setAnnotationNote(ann.note.replace('[oval]', '').replace('[pencil]', ''));
+                    setDrawShape(ann.note.startsWith('[oval]') ? 'oval' : ann.note.startsWith('[pencil]') ? 'pencil' : 'rect');
                     setDrawStart({ x: startX, y: startY });
                     setDrawEnd({ x: endX, y: endY });
                     setDrawWidth(ann.h);
@@ -1307,6 +1412,42 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               </svg>
             );
           })()}
+
+          {/* Pencil live drawing preview */}
+          {drawShape === 'pencil' && isDrawing && drawingPoints.length >= 2 && (
+            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+              <polyline
+                points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                fill="none"
+                stroke="#FF3300"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Draw angle indicator dots at each vertex */}
+              {drawingPoints.map((p, i) => (
+                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="2" fill="#FF3300" opacity="0.6" />
+              ))}
+            </svg>
+          )}
+
+          {/* Pencil confirmed preview (after mouseup, before save) */}
+          {drawShape === 'pencil' && !isDrawing && drawConfirmed && drawingPoints.length >= 2 && (
+            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+              <polyline
+                points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                fill="none"
+                stroke="#FF6600"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {drawingPoints.map((p, i) => (
+                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="3" fill="#FF6600" opacity="0.8" />
+              ))}
+            </svg>
+          )}
+
           </div>{/* end annotation layer */}
         </div>
 
@@ -1390,7 +1531,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setDrawPhase('idle'); setDrawWidth(3); setEditingAnnotationId(null); setSaveError(null); }}>{t('button.cancel')}</button>
+              <button style={cancelBtnStyle} onClick={() => { setShowAnnotationPopover(false); setDrawStart(null); setDrawEnd(null); setDrawConfirmed(false); setDrawPhase('idle'); setDrawWidth(3); setDrawingPoints([]); setIsDrawing(false); setEditingAnnotationId(null); setSaveError(null); }}>{t('button.cancel')}</button>
               {editingAnnotationId !== null && (
                 <button style={{ ...confirmBtnStyle, background: '#F15959' }} onClick={() => {
                   
@@ -1410,7 +1551,16 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 
                 if (editingAnnotationId !== null) {
                   // Update existing annotation in DB
-                  if (drawStart && drawEnd) {
+                  if (drawShape === 'pencil' && drawingPoints.length >= 2) {
+                    const xs = drawingPoints.map(p => p.x);
+                    const ys = drawingPoints.map(p => p.y);
+                    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+                    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+                    const w = Math.max(...xs) - Math.min(...xs);
+                    const h = Math.max(...ys) - Math.min(...ys);
+                    const notePayload = '[pencil]' + JSON.stringify(drawingPoints) + '|||' + annotationNote;
+                    updateAnnotation.mutate({ id: editingAnnotationId, x: cx, y: cy, w: w || 1, h: h || 1, angle: 0, type: annotationType, category: annotationCategory, note: notePayload });
+                  } else if (drawStart && drawEnd) {
                     const dx = drawEnd.x - drawStart.x;
                     const dy = drawEnd.y - drawStart.y;
                     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
@@ -1423,7 +1573,29 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   }
                 } else {
                   // Create new annotation in DB
-                  if (drawStart && drawEnd) {
+                  if (drawShape === 'pencil' && drawingPoints.length >= 2) {
+                    const xs = drawingPoints.map(p => p.x);
+                    const ys = drawingPoints.map(p => p.y);
+                    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+                    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+                    const w = Math.max(...xs) - Math.min(...xs);
+                    const h = Math.max(...ys) - Math.min(...ys);
+                    const notePayload = '[pencil]' + JSON.stringify(drawingPoints) + '|||' + annotationNote;
+                    createAnnotation.mutate({
+                      inspectionId,
+                      thumbnailId: selectedThumbnail,
+                      x: cx, y: cy, w: w || 1, h: h || 1,
+                      angle: 0,
+                      type: annotationType,
+                      category: annotationCategory,
+                      note: notePayload,
+                      rootDistance: computeRootDistance(selectedThumbnail, cy),
+                    }, {
+                      onError: (err) => {
+                        setSaveError(err instanceof Error ? err.message : t('annotate.saveFailed'));
+                      },
+                    });
+                  } else if (drawStart && drawEnd) {
                     const dx = drawEnd.x - drawStart.x;
                     const dy = drawEnd.y - drawStart.y;
                     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
@@ -1452,6 +1624,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                 setDrawConfirmed(false);
                 setDrawPhase('idle');
                 setDrawWidth(3);
+                setDrawingPoints([]);
+                setIsDrawing(false);
                 setEditingAnnotationId(null);
                 setShowAnnotationPopover(false);
                 setAnnotationNote('');
