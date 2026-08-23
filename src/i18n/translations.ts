@@ -719,6 +719,7 @@ export const translations: TranslationMap = {
   'annotate.flag': { en: 'Flag', es: 'Marcar' },
   'annotate.rectangle': { en: 'Rectangle', es: 'Rectángulo' },
   'annotate.oval': { en: 'Oval', es: 'Óvalo' },
+  'annotate.pencil': { en: 'Pencil (freehand line)', es: 'Lápiz (línea continua)' },
   'annotate.zoomOut': { en: 'Zoom out', es: 'Alejar' },
   'annotate.resetZoom': { en: 'Reset zoom', es: 'Restablecer zoom' },
   'annotate.zoomIn': { en: 'Zoom in', es: 'Acercar' },
