@@ -994,16 +994,16 @@ export function ExportPanel({
           ctx.drawImage(portadaImg, 0, 0);
           
           // Draw green scan beam from the drone to the turbine hub
-          // The drone in portada.jpeg is in the upper area of the image
+          // From screenshot: drone is at bottom-right, hub is at center
           const cw = canvas.width;
           const ch = canvas.height;
-          const droneX = cw * 0.30;  // drone position in portada.jpeg
-          const droneY = ch * 0.18;
-          const hubX = cw * 0.50;    // turbine hub center
-          const hubY = ch * 0.55;
-          const beamWidth = cw * 0.14; // beam spread at target
+          const droneX = cw * 0.72;  // drone at bottom-right
+          const droneY = ch * 0.73;
+          const hubX = cw * 0.38;    // turbine hub at center-left
+          const hubY = ch * 0.40;
+          const beamWidth = cw * 0.10; // beam spread at target (hub)
           
-          // Draw cone/triangle beam — more intense green
+          // Draw cone beam from drone (point) expanding toward hub
           const gradient = ctx.createLinearGradient(droneX, droneY, hubX, hubY);
           gradient.addColorStop(0, 'rgba(0, 230, 60, 0.85)');
           gradient.addColorStop(0.3, 'rgba(0, 210, 50, 0.5)');
@@ -1011,9 +1011,9 @@ export function ExportPanel({
           gradient.addColorStop(1, 'rgba(0, 180, 30, 0.08)');
           
           ctx.beginPath();
-          ctx.moveTo(droneX, droneY);
-          ctx.lineTo(hubX - beamWidth, hubY);
-          ctx.lineTo(hubX + beamWidth, hubY);
+          ctx.moveTo(droneX, droneY); // point source at drone
+          ctx.lineTo(hubX - beamWidth * 0.5, hubY - beamWidth); // top-left of beam at hub
+          ctx.lineTo(hubX + beamWidth * 0.5, hubY + beamWidth); // bottom-right of beam at hub
           ctx.closePath();
           ctx.fillStyle = gradient;
           ctx.fill();
@@ -1023,9 +1023,9 @@ export function ExportPanel({
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(droneX, droneY);
-          ctx.lineTo(hubX - beamWidth, hubY);
+          ctx.lineTo(hubX - beamWidth * 0.5, hubY - beamWidth);
           ctx.moveTo(droneX, droneY);
-          ctx.lineTo(hubX + beamWidth, hubY);
+          ctx.lineTo(hubX + beamWidth * 0.5, hubY + beamWidth);
           ctx.stroke();
 
           // Apply green overlay with opacity
