@@ -1353,18 +1353,18 @@ export function ExportPanel({
       y = subTitle(t.methodCategorization, y);
       const catRows = language === 'es'
         ? [
-            ['5', 'Crítico', 'Daño severo que requiere acción inmediata', 'Reparación urgente'],
-            ['4', 'Mayor', 'Daño significativo que requiere atención pronta', 'Reparación planificada'],
-            ['3', 'Moderado', 'Daño que requiere monitoreo', 'Monitorear / reparar en siguiente parada'],
-            ['2', 'Menor', 'Daño menor con bajo riesgo', 'Monitorear en siguiente inspección'],
-            ['1', 'Cosmético', 'Daño superficial sin impacto estructural', 'Sin acción requerida'],
+            ['1', 'Cosmetica', 'Daño superficial sin impacto estructural', 'Turbina continua en operación. Sin acción requerida.'],
+            ['2', 'Menor', 'Daño menor con bajo riesgo', 'Turbina continua en operación. Planificar solo si hay otros daños a reparar. En caso de no realizar reparación, monitorear anualmente.'],
+            ['3', 'Moderada', 'Daño menor, sin compromiso estructural.', 'Turbina continua en operación. Planificar reparacion de daños en los proximos 3 meses. En caso de no realizar reparación, monitorear cada 3 meses.'],
+            ['4', 'Mayor', 'Daño significativo sin compromiso de operación de la turbina durante los proximos 3 meses. Requiere pronta atención.', 'Turbina continua en operación. Requiere soporte tecnico especializado de palas y planificar reparacion de daños inmediata. En caso de no realizar reparacion, monitorear mensualmente.'],
+            ['5', 'Critico', 'Daño severo que requiere accion inmediata.', 'Detener inmediata el Aerogenerador. ¡Seguridad no garantizada! Reparación urgente.'],
           ]
         : [
-            ['5', 'Critical', 'Severe damage requiring immediate action', 'Urgent repair'],
-            ['4', 'Major', 'Significant damage requiring prompt attention', 'Planned repair'],
-            ['3', 'Moderate', 'Damage requiring monitoring', 'Monitor / repair at next stop'],
-            ['2', 'Minor', 'Minor damage with low risk', 'Monitor at next inspection'],
-            ['1', 'Cosmetic', 'Surface damage with no structural impact', 'No action required'],
+            ['1', 'Cosmetic', 'Superficial damage with no structural impact', 'Turbine continues in operation. No action required.'],
+            ['2', 'Minor', 'Minor damage with low risk', 'Turbine continues in operation. Plan only if there are other damages to repair. If no repair, monitor annually.'],
+            ['3', 'Moderate', 'Minor damage, no structural compromise.', 'Turbine continues in operation. Plan damage repair within 3 months. If no repair, monitor every 3 months.'],
+            ['4', 'Major', 'Significant damage without compromising turbine operation for the next 3 months. Requires prompt attention.', 'Turbine continues in operation. Requires specialized blade technical support and plan immediate damage repair. If no repair, monitor monthly.'],
+            ['5', 'Critical', 'Severe damage requiring immediate action.', 'Immediately stop the Wind Turbine. Safety not guaranteed! Urgent repair.'],
           ];
 
       autoTable(doc, {
