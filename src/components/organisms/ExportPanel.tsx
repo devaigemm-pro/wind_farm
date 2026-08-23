@@ -1044,8 +1044,8 @@ export function ExportPanel({
       doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 24, { align: 'right' });
       doc.text(dateStr, pageW - margin, titleY + 36, { align: 'right' });
 
-      // Footer section — white text on the green/image background
-      const footerStartY = pageH - 40;
+      // Footer section — white text at page bottom (footer height)
+      const footerStartY = pageH - 15;
       doc.setFontSize(11);
       doc.setTextColor(...PDF_COLORS.white);
       doc.text(t.generatedBy, margin + 10, footerStartY);
