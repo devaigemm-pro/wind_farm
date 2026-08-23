@@ -997,9 +997,9 @@ export function ExportPanel({
           // From evidence: drone at center-right ~55%x 60%y, hub at upper-center ~42%x 30%y
           const cw = canvas.width;
           const ch = canvas.height;
-          const droneX = cw * 0.55;  // drone position
-          const droneY = ch * 0.60;
-          const hubX = cw * 0.42;    // turbine hub
+          const droneX = cw * 0.53;  // drone position (marked with red dot by user)
+          const droneY = ch * 0.47;
+          const hubX = cw * 0.38;    // turbine hub
           const hubY = ch * 0.30;
           const beamWidth = cw * 0.08; // beam spread at target (hub)
           
