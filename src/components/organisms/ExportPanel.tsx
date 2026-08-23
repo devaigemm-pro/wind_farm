@@ -992,6 +992,42 @@ export function ExportPanel({
           const ctx = canvas.getContext('2d')!;
           // Draw the original image
           ctx.drawImage(portadaImg, 0, 0);
+          
+          // Draw green scan beam from the logo eye to the turbine hub
+          // The logo is at top-left (margin=20mm, y=15mm, 60x20mm on the PDF)
+          // In canvas pixel space: logo center corresponds to approx 15% x, 8% y
+          const cw = canvas.width;
+          const ch = canvas.height;
+          const eyeX = cw * 0.08;   // logo eye position (left area)
+          const eyeY = ch * 0.06;   // top area where logo sits
+          const hubX = cw * 0.50;   // turbine hub center
+          const hubY = ch * 0.55;   // middle-lower area
+          const beamWidth = cw * 0.15; // beam spread at target
+          
+          // Draw cone/triangle beam
+          const gradient = ctx.createLinearGradient(eyeX, eyeY, hubX, hubY);
+          gradient.addColorStop(0, 'rgba(90, 200, 90, 0.7)');
+          gradient.addColorStop(0.4, 'rgba(90, 200, 90, 0.3)');
+          gradient.addColorStop(1, 'rgba(90, 200, 90, 0.05)');
+          
+          ctx.beginPath();
+          ctx.moveTo(eyeX, eyeY); // point source at logo eye
+          ctx.lineTo(hubX - beamWidth, hubY); // left edge of beam at hub
+          ctx.lineTo(hubX + beamWidth, hubY); // right edge of beam at hub
+          ctx.closePath();
+          ctx.fillStyle = gradient;
+          ctx.fill();
+          
+          // Subtle beam edge lines
+          ctx.strokeStyle = 'rgba(90, 220, 90, 0.3)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(eyeX, eyeY);
+          ctx.lineTo(hubX - beamWidth, hubY);
+          ctx.moveTo(eyeX, eyeY);
+          ctx.lineTo(hubX + beamWidth, hubY);
+          ctx.stroke();
+
           // Apply green overlay with opacity
           ctx.fillStyle = 'rgba(90, 143, 90, 0.55)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
