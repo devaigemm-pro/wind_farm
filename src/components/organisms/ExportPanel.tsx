@@ -1030,7 +1030,7 @@ export function ExportPanel({
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = pageH * 0.62;
+      let titleY = pageH * 0.73;
       for (const line of titleLines) {
         doc.text(line, pageW - margin, titleY, { align: 'right' });
         titleY += 11;
@@ -1300,12 +1300,10 @@ export function ExportPanel({
       y += lines1.length * 4.5 + 6;
 
       // 2.2
-      doc.setFontSize(11);
+      y = subTitle(t.methodAcquisition, y);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.darkText);
-      doc.text(t.methodAcquisition, margin, y);
-      y += 7;
-      doc.setFontSize(9);
       const acqText = language === 'es'
         ? 'Los datos se adquieren mediante vuelos de dron planificados con rutas de vuelo optimizadas para capturar todas las superficies de las palas con alta resolución.'
         : 'Data is acquired through planned drone flights with optimized flight paths to capture all blade surfaces at high resolution.';
@@ -1314,12 +1312,10 @@ export function ExportPanel({
       y += lines2.length * 4.5 + 6;
 
       // 2.3
-      doc.setFontSize(11);
+      y = subTitle(t.methodProcessing, y);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.darkText);
-      doc.text(t.methodProcessing, margin, y);
-      y += 7;
-      doc.setFontSize(9);
       const procText = language === 'es'
         ? 'El procesamiento de datos incluye la detección de defectos mediante inspección, revisión y validación por parte de ingenieros certificados.'
         : 'Data processing includes defect detection through inspection, review and validation by certified engineers.';
