@@ -1928,25 +1928,30 @@ export function ExportPanel({
                       } catch { /* skip */ }
                     } else {
                       // Rectangle annotation: draw rotated rect
-                      // x,y = center in %, w = line length in %, h = perpendicular width in %
+                      // Coordinates: x,y = center (%), w = line length (%), h = perpendicular width (%)
+                      // In AnnotateStep SVG: x% = fraction of container width, y% = fraction of container height
+                      // On canvas: convert each axis independently (x→cw, y→ch) like the SVG does
                       const rad = (annData.angle || 0) * (Math.PI / 180);
-                      const halfW = (annData.w / 2 / 100) * cw;
-                      const halfH = ((annData.h || 3) / 2 / 100) * ch;
+                      const halfW = annData.w / 2; // in % units
+                      const halfH = (annData.h || 3) / 2; // in % units
+                      // Center in pixels
                       const centerX = (annData.x / 100) * cw;
                       const centerY = (annData.y / 100) * ch;
-                      // Start and end points along the line direction
-                      const startX = centerX - halfW * Math.cos(rad);
-                      const startY = centerY - halfW * Math.sin(rad);
-                      const endX = centerX + halfW * Math.cos(rad);
-                      const endY = centerY + halfW * Math.sin(rad);
-                      // Normal vector (perpendicular)
-                      const nx = -Math.sin(rad);
-                      const ny = Math.cos(rad);
+                      // Start/end of line axis (cos component → x-axis %, sin component → y-axis %)
+                      const cosR = Math.cos(rad);
+                      const sinR = Math.sin(rad);
+                      const startX = centerX - (halfW * cosR / 100) * cw;
+                      const startY = centerY - (halfW * sinR / 100) * ch;
+                      const endX = centerX + (halfW * cosR / 100) * cw;
+                      const endY = centerY + (halfW * sinR / 100) * ch;
+                      // Normal vector components (perpendicular to line) — also split by axis
+                      const nxPx = (-sinR * halfH / 100) * cw;
+                      const nyPx = (cosR * halfH / 100) * ch;
                       // 4 corners
-                      const p1x = startX + nx * halfH; const p1y = startY + ny * halfH;
-                      const p2x = endX + nx * halfH; const p2y = endY + ny * halfH;
-                      const p3x = endX - nx * halfH; const p3y = endY - ny * halfH;
-                      const p4x = startX - nx * halfH; const p4y = startY - ny * halfH;
+                      const p1x = startX + nxPx; const p1y = startY + nyPx;
+                      const p2x = endX + nxPx; const p2y = endY + nyPx;
+                      const p3x = endX - nxPx; const p3y = endY - nyPx;
+                      const p4x = startX - nxPx; const p4y = startY - nyPx;
                       ctx.beginPath();
                       ctx.moveTo(p1x, p1y);
                       ctx.lineTo(p2x, p2y);
