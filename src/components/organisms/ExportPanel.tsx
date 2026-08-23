@@ -1025,28 +1025,28 @@ export function ExportPanel({
 
       // (Cover decoration removed for clean minimalist style)
 
-      // Title
-      doc.setFontSize(28);
+      // Title — right-aligned, starting from middle of page downward
+      doc.setFontSize(30);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = 80;
+      let titleY = pageH * 0.5;
       for (const line of titleLines) {
-        doc.text(line, pageW / 2, titleY, { align: 'center' });
+        doc.text(line, pageW - margin, titleY, { align: 'right' });
         titleY += 14;
       }
 
-      // Subtitle info
-      doc.setFontSize(12);
+      // Subtitle info — right-aligned below title
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.white);
-      doc.text(windFarmName, pageW / 2, titleY + 20, { align: 'center' });
-      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW / 2, titleY + 30, { align: 'center' });
-      doc.text(dateStr, pageW / 2, titleY + 40, { align: 'center' });
+      doc.text(windFarmName, pageW - margin, titleY + 12, { align: 'right' });
+      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 24, { align: 'right' });
+      doc.text(dateStr, pageW - margin, titleY + 36, { align: 'right' });
 
       // Footer section (white area)
       const footerStartY = pageH * 0.7 + 20;
-      doc.setFontSize(9);
+      doc.setFontSize(11);
       doc.setTextColor(...PDF_COLORS.mutedText);
       doc.text(t.generatedBy, margin + 10, footerStartY);
       doc.text(windFarmName, margin + 10, footerStartY + 5);
