@@ -1025,24 +1025,24 @@ export function ExportPanel({
 
       // (Cover decoration removed for clean minimalist style)
 
-      // Title — right-aligned, starting from middle of page downward
+      // Title — right-aligned, starting just below the drone image area
       doc.setFontSize(30);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...PDF_COLORS.white);
       const titleLines = t.coverTitle.split('\n');
-      let titleY = pageH * 0.6;
+      let titleY = pageH * 0.52;
       for (const line of titleLines) {
         doc.text(line, pageW - margin, titleY, { align: 'right' });
-        titleY += 14;
+        titleY += 11;
       }
 
-      // Subtitle info — right-aligned below title
+      // Subtitle info — right-aligned, tight below title
       doc.setFontSize(14);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.white);
-      doc.text(windFarmName, pageW - margin, titleY + 12, { align: 'right' });
-      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 24, { align: 'right' });
-      doc.text(dateStr, pageW - margin, titleY + 36, { align: 'right' });
+      doc.text(windFarmName, pageW - margin, titleY + 6, { align: 'right' });
+      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 14, { align: 'right' });
+      doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
       // Footer section — white text at page bottom (footer height)
       const footerStartY = pageH - 15;
