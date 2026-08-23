@@ -1067,6 +1067,8 @@ export function ExportPanel({
       y += 10;
 
       // Professional TOC with dot leaders and section numbers
+      // We'll track actual page numbers and fill them in after generation
+      const tocPageRef: Record<string, number> = {};
       const tocSections = [
         { level: 0, num: '1', text: language === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary' },
         { level: 1, num: '1.1', text: language === 'es' ? 'Resumen de defectos' : 'Defect Summary' },
@@ -1098,11 +1100,24 @@ export function ExportPanel({
 
         // Dot leader line
         const textEndX = margin + indent + 12 + doc.getTextWidth(item.text) + 3;
-        const lineEndX = pageW - margin;
+        const lineEndX = pageW - margin - 10;
         doc.setDrawColor(...PDF_COLORS.border);
         doc.setLineDashPattern([0.5, 1.5], 0);
         doc.line(textEndX, y, lineEndX, y);
         doc.setLineDashPattern([], 0);
+
+        // Page number on the right (will be based on section order — pages start at 3)
+        const pageOffset = 3; // Cover=1, TOC=2, content starts at 3
+        let sectionPage = pageOffset;
+        if (item.num.startsWith('1')) sectionPage = 3;
+        if (item.num.startsWith('2')) sectionPage = 5;
+        if (item.num.startsWith('3')) sectionPage = 6;
+        if (item.num.startsWith('4')) sectionPage = 7;
+        if (item.num.startsWith('5')) sectionPage = 8;
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', fontStyle);
+        doc.setTextColor(...(item.level === 0 ? PDF_COLORS.titleBlue : PDF_COLORS.darkText));
+        doc.text(String(sectionPage), pageW - margin, y, { align: 'right' });
 
         y += item.level === 0 ? 10 : 7;
       }
@@ -1402,13 +1417,33 @@ export function ExportPanel({
       y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
 
       // 3.2 Report Details
+      // Get current user's full name
+      let userFullName = 'Inspector';
+      try {
+        const { data: authUser } = await supabase.auth.getUser();
+        if (authUser?.user?.id) {
+          const { data: profile } = await (supabase as any)
+            .from('profile')
+            .select('first_name, last_name')
+            .eq('id', authUser.user.id)
+            .single();
+          if (profile?.first_name || profile?.last_name) {
+            userFullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+          } else if (authUser.user.user_metadata?.full_name) {
+            userFullName = authUser.user.user_metadata.full_name;
+          } else if (authUser.user.email) {
+            userFullName = authUser.user.email;
+          }
+        }
+      } catch { /* fallback to 'Inspector' */ }
+
       y = subTitle(t.reportDetails, y);
       autoTable(doc, {
         startY: y,
         body: [
           [t.reportDate, nowStr],
-          [t.generatedByLabel, 'Inspector'],
-          [t.analyzedBy, 'CORE Insight'],
+          [t.generatedByLabel, userFullName],
+          [t.analyzedBy, userFullName],
         ],
         styles: { fontSize: 9, cellPadding: 3 },
         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
@@ -1425,7 +1460,25 @@ export function ExportPanel({
       y = sectionTitle(t.turbineInfo, y);
       y += 2;
 
-      // 4.1 Summary
+      // 4.1 Summary — fetch turbine model, power, commission date
+      let turbineModel = 'N/A';
+      let turbinePower = 'N/A';
+      let turbineCommission = 'N/A';
+      if (turbineId) {
+        try {
+          const { data: tData } = await (supabase as any)
+            .from('turbine')
+            .select('model, power_kw, powering_date')
+            .eq('id', turbineId)
+            .single();
+          if (tData) {
+            if (tData.model) turbineModel = tData.model;
+            if (tData.power_kw) turbinePower = `${tData.power_kw} kW`;
+            if (tData.powering_date) turbineCommission = new Date(tData.powering_date).toLocaleDateString(language === 'es' ? 'es-CL' : 'en-US');
+          }
+        } catch { /* fallback to N/A */ }
+      }
+
       y = subTitle(t.turbineSummary, y);
       autoTable(doc, {
         startY: y,
@@ -1433,9 +1486,9 @@ export function ExportPanel({
           [t.installName, windFarmName],
           [t.turbine, turbineName],
           [t.serialNumber, primarySerial],
-          [t.model, 'N/A'],
-          [t.totalPower, 'N/A'],
-          [t.commissionDate, 'N/A'],
+          [t.model, turbineModel],
+          [t.totalPower, turbinePower],
+          [t.commissionDate, turbineCommission],
         ],
         styles: { fontSize: 9, cellPadding: 3 },
         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
@@ -1445,11 +1498,45 @@ export function ExportPanel({
       });
       y = (doc as any).lastAutoTable?.finalY + 12 || y + 50;
 
-      // 4.2 Location (map placeholder)
+      // 4.2 Location (terrain map)
       const locationTitle = language === 'es' ? '4.2 Ubicación' : '4.2 Location';
       y = subTitle(locationTitle, y);
-      drawMapPlaceholder(doc, margin, y, contentW, 55, windFarmName, windFarmCoords ?? null);
-      y += 65;
+      const mapH = 55;
+      if (windFarmCoords) {
+        // Use OpenStreetMap static tile as terrain map
+        const mapZoom = 12;
+        const mapW_px = 600;
+        const mapH_px = 300;
+        const mapUrl = `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=${mapW_px}&height=${mapH_px}&center=lonlat:${windFarmCoords.lon},${windFarmCoords.lat}&zoom=${mapZoom}&marker=lonlat:${windFarmCoords.lon},${windFarmCoords.lat};color:%235A8F5A;size:medium&apiKey=demo`;
+        // Try loading the map image
+        let mapLoaded = false;
+        try {
+          const mapImg = new Image();
+          mapImg.crossOrigin = 'anonymous';
+          const loaded = await new Promise<boolean>((resolve) => {
+            mapImg.onload = () => resolve(true);
+            mapImg.onerror = () => resolve(false);
+            // Use a simple OSM-based static map URL (no API key needed)
+            mapImg.src = `https://staticmap.openstreetmap.de/staticmap.php?center=${windFarmCoords.lat},${windFarmCoords.lon}&zoom=${mapZoom}&size=${mapW_px}x${mapH_px}&maptype=mapnik&markers=${windFarmCoords.lat},${windFarmCoords.lon},red-pushpin`;
+          });
+          if (loaded && mapImg.naturalWidth > 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = mapImg.naturalWidth;
+            canvas.height = mapImg.naturalHeight;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(mapImg, 0, 0);
+            const mapBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            doc.addImage(mapBase64, 'JPEG', margin, y, contentW, mapH);
+            mapLoaded = true;
+          }
+        } catch { /* fallback to placeholder */ }
+        if (!mapLoaded) {
+          drawMapPlaceholder(doc, margin, y, contentW, mapH, windFarmName, windFarmCoords);
+        }
+      } else {
+        drawMapPlaceholder(doc, margin, y, contentW, mapH, windFarmName, null);
+      }
+      y += mapH + 10;
 
       // 4.3 Blade Details
       y = subTitle(t.bladeDetails, y);
@@ -1765,7 +1852,91 @@ export function ExportPanel({
             if (y + imgH > pageH - 20) { newPage(); y = 28; }
             doc.setDrawColor(200, 200, 200);
             doc.roundedRect(imgX - 1, y - 1, imgW + 2, imgH + 2, 2, 2, 'S');
-            doc.addImage(cachedImg.dataUrl, 'JPEG', imgX, y, imgW, imgH);
+
+            // Draw image with annotation overlay baked in using canvas
+            try {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              const imgLoaded = await new Promise<boolean>((resolve) => {
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+                img.src = cachedImg.dataUrl;
+              });
+              if (imgLoaded && img.naturalWidth > 0) {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0);
+
+                // Draw annotation overlay (red rectangle based on annotation coords)
+                // Get annotation data for this defect
+                const annId = d.id;
+                try {
+                  const { data: annData } = await supabase
+                    .from('annotation')
+                    .select('x, y, w, h, angle, note')
+                    .eq('id', annId)
+                    .single();
+                  if (annData && annData.x && annData.y && annData.w) {
+                    const cw = canvas.width;
+                    const ch = canvas.height;
+                    ctx.strokeStyle = '#FF3300';
+                    ctx.lineWidth = Math.max(3, cw * 0.004);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    if (annData.note && annData.note.startsWith('[pencil]')) {
+                      // Pencil annotation: draw polyline
+                      try {
+                        const pointsJson = annData.note.replace('[pencil]', '').split('|||')[0] || '[]';
+                        const points: { x: number; y: number }[] = JSON.parse(pointsJson);
+                        if (points.length >= 2) {
+                          ctx.beginPath();
+                          ctx.moveTo(points[0]!.x / 100 * cw, points[0]!.y / 100 * ch);
+                          for (let i = 1; i < points.length; i++) {
+                            ctx.lineTo(points[i]!.x / 100 * cw, points[i]!.y / 100 * ch);
+                          }
+                          ctx.stroke();
+                        }
+                      } catch { /* skip */ }
+                    } else {
+                      // Rectangle annotation: draw rotated rect
+                      const rad = (annData.angle || 0) * (Math.PI / 180);
+                      const halfW = annData.w / 2;
+                      const halfH = (annData.h || 3) / 2;
+                      const cx = annData.x / 100 * cw;
+                      const cy = annData.y / 100 * ch;
+                      const startX = cx - (halfW / 100 * cw) * Math.cos(rad);
+                      const startY = cy - (halfW / 100 * cw) * Math.sin(rad);
+                      const endX = cx + (halfW / 100 * cw) * Math.cos(rad);
+                      const endY = cy + (halfW / 100 * cw) * Math.sin(rad);
+                      const nx = -Math.sin(rad);
+                      const ny = Math.cos(rad);
+                      const hh = halfH / 100 * ch;
+                      const p1x = startX + nx * hh; const p1y = startY + ny * hh;
+                      const p2x = endX + nx * hh; const p2y = endY + ny * hh;
+                      const p3x = endX - nx * hh; const p3y = endY - ny * hh;
+                      const p4x = startX - nx * hh; const p4y = startY - ny * hh;
+                      ctx.beginPath();
+                      ctx.moveTo(p1x, p1y);
+                      ctx.lineTo(p2x, p2y);
+                      ctx.lineTo(p3x, p3y);
+                      ctx.lineTo(p4x, p4y);
+                      ctx.closePath();
+                      ctx.stroke();
+                    }
+                  }
+                } catch { /* skip annotation overlay if query fails */ }
+
+                const finalBase64 = canvas.toDataURL('image/jpeg', 0.90);
+                doc.addImage(finalBase64, 'JPEG', imgX, y, imgW, imgH);
+              } else {
+                doc.addImage(cachedImg.dataUrl, 'JPEG', imgX, y, imgW, imgH);
+              }
+            } catch {
+              doc.addImage(cachedImg.dataUrl, 'JPEG', imgX, y, imgW, imgH);
+            }
             y += imgH + 5;
           }
 
