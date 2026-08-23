@@ -974,9 +974,39 @@ export function ExportPanel({
       // PAGE 1: Cover
       // ═══════════════════════════════════════════════════════════════════════
       pageNum = 1;
-      // Blue background 70%
+      // Cover background: portada.jpeg as full-page background image + green overlay
+      let coverImageLoaded = false;
+      try {
+        const portadaResp = await fetch('/portada.jpeg');
+        if (portadaResp.ok) {
+          const portadaBlob = await portadaResp.blob();
+          const portadaBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(portadaBlob);
+          });
+          // Add image as full page background
+          doc.addImage(portadaBase64, 'JPEG', 0, 0, pageW, pageH);
+          coverImageLoaded = true;
+        }
+      } catch (e) {
+        console.warn('[ExportPanel] Could not load portada.jpeg:', e);
+      }
+
+      // Green semi-transparent overlay (covers full page like the reference)
+      // Use GState for opacity
+      const overlayGState = (doc as any).GState({ opacity: 0.7 });
+      doc.saveGraphicsState();
+      doc.setGState(overlayGState);
       doc.setFillColor(...PDF_COLORS.coverBg);
       doc.rect(0, 0, pageW, pageH * 0.7, 'F');
+      doc.restoreGraphicsState();
+
+      if (!coverImageLoaded) {
+        // Fallback: solid color if image failed to load
+        doc.setFillColor(...PDF_COLORS.coverBg);
+        doc.rect(0, 0, pageW, pageH * 0.7, 'F');
+      }
 
       // Logo in top-left corner
       const logoPng = await renderLogoPng();
