@@ -993,38 +993,38 @@ export function ExportPanel({
           // Draw the original image
           ctx.drawImage(portadaImg, 0, 0);
           
-          // Draw green scan beam from the logo eye to the turbine hub
-          // The logo is at top-left (margin=20mm, y=15mm, 60x20mm on the PDF)
-          // In canvas pixel space: logo center corresponds to approx 15% x, 8% y
+          // Draw green scan beam from the drone to the turbine hub
+          // The drone in portada.jpeg is in the upper area of the image
           const cw = canvas.width;
           const ch = canvas.height;
-          const eyeX = cw * 0.08;   // logo eye position (left area)
-          const eyeY = ch * 0.06;   // top area where logo sits
-          const hubX = cw * 0.50;   // turbine hub center
-          const hubY = ch * 0.55;   // middle-lower area
-          const beamWidth = cw * 0.15; // beam spread at target
+          const droneX = cw * 0.30;  // drone position in portada.jpeg
+          const droneY = ch * 0.18;
+          const hubX = cw * 0.50;    // turbine hub center
+          const hubY = ch * 0.55;
+          const beamWidth = cw * 0.14; // beam spread at target
           
-          // Draw cone/triangle beam
-          const gradient = ctx.createLinearGradient(eyeX, eyeY, hubX, hubY);
-          gradient.addColorStop(0, 'rgba(90, 200, 90, 0.7)');
-          gradient.addColorStop(0.4, 'rgba(90, 200, 90, 0.3)');
-          gradient.addColorStop(1, 'rgba(90, 200, 90, 0.05)');
+          // Draw cone/triangle beam — more intense green
+          const gradient = ctx.createLinearGradient(droneX, droneY, hubX, hubY);
+          gradient.addColorStop(0, 'rgba(0, 230, 60, 0.85)');
+          gradient.addColorStop(0.3, 'rgba(0, 210, 50, 0.5)');
+          gradient.addColorStop(0.7, 'rgba(0, 200, 40, 0.25)');
+          gradient.addColorStop(1, 'rgba(0, 180, 30, 0.08)');
           
           ctx.beginPath();
-          ctx.moveTo(eyeX, eyeY); // point source at logo eye
-          ctx.lineTo(hubX - beamWidth, hubY); // left edge of beam at hub
-          ctx.lineTo(hubX + beamWidth, hubY); // right edge of beam at hub
+          ctx.moveTo(droneX, droneY);
+          ctx.lineTo(hubX - beamWidth, hubY);
+          ctx.lineTo(hubX + beamWidth, hubY);
           ctx.closePath();
           ctx.fillStyle = gradient;
           ctx.fill();
           
-          // Subtle beam edge lines
-          ctx.strokeStyle = 'rgba(90, 220, 90, 0.3)';
-          ctx.lineWidth = 1.5;
+          // Beam edge lines
+          ctx.strokeStyle = 'rgba(0, 230, 60, 0.5)';
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(eyeX, eyeY);
+          ctx.moveTo(droneX, droneY);
           ctx.lineTo(hubX - beamWidth, hubY);
-          ctx.moveTo(eyeX, eyeY);
+          ctx.moveTo(droneX, droneY);
           ctx.lineTo(hubX + beamWidth, hubY);
           ctx.stroke();
 
