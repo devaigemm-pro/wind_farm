@@ -438,6 +438,7 @@ export const translations: TranslationMap = {
   'annotate.editAnnotation': { en: 'Edit annotation', es: 'Editar anotación' },
   'annotate.createAnnotation': { en: 'Create annotation', es: 'Crear anotación' },
   'annotate.downloadPhoto': { en: 'Download photo', es: 'Descargar foto' },
+  'annotate.rotatePhoto': { en: 'Rotate 90°', es: 'Rotar 90°' },
   'annotate.saveFailed': { en: 'Failed to save annotation', es: 'Error al guardar la anotación' },
   'annotate.defectType': { en: 'Defect type', es: 'Tipo de defecto' },
   'annotate.type': { en: 'Type', es: 'Tipo' },

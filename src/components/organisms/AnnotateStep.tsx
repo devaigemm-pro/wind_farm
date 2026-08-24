@@ -7,6 +7,7 @@ import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampa
 import { useInspectionPhotos, getPhotoPublicUrl, getFaceShort } from '@/hooks/useInspectionPhotos';
 import { useUpdateVerticalBlade } from '@/hooks/useInspectionMutations';
 import { useTogglePhotoTag, useMarkPhotoViewed } from '@/hooks/usePhotoTags';
+import { useRotatePhoto } from '@/hooks/useRotatePhoto';
 import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import { supabase } from '@/lib/supabase';
 import type { Inspection } from '@/types';
@@ -32,6 +33,7 @@ interface ThumbnailData {
   isTagged: boolean;     // false by default (feature pending)
   bladeRootDistance: number | null; // distance from blade root in meters
   distanceToBlade: number | null;   // distance from drone to blade in meters
+  rotation: number; // rotation angle in degrees (0, 90, 180, 270)
 }
 
 // ─── Face short → DB value mapping ───────────────────────────────────────────
@@ -115,6 +117,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   // ─── Tagged photos from BD (metadata.tagged field) ──────────────────────────
   const toggleTag = useTogglePhotoTag();
   const markViewed = useMarkPhotoViewed();
+  const rotatePhoto = useRotatePhoto();
   const taggedPhotos = useMemo(() => {
     return new Set(photos.filter(p => p.isTagged).map(p => p.id));
   }, [photos]);
@@ -134,6 +137,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       isTagged: taggedPhotos.has(photo.id),
       bladeRootDistance: photo.bladeRootDistance,
       distanceToBlade: photo.distanceToBlade,
+      rotation: photo.rotation,
     }));
   }, [photos, dbAnnotations, bladePositionMap, taggedPhotos]);
 
@@ -919,6 +923,14 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             <button style={{ ...actionBtnStyle, borderColor: showImageAdjust ? C.primary : undefined, background: showImageAdjust ? C.primaryLight : 'transparent' }} title={t('annotate.imageAdjustments')} onClick={() => setShowImageAdjust(v => !v)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={showImageAdjust ? C.primary : '#555'}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18V4c4.41 0 8 3.59 8 8s-3.59 8-8 8z"/></svg>
             </button>
+            {role !== 'supervisor' && (
+            <button style={actionBtnStyle} title={t('annotate.rotatePhoto') || 'Rotate 90°'} onClick={() => {
+              if (!selectedThumbnail) return;
+              rotatePhoto.mutate({ photoId: selectedThumbnail, currentRotation: currentThumb?.rotation || 0 });
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#5A8F5A"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+            </button>
+            )}
             <button style={actionBtnStyle} title={t('annotate.downloadPhoto')} onClick={() => {
               if (!currentThumb) return;
               const url = currentThumb.viewerSrc;
@@ -1158,7 +1170,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   filter: `blur(2px) contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
                   opacity: viewerLoaded ? 0 : 1,
                   transition: 'opacity 0.15s ease-out',
-                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px) rotate(${currentThumb.rotation}deg)`,
                   transformOrigin: 'center',
                 }}
                 draggable={false}
@@ -1183,7 +1195,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   filter: `contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
                   opacity: viewerLoaded ? 1 : 0,
                   transition: 'opacity 0.2s ease-in',
-                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px) rotate(${currentThumb.rotation}deg)`,
                   transformOrigin: 'center',
                 }}
                 draggable={false}
