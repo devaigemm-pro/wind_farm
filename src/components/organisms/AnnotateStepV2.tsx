@@ -8,6 +8,7 @@ import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampa
 import { useInspectionPhotos, getPhotoPublicUrl, getFaceShort } from '@/hooks/useInspectionPhotos';
 import { useUpdateVerticalBlade } from '@/hooks/useInspectionMutations';
 import { useTogglePhotoTag, useMarkPhotoViewed } from '@/hooks/usePhotoTags';
+import { useRotatePhoto } from '@/hooks/useRotatePhoto';
 import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import { supabase } from '@/lib/supabase';
 import type { Inspection } from '@/types';
@@ -41,6 +42,7 @@ interface ThumbnailData {
   isTagged: boolean;
   bladeRootDistance: number | null;
   distanceToBlade: number | null;
+  rotation: number;
 }
 
 export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampaignId, savedThumbId, savedBlade, onSelectionChange }: AnnotateStepV2Props) {
@@ -101,6 +103,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
   // ─── Tagged photos from BD ──────────────────────────────────────────────────
   const toggleTag = useTogglePhotoTag();
   const markViewed = useMarkPhotoViewed();
+  const rotatePhoto = useRotatePhoto();
   const taggedPhotos = useMemo(() => {
     return new Set(photos.filter(p => p.isTagged).map(p => p.id));
   }, [photos]);
@@ -119,6 +122,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
       isTagged: taggedPhotos.has(photo.id),
       bladeRootDistance: photo.bladeRootDistance,
       distanceToBlade: photo.distanceToBlade,
+      rotation: photo.rotation,
     }));
   }, [photos, dbAnnotations, bladePositionMap, taggedPhotos]);
 
@@ -933,6 +937,18 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill={showImageAdjust ? '#5A8F5A' : '#555'}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18V4c4.41 0 8 3.59 8 8s-3.59 8-8 8z" /></svg>
             </button>
+            {role !== 'supervisor' && (
+            <button
+              className="flex items-center justify-center w-8 h-[30px] border border-[#5A8F5A] rounded bg-transparent cursor-pointer p-0"
+              title={t('annotate.rotatePhoto') || 'Rotate 90°'}
+              onClick={() => {
+                if (!selectedThumbnail) return;
+                rotatePhoto.mutate({ photoId: selectedThumbnail, currentRotation: currentThumb?.rotation || 0 });
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#5A8F5A"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+            </button>
+            )}
             <button
               className="flex items-center justify-center w-8 h-[30px] border border-[#5A8F5A] rounded bg-transparent cursor-pointer p-0"
               title={t('annotate.downloadPhoto')}
@@ -1106,7 +1122,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                 style={{
                   filter: `blur(2px) contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
                   opacity: viewerLoaded ? 0 : 1,
-                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px) rotate(${currentThumb.rotation}deg)`,
                   transformOrigin: 'center',
                 }}
                 draggable={false}
@@ -1126,7 +1142,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                 style={{
                   filter: `contrast(${imgContrast}) brightness(${imgBrightness}) saturate(${imgSaturation})`,
                   opacity: viewerLoaded ? 1 : 0,
-                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                  transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px) rotate(${currentThumb.rotation}deg)`,
                   transformOrigin: 'center',
                 }}
                 draggable={false}

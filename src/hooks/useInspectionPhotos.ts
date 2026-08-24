@@ -24,6 +24,8 @@ export interface InspectionPhotoRow {
   bladeRootDistance: number | null;
   /** Distance from drone to blade surface in meters (from metadata JSONB) */
   distanceToBlade: number | null;
+  /** Rotation angle in degrees (0, 90, 180, 270) from metadata JSONB */
+  rotation: number;
 }
 
 const FACE_SHORT: Record<BladeFace, string> = {
@@ -86,6 +88,7 @@ async function fetchInspectionPhotos(
     thumbnailUrl: '', // Will be populated below for imported photos
     bladeRootDistance: (row.metadata as Record<string, unknown>)?.blade_root_distance != null ? Number((row.metadata as Record<string, unknown>).blade_root_distance) : null,
     distanceToBlade: (row.metadata as Record<string, unknown>)?.distance_to_blade != null ? Number((row.metadata as Record<string, unknown>).distance_to_blade) : null,
+    rotation: (row.metadata as Record<string, unknown>)?.rotation != null ? Number((row.metadata as Record<string, unknown>).rotation) : 0,
   })).sort((a, b) => a.bladePosition - b.bladePosition || a.flightPlanOrder - b.flightPlanOrder);
 
   // For imported photos, generate signed URLs for both original and pre-generated thumbnails.
