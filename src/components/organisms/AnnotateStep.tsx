@@ -1795,9 +1795,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             <div style={{ padding: '0 16px 16px' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                 <select style={{ ...selectStyle, flex: 1 }} value={pendingVerticalBlade} onChange={e => { setPendingVerticalBlade(e.target.value); }}>
-                  <option value="A">A - 82518</option>
-                  <option value="B">B - 82517</option>
-                  <option value="C">C - 82509</option>
+                  <option value="A">A{bladeSerials['A'] ? ` - ${bladeSerials['A']}` : ''}</option>
+                  <option value="B">B{bladeSerials['B'] ? ` - ${bladeSerials['B']}` : ''}</option>
+                  <option value="C">C{bladeSerials['C'] ? ` - ${bladeSerials['C']}` : ''}</option>
                 </select>
                 <button style={saveVerticalBtnStyle} onClick={() => setShowBladeConfirm(true)}>{t('button.save')}</button>
               </div>
@@ -1818,18 +1818,18 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               <path d="M43.7069 62.4702C44.3764 61.7926 48.0416 59.3209 48.0416 59.3209L44.4501 54.3775C44.4501 54.3775 1.42855 85.3477 1.30853 85.4349C1.18852 85.5221 1.05723 85.8087 1.32257 86.0939C1.58791 86.3792 1.66396 86.3239 2.09711 86.2004C2.53025 86.077 7.64609 83.6029 20.5916 77.3524C33.5371 71.1019 36.6369 70.5706 39.3911 67.8047C42.1844 64.2929 43.0373 63.1479 43.7069 62.4702Z" fill={(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); return selectedDefectBlade === blades[(idx + 2) % 3] ? C.primary : '#EDEDED'; })()} stroke="black" strokeWidth="1.5"/>
               <circle cx="46.9366" cy="57.0105" r="3.93249" fill="#D9D9D9" stroke="black"/>
             </svg>
-            <div style={{ position: 'absolute', top: '5%', width: '40%', left: '6%' }}>
-              <p style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textAlign: 'right', margin: 0 }}>
+            <div style={{ position: 'absolute', top: '-8%', left: '50%', transform: 'translateX(-50%)' }}>
+              <p style={{ fontSize: 11, whiteSpace: 'nowrap', textAlign: 'center', margin: 0 }}>
                 {verticalBlade} - {bladeSerials[verticalBlade] || ''}
               </p>
             </div>
-            <div style={{ position: 'absolute', top: '68%', width: '30%', left: '-28%' }}>
-              <p style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textAlign: 'right', margin: 0 }}>
+            <div style={{ position: 'absolute', top: '92%', left: '-10%' }}>
+              <p style={{ fontSize: 11, whiteSpace: 'nowrap', textAlign: 'center', margin: 0 }}>
                 {(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); const lb = blades[(idx + 2) % 3]!; return `${lb} - ${bladeSerials[lb] || ''}`; })()}
               </p>
             </div>
-            <div style={{ position: 'absolute', top: '68%', width: '30%', left: '98%' }}>
-              <p style={{ fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textAlign: 'left', margin: 0 }}>
+            <div style={{ position: 'absolute', top: '92%', right: '-10%' }}>
+              <p style={{ fontSize: 11, whiteSpace: 'nowrap', textAlign: 'center', margin: 0 }}>
                 {(() => { const blades = ['A','B','C']; const idx = Math.max(0, blades.indexOf(verticalBlade)); const rb = blades[(idx + 1) % 3]!; return `${rb} - ${bladeSerials[rb] || ''}`; })()}
               </p>
             </div>
