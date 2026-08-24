@@ -426,9 +426,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   }, [selectedThumbnail]);
 
   const bladeSerials: Record<string, string> = useMemo(() => {
-    // Use the serial numbers from the combobox (same source)
-    return { A: '82518', B: '82517', C: '82509' };
-  }, []);
+    const map: Record<string, string> = {};
+    for (const photo of photos) {
+      const posLetter = posLetters[photo.bladePosition] ?? String(photo.bladePosition);
+      if (photo.bladeSerialNumber && !map[posLetter]) {
+        map[posLetter] = photo.bladeSerialNumber;
+      }
+    }
+    return map;
+  }, [photos]);
 
   // ─── Turbine info derived from inspection ─────────────────────────────────
   const turbine = inspection?.blade?.turbine ?? inspection?.turbine;
