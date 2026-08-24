@@ -505,7 +505,9 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     const thumb = thumbnails.find(t => t.id === thumbId);
     if (thumb) {
       setSelectedDefectBlade(thumb.blade);
-      // Update metadata bar with photo distance data from BD (round decimals)
+      // Update metadata bar with blade/side/distance info
+      setMetaBlade(thumb.blade);
+      setMetaSide(thumb.face);
       if (thumb.bladeRootDistance != null) setMetaRootDist(Math.round(thumb.bladeRootDistance));
       if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade));
       // Notify parent to persist selection across step changes
@@ -800,7 +802,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     <input
                       type="range"
                       min="0"
-                      max="43"
+                      max="100"
                       step="1"
                       value={editRootDistance}
                       onChange={e => setEditRootDistance(Number(e.target.value))}
@@ -809,7 +811,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     <input
                       type="number"
                       min="0"
-                      max="43"
+                      max="100"
                       step="1"
                       value={editRootDistance}
                       onChange={e => setEditRootDistance(Number(e.target.value))}
