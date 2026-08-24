@@ -53,7 +53,7 @@ const C = {
   borderLight: '#E0E0E0',
   bg: '#FFFFFF',
   bgGray: '#F5F5F5',
-  selected: '#5A8F5A',
+  selected: '#00E676',
   visited: '#E8E8E8',
 };
 
