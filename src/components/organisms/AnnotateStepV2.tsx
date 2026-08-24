@@ -664,7 +664,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       onClick={() => handleThumbnailSelect(t.id)}
                       className={cn(
                         'relative aspect-[4/3] rounded-sm overflow-hidden cursor-pointer bg-gray-300',
-                        selectedThumbnail === t.id ? 'border-[3px] border-[#5A8F5A]' : 'border-[3px] border-transparent'
+                        selectedThumbnail === t.id ? 'border-[3px] border-[#00E676]' : 'border-[3px] border-transparent'
                       )}
                     >
                       <img
