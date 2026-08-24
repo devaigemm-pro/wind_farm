@@ -13,6 +13,14 @@ import { supabase } from '@/lib/supabase';
 import type { Inspection } from '@/types';
 import { BLADE_POSITION_LABELS } from '@/types';
 
+// ─── Face short → DB value mapping ───────────────────────────────────────────
+const FACE_SHORT_TO_DB: Record<string, string> = {
+  LE: 'leading_edge',
+  TE: 'trailing_edge',
+  SS: 'suction_side',
+  PS: 'pressure_side',
+};
+
 export interface AnnotateStepV2Props {
   inspectionId: string;
   inspection?: Inspection;
@@ -67,6 +75,15 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
     }
     return map;
   }, [photos]);
+
+  // Reverse map: position letter → bladeId (for updating photo blade assignment)
+  const letterToBladeId = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const [bladeId, letter] of Object.entries(bladePositionMap)) {
+      if (!map[letter]) map[letter] = bladeId;
+    }
+    return map;
+  }, [bladePositionMap]);
 
   // ─── Blade serial numbers from photo data ───────────────────────────────────
   const bladeSerials: Record<string, string> = useMemo(() => {
@@ -838,12 +855,49 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                   {/* Buttons */}
                   <div className="flex gap-3">
                     <button className="px-5 py-2 bg-gray-200 text-gray-800 border-none rounded text-sm font-semibold cursor-pointer" onClick={() => setShowEditPopover(false)}>{t('button.cancel')}</button>
-                    <button className="px-5 py-2 bg-[#5A8F5A] text-white border-none rounded text-sm font-semibold cursor-pointer" onClick={() => {
+                    <button className="px-5 py-2 bg-[#5A8F5A] text-white border-none rounded text-sm font-semibold cursor-pointer" onClick={async () => {
                       setMetaBlade(editBlade);
                       setMetaSide(editSide);
                       setMetaRootDist(editRootDistance);
                       setMetaDistBlade(editDistanceToBlade);
                       setShowEditPopover(false);
+                      // Persist changes to inspection_photo in DB
+                      if (selectedThumbnail) {
+                        const photo = photos.find(p => p.id === selectedThumbnail);
+                        if (photo) {
+                          try {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const db = supabase as any;
+                            const { data: currentRow } = await db
+                              .from('inspection_photo')
+                              .select('metadata')
+                              .eq('id', selectedThumbnail)
+                              .single();
+                            const currentMeta = (currentRow?.metadata as Record<string, unknown>) || {};
+                            const updates: Record<string, unknown> = {
+                              metadata: {
+                                ...currentMeta,
+                                blade_root_distance: editRootDistance,
+                                distance_to_blade: editDistanceToBlade,
+                              },
+                            };
+                            const newBladeId = letterToBladeId[editBlade];
+                            if (newBladeId && newBladeId !== photo.bladeId) {
+                              updates.blade_id = newBladeId;
+                            }
+                            const newFace = FACE_SHORT_TO_DB[editSide];
+                            if (newFace && newFace !== photo.face) {
+                              updates.face = newFace;
+                            }
+                            await db
+                              .from('inspection_photo')
+                              .update(updates)
+                              .eq('id', selectedThumbnail);
+                          } catch (err) {
+                            console.error('[AnnotateStepV2] Failed to persist photo edit:', err);
+                          }
+                        }
+                      }
                     }}>{t('button.save')}</button>
                   </div>
                 </div>
@@ -905,7 +959,29 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#5A8F5A"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96M17 13l-5 5-5-5h3V9h4v4z" /></svg>
             </button>
             {role !== 'supervisor' && (
-              <button className="flex items-center justify-center w-8 h-[30px] border border-red-400 rounded bg-transparent cursor-pointer p-0" title={t('annotate.deletePhoto')}>
+              <button className="flex items-center justify-center w-8 h-[30px] border border-red-400 rounded bg-transparent cursor-pointer p-0" title={t('annotate.deletePhoto')} onClick={async () => {
+                if (!selectedThumbnail) return;
+                if (!window.confirm(t('annotate.confirmDeletePhoto') || 'Are you sure you want to delete this photo?')) return;
+                try {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const db = supabase as any;
+                  const photo = photos.find(p => p.id === selectedThumbnail);
+                  await db.from('annotation').delete().eq('thumbnail_id', selectedThumbnail);
+                  await db.from('inspection_photo').delete().eq('id', selectedThumbnail);
+                  if (photo && photo.storagePath && photo.storagePath.startsWith('inspection-imports/')) {
+                    const originalPath = photo.storagePath.includes('?') ? photo.storagePath.split('?')[0] : photo.storagePath;
+                    if (originalPath && !originalPath.startsWith('http')) {
+                      const lastSlash = originalPath.lastIndexOf('/');
+                      const dir = originalPath.substring(0, lastSlash);
+                      const filename = originalPath.substring(lastSlash + 1);
+                      await supabase.storage.from('asset-documents').remove([originalPath, `${dir}/thumb_${filename}`]);
+                    }
+                  }
+                  window.location.reload();
+                } catch (err) {
+                  console.error('[AnnotateStepV2] Failed to delete photo:', err);
+                }
+              }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="#F15959"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z" /></svg>
               </button>
             )}
