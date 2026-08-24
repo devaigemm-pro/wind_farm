@@ -946,8 +946,8 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
             const imgRect = getImageRect(rect);
             const rawX = e.clientX - rect.left;
             const rawY = e.clientY - rect.top;
-            const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
-            const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
+            const imgX = Math.max(0, Math.min(100, ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100));
+            const imgY = Math.max(0, Math.min(100, ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100));
 
             if (drawPhase === 'expanding') {
               setDrawConfirmed(true);
@@ -974,8 +974,8 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
             const imgRect = getImageRect(rect);
             const rawX = e.clientX - rect.left;
             const rawY = e.clientY - rect.top;
-            const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
-            const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
+            const imgX = Math.max(0, Math.min(100, ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100));
+            const imgY = Math.max(0, Math.min(100, ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100));
 
             if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current) {
               setDrawEnd({ x: imgX, y: imgY });

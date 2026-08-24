@@ -925,8 +925,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const imgRect = getImageRect(rect);
             const rawX = e.clientX - rect.left;
             const rawY = e.clientY - rect.top;
-            const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
-            const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
+            const imgX = Math.max(0, Math.min(100, ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100));
+            const imgY = Math.max(0, Math.min(100, ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100));
 
             if (drawPhase === 'expanding') {
               // Click confirms the width → open popover
@@ -963,8 +963,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const imgRect = getImageRect(rect);
             const rawX = e.clientX - rect.left;
             const rawY = e.clientY - rect.top;
-            const imgX = ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100;
-            const imgY = ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100;
+            const imgX = Math.max(0, Math.min(100, ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100));
+            const imgY = Math.max(0, Math.min(100, ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100));
 
             if (drawShape === 'pencil' && isDrawing && isMouseDownRef.current) {
               // Pencil mode: add point (with min distance threshold to avoid too many points)
