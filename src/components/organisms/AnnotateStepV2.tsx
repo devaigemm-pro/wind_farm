@@ -470,6 +470,8 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
     const thumb = thumbnails.find(t => t.id === thumbId);
     if (thumb) {
       setSelectedDefectBlade(thumb.blade);
+      setMetaBlade(thumb.blade);
+      setMetaSide(thumb.face);
       if (thumb.bladeRootDistance != null) setMetaRootDist(Math.round(thumb.bladeRootDistance));
       if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade));
       onSelectionChange?.(thumbId, thumb.blade);
@@ -803,7 +805,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     <input
                       type="range"
                       min="0"
-                      max="43"
+                      max="100"
                       step="1"
                       value={editRootDistance}
                       onChange={e => setEditRootDistance(Number(e.target.value))}
@@ -812,7 +814,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     <input
                       type="number"
                       min="0"
-                      max="43"
+                      max="100"
                       step="1"
                       value={editRootDistance}
                       onChange={e => setEditRootDistance(Number(e.target.value))}
