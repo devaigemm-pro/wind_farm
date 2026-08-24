@@ -1318,12 +1318,6 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       </>
                     )}
                   </svg>
-                  {/* Size label */}
-                  <div className="absolute pointer-events-none mt-0.5" style={{ left: `${minX}%`, top: `${maxY}%` }}>
-                    <span className="text-[13px] font-semibold text-white italic whitespace-nowrap [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">
-                      {Math.round(ann.w * 1.5)} x {Math.round(ann.h * 1.3)} cm
-                    </span>
-                  </div>
                 </div>
               );
             })}
