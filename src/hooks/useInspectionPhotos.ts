@@ -10,6 +10,7 @@ export interface InspectionPhotoRow {
   campaignId: string;
   bladeId: string;
   bladePosition: number;
+  bladeSerialNumber: string | null;
   face: BladeFace;
   radialPosition: number;
   flightPlanOrder: number;
@@ -57,7 +58,7 @@ async function fetchInspectionPhotos(
 
   let query = db
     .from('inspection_photo')
-    .select('id, campaign_id, blade_id, face, radial_position, flight_plan_order, storage_path, filename, metadata, is_tagged, blade:blade_id(position)')
+    .select('id, campaign_id, blade_id, face, radial_position, flight_plan_order, storage_path, filename, metadata, is_tagged, blade:blade_id(position, serial_number)')
     .eq('campaign_id', campaignId)
     .order('flight_plan_order', { ascending: true });
 
@@ -74,6 +75,7 @@ async function fetchInspectionPhotos(
     campaignId: row.campaign_id as string,
     bladeId: row.blade_id as string,
     bladePosition: (row.blade as Record<string, unknown>)?.position as number ?? 1,
+    bladeSerialNumber: (row.blade as Record<string, unknown>)?.serial_number as string | null ?? null,
     face: row.face as BladeFace,
     radialPosition: Number(row.radial_position),
     flightPlanOrder: Number(row.flight_plan_order),

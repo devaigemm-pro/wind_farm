@@ -71,9 +71,7 @@ export default function LoginV2() {
         {/* Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#5A8F5A] flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>
-            </div>
+            <img src="/core-insight-eye.svg" width="32" height="32" alt="CORE Insight" />
             <span className="text-white font-semibold text-lg">CORE | Insight</span>
           </div>
         </div>

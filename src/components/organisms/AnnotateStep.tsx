@@ -82,6 +82,19 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     return map;
   }, [photos]);
 
+  // ─── Blade serial numbers from photo data ───────────────────────────────────
+  const bladeSerials: Record<string, string> = useMemo(() => {
+    const map: Record<string, string> = {};
+    const posL: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
+    for (const photo of photos) {
+      const posLetter = posL[photo.bladePosition] ?? String(photo.bladePosition);
+      if (photo.bladeSerialNumber && !map[posLetter]) {
+        map[posLetter] = photo.bladeSerialNumber;
+      }
+    }
+    return map;
+  }, [photos]);
+
   // ─── Tagged photos from BD (metadata.tagged field) ──────────────────────────
   const toggleTag = useTogglePhotoTag();
   const markViewed = useMarkPhotoViewed();
@@ -336,16 +349,17 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
     
     for (const blade of bladeOrder) {
       for (const face of faceOrder) {
-        const key = `${blade} - ${face}`;
+        const serial = bladeSerials[blade];
+        const label = serial ? `${blade} (${serial}) - ${face}` : `${blade} - ${face}`;
         const items = filteredThumbnails.filter(t => t.blade === blade && t.face === face);
         if (items.length > 0) {
-          groups[key] = items;
+          groups[label] = items;
         }
       }
     }
     
     return groups;
-  }, [filteredThumbnails]);
+  }, [filteredThumbnails, bladeSerials]);
 
   // Auto-select: restore saved selection or pick first VISIBLE thumbnail (from grouped order)
   useEffect(() => {
@@ -424,11 +438,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [selectedThumbnail]);
-
-  const bladeSerials: Record<string, string> = useMemo(() => {
-    // Use the serial numbers from the combobox (same source)
-    return { A: '82518', B: '82517', C: '82509' };
-  }, []);
 
   // ─── Turbine info derived from inspection ─────────────────────────────────
   const turbine = inspection?.blade?.turbine ?? inspection?.turbine;
