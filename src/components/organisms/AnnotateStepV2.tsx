@@ -1275,7 +1275,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                   {/* Label */}
                   <div
                     className="absolute -translate-x-1/2 -translate-y-full -mt-1 flex items-center gap-1 pointer-events-auto z-[1]"
-                    style={{ left: `${ann.x}%`, top: `${Math.min(startY, endY)}%` }}
+                    style={{ left: `${ann.x}%`, top: `${minY}%` }}
                   >
                     <div className="bg-white/[0.92] rounded px-2.5 py-1 flex items-center gap-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.2)]">
                       <span className="text-[13px] font-bold text-gray-800 whitespace-nowrap">{ann.type}</span>
