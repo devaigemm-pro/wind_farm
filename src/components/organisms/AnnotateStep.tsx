@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/components/design-system';
 import { useCreateAnnotation, useUpdateAnnotation, useDeleteAnnotation, useCampaignInspectionIds, useMultiAnnotations } from '@/hooks/useAnnotations';
@@ -62,6 +62,7 @@ const C = {
 export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaignId, savedThumbId, savedBlade, onSelectionChange }: AnnotateStepProps) {
   const { role } = useAuth();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   // ─── Fetch ALL inspections of the campaign ─────────────────────────────────
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
   const { data: campaignInspIds = [] } = useCampaignInspectionIds(campaignId);
@@ -977,14 +978,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     await supabase.storage.from('asset-documents').remove([originalPath, `${dir}/thumb_${filename}`]);
                   }
                 }
-                // Navigate to next photo
+                // Navigate to next photo and refetch
                 const nextIndex = currentThumbIndex < flatFilteredThumbs.length - 1 ? currentThumbIndex + 1 : Math.max(0, currentThumbIndex - 1);
                 const nextThumb = flatFilteredThumbs[nextIndex];
                 if (nextThumb && nextThumb.id !== selectedThumbnail) {
                   setSelectedThumbnail(nextThumb.id);
                 }
-                // Force refetch photos
-                window.location.reload();
+                // Invalidate queries to refresh photo list without page reload
+                await queryClient.invalidateQueries({ queryKey: ['inspection-photos'] });
+                await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
               } catch (err) {
                 console.error('[AnnotateStep] Failed to delete photo:', err);
               }
