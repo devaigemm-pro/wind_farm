@@ -1346,11 +1346,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                         style={{ transformOrigin: `${ann.x}% ${ann.y}%`, transform: `rotate(${ann.angle}deg)` }}
                       />
                     ) : (
-                      <polygon
-                        points={`${p1x}%,${p1y}% ${p2x}%,${p2y}% ${p3x}%,${p3y}% ${p4x}%,${p4y}%`}
-                        fill="none" stroke="#FF6600" strokeWidth="2.5"
-                        strokeLinejoin="miter"
-                      />
+                      <>
+                        <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF6600" strokeWidth="2.5" strokeLinecap="square" />
+                        <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF6600" strokeWidth="2.5" strokeLinecap="square" />
+                        <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF6600" strokeWidth="2.5" strokeLinecap="square" />
+                        <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF6600" strokeWidth="2.5" strokeLinecap="square" />
+                      </>
                     )}
                   </svg>
                 </div>
@@ -1400,11 +1401,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     stroke="#FF3300" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.7"
                   />
                   {drawShape === 'rect' ? (
-                    <polygon
-                      points={`${p1x}%,${p1y}% ${p2x}%,${p2y}% ${p3x}%,${p3y}% ${p4x}%,${p4y}%`}
-                      fill="none" stroke="#FF3300" strokeWidth="2.5"
-                      strokeLinejoin="miter"
-                    />
+                    <>
+                      <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF3300" strokeWidth="2.5" strokeLinecap="square" />
+                      <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF3300" strokeWidth="2.5" strokeLinecap="square" />
+                      <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF3300" strokeWidth="2.5" strokeLinecap="square" />
+                      <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF3300" strokeWidth="2.5" strokeLinecap="square" />
+                    </>
                   ) : (
                     <ellipse
                       cx={`${(drawStart.x + drawEnd.x) / 2}%`}
