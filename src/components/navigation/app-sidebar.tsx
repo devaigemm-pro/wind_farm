@@ -74,8 +74,8 @@ export function AppSidebar({ currentPath, onNavigate }: AppSidebarProps) {
       <div className="flex items-center gap-3 px-3 py-3 border-b border-white/10 min-h-[56px]">
         <img
           src="/core-insight-eye.svg"
-          width="28"
-          height="18"
+          width="24"
+          height="15"
           alt="CORE Insight"
           className="flex-shrink-0"
         />

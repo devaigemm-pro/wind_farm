@@ -71,7 +71,7 @@ export default function LoginV2() {
         {/* Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <img src="/core-insight-eye.svg" width="32" height="32" alt="CORE Insight" />
+            <img src="/core-insight-eye.svg" width="37" height="37" alt="CORE Insight" />
             <span className="text-white font-semibold text-lg">CORE <span style={{ color: '#5A8F5A' }}>|</span> Insight</span>
           </div>
         </div>
