@@ -1541,7 +1541,7 @@ export function ExportPanel({
       // 4.2 Location (terrain map with turbine icon + Google Maps link)
       const locationTitle = language === 'es' ? '4.2 Ubicación' : '4.2 Location';
       y = subTitle(locationTitle, y);
-      const mapH = 65;
+      const mapH = 45;
       if (windFarmCoords) {
         // Generate a terrain map by compositing OSM tiles on canvas
         let mapLoaded = false;
