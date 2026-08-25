@@ -1346,12 +1346,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                         style={{ transformOrigin: `${ann.x}% ${ann.y}%`, transform: `rotate(${ann.angle}deg)` }}
                       />
                     ) : (
-                      <>
-                        <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF6600" strokeWidth="2.5" />
-                        <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF6600" strokeWidth="2.5" />
-                        <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF6600" strokeWidth="2.5" />
-                        <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF6600" strokeWidth="2.5" />
-                      </>
+                      <rect
+                        x={`${minX}%`} y={`${minY}%`}
+                        width={`${Math.max(p1x, p2x, p3x, p4x) - minX}%`}
+                        height={`${maxY - minY}%`}
+                        fill="none" stroke="#FF6600" strokeWidth="2.5"
+                      />
                     )}
                   </svg>
                 </div>
@@ -1401,12 +1401,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     stroke="#FF3300" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.7"
                   />
                   {drawShape === 'rect' ? (
-                    <>
-                      <line x1={`${p1x}%`} y1={`${p1y}%`} x2={`${p2x}%`} y2={`${p2y}%`} stroke="#FF3300" strokeWidth="2.5" />
-                      <line x1={`${p2x}%`} y1={`${p2y}%`} x2={`${p3x}%`} y2={`${p3y}%`} stroke="#FF3300" strokeWidth="2.5" />
-                      <line x1={`${p3x}%`} y1={`${p3y}%`} x2={`${p4x}%`} y2={`${p4y}%`} stroke="#FF3300" strokeWidth="2.5" />
-                      <line x1={`${p4x}%`} y1={`${p4y}%`} x2={`${p1x}%`} y2={`${p1y}%`} stroke="#FF3300" strokeWidth="2.5" />
-                    </>
+                    <rect
+                      x={`${Math.min(p1x, p2x, p3x, p4x)}%`} y={`${Math.min(p1y, p2y, p3y, p4y)}%`}
+                      width={`${Math.max(p1x, p2x, p3x, p4x) - Math.min(p1x, p2x, p3x, p4x)}%`}
+                      height={`${Math.max(p1y, p2y, p3y, p4y) - Math.min(p1y, p2y, p3y, p4y)}%`}
+                      fill="none" stroke="#FF3300" strokeWidth="2.5"
+                    />
                   ) : (
                     <ellipse
                       cx={`${(drawStart.x + drawEnd.x) / 2}%`}
