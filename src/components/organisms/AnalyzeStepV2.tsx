@@ -36,6 +36,7 @@ interface Defect {
   nextStep: string;
   thumbnailUrl?: string;
   imageUrl?: string;
+  rotation?: number;
 }
 
 // ─── Legacy thumbnail → blade/face mapping (for old annotations with t1-t18 IDs) ─
@@ -83,7 +84,7 @@ export function AnalyzeStepV2({ inspectionId, inspection, campaignId: propCampai
 
   // Build a photo lookup map: photoId → { blade, face }
   const photoLookup = useMemo(() => {
-    const map: Record<string, { blade: string; face: string; storagePath: string; bladeRootDistance: number | null; distanceToBlade: number | null }> = {};
+    const map: Record<string, { blade: string; face: string; storagePath: string; bladeRootDistance: number | null; distanceToBlade: number | null; rotation: number }> = {};
     for (const photo of photos) {
       map[photo.id] = {
         blade: bladePositionMap[photo.bladeId] ?? 'A',
@@ -91,6 +92,7 @@ export function AnalyzeStepV2({ inspectionId, inspection, campaignId: propCampai
         storagePath: photo.storagePath,
         bladeRootDistance: photo.bladeRootDistance,
         distanceToBlade: photo.distanceToBlade,
+        rotation: photo.rotation,
       };
     }
     return map;
@@ -140,6 +142,7 @@ export function AnalyzeStepV2({ inspectionId, inspection, campaignId: propCampai
         imageUrl: photoLookup[a.thumbnailId]?.storagePath
           ? getPhotoPublicUrl(photoLookup[a.thumbnailId]!.storagePath, 'viewer')
           : undefined,
+        rotation: photoLookup[a.thumbnailId]?.rotation ?? 0,
       };
     });
   }, [dbAnnotations, photoLookup]);
@@ -470,7 +473,7 @@ export function AnalyzeStepV2({ inspectionId, inspection, campaignId: propCampai
                   )}
                 >
                   {(d.thumbnailUrl || d.imageUrl) ? (
-                    <img src={d.thumbnailUrl || d.imageUrl} alt={d.type} loading="lazy" className="w-full h-full object-cover" />
+                    <img src={d.thumbnailUrl || d.imageUrl} alt={d.type} loading="lazy" className="w-full h-full object-cover" style={{ transform: `rotate(${d.rotation || 0}deg)` }} />
                   ) : (
                     <span className="text-[10px] text-gray-400 text-center p-1">{d.type}</span>
                   )}
@@ -497,7 +500,7 @@ export function AnalyzeStepV2({ inspectionId, inspection, campaignId: propCampai
               </div>
               <div className="relative flex-1 min-h-[120px] bg-[#222] overflow-hidden">
                 {selectedDefect.imageUrl ? (
-                  <img src={selectedDefect.imageUrl} alt="defect preview" loading="lazy" className="w-full h-full object-cover" />
+                  <img src={selectedDefect.imageUrl} alt="defect preview" loading="lazy" className="w-full h-full object-cover" style={{ transform: `rotate(${selectedDefect.rotation || 0}deg)` }} />
                 ) : (
                   <div className="w-full h-full bg-[#333] flex items-center justify-center">
                     <span className="text-gray-500 text-xs">{t('defectImage.noImage')}</span>
@@ -532,7 +535,7 @@ export function AnalyzeStepV2({ inspectionId, inspection, campaignId: propCampai
           {/* Defect image — uses object-contain to show full without crop */}
           <div className="relative flex-1 min-h-0 mb-3 rounded-xl overflow-hidden bg-[#1a1a1a]">
             {selectedDefect?.imageUrl ? (
-              <img src={selectedDefect.imageUrl} alt="defect" loading="lazy" className="w-full h-full object-contain" />
+              <img src={selectedDefect.imageUrl} alt="defect" loading="lazy" className="w-full h-full object-contain" style={{ transform: `rotate(${selectedDefect.rotation || 0}deg)` }} />
             ) : photosLoading ? (
               <div className="w-full h-full bg-[#2a2a2a] rounded-md flex items-center justify-center">
                 <div className="w-7 h-7 border-3 border-gray-600 border-t-[#5A8F5A] rounded-full animate-spin" />

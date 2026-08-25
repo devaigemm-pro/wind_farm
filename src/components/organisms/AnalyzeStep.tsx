@@ -35,6 +35,7 @@ interface Defect {
   nextStep: string;
   thumbnailUrl?: string;
   imageUrl?: string;
+  rotation?: number;
 }
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
@@ -95,7 +96,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
 
   // Build a photo lookup map: photoId → { blade, face }
   const photoLookup = useMemo(() => {
-    const map: Record<string, { blade: string; face: string; storagePath: string; bladeRootDistance: number | null; distanceToBlade: number | null }> = {};
+    const map: Record<string, { blade: string; face: string; storagePath: string; bladeRootDistance: number | null; distanceToBlade: number | null; rotation: number }> = {};
     for (const photo of photos) {
       map[photo.id] = {
         blade: bladePositionMap[photo.bladeId] ?? 'A',
@@ -103,6 +104,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         storagePath: photo.storagePath,
         bladeRootDistance: photo.bladeRootDistance,
         distanceToBlade: photo.distanceToBlade,
+        rotation: photo.rotation,
       };
     }
     return map;
@@ -152,6 +154,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         imageUrl: photoLookup[a.thumbnailId]?.storagePath
           ? getPhotoPublicUrl(photoLookup[a.thumbnailId]!.storagePath, 'viewer')
           : undefined,
+        rotation: photoLookup[a.thumbnailId]?.rotation ?? 0,
       };
     });
   }, [dbAnnotations, photoLookup]);
@@ -490,7 +493,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                   }}
                 >
                   {(d.thumbnailUrl || d.imageUrl) ? (
-                    <img src={d.thumbnailUrl || d.imageUrl} alt={d.type} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={d.thumbnailUrl || d.imageUrl} alt={d.type} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `rotate(${d.rotation || 0}deg)` }} />
                   ) : (
                     <span style={{ fontSize: 10, color: C.muted, textAlign: 'center', padding: 4 }}>{d.type}</span>
                   )}
@@ -519,7 +522,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               </div>
               <div style={previewImageContainerStyle}>
                 {selectedDefect.imageUrl ? (
-                  <img src={selectedDefect.imageUrl} alt="defect preview" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={selectedDefect.imageUrl} alt="defect preview" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `rotate(${selectedDefect.rotation || 0}deg)` }} />
                 ) : (
                   <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ color: '#888', fontSize: 12 }}>{t('defectImage.noImage')}</span>
@@ -551,7 +554,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
           {/* Defect image */}
           <div style={imageContainerStyle}>
             {selectedDefect?.imageUrl ? (
-              <img src={selectedDefect.imageUrl} alt="defect" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+              <img src={selectedDefect.imageUrl} alt="defect" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, transform: `rotate(${selectedDefect.rotation || 0}deg)` }} />
             ) : photosLoading ? (
               <div style={{ width: '100%', height: '100%', background: '#2a2a2a', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: 28, height: 28, border: '3px solid #555', borderTopColor: '#5A8F5A', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
