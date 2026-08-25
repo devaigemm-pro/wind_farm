@@ -12,10 +12,8 @@ export function useRotatePhoto() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ photoId, currentRotation }: { photoId: string; currentRotation: number }) => {
-      const newRotation = (currentRotation + 90) % 360;
-
-      // Read current metadata
+    mutationFn: async ({ photoId }: { photoId: string; currentRotation: number }) => {
+      // Read current metadata from DB to get the real rotation value
       const { data: current, error: readErr } = await db
         .from('inspection_photo')
         .select('metadata')
@@ -25,6 +23,8 @@ export function useRotatePhoto() {
       if (readErr) throw readErr;
 
       const currentMeta = (current?.metadata as Record<string, unknown>) || {};
+      const dbRotation = typeof currentMeta.rotation === 'number' ? currentMeta.rotation : 0;
+      const newRotation = (dbRotation + 90) % 360;
       const updatedMeta = { ...currentMeta, rotation: newRotation };
 
       const { error } = await db
