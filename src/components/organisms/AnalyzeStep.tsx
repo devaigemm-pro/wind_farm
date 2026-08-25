@@ -261,11 +261,16 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     try {
       const rootDistNum = parseFloat(rootDistance) || 0;
       // Update the annotation fields (preserve original x/y position — never overwrite drawing coords)
+      // Preserve [oval]/[pencil] prefix from original note (shape marker used by step 2 renderer)
+      const originalAnn = (dbAnnotations ?? []).find(a => a.id === selectedDefectId);
+      const originalPrefix = originalAnn?.note?.match(/^\[oval\]|\^\[pencil\].*?\|\|\|/)?.[0] || '';
+      const preservedNote = originalAnn?.note?.startsWith('[oval]') ? '[oval]' + note :
+                            originalAnn?.note?.startsWith('[pencil]') ? originalAnn.note.split('|||')[0] + '|||' + note : note;
       await updateAnnotation.mutateAsync({
         id: selectedDefectId,
         type: defectType,
         category: category,
-        note: note,
+        note: preservedNote,
         rootCause: rootCause,
         nextStep: nextStep,
         side: bladeFace,
@@ -330,11 +335,15 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         'OTHER ADD-ONS MISSING': 'other',
       };
       for (const d of pending) {
+        // Preserve [oval]/[pencil] prefix from original annotation note
+        const origAnn = (dbAnnotations ?? []).find(a => a.id === d.annotationId);
+        const bulkNote = origAnn?.note?.startsWith('[oval]') ? '[oval]' + d.note :
+                         origAnn?.note?.startsWith('[pencil]') ? origAnn.note.split('|||')[0] + '|||' + d.note : d.note;
         await updateAnnotation.mutateAsync({
           id: d.annotationId,
           type: d.type,
           category: d.cat,
-          note: d.note,
+          note: bulkNote,
           rootCause: d.rootCause,
           nextStep: d.nextStep,
           side: d.face,
