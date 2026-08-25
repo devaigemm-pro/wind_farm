@@ -1187,7 +1187,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
           {/* ─── Blade Face Overlay (floating, top-left) ─────────────── */}
           {showBladeOverlay && (
             <div className="absolute top-2 left-2 z-[25] pointer-events-auto">
-              <div className="bg-white rounded-lg shadow-lg p-3 px-4 w-[240px] relative">
+              <div className="bg-white rounded-lg shadow-lg p-3 px-4 w-[280px] relative">
                 <div className="flex justify-end mb-1.5">
                   <button onClick={() => setShowBladeOverlay(false)} className="bg-none border-none cursor-pointer p-0.5 flex items-center">
                     <svg width="14" height="14" viewBox="0 0 352 512" fill="#888"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z" /></svg>
@@ -1209,7 +1209,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     }}
                     className={cn(
                       'py-1 px-3 text-[11px] font-semibold border-none rounded cursor-pointer',
-                      currentThumb?.face === 'SS' ? 'bg-[#00A6FF] text-white' : 'bg-gray-100 text-[#00A6FF]'
+                      currentThumb?.face === 'SS' ? 'bg-[#5A8F5A] text-white' : 'bg-gray-100 text-[#5A8F5A]'
                     )}
                   >SS</button>
                   <div className="flex items-center gap-1.5">
@@ -1227,7 +1227,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       }}
                       className={cn(
                         'py-1 px-3 text-[11px] font-semibold border-none rounded cursor-pointer',
-                        currentThumb?.face === 'LE' ? 'bg-[#00A6FF] text-white' : 'bg-gray-100 text-[#00A6FF]'
+                        currentThumb?.face === 'LE' ? 'bg-[#5A8F5A] text-white' : 'bg-gray-100 text-[#5A8F5A]'
                       )}
                     >LE</button>
                     <img src="/airfoil.png" alt="blade" className="w-[140px] h-14 object-contain pointer-events-none" />
@@ -1245,7 +1245,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       }}
                       className={cn(
                         'py-1 px-3 text-[11px] font-semibold border-none rounded cursor-pointer',
-                        currentThumb?.face === 'TE' ? 'bg-[#00A6FF] text-white' : 'bg-gray-100 text-[#00A6FF]'
+                        currentThumb?.face === 'TE' ? 'bg-[#5A8F5A] text-white' : 'bg-gray-100 text-[#5A8F5A]'
                       )}
                     >TE</button>
                   </div>
@@ -1264,7 +1264,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     }}
                     className={cn(
                       'py-1 px-3 text-[11px] font-semibold border-none rounded cursor-pointer',
-                      currentThumb?.face === 'PS' ? 'bg-[#00A6FF] text-white' : 'bg-gray-100 text-[#00A6FF]'
+                      currentThumb?.face === 'PS' ? 'bg-[#5A8F5A] text-white' : 'bg-gray-100 text-[#5A8F5A]'
                     )}
                   >PS</button>
                 </div>
