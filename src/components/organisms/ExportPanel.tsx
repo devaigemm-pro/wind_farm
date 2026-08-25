@@ -1902,7 +1902,10 @@ export function ExportPanel({
             [t.distance, `${d.distanceFromRoot?.toFixed(1) ?? '-'} m`],
             [t.size, sizeStr],
           ];
-          if (d.notes) detailRows.push([t.note, d.notes]);
+          if (d.notes) {
+            const cleanNote = d.notes.replace(/^\[oval\]/, '').replace(/^\[pencil\].*?\|\|\|/, '').replace(/^\[pencil\].*$/, '');
+            if (cleanNote) detailRows.push([t.note, cleanNote]);
+          }
           if (d.rootCause) detailRows.push([t.rootCause, d.rootCause]);
           if (d.nextStep) detailRows.push([t.nextStep, d.nextStep]);
           detailRows.push([t.status, d.resolved ? t.resolved : t.unresolved]);
