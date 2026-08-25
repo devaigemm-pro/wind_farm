@@ -1179,8 +1179,8 @@ export function ExportPanel({
         startY: y,
         head: [[t.blade, t.totalDefects, 'Cat 5', 'Cat 4', 'Cat 3', 'Cat 2', 'Cat 1']],
         body: bladeSummaryRows,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3, halign: 'center' },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold', halign: 'center' },
         columnStyles: {
           2: { fillColor: [255, 235, 235] },
           3: { fillColor: [255, 243, 230] },
@@ -1291,8 +1291,9 @@ export function ExportPanel({
         startY: y,
         head: [[t.type, 'Total', 'Cat 5', 'Cat 4', 'Cat 3', 'Cat 2', 'Cat 1']],
         body: typeRows,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
+        headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold', halign: 'center' },
+        columnStyles: { 0: { halign: 'left' } },
         margin: { left: margin, right: margin },
       });
 
@@ -1759,6 +1760,7 @@ export function ExportPanel({
             body: bladeTableRows,
             styles: { fontSize: 8, cellPadding: 2.5 },
             headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
+            columnStyles: { 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } },
             didParseCell: (data: any) => {
               if (data.section === 'body' && data.column.index === 3) {
                 const catNum = parseInt(data.cell.raw as string, 10);
