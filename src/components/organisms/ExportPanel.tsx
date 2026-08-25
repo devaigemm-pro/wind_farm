@@ -804,7 +804,7 @@ export function ExportPanel({
   turbineId,
   campaignId,
 }: ExportPanelProps) {
-  const [language, setLanguage] = useState<'en' | 'es'>('en');
+  const [language, setLanguage] = useState<'en' | 'es'>('es');
   const [includeDetails, setIncludeDetails] = useState(true);
   const [resolvedFilter, setResolvedFilter] = useState<'all' | 'resolved' | 'unresolved'>('all');
   const [selectedCategories, setSelectedCategories] = useState<Set<number>>(
