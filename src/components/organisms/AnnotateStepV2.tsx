@@ -1199,7 +1199,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     onClick={(e) => {
                       e.stopPropagation();
                       const blade = currentThumb?.blade || 'A';
-                      const target = thumbnails.find(t => t.face === 'SS' && t.blade === blade) || thumbnails.find(t => t.face === 'SS');
+                      const currentFace = currentThumb?.face || '';
+                      const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                      const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                      const targetGroup = thumbnails.filter(t => t.face === 'SS' && t.blade === blade);
+                      const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                      const target = targetGroup[targetIdx] || targetGroup[0];
                       if (target) handleThumbnailSelect(target.id);
                     }}
                     className={cn(
@@ -1212,7 +1217,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       onClick={(e) => {
                         e.stopPropagation();
                         const blade = currentThumb?.blade || 'A';
-                        const target = thumbnails.find(t => t.face === 'LE' && t.blade === blade) || thumbnails.find(t => t.face === 'LE');
+                        const currentFace = currentThumb?.face || '';
+                        const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                        const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                        const targetGroup = thumbnails.filter(t => t.face === 'LE' && t.blade === blade);
+                        const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                        const target = targetGroup[targetIdx] || targetGroup[0];
                         if (target) handleThumbnailSelect(target.id);
                       }}
                       className={cn(
@@ -1225,7 +1235,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       onClick={(e) => {
                         e.stopPropagation();
                         const blade = currentThumb?.blade || 'A';
-                        const target = thumbnails.find(t => t.face === 'TE' && t.blade === blade) || thumbnails.find(t => t.face === 'TE');
+                        const currentFace = currentThumb?.face || '';
+                        const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                        const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                        const targetGroup = thumbnails.filter(t => t.face === 'TE' && t.blade === blade);
+                        const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                        const target = targetGroup[targetIdx] || targetGroup[0];
                         if (target) handleThumbnailSelect(target.id);
                       }}
                       className={cn(
@@ -1239,7 +1254,12 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                     onClick={(e) => {
                       e.stopPropagation();
                       const blade = currentThumb?.blade || 'A';
-                      const target = thumbnails.find(t => t.face === 'PS' && t.blade === blade) || thumbnails.find(t => t.face === 'PS');
+                      const currentFace = currentThumb?.face || '';
+                      const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                      const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                      const targetGroup = thumbnails.filter(t => t.face === 'PS' && t.blade === blade);
+                      const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                      const target = targetGroup[targetIdx] || targetGroup[0];
                       if (target) handleThumbnailSelect(target.id);
                     }}
                     className={cn(

@@ -1254,8 +1254,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     onClick={(e) => {
                       e.stopPropagation();
                       const blade = currentThumb?.blade || 'A';
-                      const target = thumbnails.find(t => t.face === 'SS' && t.blade === blade)
-                        || thumbnails.find(t => t.face === 'SS');
+                      const currentFace = currentThumb?.face || '';
+                      const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                      const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                      const targetGroup = thumbnails.filter(t => t.face === 'SS' && t.blade === blade);
+                      const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                      const target = targetGroup[targetIdx] || targetGroup[0];
                       if (target) handleThumbnailSelect(target.id);
                     }}
                     style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'SS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'SS' ? '#fff' : '#00A6FF' }}
@@ -1266,8 +1270,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       onClick={(e) => {
                         e.stopPropagation();
                         const blade = currentThumb?.blade || 'A';
-                        const target = thumbnails.find(t => t.face === 'LE' && t.blade === blade)
-                          || thumbnails.find(t => t.face === 'LE');
+                        const currentFace = currentThumb?.face || '';
+                        const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                        const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                        const targetGroup = thumbnails.filter(t => t.face === 'LE' && t.blade === blade);
+                        const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                        const target = targetGroup[targetIdx] || targetGroup[0];
                         if (target) handleThumbnailSelect(target.id);
                       }}
                       style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#00A6FF' }}
@@ -1277,8 +1285,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       onClick={(e) => {
                         e.stopPropagation();
                         const blade = currentThumb?.blade || 'A';
-                        const target = thumbnails.find(t => t.face === 'TE' && t.blade === blade)
-                          || thumbnails.find(t => t.face === 'TE');
+                        const currentFace = currentThumb?.face || '';
+                        const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                        const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                        const targetGroup = thumbnails.filter(t => t.face === 'TE' && t.blade === blade);
+                        const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                        const target = targetGroup[targetIdx] || targetGroup[0];
                         if (target) handleThumbnailSelect(target.id);
                       }}
                       style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'TE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'TE' ? '#fff' : '#00A6FF' }}
@@ -1289,8 +1301,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     onClick={(e) => {
                       e.stopPropagation();
                       const blade = currentThumb?.blade || 'A';
-                      const target = thumbnails.find(t => t.face === 'PS' && t.blade === blade)
-                        || thumbnails.find(t => t.face === 'PS');
+                      const currentFace = currentThumb?.face || '';
+                      const currentGroup = thumbnails.filter(t => t.blade === blade && t.face === currentFace);
+                      const posInGroup = currentGroup.findIndex(t => t.id === selectedThumbnail);
+                      const targetGroup = thumbnails.filter(t => t.face === 'PS' && t.blade === blade);
+                      const targetIdx = Math.min(Math.max(posInGroup, 0), targetGroup.length - 1);
+                      const target = targetGroup[targetIdx] || targetGroup[0];
                       if (target) handleThumbnailSelect(target.id);
                     }}
                     style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'PS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'PS' ? '#fff' : '#00A6FF' }}
