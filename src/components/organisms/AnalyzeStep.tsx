@@ -47,7 +47,7 @@ const C = {
   bg: '#FFFFFF',
   bgLight: '#F5F7FA',
   selected: 'rgba(90, 143, 90, 0.10)',
-  selectedBorder: '#5A8F5A',
+  selectedBorder: '#00E676',
 };
 
 // ─── Legacy thumbnail → blade/face mapping (for old annotations with t1-t18 IDs) ─
