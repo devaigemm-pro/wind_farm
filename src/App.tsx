@@ -11,10 +11,7 @@ import { ToastContainer } from '@/components/organisms';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSplash } from '@/components/atoms/LoadingSplash';
 
-const Login = lazy(() => {
-  const { newLayout } = getFeatureFlags();
-  return newLayout ? import('@/pages/LoginV2') : import('@/pages/Login');
-});
+const Login = lazy(() => import('@/pages/LoginV2'));
 const Dashboard = lazy(() => {
   const { newLayout } = getFeatureFlags();
   return newLayout ? import('@/pages/DashboardV2') : import('@/pages/Dashboard');
