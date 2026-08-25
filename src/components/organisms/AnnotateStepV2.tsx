@@ -366,7 +366,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
       setSelectedThumbnail(target.id);
       setSelectedDefectBlade(target.blade);
       if (target.bladeRootDistance != null) setMetaRootDist(Math.round(target.bladeRootDistance));
-      if (target.distanceToBlade != null) setMetaDistBlade(Math.round(target.distanceToBlade));
+      if (target.distanceToBlade != null) setMetaDistBlade(Math.round(target.distanceToBlade * 10) / 10);
       onSelectionChange?.(target.id, target.blade);
       markViewed.mutate({ photoId: target.id, campaignId });
     }
@@ -494,7 +494,7 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
       setMetaBlade(thumb.blade);
       setMetaSide(thumb.face);
       if (thumb.bladeRootDistance != null) setMetaRootDist(Math.round(thumb.bladeRootDistance));
-      if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade));
+      if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade * 10) / 10);
       onSelectionChange?.(thumbId, thumb.blade);
     }
   };
