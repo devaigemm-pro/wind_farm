@@ -392,7 +392,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       setSelectedDefectBlade(target.blade);
       // Populate metadata bar with distance data from BD (round decimals)
       if (target.bladeRootDistance != null) setMetaRootDist(Math.round(target.bladeRootDistance));
-      if (target.distanceToBlade != null) setMetaDistBlade(Math.round(target.distanceToBlade));
+      if (target.distanceToBlade != null) setMetaDistBlade(Math.round(target.distanceToBlade * 10) / 10);
       onSelectionChange?.(target.id, target.blade);
       // Mark first photo as viewed so progress starts counting
       markViewed.mutate({ photoId: target.id, campaignId });
@@ -530,7 +530,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
       setMetaBlade(thumb.blade);
       setMetaSide(thumb.face);
       if (thumb.bladeRootDistance != null) setMetaRootDist(Math.round(thumb.bladeRootDistance));
-      if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade));
+      if (thumb.distanceToBlade != null) setMetaDistBlade(Math.round(thumb.distanceToBlade * 10) / 10);
       // Notify parent to persist selection across step changes
       onSelectionChange?.(thumbId, thumb.blade);
     }
