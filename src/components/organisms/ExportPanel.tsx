@@ -920,6 +920,14 @@ export function ExportPanel({
         : now.toLocaleDateString(language === 'es' ? 'es-CL' : 'en-US');
       const nowStr = now.toLocaleDateString(language === 'es' ? 'es-CL' : 'en-US');
 
+      // Fetch inspection metadata (inspected_by) from DB
+      let inspectedByName = 'Inspector';
+      try {
+        const db = supabase as any;
+        const { data: inspRow } = await db.from('inspection').select('inspected_by').eq('id', inspectionId).single();
+        if (inspRow?.inspected_by) inspectedByName = inspRow.inspected_by;
+      } catch { /* fallback to defaults */ }
+
       const bladeSerials: Record<string, string> = {};
       if (blades) {
         for (const b of blades) {
@@ -1172,7 +1180,7 @@ export function ExportPanel({
       // Per-blade summary table
       const bladeLetters = ['A', 'B', 'C'];
       const bladeSummaryRows = bladeLetters.map((bl) => {
-        const bladeDefects = filtered.filter((d) => d.blade === bl);
+        const bladeDefects = filtered.filter((d) => d.blade === bl).sort((a, b) => (a.severity ?? 0) - (b.severity ?? 0));
         return [
           `${t.blade} ${bl}`,
           String(bladeDefects.length),
@@ -1462,7 +1470,7 @@ export function ExportPanel({
         body: [
           [t.inspMethod, 'CORE Insight'],
           [t.inspectedOn, dateStr],
-          [t.inspectedBy, 'Inspector'],
+          [t.inspectedBy, inspectedByName],
           [t.avgGSD, '0.07 cm/pixel'],
         ],
         styles: { fontSize: 9, cellPadding: 3 },
@@ -1661,7 +1669,7 @@ export function ExportPanel({
       // 4.3 Blade Details
       y = subTitle(t.bladeDetails, y);
       const bladeDetailRows = [
-        [t.manufacturer, 'N/A'],
+        [t.manufacturer, turbineModel],
         [t.length, `${bladeLength || 43}m`],
         [`${t.blade} A`, bladeSerials['A'] || 'N/A'],
         [`${t.blade} B`, bladeSerials['B'] || 'N/A'],
@@ -1714,7 +1722,7 @@ export function ExportPanel({
 
       let bladeIdx = 1;
       for (const bl of bladeLetters) {
-        const bladeDefects = filtered.filter((d) => d.blade === bl);
+        const bladeDefects = filtered.filter((d) => d.blade === bl).sort((a, b) => (a.severity ?? 0) - (b.severity ?? 0));
         const serial = bladeSerials[bl] || 'N/A';
 
         if (y > pageH - 160) { newPage(); y = 28; }
