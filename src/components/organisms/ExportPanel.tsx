@@ -1058,7 +1058,7 @@ export function ExportPanel({
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_COLORS.white);
       doc.text(windFarmName, pageW - margin, titleY + 6, { align: 'right' });
-      doc.text(`${t.turbine}: ${turbineName} - ${primarySerial}`, pageW - margin, titleY + 14, { align: 'right' });
+      doc.text(`${t.turbine}: ${turbineName}`, pageW - margin, titleY + 14, { align: 'right' });
       doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
       // Footer section — white text at page bottom
@@ -1630,9 +1630,7 @@ export function ExportPanel({
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0, 100, 200);
-        doc.text(linkLabel, margin, y);
-        const linkW = doc.getTextWidth(linkLabel);
-        doc.link(margin, y - 4, linkW, 5, { url: gmapsUrl });
+        doc.textWithLink(linkLabel, margin, y, { url: gmapsUrl });
         doc.setTextColor(...PDF_COLORS.darkText);
         y += 10;
       } else {
@@ -2030,8 +2028,21 @@ export function ExportPanel({
                           ctx.stroke();
                         }
                       } catch { /* skip */ }
+                    } else if (annData.note && annData.note.startsWith('[oval]')) {
+                      // Oval annotation: draw ellipse
+                      const cxPx = (annData.x / 100) * cw;
+                      const cyPx = (annData.y / 100) * ch;
+                      const rxPx = (annData.w / 2 / 100) * cw;
+                      const ryPx = ((annData.h || 3) / 2 / 100) * ch;
+                      const rad = (annData.angle || 0) * (Math.PI / 180);
+                      ctx.save();
+                      ctx.translate(cxPx, cyPx);
+                      ctx.rotate(rad);
+                      ctx.beginPath();
+                      ctx.ellipse(0, 0, rxPx, ryPx, 0, 0, 2 * Math.PI);
+                      ctx.restore();
+                      ctx.stroke();
                     } else {
-                      // Rectangle annotation: draw rotated rect
                       // Coordinates: x,y = center (%), w = line length (%), h = perpendicular width (%)
                       // In AnnotateStep SVG: x% = fraction of container width, y% = fraction of container height
                       // On canvas: convert each axis independently (x→cw, y→ch) like the SVG does
