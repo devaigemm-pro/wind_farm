@@ -678,7 +678,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                 }}
                 disabled={!selectedDefectId || role === 'supervisor'}
               >
-                {t('analyze.delete') || 'Eliminar'}
+                Eliminar
               </button>
               <button
                 style={{ ...saveBtnStyle, opacity: selectedDefectId && role !== 'supervisor' ? 1 : 0.5, cursor: selectedDefectId && role !== 'supervisor' ? 'pointer' : 'not-allowed' }}
