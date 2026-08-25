@@ -895,6 +895,14 @@ export function ExportPanel({
       if (resolvedFilter === 'unresolved') filtered = filtered.filter((d) => !d.resolved);
       filtered = filtered.filter((d) => selectedCategories.has(d.severity));
       filtered = filtered.filter((d) => selectedTypes.has(d.type));
+      // Sort by blade (A→B→C) then by category (1→5)
+      const bladeOrder: Record<string, number> = { A: 1, B: 2, C: 3 };
+      filtered.sort((a, b) => {
+        const ba = bladeOrder[a.blade] ?? 9;
+        const bb = bladeOrder[b.blade] ?? 9;
+        if (ba !== bb) return ba - bb;
+        return Number(a.severity || 0) - Number(b.severity || 0);
+      });
 
       const t = texts[language];
       const { jsPDF } = await import('jspdf');
@@ -1722,7 +1730,7 @@ export function ExportPanel({
 
       let bladeIdx = 1;
       for (const bl of bladeLetters) {
-        const bladeDefects = filtered.filter((d) => d.blade === bl).sort((a, b) => (a.severity ?? 0) - (b.severity ?? 0));
+        const bladeDefects = filtered.filter((d) => d.blade === bl).sort((a, b) => Number(a.severity || 0) - Number(b.severity || 0));
         const serial = bladeSerials[bl] || 'N/A';
 
         if (y > pageH - 160) { newPage(); y = 28; }
