@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
-import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import type { DefectDashboardRow } from '@/types';
+import { DEFECT_TYPE_DISPLAY_LABELS } from '@/types';
 
 export interface DefectEditFormProps {
   defect: DefectDashboardRow;
@@ -21,11 +21,11 @@ export interface DefectEditData {
   nextStep: string;
 }
 
+const DEFECT_TYPES = Object.values(DEFECT_TYPE_DISPLAY_LABELS);
 const BLADE_FACES = ['LE', 'TE', 'SS', 'PS'];
 
 export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEditFormProps) {
   const { t } = useLanguage();
-  const { data: annotationTypes = [] } = useAnnotationTypes();
   // Initialize directly from defect props
   const initialType = defect.type || '';
   const initialCategory = defect.category || 3;
@@ -54,12 +54,11 @@ export function DefectEditForm({ defect, onClose, onUpdate, onRemove }: DefectEd
     setNextStep(defect.nextStep || '');
   }, [defect.id, defect.type, defect.category, defect.rootDistance, defect.side, defect.notes, defect.rootCause, defect.nextStep]);
 
-  // Build type options from annotation_types (DB), ensure current type is always included
-  const typeOptions = annotationTypes.map(at => at.name);
+  // Ensure defect.type is in the options list
   const currentType = defect.type || '';
-  if (currentType && !typeOptions.includes(currentType)) {
-    typeOptions.unshift(currentType);
-  }
+  const typeOptions = DEFECT_TYPES.includes(currentType)
+    ? DEFECT_TYPES
+    : currentType ? [currentType, ...DEFECT_TYPES] : DEFECT_TYPES;
 
   // Ensure defect.side is in the options list
   const currentSide = defect.side || 'LE';
