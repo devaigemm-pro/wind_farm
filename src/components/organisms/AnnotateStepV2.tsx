@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/components/design-system';
@@ -48,6 +48,7 @@ interface ThumbnailData {
 export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampaignId, savedThumbId, savedBlade, onSelectionChange }: AnnotateStepV2Props) {
   const { role } = useAuth();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
 
   // ─── Fetch ALL inspections of the campaign ─────────────────────────────────
   const campaignId = propCampaignId ?? inspection?.campaign_id ?? null;
@@ -992,7 +993,8 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
                       await supabase.storage.from('asset-documents').remove([originalPath, `${dir}/thumb_${filename}`]);
                     }
                   }
-                  window.location.reload();
+                  await queryClient.invalidateQueries({ queryKey: ['inspection-photos'] });
+                  await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
                 } catch (err) {
                   console.error('[AnnotateStepV2] Failed to delete photo:', err);
                 }
