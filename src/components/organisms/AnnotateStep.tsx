@@ -1240,7 +1240,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           {/* ─── Blade Face Overlay (floating, top-left) ─────────────── */}
           {showBladeOverlay && (
             <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 25, pointerEvents: 'auto' }}>
-              <div style={{ background: 'var(--color-neutral-0)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '12px 16px', width: 240, position: 'relative' }}>
+              <div style={{ background: 'var(--color-neutral-0)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '12px 16px', width: 280, position: 'relative' }}>
                 {/* Header with close button */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
                   <button onClick={() => setShowBladeOverlay(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
@@ -1262,7 +1262,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       const target = targetGroup[targetIdx] || targetGroup[0];
                       if (target) handleThumbnailSelect(target.id);
                     }}
-                    style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'SS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'SS' ? '#fff' : '#00A6FF' }}
+                    style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'SS' ? '#5A8F5A' : '#f5f5f5', color: currentThumb?.face === 'SS' ? '#fff' : '#5A8F5A' }}
                   >SS</button>
                   {/* Blade shape SVG - horizontal (lying down) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1278,7 +1278,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                         const target = targetGroup[targetIdx] || targetGroup[0];
                         if (target) handleThumbnailSelect(target.id);
                       }}
-                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#00A6FF' }}
+                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'LE' ? '#5A8F5A' : '#f5f5f5', color: currentThumb?.face === 'LE' ? '#fff' : '#5A8F5A' }}
                     >LE</button>
                     <img src="/airfoil.png" alt="blade" style={{ width: 140, height: 56, objectFit: 'contain', pointerEvents: 'none' }} />
                     <button
@@ -1293,7 +1293,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                         const target = targetGroup[targetIdx] || targetGroup[0];
                         if (target) handleThumbnailSelect(target.id);
                       }}
-                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'TE' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'TE' ? '#fff' : '#00A6FF' }}
+                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'TE' ? '#5A8F5A' : '#f5f5f5', color: currentThumb?.face === 'TE' ? '#fff' : '#5A8F5A' }}
                     >TE</button>
                   </div>
                   {/* PS button - bottom */}
@@ -1309,7 +1309,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       const target = targetGroup[targetIdx] || targetGroup[0];
                       if (target) handleThumbnailSelect(target.id);
                     }}
-                    style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'PS' ? '#00A6FF' : '#f5f5f5', color: currentThumb?.face === 'PS' ? '#fff' : '#00A6FF' }}
+                    style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 4, cursor: 'pointer', background: currentThumb?.face === 'PS' ? '#5A8F5A' : '#f5f5f5', color: currentThumb?.face === 'PS' ? '#fff' : '#5A8F5A' }}
                   >PS</button>
                 </div>
               </div>
