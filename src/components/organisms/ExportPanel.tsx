@@ -982,7 +982,7 @@ export function ExportPanel({
         const portadaLoaded = await new Promise<boolean>((resolve) => {
           portadaImg.onload = () => resolve(true);
           portadaImg.onerror = () => resolve(false);
-          portadaImg.src = '/portada.jpeg';
+          portadaImg.src = '/portada.png';
         });
         if (portadaLoaded && portadaImg.naturalWidth > 0) {
           // Draw image to canvas with green overlay baked in
@@ -1038,7 +1038,7 @@ export function ExportPanel({
           coverImageLoaded = true;
         }
       } catch (e) {
-        console.warn('[ExportPanel] Could not load portada.jpeg:', e);
+        console.warn('[ExportPanel] Could not load portada.png:', e);
       }
 
       if (!coverImageLoaded) {
