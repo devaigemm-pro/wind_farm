@@ -1444,11 +1444,10 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                     style={{ transformOrigin: `${ann.x}% ${ann.y}%`, transform: `rotate(${ann.angle}deg)` }}
                   />
                 ) : (
-                  <rect
-                    x={`${minX}%`} y={`${minY}%`}
-                    width={`${Math.max(p1x, p2x, p3x, p4x) - minX}%`}
-                    height={`${maxY - minY}%`}
+                  <polygon
+                    points={`${p1x}%,${p1y}% ${p2x}%,${p2y}% ${p3x}%,${p3y}% ${p4x}%,${p4y}%`}
                     fill="none" stroke="#FF6600" strokeWidth="2.5"
+                    strokeLinejoin="miter"
                   />
                 )}
               </svg>
@@ -1511,12 +1510,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                   stroke="#FF3300" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.7"
                 />
                 {drawShape === 'rect' ? (
-                  /* Rectangle as axis-aligned rect */
-                  <rect
-                    x={`${Math.min(p1x, p2x, p3x, p4x)}%`} y={`${Math.min(p1y, p2y, p3y, p4y)}%`}
-                    width={`${Math.max(p1x, p2x, p3x, p4x) - Math.min(p1x, p2x, p3x, p4x)}%`}
-                    height={`${Math.max(p1y, p2y, p3y, p4y) - Math.min(p1y, p2y, p3y, p4y)}%`}
+                  /* Rectangle as polygon with sharp corners */
+                  <polygon
+                    points={`${p1x}%,${p1y}% ${p2x}%,${p2y}% ${p3x}%,${p3y}% ${p4x}%,${p4y}%`}
                     fill="none" stroke="#FF3300" strokeWidth="2.5"
+                    strokeLinejoin="miter"
                   />
                 ) : (
                   /* Oval — use ellipse with % center and radii in % */
