@@ -1802,6 +1802,7 @@ export function ExportPanel({
       if (includeDetails) {
         // Pre-load defect images: fetch signed URLs from DB in batch, then download in parallel
         const imageCache: Record<string, ImageWithDims> = {};
+        const annotRotationMap: Record<string, number> = {};
         try {
           const annotIds = filtered.map(d => d.id).filter(Boolean);
           if (annotIds.length > 0) {
@@ -1817,12 +1818,16 @@ export function ExportPanel({
                 // Step 2: Get storage paths for all photos
                 const { data: photos } = await (supabase as any)
                   .from('inspection_photo')
-                  .select('id, storage_path')
+                  .select('id, storage_path, metadata')
                   .in('id', thumbIds);
 
                 if (photos && photos.length > 0) {
                   const photoMap: Record<string, string> = {};
-                  for (const p of photos) if (p.storage_path) photoMap[p.id] = p.storage_path;
+                  const rotationMap: Record<string, number> = {};
+                  for (const p of photos) {
+                    if (p.storage_path) photoMap[p.id] = p.storage_path;
+                    rotationMap[p.id] = (p.metadata as any)?.rotation || 0;
+                  }
 
                   // Step 3: Generate signed URLs in batch
                   const assetPaths = Object.values(photoMap).filter((p: string) => p.startsWith('inspection-imports/'));
@@ -1842,6 +1847,9 @@ export function ExportPanel({
                     if (a.thumbnail_id && photoMap[a.thumbnail_id]) {
                       const url = signedMap[photoMap[a.thumbnail_id]!];
                       if (url) annotUrlMap[a.id] = url;
+                    }
+                    if (a.thumbnail_id) {
+                      annotRotationMap[a.id] = rotationMap[a.thumbnail_id] || 0;
                     }
                   }
 
@@ -1962,9 +1970,13 @@ export function ExportPanel({
           const cachedImg = imageCache[d.id];
           if (cachedImg) {
             // Calculate dimensions preserving aspect ratio within a bounding box
+            // Account for rotation when computing aspect ratio
+            const imgRotation = annotRotationMap[d.id] || 0;
+            const rotatedW = (imgRotation === 90 || imgRotation === 270) ? cachedImg.height : cachedImg.width;
+            const rotatedH = (imgRotation === 90 || imgRotation === 270) ? cachedImg.width : cachedImg.height;
             const maxImgW = contentW * 0.9;
             const maxImgH = 120; // max height in mm
-            const aspectRatio = cachedImg.width / cachedImg.height;
+            const aspectRatio = rotatedW / rotatedH;
             let imgW = maxImgW;
             let imgH = imgW / aspectRatio;
             if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * aspectRatio; }
@@ -1983,11 +1995,26 @@ export function ExportPanel({
                 img.src = cachedImg.dataUrl;
               });
               if (imgLoaded && img.naturalWidth > 0) {
+                const rotation = annotRotationMap?.[d.id] || 0;
                 const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
+                const origW = img.naturalWidth;
+                const origH = img.naturalHeight;
+
+                // If rotated 90/270, swap canvas dimensions
+                if (rotation === 90 || rotation === 270) {
+                  canvas.width = origH;
+                  canvas.height = origW;
+                } else {
+                  canvas.width = origW;
+                  canvas.height = origH;
+                }
+
                 const ctx = canvas.getContext('2d')!;
-                ctx.drawImage(img, 0, 0);
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate((rotation * Math.PI) / 180);
+                ctx.drawImage(img, -origW / 2, -origH / 2);
+                // Reset transform for annotation overlay
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
 
                 // Draw annotation overlay (red rectangle based on annotation coords)
                 // Get annotation data for this defect
