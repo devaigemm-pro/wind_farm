@@ -661,6 +661,26 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
               <button style={clearBtnStyle} onClick={handleClear}>{t('analyze.clear')}</button>
               <button
+                style={{ ...clearBtnStyle, color: '#F15959', borderColor: '#F15959' }}
+                onClick={async () => {
+                  if (!selectedDefectId) return;
+                  try {
+                    // Delete annotation from DB
+                    await deleteAnnotation.mutateAsync(selectedDefectId);
+                    // Also delete associated defect record if exists
+                    const db = supabase as any;
+                    await db.from('defect').delete().eq('description', selectedDefectId);
+                    await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
+                    handleClear();
+                  } catch (err) {
+                    console.error('[AnalyzeStep] Failed to delete:', err);
+                  }
+                }}
+                disabled={!selectedDefectId || role === 'supervisor'}
+              >
+                {t('analyze.delete') || 'Eliminar'}
+              </button>
+              <button
                 style={{ ...saveBtnStyle, opacity: selectedDefectId && role !== 'supervisor' ? 1 : 0.5, cursor: selectedDefectId && role !== 'supervisor' ? 'pointer' : 'not-allowed' }}
                 onClick={handleSaveDefect}
                 disabled={!selectedDefectId || saveStatus === 'saving' || role === 'supervisor'}
