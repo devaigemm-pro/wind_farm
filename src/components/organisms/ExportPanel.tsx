@@ -1009,42 +1009,7 @@ export function ExportPanel({
           // Draw the original image
           ctx.drawImage(portadaImg, 0, 0);
           
-          // Draw green scan beam from the drone to the turbine hub
-          // The drone in portada.jpeg is in the upper area of the image
-          const cw = canvas.width;
-          const ch = canvas.height;
-          const droneX = cw * 0.30;  // drone position in portada.jpeg
-          const droneY = ch * 0.18;
-          const hubX = cw * 0.50;    // turbine hub center
-          const hubY = ch * 0.55;
-          const beamWidth = cw * 0.14; // beam spread at target
-          
-          // Draw cone/triangle beam — more intense green
-          const gradient = ctx.createLinearGradient(droneX, droneY, hubX, hubY);
-          gradient.addColorStop(0, 'rgba(0, 230, 60, 0.85)');
-          gradient.addColorStop(0.3, 'rgba(0, 210, 50, 0.5)');
-          gradient.addColorStop(0.7, 'rgba(0, 200, 40, 0.25)');
-          gradient.addColorStop(1, 'rgba(0, 180, 30, 0.08)');
-          
-          ctx.beginPath();
-          ctx.moveTo(droneX, droneY);
-          ctx.lineTo(hubX - beamWidth, hubY);
-          ctx.lineTo(hubX + beamWidth, hubY);
-          ctx.closePath();
-          ctx.fillStyle = gradient;
-          ctx.fill();
-          
-          // Beam edge lines
-          ctx.strokeStyle = 'rgba(0, 230, 60, 0.5)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(droneX, droneY);
-          ctx.lineTo(hubX - beamWidth, hubY);
-          ctx.moveTo(droneX, droneY);
-          ctx.lineTo(hubX + beamWidth, hubY);
-          ctx.stroke();
-
-          // Apply green overlay with opacity
+          // Apply subtle overlay
           ctx.fillStyle = 'rgba(90, 143, 90, 0.55)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           // Convert to JPEG base64
