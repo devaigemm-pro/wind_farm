@@ -977,7 +977,6 @@ export function AnnotateStepV2({ inspectionId, inspection, campaignId: propCampa
             {role !== 'supervisor' && (
               <button className="flex items-center justify-center w-8 h-[30px] border border-red-400 rounded bg-transparent cursor-pointer p-0" title={t('annotate.deletePhoto')} onClick={async () => {
                 if (!selectedThumbnail) return;
-                if (!window.confirm(t('annotate.confirmDeletePhoto') || 'Are you sure you want to delete this photo?')) return;
                 try {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const db = supabase as any;
