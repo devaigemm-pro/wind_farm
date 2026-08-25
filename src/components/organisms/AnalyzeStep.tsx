@@ -143,7 +143,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
           return Math.round(a.y * 0.43 * 10) / 10;
         })(),
         size: `${Math.round(a.w)} x ${Math.round(a.h)} cm`,
-        note: a.note,
+        note: a.note.replace(/^\[oval\]/, '').replace(/^\[pencil\].*?\|\|\|/, '').replace(/^\[pencil\].*$/, ''),
         rootCause: a.rootCause || '',
         nextStep: a.nextStep || '',
         thumbnailUrl: photoLookup[a.thumbnailId]?.storagePath
