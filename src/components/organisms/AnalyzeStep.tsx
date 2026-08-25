@@ -661,7 +661,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
               <button style={clearBtnStyle} onClick={handleClear}>{t('analyze.clear')}</button>
               <button
-                style={{ ...clearBtnStyle, color: '#F15959', borderColor: '#F15959' }}
+                style={{ ...clearBtnStyle, color: '#5A8F5A', borderColor: '#5A8F5A' }}
                 onClick={async () => {
                   if (!selectedDefectId) return;
                   try {
@@ -678,7 +678,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                 }}
                 disabled={!selectedDefectId || role === 'supervisor'}
               >
-                Eliminar
+                ELIMINAR
               </button>
               <button
                 style={{ ...saveBtnStyle, opacity: selectedDefectId && role !== 'supervisor' ? 1 : 0.5, cursor: selectedDefectId && role !== 'supervisor' ? 'pointer' : 'not-allowed' }}
@@ -1030,9 +1030,9 @@ const catBtnActiveStyle: React.CSSProperties = {
 
 const clearBtnStyle: React.CSSProperties = {
   padding: '8px 20px',
-  background: '#E0E0E0',
-  color: C.text,
-  border: 'none',
+  background: 'transparent',
+  color: '#5A8F5A',
+  border: '1px solid #5A8F5A',
   borderRadius: 4,
   fontSize: 12,
   fontWeight: 700,
