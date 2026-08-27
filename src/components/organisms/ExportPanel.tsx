@@ -884,6 +884,13 @@ export function ExportPanel({
           storage_path: `reports/${inspectionId}/${Date.now()}.pdf`,
         });
       }
+      // Idempotent & self-correcting: always advance stage to 'report' explicitly.
+      // Don't rely solely on the DB trigger — the guard (.neq) prevents redundant
+      // writes and recovers any inspection left behind on an earlier stage.
+      await (supabase as any).from('inspection')
+        .update({ stage: 'report' })
+        .eq('id', inspectionId)
+        .neq('stage', 'report');
     } catch (e) {
       console.error('[ExportPanel] report insert error:', e);
     }

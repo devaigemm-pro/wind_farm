@@ -121,20 +121,16 @@ export const annotationsService = {
 
     if (error) throw new Error(error.message);
 
-    // Transition inspection stage to 'annotate' if this is the first annotation
+    // Transition inspection stage to 'annotate'. Idempotent & self-correcting:
+    // we always attempt the update on every annotation create. The stage guard
+    // (.in) prevents regressions, so this recovers any missed transition (e.g.
+    // if the first annotation failed to advance the stage).
     try {
-      const { count } = await supabase
-        .from('annotation')
-        .select('id', { count: 'exact', head: true })
-        .eq('inspection_id', input.inspectionId);
-
-      if (count === 1) {
-        await supabase
-          .from('inspection')
-          .update({ stage: 'annotate' })
-          .eq('id', input.inspectionId)
-          .in('stage', ['planned', 'inspect']);
-      }
+      await supabase
+        .from('inspection')
+        .update({ stage: 'annotate' })
+        .eq('id', input.inspectionId)
+        .in('stage', ['planned', 'inspect']);
     } catch (stageError) {
       console.error('[annotations.service] Failed to update inspection stage:', stageError);
     }

@@ -185,20 +185,16 @@ export const defectsService = {
 
     if (error) throw new DefectServiceError(error.message, error.code);
 
-    // Transition inspection stage to 'analyze' if this is the first defect
+    // Transition inspection stage to 'analyze'. Idempotent & self-correcting:
+    // we always attempt the update on every defect create. The stage guard
+    // (.in) prevents regressions, so this recovers any missed transition (e.g.
+    // if the first defect failed to advance the stage).
     try {
-      const { count } = await supabase
-        .from('defect')
-        .select('id', { count: 'exact', head: true })
-        .eq('inspection_id', input.inspection_id);
-
-      if (count === 1) {
-        await supabase
-          .from('inspection')
-          .update({ stage: 'analyze' })
-          .eq('id', input.inspection_id)
-          .in('stage', ['planned', 'inspect', 'annotate']);
-      }
+      await supabase
+        .from('inspection')
+        .update({ stage: 'analyze' })
+        .eq('id', input.inspection_id)
+        .in('stage', ['planned', 'inspect', 'annotate']);
     } catch (stageError) {
       console.error('[defects.service] Failed to update inspection stage:', stageError);
     }
