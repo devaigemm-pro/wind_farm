@@ -711,6 +711,8 @@ export const translations: TranslationMap = {
   'analyze.saving': { en: 'SAVING...', es: 'GUARDANDO...' },
   'analyze.saved': { en: '✓ SAVED', es: '✓ GUARDADO' },
   'analyze.saveAsDefect': { en: 'SAVE AS DEFECT', es: 'GUARDAR COMO DEFECTO' },
+  'analyze.markAnalyzed': { en: 'MARK AS ANALYZED', es: 'MARCAR COMO ANALIZADO' },
+  'analyze.removing': { en: 'REMOVING...', es: 'ELIMINANDO...' },
   'analyze.summaryTitle': { en: 'Summary and Reviews', es: 'Resumen y Revisiones' },
   'analyze.noConfirmed': { en: 'No confirmed defects yet', es: 'Sin defectos confirmados aún' },
 

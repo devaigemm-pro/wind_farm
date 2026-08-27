@@ -687,6 +687,13 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
               >
                 {saveStatus === 'saving' ? t('analyze.saving') : saveStatus === 'saved' ? t('analyze.saved') : t('analyze.saveAsDefect')}
               </button>
+              <button
+                style={{ ...saveBtnStyle, opacity: selectedDefectId && role !== 'supervisor' && !markingAnalyzed ? 1 : 0.5, cursor: selectedDefectId && role !== 'supervisor' && !markingAnalyzed ? 'pointer' : 'not-allowed' }}
+                onClick={handleMarkAsAnalyzed}
+                disabled={!selectedDefectId || role === 'supervisor' || markingAnalyzed}
+              >
+                {markingAnalyzed ? t('analyze.removing') : t('analyze.markAnalyzed')}
+              </button>
             </div>
           </div>
         </div>
@@ -778,22 +785,6 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
             </div>
           </div>
 
-          {/* Mark as analyzed button — deletes selected annotation */}
-          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              style={{
-                ...saveBtnStyle,
-                padding: '10px 24px',
-                fontSize: 13,
-                opacity: selectedDefectId && role !== 'supervisor' && !markingAnalyzed ? 1 : 0.5,
-                cursor: selectedDefectId && role !== 'supervisor' && !markingAnalyzed ? 'pointer' : 'not-allowed',
-              }}
-              onClick={handleMarkAsAnalyzed}
-              disabled={!selectedDefectId || role === 'supervisor' || markingAnalyzed}
-            >
-              {markingAnalyzed ? 'REMOVING...' : 'MARK AS ANALYZED'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
