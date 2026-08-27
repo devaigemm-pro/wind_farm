@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Download, Search, ChevronUp, ChevronDown, Loader2, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/atoms/Skeleton';
 import { EmptyState } from '@/components/molecules';
@@ -17,6 +18,7 @@ export function Reports() {
   const { data: rows, isLoading } = useFinalizedInspections();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
 
   // State
   const [search, setSearch] = useState('');
@@ -118,7 +120,6 @@ export function Reports() {
 
   const handleRemove = async (e: React.MouseEvent, row: InspectionReportRow) => {
     e.stopPropagation();
-    if (!confirm('¿Eliminar este reporte de la lista?')) return;
     try {
       // 1. Fetch the report rows linked to this inspection so we can clean up
       //    their PDFs from storage before deleting the DB records.
@@ -139,15 +140,17 @@ export function Reports() {
       // 3. Delete the report records so no orphans remain.
       await (supabase as any).from('report').delete().eq('reference_id', row.id);
 
-      // 4. Send the inspection back to the 'analyze' stage.
+      // 4. Send the inspection back to the 'analyze' stage so it no longer
+      //    matches stage='report' in the finalized-inspections listing.
       await (supabase as any).from('inspection')
         .update({ stage: 'analyze', completed_at: null })
         .eq('id', row.id);
 
-      // Refresh the list
-      window.location.reload();
+      // 5. Refresh the list by invalidating the react-query cache instead of
+      //    reloading the whole page.
+      await queryClient.invalidateQueries({ queryKey: ['finalized-inspections'] });
     } catch {
-      alert('Error al eliminar.');
+      // Silent: the user prefers a frictionless flow.
     }
   };
 
