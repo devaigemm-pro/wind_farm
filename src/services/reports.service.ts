@@ -30,6 +30,14 @@ export const reportsService = {
         scheduled_date,
         completed_at,
         stage,
+        turbine:turbine_id (
+          id,
+          name,
+          wind_farm:wind_farm_id (
+            id,
+            name
+          )
+        ),
         blade:blade_id (
           id,
           position,
@@ -95,7 +103,10 @@ export const reportsService = {
     // Build result rows
     return inspections.map((insp) => {
       const blade = insp.blade as any;
-      const turbine = blade?.turbine;
+      // Prefer the turbine linked directly to the inspection (turbine_id).
+      // Fall back to the turbine reached through the blade relation for
+      // inspections created per-blade (blade_id set).
+      const turbine = (insp as any).turbine ?? blade?.turbine;
       const windFarm = turbine?.wind_farm;
 
       return {

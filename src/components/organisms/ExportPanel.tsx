@@ -2124,6 +2124,28 @@ export function ExportPanel({
           const { data: userData } = await supabase.auth.getUser();
           const userId = userData.user?.id;
           if (userId) {
+            // Remove any previous report(s) for this inspection so only the
+            // most recent one remains (both storage PDFs and DB records).
+            try {
+              const { data: prevReports } = await (supabase as any)
+                .from('report')
+                .select('storage_path')
+                .eq('reference_id', inspectionId);
+
+              const pathsToRemove = (prevReports || [])
+                .map((r: { storage_path: string | null }) => r.storage_path)
+                .filter((p: string | null): p is string => !!p && !p.startsWith('pending/'));
+
+              if (pathsToRemove.length > 0) {
+                await supabase.storage.from('reports').remove(pathsToRemove);
+              }
+
+              await (supabase as any)
+                .from('report')
+                .delete()
+                .eq('reference_id', inspectionId);
+            } catch { /* ignore cleanup errors */ }
+
             const filename = `Inspection_${windFarmName}_${turbineName}_${Date.now()}.pdf`;
             const storagePath = `${inspectionId}/${filename}`;
 
