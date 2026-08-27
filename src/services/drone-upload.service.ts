@@ -56,24 +56,8 @@ export const droneUploadService = {
       throw new DroneUploadServiceError(`DB insert failed: ${error.message}`, error.code);
     }
 
-    // Transition inspection stage to 'inspect' if this is the first photo
-    try {
-      const { data: insp } = await db
-        .from('inspection')
-        .select('id, stage')
-        .eq('campaign_id', payload.campaignId)
-        .single();
-
-      if (insp && insp.stage === 'planned') {
-        await db
-          .from('inspection')
-          .update({ stage: 'inspect' })
-          .eq('id', insp.id)
-          .eq('stage', 'planned');
-      }
-    } catch (stageError) {
-      console.error('[drone-upload.service] Failed to update inspection stage:', stageError);
-    }
+    // Transition the specific inspection (this photo's turbine) from 'planned' to 'inspect'.
+    await transitionInspectionsToInspect(payload.campaignId, [payload.bladeId]);
 
     return mapPhotoRow(data);
   },
@@ -104,6 +88,16 @@ export const droneUploadService = {
 
     if (error) {
       throw new DroneUploadServiceError(`Batch insert failed: ${error.message}`, error.code);
+    }
+
+    // Transition each affected inspection (grouped by campaign + turbine) to 'inspect'.
+    const byCampaign = new Map<string, Set<string>>();
+    for (const p of photos) {
+      if (!byCampaign.has(p.campaignId)) byCampaign.set(p.campaignId, new Set());
+      byCampaign.get(p.campaignId)!.add(p.bladeId);
+    }
+    for (const [campaignId, bladeIds] of byCampaign) {
+      await transitionInspectionsToInspect(campaignId, [...bladeIds]);
     }
 
     return (data ?? []).map(mapPhotoRow);
@@ -242,6 +236,64 @@ export const droneUploadService = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Transition the inspections associated with the given blades (in a campaign)
+ * from stage 'planned' to 'inspect'.
+ *
+ * Match path: photo.blade_id → blade.turbine_id → inspection (campaign_id + turbine_id).
+ * Each inspection is tied to a single turbine, so a campaign with multiple turbines
+ * has multiple inspections. We update ONLY the inspections whose turbine matches the
+ * uploaded photos, guarded by .eq('stage','planned') so more advanced stages
+ * (annotate/analyze/report) are never rolled back.
+ *
+ * Never throws: stage transition failures are logged and swallowed so they don't
+ * break the photo upload flow.
+ */
+async function transitionInspectionsToInspect(
+  campaignId: string,
+  bladeIds: string[],
+): Promise<void> {
+  try {
+    const uniqueBladeIds = [...new Set(bladeIds.filter(Boolean))];
+    if (uniqueBladeIds.length === 0) return;
+
+    // Resolve blade_id → turbine_id
+    const { data: blades, error: bladeErr } = await db
+      .from('blade')
+      .select('id, turbine_id')
+      .in('id', uniqueBladeIds);
+
+    if (bladeErr) {
+      console.error('[drone-upload.service] Failed to resolve blades for stage transition:', bladeErr);
+      return;
+    }
+
+    const turbineIds = [
+      ...new Set(
+        ((blades ?? []) as Array<{ turbine_id: string | null }>)
+          .map((b) => b.turbine_id)
+          .filter((t): t is string => Boolean(t)),
+      ),
+    ];
+
+    if (turbineIds.length === 0) return;
+
+    // Update only the inspections for this campaign + these turbines that are still 'planned'.
+    const { error: updateErr } = await db
+      .from('inspection')
+      .update({ stage: 'inspect' })
+      .eq('campaign_id', campaignId)
+      .in('turbine_id', turbineIds)
+      .eq('stage', 'planned');
+
+    if (updateErr) {
+      console.error('[drone-upload.service] Failed to update inspection stage:', updateErr);
+    }
+  } catch (stageError) {
+    console.error('[drone-upload.service] Failed to update inspection stage:', stageError);
+  }
+}
 
 function mapPhotoRow(row: unknown): InspectionPhoto {
   const r = row as Record<string, unknown>;
