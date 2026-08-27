@@ -869,21 +869,12 @@ export function ExportPanel({
     setIsGenerating(true);
     setGenerateError(null);
 
-    // Transition inspection stage to 'report' immediately
+    // Transition inspection stage to 'report' immediately.
+    // NOTE: the real `report` record (with the uploaded PDF storage_path) is
+    // inserted later in the background block once the file has been uploaded.
+    // We intentionally do NOT insert a placeholder report here to avoid
+    // duplicated rows in the `report` table.
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (userId) {
-        // Insert report record — DB trigger will change stage to 'report'
-        await (supabase as any).from('report').insert({
-          reference_id: inspectionId,
-          type: 'inspection',
-          generated_by: userId,
-          generated_at: new Date().toISOString(),
-          filename: `report_${inspectionId}.pdf`,
-          storage_path: `reports/${inspectionId}/${Date.now()}.pdf`,
-        });
-      }
       // Idempotent & self-correcting: always advance stage to 'report' explicitly.
       // Don't rely solely on the DB trigger — the guard (.neq) prevents redundant
       // writes and recovers any inspection left behind on an earlier stage.
@@ -892,7 +883,7 @@ export function ExportPanel({
         .eq('id', inspectionId)
         .neq('stage', 'report');
     } catch (e) {
-      console.error('[ExportPanel] report insert error:', e);
+      console.error('[ExportPanel] stage update error:', e);
     }
 
     try {
