@@ -1404,13 +1404,14 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                       </div>
                     </div>
                     {/* SVG closed polygon with semi-transparent orange fill */}
-                    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                       <polygon
-                        points={points.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                        points={points.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="rgba(255,102,0,0.08)"
                         stroke="#FF6600"
                         strokeWidth="2.5"
                         strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
                       />
                     </svg>
                   </div>
@@ -1570,11 +1571,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
           {/* Pencil live building preview — polygon under construction (click to add vertices) */}
           {drawShape === 'pencil' && !drawConfirmed && drawingPoints.length >= 1 && (
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
               {/* Filled area preview once there are 3+ vertices */}
               {drawingPoints.length >= 3 && (
                 <polygon
-                  points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                  points={drawingPoints.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="rgba(255,102,0,0.08)"
                   stroke="none"
                 />
@@ -1582,23 +1583,29 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               {/* Open polyline connecting placed vertices in order */}
               {drawingPoints.length >= 2 && (
                 <polyline
-                  points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                  points={drawingPoints.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="none"
                   stroke="#FF6600"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
                 />
               )}
               {/* Dashed segment hinting the closing edge (last → first) */}
               {drawingPoints.length >= 3 && (
                 <line
-                  x1={`${drawingPoints[drawingPoints.length - 1]!.x}%`} y1={`${drawingPoints[drawingPoints.length - 1]!.y}%`}
-                  x2={`${drawingPoints[0]!.x}%`} y2={`${drawingPoints[0]!.y}%`}
+                  x1={drawingPoints[drawingPoints.length - 1]!.x} y1={drawingPoints[drawingPoints.length - 1]!.y}
+                  x2={drawingPoints[0]!.x} y2={drawingPoints[0]!.y}
                   stroke="#FF6600" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6"
+                  vectorEffect="non-scaling-stroke"
                 />
               )}
-              {/* Draggable vertex handles */}
+            </svg>
+          )}
+          {/* Vertex handles rendered in a separate SVG (percent coords keep them round) */}
+          {drawShape === 'pencil' && !drawConfirmed && drawingPoints.length >= 1 && (
+            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
               {drawingPoints.map((p, i) => (
                 <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="4" fill="#fff" stroke="#FF6600" strokeWidth="2" />
               ))}
@@ -1607,19 +1614,24 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
           {/* Pencil confirmed preview (polygon closed, popover open — also used when editing) */}
           {drawShape === 'pencil' && drawConfirmed && drawingPoints.length >= 3 && (
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-              <polygon
-                points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
-                fill="rgba(255,102,0,0.08)"
-                stroke="#FF6600"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-              />
-              {/* Draggable vertex handles */}
-              {drawingPoints.map((p, i) => (
-                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="4" fill="#fff" stroke="#FF6600" strokeWidth="2" />
-              ))}
-            </svg>
+            <>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                <polygon
+                  points={drawingPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                  fill="rgba(255,102,0,0.08)"
+                  stroke="#FF6600"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              {/* Draggable vertex handles (percent coords keep them round) */}
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                {drawingPoints.map((p, i) => (
+                  <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="4" fill="#fff" stroke="#FF6600" strokeWidth="2" />
+                ))}
+              </svg>
+            </>
           )}
 
           </div>{/* end annotation layer */}
