@@ -2016,7 +2016,7 @@ export function ExportPanel({
                     ctx.lineJoin = 'round';
 
                     if (annData.note && annData.note.startsWith('[pencil]')) {
-                      // Pencil annotation: draw polyline
+                      // Pencil annotation: draw closed polygon (orange border + semi-transparent fill)
                       try {
                         const pointsJson = annData.note.replace('[pencil]', '').split('|||')[0] || '[]';
                         const points: { x: number; y: number }[] = JSON.parse(pointsJson);
@@ -2026,7 +2026,16 @@ export function ExportPanel({
                           for (let i = 1; i < points.length; i++) {
                             ctx.lineTo(points[i]!.x / 100 * cw, points[i]!.y / 100 * ch);
                           }
+                          // Close the polygon (connect last vertex back to the first)
+                          ctx.closePath();
+                          const prevStroke = ctx.strokeStyle;
+                          const prevFill = ctx.fillStyle;
+                          ctx.fillStyle = 'rgba(255,102,0,0.08)';
+                          ctx.strokeStyle = '#FF6600';
+                          ctx.fill();
                           ctx.stroke();
+                          ctx.strokeStyle = prevStroke;
+                          ctx.fillStyle = prevFill;
                         }
                       } catch { /* skip */ }
                     } else if (annData.note && annData.note.startsWith('[oval]')) {
