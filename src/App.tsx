@@ -67,6 +67,9 @@ const CampaignResultsPage = lazy(() =>
 const CampaignUploadStatusPage = lazy(() =>
   import('@/pages/CampaignUploadStatus').then((m) => ({ default: m.CampaignUploadStatus })),
 );
+const UploadsPage = lazy(() =>
+  import('@/pages/UploadsPage').then((m) => ({ default: m.UploadsPage })),
+);
 const OngoingInspectionsPage = lazy(() => {
   const { newLayout } = getFeatureFlags();
   return newLayout
@@ -171,7 +174,7 @@ function AppRoutes() {
         <Route path="/assets" element={<AssetsPage />} />
         <Route path="/inspections" element={<InspectionsPage />} />
         <Route path="/inspections/new" element={<NewInspectionPage />} />
-        <Route path="/inspections/upload" element={<InspectionsPage />} />
+        <Route path="/inspections/upload" element={<UploadsPage />} />
         <Route path="/inspections/ongoing" element={<OngoingInspectionsPage />} />
         <Route path="/inspections/reports" element={<ReportsPage />} />
         <Route path="/inspections/:id/workflow" element={<InspectionWorkflowPage />} />

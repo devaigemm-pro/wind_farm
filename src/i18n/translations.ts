@@ -479,6 +479,23 @@ export const translations: TranslationMap = {
   'uploadStatus.closeViewer': { en: 'Close viewer', es: 'Cerrar visor' },
   'uploadStatus.photos': { en: 'photos', es: 'fotos' },
 
+  // ─── Uploads / Cargas view (/inspections/upload) ────────────────────────────
+  'page.uploads': { en: 'Uploads', es: 'Cargas' },
+  'uploads.turbine': { en: 'Inspection / Turbine', es: 'Inspección / Turbina' },
+  'uploads.farm': { en: 'Wind Farm', es: 'Parque' },
+  'uploads.photos': { en: 'Photos', es: 'Fotos' },
+  'uploads.uploadedBy': { en: 'Uploaded by', es: 'Cargado por' },
+  'uploads.date': { en: 'Date', es: 'Fecha' },
+  'uploads.status': { en: 'Status', es: 'Estado' },
+  'uploads.statusInProgress': { en: 'In progress', es: 'En progreso' },
+  'uploads.statusUploaded': { en: 'Uploaded', es: 'Cargadas' },
+  'uploads.noFound': { en: 'No uploads found', es: 'No hay cargas' },
+  'uploads.noFoundDesc': {
+    en: 'Photo syncs from the drone agent will appear here.',
+    es: 'Las sincronizaciones de fotos del agente de drone aparecerán aquí.',
+  },
+  'uploads.moreTurbines': { en: 'more', es: 'más' },
+
   // ─── Annotate Step (additional) ─────────────────────────────────────────────
   'annotate.blade': { en: 'Blade: ', es: 'Pala: ' },
   'annotate.side': { en: 'Side: ', es: 'Cara: ' },
