@@ -240,6 +240,8 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [drawWidth, setDrawWidth] = useState(3); // perpendicular width in % units
   const [drawShape, setDrawShape] = useState<'rect' | 'oval' | 'pencil'>('rect');
   const isMouseDownRef = useRef(false);
+  // Pencil polygon: index of the vertex currently being dragged (-1 = none)
+  const draggingVertexRef = useRef<number>(-1);
   const viewerImgRef = useRef<HTMLImageElement | null>(null);
   const viewerContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -446,6 +448,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           setDrawingPoints([]);
           setIsDrawing(false);
           isMouseDownRef.current = false;
+          draggingVertexRef.current = -1;
         }
       }
     };
@@ -1015,7 +1018,10 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
           }}
           onContextMenu={(e) => { if (zoomLevel > 1) e.preventDefault(); }}
           onMouseDown={(e) => {
-            if (showAnnotationPopover) return;
+            // While the annotation popover is open we still allow dragging pencil
+            // polygon vertices (to fine-tune the shape), but block everything else.
+            const pencilEditActive = drawShape === 'pencil' && drawConfirmed && drawingPoints.length >= 3;
+            if (showAnnotationPopover && !pencilEditActive) return;
             // Middle mouse or right click = pan when zoomed
             if ((e.button === 1 || e.button === 2) && zoomLevel > 1) {
               e.preventDefault();
@@ -1038,12 +1044,28 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setDrawPhase('idle');
               setShowAnnotationPopover(true);
             } else if (drawShape === 'pencil') {
-              // Pencil mode: start collecting points
+              // Pencil mode: polygon by clicks.
+              // Mousedown on an existing vertex → start dragging it.
+              // Otherwise → add a new vertex (only while still building, popover closed).
               isMouseDownRef.current = true;
-              setDrawingPoints([{ x: imgX, y: imgY }]);
-              setIsDrawing(true);
-              setDrawPhase('drawing-line');
-              setShowEditPopover(false);
+              const TOL = 1.5; // % tolerance to grab a vertex
+              const hitIdx = drawingPoints.findIndex(p =>
+                Math.sqrt((imgX - p.x) ** 2 + (imgY - p.y) ** 2) <= TOL
+              );
+              if (hitIdx !== -1) {
+                // Begin dragging this existing vertex (works both while building and while editing)
+                draggingVertexRef.current = hitIdx;
+                setIsDrawing(true);
+                setDrawPhase('drawing-line');
+              } else if (!showAnnotationPopover) {
+                // Add a new vertex to the polygon (only while building)
+                setShowEditPopover(false);
+                draggingVertexRef.current = -1;
+                setDrawingPoints(pts => [...pts, { x: imgX, y: imgY }]);
+                setIsDrawing(true);
+                setDrawPhase('drawing-line');
+                setDrawConfirmed(false);
+              }
             } else {
               // Start drawing a new line (Phase 1)
               isMouseDownRef.current = true;
@@ -1070,16 +1092,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const imgX = Math.max(0, Math.min(100, ((rawX - imgRect.offsetX - imgRect.width / 2 - panOffset.x) / zoomLevel + imgRect.width / 2) / imgRect.width * 100));
             const imgY = Math.max(0, Math.min(100, ((rawY - imgRect.offsetY - imgRect.height / 2 - panOffset.y) / zoomLevel + imgRect.height / 2) / imgRect.height * 100));
 
-            if (drawShape === 'pencil' && isDrawing && isMouseDownRef.current) {
-              // Pencil mode: add point (with min distance threshold to avoid too many points)
-              const lastPt = drawingPoints[drawingPoints.length - 1];
-              if (lastPt) {
-                const dist = Math.sqrt((imgX - lastPt.x) ** 2 + (imgY - lastPt.y) ** 2);
-                if (dist > 0.5) { // min 0.5% distance between points
-                  setDrawingPoints(pts => [...pts, { x: imgX, y: imgY }]);
-                }
-              }
-            } else if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current) {
+            if (drawShape === 'pencil' && isMouseDownRef.current && draggingVertexRef.current !== -1) {
+              // Pencil mode: dragging an existing vertex → reposition it
+              const vi = draggingVertexRef.current;
+              setDrawingPoints(pts => pts.map((p, i) => (i === vi ? { x: imgX, y: imgY } : p)));
+            } else if (drawPhase === 'drawing-line' && drawStart && isMouseDownRef.current && drawShape !== 'pencil') {
               // Phase 1: update line endpoint as user drags (only while button held)
               setDrawEnd({ x: imgX, y: imgY });
             } else if (drawPhase === 'expanding' && drawStart && drawEnd) {
@@ -1107,33 +1124,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               panStartRef.current = null;
               return;
             }
-            // Pencil mode: finish polyline and open popover
-            if (drawShape === 'pencil' && isDrawing && drawingPoints.length >= 2) {
-              setIsDrawing(false);
-              setDrawPhase('idle');
-              // Compute bounding box for storage (x,y = center, w,h = bounding dims)
-              const xs = drawingPoints.map(p => p.x);
-              const ys = drawingPoints.map(p => p.y);
-              const minX = Math.min(...xs);
-              const maxX = Math.max(...xs);
-              const minY = Math.min(...ys);
-              const maxY = Math.max(...ys);
-              const cx = (minX + maxX) / 2;
-              const cy = (minY + maxY) / 2;
-              setDrawStart({ x: minX, y: minY });
-              setDrawEnd({ x: maxX, y: maxY });
-              setDrawConfirmed(true);
-              setShowAnnotationPopover(true);
-              return;
-            } else if (drawShape === 'pencil' && isDrawing) {
-              // Too few points, cancel
-              setIsDrawing(false);
-              setDrawingPoints([]);
+            // Pencil mode: mouseup just ends a vertex drag (if any). Polygon is
+            // closed/confirmed via double-click (see onDoubleClick handler).
+            if (drawShape === 'pencil') {
+              draggingVertexRef.current = -1;
               setDrawPhase('idle');
               return;
             }
             // End of line drawing → transition to expanding phase (only for rect/oval)
-            if (drawShape !== 'pencil' && drawPhase === 'drawing-line' && drawStart && drawEnd) {
+            if (drawPhase === 'drawing-line' && drawStart && drawEnd) {
               const dx = drawEnd.x - drawStart.x;
               const dy = drawEnd.y - drawStart.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1152,6 +1151,42 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               setIsPanning(false);
               panStartRef.current = null;
             }
+          }}
+          onDoubleClick={(e) => {
+            if (role === 'supervisor') return;
+            if (drawShape !== 'pencil') return;
+            if (showAnnotationPopover) return;
+            e.preventDefault();
+            // A double-click adds two near-identical vertices via the two mousedowns.
+            // Deduplicate consecutive vertices that are essentially the same point.
+            const DEDUP = 1.5; // % distance under which points are considered duplicates
+            const deduped: { x: number; y: number }[] = [];
+            for (const p of drawingPoints) {
+              const last = deduped[deduped.length - 1];
+              if (!last || Math.sqrt((p.x - last.x) ** 2 + (p.y - last.y) ** 2) > DEDUP) {
+                deduped.push(p);
+              }
+            }
+            // Need at least 3 vertices to form a closed polygon
+            if (deduped.length < 3) {
+              return;
+            }
+            draggingVertexRef.current = -1;
+            isMouseDownRef.current = false;
+            setDrawingPoints(deduped);
+            setIsDrawing(false);
+            setDrawPhase('idle');
+            // Compute bounding box for storage (x,y = center, w,h = bounding dims)
+            const xs = deduped.map(p => p.x);
+            const ys = deduped.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            setDrawStart({ x: minX, y: minY });
+            setDrawEnd({ x: maxX, y: maxY });
+            setDrawConfirmed(true);
+            setShowAnnotationPopover(true);
           }}
         >
           {currentThumb ? (
@@ -1368,19 +1403,15 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
                         )}
                       </div>
                     </div>
-                    {/* SVG polyline */}
+                    {/* SVG closed polygon with semi-transparent orange fill */}
                     <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-                      <polyline
+                      <polygon
                         points={points.map(p => `${p.x}%,${p.y}%`).join(' ')}
-                        fill="none"
+                        fill="rgba(255,102,0,0.08)"
                         stroke="#FF6600"
                         strokeWidth="2.5"
-                        strokeLinecap="round"
                         strokeLinejoin="round"
                       />
-                      {points.map((p, i) => (
-                        <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="2.5" fill="#FF6600" opacity="0.7" />
-                      ))}
                     </svg>
                   </div>
                 );
@@ -1537,37 +1568,56 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             );
           })()}
 
-          {/* Pencil live drawing preview */}
-          {drawShape === 'pencil' && isDrawing && drawingPoints.length >= 2 && (
+          {/* Pencil live building preview — polygon under construction (click to add vertices) */}
+          {drawShape === 'pencil' && !drawConfirmed && drawingPoints.length >= 1 && (
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-              <polyline
-                points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
-                fill="none"
-                stroke="#FF3300"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Draw angle indicator dots at each vertex */}
+              {/* Filled area preview once there are 3+ vertices */}
+              {drawingPoints.length >= 3 && (
+                <polygon
+                  points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                  fill="rgba(255,102,0,0.08)"
+                  stroke="none"
+                />
+              )}
+              {/* Open polyline connecting placed vertices in order */}
+              {drawingPoints.length >= 2 && (
+                <polyline
+                  points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
+                  fill="none"
+                  stroke="#FF6600"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+              {/* Dashed segment hinting the closing edge (last → first) */}
+              {drawingPoints.length >= 3 && (
+                <line
+                  x1={`${drawingPoints[drawingPoints.length - 1]!.x}%`} y1={`${drawingPoints[drawingPoints.length - 1]!.y}%`}
+                  x2={`${drawingPoints[0]!.x}%`} y2={`${drawingPoints[0]!.y}%`}
+                  stroke="#FF6600" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6"
+                />
+              )}
+              {/* Draggable vertex handles */}
               {drawingPoints.map((p, i) => (
-                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="2" fill="#FF3300" opacity="0.6" />
+                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="4" fill="#fff" stroke="#FF6600" strokeWidth="2" />
               ))}
             </svg>
           )}
 
-          {/* Pencil confirmed preview (after mouseup, before save) */}
-          {drawShape === 'pencil' && !isDrawing && drawConfirmed && drawingPoints.length >= 2 && (
+          {/* Pencil confirmed preview (polygon closed, popover open — also used when editing) */}
+          {drawShape === 'pencil' && drawConfirmed && drawingPoints.length >= 3 && (
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-              <polyline
+              <polygon
                 points={drawingPoints.map(p => `${p.x}%,${p.y}%`).join(' ')}
-                fill="none"
+                fill="rgba(255,102,0,0.08)"
                 stroke="#FF6600"
                 strokeWidth="2.5"
-                strokeLinecap="round"
                 strokeLinejoin="round"
               />
+              {/* Draggable vertex handles */}
               {drawingPoints.map((p, i) => (
-                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="3" fill="#FF6600" opacity="0.8" />
+                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="4" fill="#fff" stroke="#FF6600" strokeWidth="2" />
               ))}
             </svg>
           )}
