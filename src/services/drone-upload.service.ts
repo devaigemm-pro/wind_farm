@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
-import type { InspectionPhoto, DroneUploadPayload, BladeUploadProgress, CampaignStatus, BladeFace } from '@/types';
+import type { InspectionPhoto, DroneUploadPayload, BladeUploadProgress, CampaignStatus, BladeFace, UploadRecord } from '@/types';
 
 export class DroneUploadServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -119,6 +119,34 @@ export const droneUploadService = {
         face: r.face as BladeFace,
         photoCount: Number(r.photo_count),
         analyzedCount: Number(r.analyzed_count),
+      };
+    });
+  },
+
+  /**
+   * Get all photo-sync records (one row per campaign that has >= 1 photo).
+   * Powers the /inspections/upload (Uploads) view.
+   * Backed by the `get_upload_records` RPC.
+   */
+  async getUploadRecords(): Promise<UploadRecord[]> {
+    const { data, error } = await db.rpc('get_upload_records');
+
+    if (error) {
+      throw new DroneUploadServiceError(`Failed to get upload records: ${error.message}`, error.code);
+    }
+
+    return ((data as unknown[]) ?? []).map((row: unknown) => {
+      const r = row as Record<string, unknown>;
+      return {
+        campaignId: r.campaign_id as string,
+        campaignName: (r.campaign_name as string) ?? '',
+        windFarmId: (r.wind_farm_id as string) ?? null,
+        windFarmName: (r.wind_farm_name as string) ?? null,
+        turbineNames: ((r.turbine_names as string[]) ?? []).filter(Boolean),
+        photoCount: Number(r.photo_count ?? 0),
+        uploadedBy: (r.uploaded_by as string) ?? null,
+        uploadedAt: (r.uploaded_at as string) ?? null,
+        status: (r.status as CampaignStatus) ?? 'awaiting_photos',
       };
     });
   },

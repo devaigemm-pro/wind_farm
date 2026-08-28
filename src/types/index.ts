@@ -439,6 +439,19 @@ export interface CampaignWithStatus extends Campaign {
   status: CampaignStatus;
 }
 
+/** One photo-sync record (one campaign that has at least one uploaded photo) */
+export interface UploadRecord {
+  campaignId: string;
+  campaignName: string;
+  windFarmId: string | null;
+  windFarmName: string | null;
+  turbineNames: string[];
+  photoCount: number;
+  uploadedBy: string | null;
+  uploadedAt: string | null;
+  status: CampaignStatus;
+}
+
 /** Defect data for the results/export view */
 export interface ResultsDefect {
   id: string;
