@@ -15,6 +15,7 @@ export interface RepairReportData {
 type RGB = [number, number, number];
 
 interface RepairPhotoForPdf {
+  defectId: string | null;
   repairStage: string;
   url: string;
 }
@@ -224,10 +225,11 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     };
   });
 
-  // 5. Selected repair photos (repair_selected = true, repair_stage set).
+  // 5. Selected repair photos (repair_selected = true, repair_stage set),
+  //    including defect_id so each defect shows its own repair evidence.
   const { data: photoRows } = await db
     .from('inspection_photo')
-    .select('repair_stage, storage_path')
+    .select('defect_id, repair_stage, storage_path')
     .eq('campaign_id', campaignId)
     .eq('repair_selected', true)
     .not('repair_stage', 'is', null)
@@ -237,7 +239,11 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
   for (const p of (photoRows as unknown[]) ?? []) {
     const r = p as Record<string, unknown>;
     const url = await resolveSignedUrl(r.storage_path as string);
-    photos.push({ repairStage: r.repair_stage as string, url });
+    photos.push({
+      defectId: (r.defect_id as string) ?? null,
+      repairStage: r.repair_stage as string,
+      url,
+    });
   }
 
   return {
@@ -378,11 +384,7 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
   doc.text(`PALA ${label}`, PAGE_WIDTH / 2, PAGE_HEIGHT / 2, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
-  // Selected photos, distributed across damages by stage order.
   const stageOrder = REPAIR_STAGES.map((s) => s.key);
-  const sortedPhotos = [...ctx.photos].sort(
-    (a, b) => stageOrder.indexOf(a.repairStage) - stageOrder.indexOf(b.repairStage),
-  );
 
   for (let i = 0; i < bladeDefects.length; i++) {
     const defect = bladeDefects[i]!;
@@ -431,10 +433,11 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
 
     let imgY = ((doc as any).lastAutoTable?.finalY ?? y + 60) + 8;
 
-    // Selected photos for this damage. First damage carries all photos (we don't
-    // have a per-damage photo link yet); subsequent damages show the same
-    // repair evidence set only on the first to avoid duplication.
-    const photosForDamage = i === 0 ? sortedPhotos : [];
+    // Selected photos for THIS defect, filtered by defect_id and ordered by the
+    // 11 repair stages. Each defect shows its own repair evidence.
+    const photosForDamage = ctx.photos
+      .filter((p) => p.defectId === defect.id)
+      .sort((a, b) => stageOrder.indexOf(a.repairStage) - stageOrder.indexOf(b.repairStage));
     if (photosForDamage.length > 0) {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');

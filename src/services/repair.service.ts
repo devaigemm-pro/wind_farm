@@ -30,11 +30,25 @@ export interface RepairCampaignDetail {
   turbineModel: string | null;
 }
 
+/** A defect being repaired in the campaign (from the approved quote). */
+export interface RepairDefect {
+  id: string;
+  type: string;
+  severity: number;
+  side: string | null;
+  distanceFromRoot: number;
+  widthCm: number | null;
+  heightCm: number | null;
+  description: string | null;
+  bladePosition: number;
+}
+
 /** A repair photo (inspection_photo row with repair_stage set). */
 export interface RepairPhoto {
   id: string;
   campaignId: string;
   bladeId: string | null;
+  defectId: string | null;
   repairStage: string;
   repairSelected: boolean;
   storagePath: string;
@@ -44,16 +58,26 @@ export interface RepairPhoto {
   isViewed: boolean;
 }
 
-/** Repair photos grouped by stage key. */
-export interface RepairStagePhotos {
+/** One repair stage (of the 11) with its photos, scoped to a single defect. */
+export interface RepairStageNode {
   stageKey: string;
   photos: RepairPhoto[];
 }
+
+/** A defect with its full 11-stage repair cycle. */
+export interface RepairDefectNode {
+  defect: RepairDefect;
+  stages: RepairStageNode[];
+}
+
+/** Full repair tree: defects[] → stages[] (the 11, ordered) → photos[]. */
+export type RepairTree = RepairDefectNode[];
 
 /** Summary data for the repair row in the campaigns panel. */
 export interface RepairSummary {
   photosCount: number;
   selectedCount: number;
+  defectsCount: number;
   stagesWithPhotos: number;
   totalStages: number;
   /** % of stages that have at least one photo (0-100). */
@@ -111,6 +135,67 @@ async function resolvePhotoUrls(
   return urlMap;
 }
 
+/**
+ * Fetch the raw defects of a repair campaign via its approved quote:
+ * campaign.quote_id → quote_item.defect_id → defect (+ its blade via inspection).
+ * Returns them ordered by blade position, then by defect id (stable).
+ */
+async function fetchRepairDefects(
+  campaignId: string,
+  quoteId: string | null,
+): Promise<RepairDefect[]> {
+  if (!quoteId) return [];
+
+  const { data: quoteItems, error: qiErr } = await db
+    .from('quote_item')
+    .select('defect_id')
+    .eq('quote_id', quoteId);
+
+  if (qiErr) throw new RepairServiceError(qiErr.message, qiErr.code);
+
+  const defectIds: string[] = [];
+  for (const qi of (quoteItems as unknown[]) ?? []) {
+    const id = (qi as Record<string, unknown>).defect_id as string | null;
+    if (id) defectIds.push(id);
+  }
+  if (defectIds.length === 0) return [];
+
+  const { data, error } = await db
+    .from('defect')
+    .select(`
+      id, type, severity, side, distance_from_root, width_cm, height_cm, description,
+      inspection:inspection ( blade:blade ( position ) )
+    `)
+    .in('id', defectIds);
+
+  if (error) throw new RepairServiceError(error.message, error.code);
+
+  const defects: RepairDefect[] = ((data as unknown[]) ?? []).map((d) => {
+    const r = d as Record<string, unknown>;
+    const inspection = (r.inspection as Record<string, unknown>) ?? {};
+    const blade = (inspection.blade as Record<string, unknown>) ?? {};
+    return {
+      id: r.id as string,
+      type: (r.type as string) ?? 'other',
+      severity: Number(r.severity) || 0,
+      side: (r.side as string) ?? null,
+      distanceFromRoot: Number(r.distance_from_root) || 0,
+      widthCm: r.width_cm != null ? Number(r.width_cm) : null,
+      heightCm: r.height_cm != null ? Number(r.height_cm) : null,
+      description: (r.description as string) ?? null,
+      bladePosition: Number(blade.position) || 1,
+    };
+  });
+
+  // Order by blade position, then defect id for stability.
+  defects.sort((a, b) => {
+    if (a.bladePosition !== b.bladePosition) return a.bladePosition - b.bladePosition;
+    return a.id.localeCompare(b.id);
+  });
+
+  return defects;
+}
+
 // ─── Service ────────────────────────────────────────────────────────────────
 
 export const repairService = {
@@ -153,13 +238,30 @@ export const repairService = {
   },
 
   /**
-   * Get all repair photos of a campaign (repair_stage != null), grouped by stage.
-   * Returns one entry per stage that has at least one photo. URLs are resolved.
+   * Get the defects being repaired in this campaign (from the approved quote),
+   * ordered by blade then defect.
    */
-  async getRepairPhotosByStage(campaignId: string): Promise<RepairStagePhotos[]> {
+  async getRepairDefects(campaignId: string): Promise<RepairDefect[]> {
+    const { data: campaign, error } = await db
+      .from('campaign')
+      .select('quote_id')
+      .eq('id', campaignId)
+      .single();
+
+    if (error || !campaign) {
+      throw new RepairServiceError(error?.message || 'Repair campaign not found', error?.code);
+    }
+    return fetchRepairDefects(campaignId, (campaign.quote_id as string) ?? null);
+  },
+
+  /**
+   * Get all repair photos of a campaign (repair_stage != null), including
+   * defect_id. URLs are resolved. Returns [] if none exist yet.
+   */
+  async getRepairPhotos(campaignId: string): Promise<RepairPhoto[]> {
     const { data, error } = await db
       .from('inspection_photo')
-      .select('id, campaign_id, blade_id, repair_stage, repair_selected, storage_path, filename, metadata')
+      .select('id, campaign_id, blade_id, defect_id, repair_stage, repair_selected, storage_path, filename, metadata')
       .eq('campaign_id', campaignId)
       .not('repair_stage', 'is', null)
       .order('uploaded_at', { ascending: true });
@@ -174,6 +276,7 @@ export const repairService = {
         id: r.id as string,
         campaignId: r.campaign_id as string,
         bladeId: (r.blade_id as string) ?? null,
+        defectId: (r.defect_id as string) ?? null,
         repairStage: r.repair_stage as string,
         repairSelected: Boolean(r.repair_selected),
         storagePath: r.storage_path as string,
@@ -184,18 +287,30 @@ export const repairService = {
 
     const urlMap = await resolvePhotoUrls(rows.map((r) => ({ id: r.id, storagePath: r.storagePath })));
 
-    const photos: RepairPhoto[] = rows.map((r) => ({
+    return rows.map((r) => ({
       ...r,
       url: urlMap.get(r.id) ?? '',
     }));
+  },
 
-    // Group by stage, preserving the canonical stage order.
-    const grouped: RepairStagePhotos[] = REPAIR_STAGE_KEYS.map((stageKey) => ({
-      stageKey,
-      photos: photos.filter((p) => p.repairStage === stageKey),
+  /**
+   * Build the full repair tree: for each defect (ordered by blade, then defect),
+   * the 11 repair stages in order, each with its photos filtered by
+   * defect_id + repair_stage.
+   */
+  async getRepairTree(campaignId: string): Promise<RepairTree> {
+    const [defects, photos] = await Promise.all([
+      this.getRepairDefects(campaignId),
+      this.getRepairPhotos(campaignId),
+    ]);
+
+    return defects.map((defect) => ({
+      defect,
+      stages: REPAIR_STAGE_KEYS.map((stageKey) => ({
+        stageKey,
+        photos: photos.filter((p) => p.defectId === defect.id && p.repairStage === stageKey),
+      })),
     }));
-
-    return grouped;
   },
 
   /**
@@ -216,11 +331,20 @@ export const repairService = {
    * Aggregate summary for the repair row in the campaigns panel.
    */
   async getRepairSummary(campaignId: string): Promise<RepairSummary> {
-    const { data, error } = await db
-      .from('inspection_photo')
-      .select('id, repair_stage, repair_selected, metadata')
-      .eq('campaign_id', campaignId)
-      .not('repair_stage', 'is', null);
+    const { data: campaign } = await db
+      .from('campaign')
+      .select('quote_id')
+      .eq('id', campaignId)
+      .single();
+
+    const [{ data, error }, defects] = await Promise.all([
+      db
+        .from('inspection_photo')
+        .select('id, defect_id, repair_stage, repair_selected, metadata')
+        .eq('campaign_id', campaignId)
+        .not('repair_stage', 'is', null),
+      fetchRepairDefects(campaignId, (campaign?.quote_id as string) ?? null),
+    ]);
 
     if (error) {
       throw new RepairServiceError(error.message, error.code);
@@ -229,6 +353,7 @@ export const repairService = {
     const rows = ((data as unknown[]) ?? []).map((row) => {
       const r = row as Record<string, unknown>;
       return {
+        defectId: (r.defect_id as string) ?? null,
         repairStage: r.repair_stage as string,
         repairSelected: Boolean(r.repair_selected),
         isViewed: ((r.metadata as Record<string, unknown>)?.viewed as boolean) ?? false,
@@ -238,12 +363,16 @@ export const repairService = {
     const photosCount = rows.length;
     const selectedCount = rows.filter((r) => r.repairSelected).length;
     const viewedCount = rows.filter((r) => r.isViewed).length;
-    const stagesWithPhotos = new Set(rows.map((r) => r.repairStage)).size;
-    const totalStages = REPAIR_STAGE_KEYS.length;
+    // Count distinct (defect_id, stage) pairs that carry at least one photo.
+    const stagesWithPhotos = new Set(rows.map((r) => `${r.defectId ?? '∅'}::${r.repairStage}`)).size;
+    // Total stage slots = defects × 11 (falls back to 11 when defects unknown).
+    const defectsCount = defects.length;
+    const totalStages = (defectsCount > 0 ? defectsCount : 1) * REPAIR_STAGE_KEYS.length;
 
     return {
       photosCount,
       selectedCount,
+      defectsCount,
       stagesWithPhotos,
       totalStages,
       stagesProgressPercent: totalStages > 0 ? Math.round((stagesWithPhotos / totalStages) * 100) : 0,
