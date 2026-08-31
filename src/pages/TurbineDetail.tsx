@@ -650,6 +650,19 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           <button style={planBtn} onClick={() => navigate(`/inspections/new?windFarm=${windFarmId || inspectionData?.windFarmId || ''}`)}>
             {t('button.planNextInspection')}
           </button>
+          {/* Request quote — only outside the shared/public view */}
+          {!isSharedView && (
+            <button
+              style={requestQuoteBtn}
+              onClick={() =>
+                navigate(
+                  `/quotes/new?turbine=${turbineId ?? ''}&windFarm=${windFarmId || inspectionData?.windFarmId || ''}`,
+                )
+              }
+            >
+              {t('button.requestQuote')}
+            </button>
+          )}
         </div>
 
         {tab === 'statistics' ? (
@@ -1388,6 +1401,7 @@ const counters: React.CSSProperties = { display: 'flex', gap: 20, padding: '12px
 const counterItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text };
 const conclText: React.CSSProperties = { fontSize: 12.5, color: '#555', margin: '0 0 8px', lineHeight: 1.45 };
 const planBtn: React.CSSProperties = { width: '100%', padding: '12px', background: '#5A8F5A', color: 'var(--color-neutral-0)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 500, textAlign: 'center', cursor: 'pointer', fontFamily: 'var(--font-family-sans)' };
+const requestQuoteBtn: React.CSSProperties = { width: '100%', padding: '12px', marginTop: 8, background: 'var(--color-neutral-0)', color: '#5A8F5A', border: '1px solid #5A8F5A', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 600, textAlign: 'center', cursor: 'pointer', fontFamily: 'var(--font-family-sans)' };
 const counterCard: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--color-neutral-0)', boxShadow: '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)' };
 const counterCardText: React.CSSProperties = { margin: 0, fontSize: 14, fontFamily: 'var(--font-family-sans)', color: C.text };
 const conclusionCard: React.CSSProperties = { padding: 12, borderRadius: 8, background: 'var(--color-neutral-0)', boxShadow: '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)' };
