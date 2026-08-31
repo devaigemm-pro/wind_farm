@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { X } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
@@ -20,10 +21,37 @@ export function CampaignsPanel({
   campaigns, isLoading, onViewResults, onSubassetClick, onInspectionClick, onEditCampaign, onDeleteCampaign, filterBySubasset, onClearFilter,
 }: CampaignsPanelProps) {
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'inspection' | 'repair'>('inspection');
+
+  const inspectionCampaigns = useMemo(
+    () => campaigns.filter((c) => (c.type ?? 'inspection') !== 'repair'),
+    [campaigns],
+  );
+  const repairCampaigns = useMemo(
+    () => campaigns.filter((c) => c.type === 'repair'),
+    [campaigns],
+  );
+  const visibleCampaigns = activeTab === 'repair' ? repairCampaigns : inspectionCampaigns;
+
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
         <h3 style={titleStyle}>{t('campaigns.title')}</h3>
+      </div>
+      {/* Tabs: Inspections vs Repairs */}
+      <div style={tabsStyle}>
+        <button
+          style={activeTab === 'inspection' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('inspection')}
+        >
+          {t('campaign.typeInspection')} ({inspectionCampaigns.length})
+        </button>
+        <button
+          style={activeTab === 'repair' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('repair')}
+        >
+          {t('campaign.typeRepair')} ({repairCampaigns.length})
+        </button>
       </div>
       {filterBySubasset && (
         <div style={filterBadgeStyle}>
@@ -41,11 +69,11 @@ export function CampaignsPanel({
             <Skeleton key={i} variant="rect" height="48px" />
           ))}
         </div>
-      ) : campaigns.length === 0 ? (
+      ) : visibleCampaigns.length === 0 ? (
         <p style={emptyStyle}>{t('campaigns.noCampaigns')}</p>
       ) : (
         <div style={listStyle}>
-          {campaigns.map((campaign) => (
+          {visibleCampaigns.map((campaign) => (
             <CampaignAccordion
               key={campaign.id}
               campaign={campaign}
@@ -64,6 +92,15 @@ export function CampaignsPanel({
 }
 
 const containerStyle: React.CSSProperties = { padding: 'var(--space-4)' };
+const tabsStyle: React.CSSProperties = { display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-neutral-200)' };
+const tabStyle: React.CSSProperties = {
+  padding: '8px 16px', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer',
+  background: 'none', border: 'none', borderBottom: '2px solid transparent',
+  color: 'var(--color-neutral-500)', fontFamily: 'var(--font-family-sans)',
+};
+const activeTabStyle: React.CSSProperties = {
+  ...tabStyle, color: '#5A8F5A', borderBottom: '2px solid #5A8F5A',
+};
 const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' };
 const titleStyle: React.CSSProperties = { fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-neutral-900)', margin: 0 };
 const emptyStyle: React.CSSProperties = { fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' };
