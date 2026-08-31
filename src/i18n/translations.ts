@@ -281,6 +281,26 @@ export const translations: TranslationMap = {
   'campaign.categoryRepartition': { en: 'Turbine defect category repartition', es: 'Distribución de categorías de defectos por turbina' },
   'campaign.typeRepartition': { en: 'Turbine defect type repartition', es: 'Distribución de tipos de defectos por turbina' },
 
+  // ─── Repair Workflow ────────────────────────────────────────────────────────
+  'repair.workflowTitle': { en: 'Repair Workflow', es: 'Flujo de Reparación' },
+  'repair.workflowHint': { en: 'For each repair stage, drag or click to select the preferred photos that will appear in the repair report.', es: 'Para cada etapa de reparación, arrastra o haz clic para seleccionar las fotos preferidas que aparecerán en el informe.' },
+  'repair.downloadReport': { en: 'Download repair report', es: 'Descargar informe de reparación' },
+  'repair.pdfError': { en: 'Failed to generate the repair report.', es: 'Error al generar el informe de reparación.' },
+  'repair.photos': { en: 'photos', es: 'fotos' },
+  'repair.selected': { en: 'selected', es: 'seleccionadas' },
+  'repair.allPhotos': { en: 'All photos', es: 'Todas las fotos' },
+  'repair.selectedForReport': { en: 'Selected for the report', es: 'Seleccionadas para el informe' },
+  'repair.noPhotosStage': { en: 'No photos uploaded for this stage yet.', es: 'Aún no hay fotos subidas para esta etapa.' },
+  'repair.allSelectedStage': { en: 'All photos selected.', es: 'Todas las fotos seleccionadas.' },
+  'repair.dropHere': { en: 'Drop photos here to add them to the report', es: 'Suelta fotos aquí para agregarlas al informe' },
+  'repair.select': { en: 'Select', es: 'Seleccionar' },
+  'repair.remove': { en: 'Remove', es: 'Quitar' },
+  'repair.colTurbine': { en: 'Turbine', es: 'Turbina' },
+  'repair.stagesWithPhotos': { en: 'stages', es: 'etapas' },
+  'repair.statusOpen': { en: 'Open', es: 'Abierta' },
+  'repair.statusInProgress': { en: 'In progress', es: 'En progreso' },
+  'repair.statusDone': { en: 'Done', es: 'Finalizada' },
+
   // ─── Campaign Upload Status ─────────────────────────────────────────────────
   'uploadStatus.waitingDrone': { en: 'Waiting for drone upload', es: 'Esperando subida del dron' },
   'uploadStatus.waitingDroneDesc': { en: 'The system is polling every 10 seconds for incoming photos.', es: 'El sistema consulta cada 10 segundos por fotos entrantes.' },
