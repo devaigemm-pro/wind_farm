@@ -265,11 +265,34 @@ export interface TurbineSubassetRow {
   inspectionsCount: number;
 }
 
+/** Campaign discriminator: inspection (drone photos) vs repair (from approved quote) */
+export type CampaignType = 'inspection' | 'repair';
+
+/** Repair campaign workflow status */
+export type RepairCampaignStatus = 'repair_open' | 'repair_in_progress' | 'repair_done';
+
 /** Campaign entity */
 export interface Campaign {
   id: string;
   name: string;
   windFarmId: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  type?: CampaignType;
+  turbineId?: string | null;
+  quoteId?: string | null;
+  status?: string | null;
+}
+
+/** Repair campaign created when a quote is approved */
+export interface RepairCampaign {
+  id: string;
+  name: string;
+  windFarmId: string;
+  turbineId: string | null;
+  quoteId: string | null;
+  status: RepairCampaignStatus;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;

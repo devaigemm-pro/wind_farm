@@ -130,6 +130,7 @@ export const assetDetailService = {
       .from('campaign')
       .select('*')
       .eq('wind_farm_id', windFarmId)
+      .eq('type', 'inspection')
       .order('created_at', { ascending: false });
     if (error) throw new AssetDetailServiceError(error.message, error.code);
     return ((data as unknown[]) ?? []).map((r: unknown) => {
@@ -149,7 +150,7 @@ export const assetDetailService = {
     const user = (await db.auth.getUser()).data.user;
     const { data, error } = await db
       .from('campaign')
-      .insert({ wind_farm_id: windFarmId, name, created_by: user?.id ?? null })
+      .insert({ wind_farm_id: windFarmId, name, type: 'inspection', created_by: user?.id ?? null })
       .select()
       .single();
     if (error) throw new AssetDetailServiceError(error.message, error.code);
