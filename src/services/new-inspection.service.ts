@@ -130,6 +130,7 @@ export const newInspectionService = {
       .insert({
         name: input.campaignName,
         wind_farm_id: input.windFarmId,
+        type: 'inspection',
         created_by: user.id,
       })
       .select()

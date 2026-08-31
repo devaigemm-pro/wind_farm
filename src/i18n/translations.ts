@@ -858,6 +858,13 @@ export const translations: TranslationMap = {
   'quoteDetail.awaitingQuote': { en: 'Awaiting the technical team\'s quote.', es: 'A la espera de la cotización del equipo técnico.' },
   'quoteDetail.back': { en: 'Back to quotes', es: 'Volver a cotizaciones' },
 
+  // Repair campaign (created on approval)
+  'quoteDetail.repairCampaign': { en: 'Repair campaign', es: 'Campaña de reparación' },
+  'quote.repairCampaignCreated': { en: 'Repair campaign created', es: 'Campaña de reparación creada' },
+  'repairCampaign.status.repair_open': { en: 'Open', es: 'Abierta' },
+  'repairCampaign.status.repair_in_progress': { en: 'In progress', es: 'En progreso' },
+  'repairCampaign.status.repair_done': { en: 'Done', es: 'Finalizada' },
+
   // Traceability
   'traceability.title': { en: 'Cost traceability', es: 'Trazabilidad de costos' },
   'traceability.subtitle': { en: 'Defects, repairs and accumulated costs over time', es: 'Defectos, reparaciones y costos acumulados en el tiempo' },

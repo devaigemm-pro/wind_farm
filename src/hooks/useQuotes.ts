@@ -8,6 +8,7 @@ import type {
   QuoteMaterial,
   TraceabilityRow,
   TraceabilitySummary,
+  RepairCampaign,
 } from '@/types';
 
 // ─── Quotable defects (left column of the new quote screen) ──────────────────
@@ -46,6 +47,16 @@ export function useQuoteWorkOrders(quoteId: string | undefined, enabled: boolean
   return useQuery<TraceabilityRow[]>({
     queryKey: ['quote-work-orders', quoteId],
     queryFn: () => quotesService.listWorkOrdersByQuote(quoteId!),
+    enabled: !!quoteId && enabled,
+  });
+}
+
+// ─── Repair campaign generated on approval ───────────────────────────────────
+
+export function useRepairCampaign(quoteId: string | undefined, enabled: boolean) {
+  return useQuery<RepairCampaign | null>({
+    queryKey: ['repair-campaign', quoteId],
+    queryFn: () => quotesService.getRepairCampaign(quoteId!),
     enabled: !!quoteId && enabled,
   });
 }
@@ -102,6 +113,7 @@ export function useApproveQuote() {
       queryClient.invalidateQueries({ queryKey: ['quote', quoteId] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['quote-work-orders', quoteId] });
+      queryClient.invalidateQueries({ queryKey: ['repair-campaign', quoteId] });
       queryClient.invalidateQueries({ queryKey: ['traceability'] });
     },
   });

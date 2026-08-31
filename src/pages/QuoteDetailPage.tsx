@@ -9,11 +9,18 @@ import { useToast } from '@/store/toastStore';
 import {
   useQuote,
   useQuoteWorkOrders,
+  useRepairCampaign,
   useSubmitQuoteResponse,
   useApproveQuote,
   useRejectQuote,
 } from '@/hooks/useQuotes';
-import type { QuoteStatus, QuoteCurrency, QuoteMaterial, WorkOrderStatus } from '@/types';
+import type {
+  QuoteStatus,
+  QuoteCurrency,
+  QuoteMaterial,
+  WorkOrderStatus,
+  RepairCampaignStatus,
+} from '@/types';
 
 const C = {
   brand: '#5A8F5A',
@@ -34,6 +41,12 @@ const WO_BADGE: Record<WorkOrderStatus, BadgeVariant> = {
   in_progress: 'info',
   done: 'success',
   cancelled: 'neutral',
+};
+
+const REPAIR_BADGE: Record<RepairCampaignStatus, BadgeVariant> = {
+  repair_open: 'warning',
+  repair_in_progress: 'info',
+  repair_done: 'success',
 };
 
 interface EditableItem {
@@ -60,6 +73,7 @@ export function QuoteDetailPage() {
   const isApproved = quote?.status === 'approved';
 
   const { data: workOrders } = useQuoteWorkOrders(id, isApproved);
+  const { data: repairCampaign } = useRepairCampaign(id, isApproved);
   const submitResponse = useSubmitQuoteResponse();
   const approveQuote = useApproveQuote();
   const rejectQuote = useRejectQuote();
@@ -414,6 +428,24 @@ export function QuoteDetailPage() {
           <p style={{ color: C.muted, fontSize: 13, alignSelf: 'center' }}>{t('quoteDetail.awaitingQuote')}</p>
         )}
       </div>
+
+      {/* Repair campaign (created on approval) */}
+      {isApproved && repairCampaign && (
+        <div style={{ marginTop: 28 }}>
+          <h2 style={sectionTitle}>{t('quoteDetail.repairCampaign')}</h2>
+          <div style={{ ...infoCard, marginBottom: 0 }}>
+            <div>
+              <span style={infoLabel}>{t('quote.repairCampaignCreated')}</span>
+              <div style={infoValue}>{repairCampaign.name}</div>
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <Badge variant={REPAIR_BADGE[repairCampaign.status]}>
+                {t(`repairCampaign.status.${repairCampaign.status}`)}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Work orders (after approval) */}
       {isApproved && (

@@ -10,6 +10,7 @@ import type {
   QuoteCurrency,
   TraceabilityRow,
   TraceabilitySummary,
+  RepairCampaign,
 } from '@/types';
 
 // ─── Custom Error ───────────────────────────────────────────────────────────
@@ -371,6 +372,10 @@ export const quotesService = {
       if (woErr) throw new QuoteServiceError(woErr.message, woErr.code);
     }
 
+    // Create a single repair campaign that groups all the work orders of this
+    // approved quote, associated with the wind farm + turbine.
+    await createRepairCampaign(quote, user?.id ?? null);
+
     const { error } = await db
       .from('quote')
       .update({
@@ -382,6 +387,24 @@ export const quotesService = {
       .eq('id', quoteId);
 
     if (error) throw new QuoteServiceError(error.message, error.code);
+  },
+
+  /**
+   * Get the repair campaign that was created when the given quote was approved
+   * (if any). Returns null when no repair campaign exists yet.
+   */
+  async getRepairCampaign(quoteId: string): Promise<RepairCampaign | null> {
+    const { data, error } = await db
+      .from('campaign')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .eq('type', 'repair')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapRepairCampaignRow(data as Record<string, unknown>);
   },
 
   /**
@@ -493,6 +516,54 @@ export const quotesService = {
     };
   },
 };
+
+/**
+ * Create a repair campaign for an approved quote. This groups all the work
+ * orders of the quote into a single campaign associated with the wind farm and
+ * turbine.
+ *
+ * Never throws: creating the campaign is a requirement, but a failure here must
+ * not roll back the quote approval / work orders. Failures are logged (mirrors
+ * the pattern used by transitionInspectionsToInspect in drone-upload.service).
+ */
+async function createRepairCampaign(quote: Quote, userId: string | null): Promise<void> {
+  try {
+    const turbineName = quote.turbineName?.trim()
+      || (quote.turbine_id ? `turbina ${quote.turbine_id.slice(0, 8)}` : 'turbina');
+    const dateLabel = new Date().toLocaleDateString('es-CL');
+    const name = `Reparación - ${turbineName} - ${dateLabel}`;
+
+    const { error } = await db.from('campaign').insert({
+      type: 'repair',
+      name,
+      wind_farm_id: quote.wind_farm_id,
+      turbine_id: quote.turbine_id,
+      quote_id: quote.id,
+      status: 'repair_open',
+      created_by: userId,
+    });
+
+    if (error) {
+      console.error('[quotes.service] Failed to create repair campaign:', error);
+    }
+  } catch (campaignError) {
+    console.error('[quotes.service] Failed to create repair campaign:', campaignError);
+  }
+}
+
+function mapRepairCampaignRow(row: Record<string, unknown>): RepairCampaign {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    windFarmId: row.wind_farm_id as string,
+    turbineId: (row.turbine_id as string) ?? null,
+    quoteId: (row.quote_id as string) ?? null,
+    status: (row.status as RepairCampaign['status']) ?? 'repair_open',
+    createdBy: (row.created_by as string) ?? null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
 
 function mapWorkOrderRow(row: Record<string, unknown>): TraceabilityRow {
   const turbine = row.turbine as Record<string, unknown> | null;
