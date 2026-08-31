@@ -103,33 +103,36 @@ async function resolvePhotoUrls(
   const importBucket = 'asset-documents';
   const nativeBucket = 'inspection-photos';
 
+  // Imported photos live in the PRIVATE 'asset-documents' bucket → need signed URLs.
+  // Native drone photos live in the PUBLIC 'inspection-photos' bucket → public URLs
+  // (this mirrors useInspectionPhotos / getPhotoPublicUrl, which is the mechanism
+  // that actually renders in the browser with the anon key).
   const imported = photos.filter((p) => p.storagePath.startsWith('inspection-imports/'));
   const native = photos.filter((p) => !p.storagePath.startsWith('inspection-imports/'));
 
-  const BATCH = 50;
+  // Native → public URLs (no signing).
+  for (const p of native) {
+    const { data } = supabase.storage.from(nativeBucket).getPublicUrl(p.storagePath);
+    if (data?.publicUrl) urlMap.set(p.id, data.publicUrl);
+  }
 
-  async function signBatch(bucket: string, batch: { id: string; storagePath: string }[]) {
-    if (batch.length === 0) return;
+  // Imported → signed URLs in batches.
+  const BATCH = 50;
+  for (let i = 0; i < imported.length; i += BATCH) {
+    const batch = imported.slice(i, i + BATCH);
     try {
       const { data } = await supabase.storage
-        .from(bucket)
+        .from(importBucket)
         .createSignedUrls(batch.map((p) => p.storagePath), 3600);
       if (data) {
-        for (let i = 0; i < data.length; i++) {
-          const url = data[i]?.signedUrl;
-          if (url) urlMap.set(batch[i]!.id, url);
+        for (let j = 0; j < data.length; j++) {
+          const url = data[j]?.signedUrl;
+          if (url) urlMap.set(batch[j]!.id, url);
         }
       }
     } catch {
       // Silent fallback — photos render broken but nothing crashes.
     }
-  }
-
-  for (let i = 0; i < imported.length; i += BATCH) {
-    await signBatch(importBucket, imported.slice(i, i + BATCH));
-  }
-  for (let i = 0; i < native.length; i += BATCH) {
-    await signBatch(nativeBucket, native.slice(i, i + BATCH));
   }
 
   return urlMap;
