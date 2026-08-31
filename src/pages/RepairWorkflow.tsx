@@ -48,10 +48,15 @@ export function RepairWorkflow() {
   const setSelected = useSetPhotoSelected(campaignId);
 
   const [downloading, setDownloading] = useState(false);
+  const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
 
   const handleSelect = (photo: RepairPhoto, selected: boolean) => {
     if (photo.repairSelected === selected) return;
     setSelected.mutate({ photoId: photo.id, selected });
+  };
+
+  const handlePreview = (photo: RepairPhoto) => {
+    if (photo.url) setLightbox(photo);
   };
 
   const handleDownloadPdf = async () => {
@@ -111,8 +116,32 @@ export function RepairWorkflow() {
               locale={locale}
               t={t}
               onSelect={handleSelect}
+              onPreview={handlePreview}
             />
           ))}
+        </div>
+      )}
+
+      {/* Lightbox: enlarged photo preview */}
+      {lightbox && (
+        <div
+          style={lightboxOverlay}
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button style={lightboxClose} onClick={() => setLightbox(null)} aria-label={t('general.close')}>
+            <X size={22} />
+          </button>
+          <img
+            src={lightbox.url}
+            alt={lightbox.filename}
+            style={lightboxImg}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={lightboxCaption} onClick={(e) => e.stopPropagation()}>
+            {lightbox.filename}
+          </div>
         </div>
       )}
     </div>
@@ -127,9 +156,10 @@ interface DefectSectionProps {
   locale: 'es' | 'en';
   t: (key: string) => string;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  onPreview: (photo: RepairPhoto) => void;
 }
 
-function DefectSection({ node, index, locale, t, onSelect }: DefectSectionProps) {
+function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSectionProps) {
   const [open, setOpen] = useState(true);
   const { defect } = node;
 
@@ -175,6 +205,7 @@ function DefectSection({ node, index, locale, t, onSelect }: DefectSectionProps)
                 photos={photos}
                 t={t}
                 onSelect={onSelect}
+                onPreview={onPreview}
               />
             );
           })}
@@ -194,9 +225,10 @@ interface StageRowProps {
   photos: RepairPhoto[];
   t: (key: string) => string;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  onPreview: (photo: RepairPhoto) => void;
 }
 
-function StageRow({ defectId, stageKey, order, label, photos, t, onSelect }: StageRowProps) {
+function StageRow({ defectId, stageKey, order, label, photos, t, onSelect, onPreview }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
 
@@ -236,6 +268,7 @@ function StageRow({ defectId, stageKey, order, label, photos, t, onSelect }: Sta
                     action="add"
                     actionLabel={t('repair.select')}
                     onAction={() => onSelect(photo, true)}
+                    onPreview={() => onPreview(photo)}
                   />
                 ))
               )}
@@ -278,6 +311,7 @@ function StageRow({ defectId, stageKey, order, label, photos, t, onSelect }: Sta
                     action="remove"
                     actionLabel={t('repair.remove')}
                     onAction={() => onSelect(photo, false)}
+                    onPreview={() => onPreview(photo)}
                     selected
                   />
                 ))
@@ -301,6 +335,7 @@ interface PhotoCardProps {
   onDragStart: () => void;
   onDragEnd: () => void;
   onAction: () => void;
+  onPreview: () => void;
 }
 
 function PhotoCard({
@@ -312,6 +347,7 @@ function PhotoCard({
   onDragStart,
   onDragEnd,
   onAction,
+  onPreview,
 }: PhotoCardProps) {
   return (
     <div
@@ -322,6 +358,7 @@ function PhotoCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
+      onClick={onPreview}
       onDoubleClick={onAction}
       style={{ ...photoCard, opacity: dimmed ? 0.5 : 1, borderColor: selected ? C.brand : C.border }}
       title={photo.filename}
@@ -418,4 +455,21 @@ const photoBroken: React.CSSProperties = {
 const photoActionBtn: React.CSSProperties = {
   position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none',
   color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+};
+const lightboxOverlay: React.CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.85)',
+  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+  padding: 32, cursor: 'zoom-out',
+};
+const lightboxImg: React.CSSProperties = {
+  maxWidth: '92vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8,
+  boxShadow: '0 8px 40px rgba(0,0,0,0.5)', cursor: 'default',
+};
+const lightboxClose: React.CSSProperties = {
+  position: 'fixed', top: 20, right: 24, width: 40, height: 40, borderRadius: '50%',
+  background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const lightboxCaption: React.CSSProperties = {
+  marginTop: 12, color: '#fff', fontSize: 13, opacity: 0.85, cursor: 'default',
 };
