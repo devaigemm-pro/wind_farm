@@ -5,6 +5,7 @@ import {
   Upload,
   Clock,
   FileText,
+  ClipboardList,
   User,
   LogOut,
   ChevronsLeft,
@@ -50,7 +51,10 @@ export function Sidebar({
     },
     {
       title: t('sidebar.assets'),
-      items: [{ icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' }],
+      items: [
+        { icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' },
+        { icon: ClipboardList, label: t('sidebar.quotes'), path: '/quotes' },
+      ],
     },
     {
       title: t('sidebar.inspections'),
@@ -83,7 +87,10 @@ export function Sidebar({
             },
             {
               title: t('sidebar.assets'),
-              items: [{ icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' }],
+              items: [
+                { icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' },
+                { icon: ClipboardList, label: t('sidebar.quotes'), path: '/quotes' },
+              ],
             },
             {
               title: t('sidebar.reports'),

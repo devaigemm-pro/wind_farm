@@ -91,6 +91,18 @@ const SharedResultsPage = lazy(() =>
 const ComparePageLazy = lazy(() =>
   import('@/pages/ComparePage').then((m) => ({ default: m.ComparePage })),
 );
+const QuotesPage = lazy(() =>
+  import('@/pages/QuotesPage').then((m) => ({ default: m.QuotesPage })),
+);
+const NewQuotePage = lazy(() =>
+  import('@/pages/NewQuotePage').then((m) => ({ default: m.NewQuotePage })),
+);
+const QuoteDetailPage = lazy(() =>
+  import('@/pages/QuoteDetailPage').then((m) => ({ default: m.QuoteDetailPage })),
+);
+const TraceabilityPage = lazy(() =>
+  import('@/pages/TraceabilityPage').then((m) => ({ default: m.TraceabilityPage })),
+);
 
 
 
@@ -189,6 +201,14 @@ function AppRoutes() {
         <Route path="/assets-wind/:windFarmId/subasset/:turbineId" element={<SubassetDetailPage />} />
         <Route path="/campaigns/:id/results" element={<CampaignResultsPage />} />
         <Route path="/campaigns/:id/upload" element={<CampaignUploadStatusPage />} />
+
+        {/* Quotes & Work Orders. `traceability` and `new` are declared before
+            `/quotes/:id` so the router does not treat them as an id. */}
+        <Route path="/quotes" element={<QuotesPage />} />
+        <Route path="/quotes/new" element={<NewQuotePage />} />
+        <Route path="/quotes/traceability" element={<TraceabilityPage />} />
+        <Route path="/quotes/:id" element={<QuoteDetailPage />} />
+
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
 

@@ -6,6 +6,7 @@ import {
   Upload,
   Clock,
   FileText,
+  ClipboardList,
   User,
   LogOut,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ export function AppSidebar({ currentPath, onNavigate }: AppSidebarProps) {
       items: [
         { icon: LayoutDashboard, label: t('sidebar.dashboard'), path: '/dashboard' },
         { icon: Wind, label: t('sidebar.windFarms'), path: '/assets-wind' },
+        { icon: ClipboardList, label: t('sidebar.quotes'), path: '/quotes' },
       ],
     },
     {

@@ -6,7 +6,7 @@ import type { Tables } from './supabase';
 
 // ─── Shared Type Aliases (union types matching DB constraints) ───────────────
 
-export type UserRole = 'inspector' | 'supervisor' | 'admin';
+export type UserRole = 'inspector' | 'supervisor' | 'admin' | 'client';
 
 export type InspectionStatus = 'in_progress' | 'completed' | 'approved';
 
@@ -29,7 +29,7 @@ export type MimeType = 'image/jpeg' | 'image/png';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-export const USER_ROLES: readonly UserRole[] = ['inspector', 'supervisor', 'admin'] as const;
+export const USER_ROLES: readonly UserRole[] = ['inspector', 'supervisor', 'admin', 'client'] as const;
 
 export const INSPECTION_STATUSES: readonly InspectionStatus[] = [
   'in_progress',
@@ -469,4 +469,142 @@ export interface ResultsDefect {
   notes?: string | null;
   rootCause?: string | null;
   nextStep?: string | null;
+}
+
+// ─── Quotes & Work Orders Types ─────────────────────────────────────────────
+
+/** Status of a quote request/response */
+export type QuoteStatus = 'requested' | 'quoted' | 'approved' | 'rejected';
+
+/** Currency of a quote */
+export type QuoteCurrency = 'CLP' | 'USD';
+
+/** Status of a work order */
+export type WorkOrderStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
+
+export const QUOTE_STATUSES: readonly QuoteStatus[] = [
+  'requested',
+  'quoted',
+  'approved',
+  'rejected',
+] as const;
+
+export const QUOTE_CURRENCIES: readonly QuoteCurrency[] = ['CLP', 'USD'] as const;
+
+export const WORK_ORDER_STATUSES: readonly WorkOrderStatus[] = [
+  'open',
+  'in_progress',
+  'done',
+  'cancelled',
+] as const;
+
+/** A single material line inside a quote item (stored as JSONB) */
+export interface QuoteMaterial {
+  description: string;
+  quantity: number;
+  unit_cost: number;
+  subtotal: number;
+}
+
+/** A quote line item, one per selected defect */
+export interface QuoteItem {
+  id: string;
+  quote_id: string;
+  defect_id: string | null;
+  labor_hours: number;
+  hourly_rate: number;
+  labor_subtotal: number;
+  materials: QuoteMaterial[];
+  materials_subtotal: number;
+  item_total: number;
+  created_at: string;
+  /** Enriched: defect info for display */
+  defect?: {
+    id: string;
+    type: string;
+    typeLabel: string;
+    severity: number;
+    side: string;
+    distanceFromRoot: number;
+    widthCm: number | null;
+    heightCm: number | null;
+    bladePosition: string;
+    description: string | null;
+  } | null;
+}
+
+/** A quote (request or response) */
+export interface Quote {
+  id: string;
+  turbine_id: string | null;
+  wind_farm_id: string | null;
+  requested_by: string | null;
+  status: QuoteStatus;
+  currency: QuoteCurrency;
+  quoted_by: string | null;
+  quoted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  /** Enriched fields for lists/detail */
+  turbineName?: string;
+  windFarmName?: string;
+  requestedByName?: string;
+  itemsCount?: number;
+  items?: QuoteItem[];
+}
+
+/** A work order generated from an approved quote */
+export interface WorkOrder {
+  id: string;
+  quote_id: string | null;
+  quote_item_id: string | null;
+  defect_id: string | null;
+  turbine_id: string | null;
+  wind_farm_id: string | null;
+  blade_side: string | null;
+  cost_amount: number;
+  currency: QuoteCurrency;
+  status: WorkOrderStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Defect available for quoting (left column in the new quote screen) */
+export interface QuotableDefect {
+  id: string;
+  type: string;
+  typeLabel: string;
+  severity: number;
+  side: string;
+  bladePosition: string;
+  distanceFromRoot: number;
+  widthCm: number | null;
+  heightCm: number | null;
+  description: string | null;
+}
+
+/** Traceability row aggregating work orders and costs */
+export interface TraceabilityRow {
+  key: string;
+  windFarmId: string | null;
+  windFarmName: string;
+  turbineId: string | null;
+  turbineName: string;
+  bladeSide: string;
+  defectType: string;
+  status: WorkOrderStatus;
+  cost: number;
+  currency: QuoteCurrency;
+  createdAt: string;
+}
+
+/** Cost aggregation summary for traceability */
+export interface TraceabilitySummary {
+  byTurbine: { turbineId: string; turbineName: string; total: number; count: number }[];
+  byWindFarm: { windFarmId: string; windFarmName: string; total: number; count: number }[];
+  rows: TraceabilityRow[];
+  currency: QuoteCurrency;
 }
