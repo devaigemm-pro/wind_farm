@@ -275,6 +275,8 @@ export const translations: TranslationMap = {
   'reports.rowsPerPage': { en: 'Rows per page:', es: 'Filas por página:' },
 
   // ─── Campaign Results ───────────────────────────────────────────────────────
+  'campaign.typeInspection': { en: 'Inspection', es: 'Inspección' },
+  'campaign.typeRepair': { en: 'Repair', es: 'Reparación' },
   'campaign.selectedTurbinesInfo': { en: 'Only the defects of the selected turbines are displayed', es: 'Solo se muestran los defectos de las turbinas seleccionadas' },
   'campaign.categoryRepartition': { en: 'Turbine defect category repartition', es: 'Distribución de categorías de defectos por turbina' },
   'campaign.typeRepartition': { en: 'Turbine defect type repartition', es: 'Distribución de tipos de defectos por turbina' },

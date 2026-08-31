@@ -130,7 +130,6 @@ export const assetDetailService = {
       .from('campaign')
       .select('*')
       .eq('wind_farm_id', windFarmId)
-      .eq('type', 'inspection')
       .order('created_at', { ascending: false });
     if (error) throw new AssetDetailServiceError(error.message, error.code);
     return ((data as unknown[]) ?? []).map((r: unknown) => {
@@ -142,6 +141,8 @@ export const assetDetailService = {
         createdBy: row.created_by as string | null,
         createdAt: row.created_at as string,
         updatedAt: row.updated_at as string,
+        type: ((row.type as string) ?? 'inspection') as Campaign['type'],
+        status: (row.status as string) ?? 'awaiting_photos',
       };
     });
   },
