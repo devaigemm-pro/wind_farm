@@ -24,8 +24,9 @@ export function useRepairTree(campaignId: string | undefined) {
     queryKey: ['repair-tree', campaignId],
     queryFn: () => repairService.getRepairTree(campaignId!),
     enabled: !!campaignId,
-    staleTime: 30 * 60 * 1000, // signed URLs valid 1h
-    gcTime: 60 * 60 * 1000,
+    // Photos resolve to PUBLIC URLs (no expiry), so a short stale window is fine.
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 
@@ -41,7 +42,11 @@ export function useRepairSummary(campaignId: string | undefined) {
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
-/** Toggle repair_selected on a photo, then refresh photos + summary (no reload). */
+/**
+ * Toggle a photo's selection for the report (persisted in
+ * repair_photo.metadata.selected_for_report), then refresh tree + summary
+ * via react-query invalidation (no page reload).
+ */
 export function useSetPhotoSelected(campaignId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
