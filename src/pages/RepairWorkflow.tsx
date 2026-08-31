@@ -8,9 +8,8 @@ import {
   useRepairTree,
   useSetPhotoSelected,
 } from '@/hooks/useRepair';
-import { getRepairStageLabel, REPAIR_STAGES } from '@/constants/repair-stages';
 import { generateAndDownloadRepairReport } from '@/services/repairReportPdf.service';
-import type { RepairDefectNode, RepairPhoto } from '@/services/repair.service';
+import type { RepairDefectNode, RepairPhoto, RepairStageNode } from '@/services/repair.service';
 
 const C = {
   brand: '#5A8F5A',
@@ -169,6 +168,7 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
     0,
   );
   const bladeLabel = BLADE_LABELS[defect.bladePosition] || String(defect.bladePosition);
+  const notStarted = node.repairId === null;
 
   return (
     <div style={defectCard}>
@@ -183,6 +183,8 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
             {t('repair.blade')} {bladeLabel}
             {' · '}{t('repair.category')} {defect.severity || '—'}
             {defect.side ? ` · ${defect.side}` : ''}
+            {node.technicianName ? ` · ${node.technicianName}` : ''}
+            {notStarted ? ` · ${t('repair.notStarted')}` : ''}
           </div>
         </div>
         <span style={defectCount}>
@@ -192,23 +194,16 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
 
       {open && (
         <div style={stagesWrap}>
-          {REPAIR_STAGES.map((stage) => {
-            const group = node.stages.find((s) => s.stageKey === stage.key);
-            const photos = group?.photos ?? [];
-            return (
-              <StageRow
-                key={stage.key}
-                defectId={defect.id}
-                stageKey={stage.key}
-                order={stage.order}
-                label={getRepairStageLabel(stage.key, locale)}
-                photos={photos}
-                t={t}
-                onSelect={onSelect}
-                onPreview={onPreview}
-              />
-            );
-          })}
+          {node.stages.map((stage) => (
+            <StageRow
+              key={stage.stageId ?? stage.stageCode}
+              defectId={defect.id}
+              stage={stage}
+              t={t}
+              onSelect={onSelect}
+              onPreview={onPreview}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -219,33 +214,37 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
 
 interface StageRowProps {
   defectId: string;
-  stageKey: string;
-  order: number;
-  label: string;
-  photos: RepairPhoto[];
+  stage: RepairStageNode;
   t: (key: string) => string;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
 }
 
-function StageRow({ defectId, stageKey, order, label, photos, t, onSelect, onPreview }: StageRowProps) {
+function StageRow({ defectId, stage, t, onSelect, onPreview }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
 
+  const photos = stage.photos;
   const available = photos.filter((p) => !p.repairSelected);
   const selected = photos.filter((p) => p.repairSelected);
   // Scope drop zone to this defect+stage to avoid cross-stage drops.
-  const dropKey = `${defectId}::${stageKey}`;
+  const dropKey = `${defectId}::${stage.stageCode}`;
 
   return (
     <div style={stageCard}>
       <div style={stageHeader}>
-        <span style={stageOrder}>{order}</span>
-        <h3 style={stageTitle}>{label}</h3>
+        <span style={stageOrder}>{stage.sortOrder}</span>
+        <h3 style={stageTitle}>{stage.stageLabel}</h3>
         <span style={stageCount}>
           {photos.length} {t('repair.photos')} · {selected.length} {t('repair.selected')}
         </span>
       </div>
+
+      {stage.note ? (
+        <p style={stageNote}>
+          <span style={stageNoteLabel}>{t('repair.stageNote')}:</span> {stage.note}
+        </p>
+      ) : null}
 
       {photos.length === 0 ? (
         <p style={emptyStage}>{t('repair.noPhotosStage')}</p>
@@ -363,8 +362,8 @@ function PhotoCard({
       style={{ ...photoCard, opacity: dimmed ? 0.5 : 1, borderColor: selected ? C.brand : C.border }}
       title={photo.filename}
     >
-      {photo.url ? (
-        <img src={photo.url} alt={photo.filename} style={photoImg} loading="lazy" />
+      {photo.thumbnailUrl ? (
+        <img src={photo.thumbnailUrl} alt={photo.filename} style={photoImg} loading="lazy" />
       ) : (
         <div style={photoBroken}>—</div>
       )}
@@ -429,6 +428,11 @@ const stageOrder: React.CSSProperties = {
 const stageTitle: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: '#1a1a1a', margin: 0, flex: 1 };
 const stageCount: React.CSSProperties = { fontSize: 12, color: C.muted };
 const emptyStage: React.CSSProperties = { fontSize: 13, color: C.muted, padding: '4px 0' };
+const stageNote: React.CSSProperties = {
+  fontSize: 12, color: C.text, background: '#F7FAF7', border: `1px solid ${C.border}`,
+  borderRadius: 8, padding: '6px 10px', margin: '0 0 10px', lineHeight: 1.4,
+};
+const stageNoteLabel: React.CSSProperties = { fontWeight: 600, color: C.brand };
 const columns: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 };
 const col: React.CSSProperties = {
   border: `1px dashed ${C.border}`, borderRadius: 10, padding: 10, minHeight: 120, transition: 'border-color 0.15s',

@@ -275,7 +275,9 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
         <tr style={{ cursor: 'pointer' }} onClick={openRepair}>
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
           <td style={tdStyle}>{campaign.name}</td>
-          <td style={tdStyle}>{getRepairStatusBadge(campaign.status)}</td>
+          <td style={tdStyle}>
+            {getRepairStatusBadge(summary?.hasCompletedRepair ? 'repair_done' : campaign.status)}
+          </td>
           <td style={tdStyle}>Blade</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
           <td style={tdStyle}>{isLoading ? '…' : `${summary?.viewedPercent ?? 0}%`}</td>

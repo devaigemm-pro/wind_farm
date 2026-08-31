@@ -305,6 +305,8 @@ export const translations: TranslationMap = {
   'repair.statusOpen': { en: 'Open', es: 'Abierta' },
   'repair.statusInProgress': { en: 'In progress', es: 'En progreso' },
   'repair.statusDone': { en: 'Done', es: 'Finalizada' },
+  'repair.stageNote': { en: 'Note', es: 'Nota' },
+  'repair.notStarted': { en: 'Not started', es: 'Sin iniciar' },
 
   // ─── Campaign Upload Status ─────────────────────────────────────────────────
   'uploadStatus.waitingDrone': { en: 'Waiting for drone upload', es: 'Esperando subida del dron' },

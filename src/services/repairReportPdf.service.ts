@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
-import { REPAIR_STAGES } from '@/constants/repair-stages';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -16,7 +15,10 @@ type RGB = [number, number, number];
 
 interface RepairPhotoForPdf {
   defectId: string | null;
-  repairStage: string;
+  stageCode: string;
+  /** repair_stage.sort_order for grouping/ordering photos by stage. */
+  sortOrder: number;
+  captureOrder: number;
   url: string;
 }
 
@@ -111,13 +113,9 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
   }
 }
 
-async function resolveSignedUrl(storagePath: string): Promise<string> {
-  // Imported photos → private 'asset-documents' bucket (signed URL).
-  // Native drone photos → public 'inspection-photos' bucket (public URL).
-  if (storagePath.startsWith('inspection-imports/')) {
-    const { data } = await supabase.storage.from('asset-documents').createSignedUrl(storagePath, 3600);
-    return data?.signedUrl ?? '';
-  }
+function resolvePhotoUrl(storagePath: string): string {
+  // Repair photos live under repairs/{repair_id}/... in the PUBLIC
+  // 'inspection-photos' bucket → public URL (no signing).
   const { data } = supabase.storage.from('inspection-photos').getPublicUrl(storagePath);
   return data?.publicUrl ?? '';
 }
@@ -184,30 +182,35 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     }
   }
 
-  // 4. Defects — from the approved quote items if available, else all turbine defects.
+  // 4. Work orders + defects — via campaign.quote_id → work_order (quote_id) →
+  //    defect (work_order.defect_id). One work_order per defect being repaired.
   let defects: DefectForPdf[] = [];
-  const defectIdsFromQuote: string[] = [];
+  // Maps defect_id → work_order_id, so we can walk work_order → repair → photos.
+  const workOrderByDefect = new Map<string, string>();
   if (campaign.quote_id) {
-    const { data: quoteItems } = await db
-      .from('quote_item')
-      .select('defect_id')
+    const { data: workOrders } = await db
+      .from('work_order')
+      .select('id, defect_id')
       .eq('quote_id', campaign.quote_id);
-    for (const qi of (quoteItems as unknown[]) ?? []) {
-      const id = (qi as Record<string, unknown>).defect_id as string | null;
-      if (id) defectIdsFromQuote.push(id);
+    for (const w of (workOrders as unknown[]) ?? []) {
+      const r = w as Record<string, unknown>;
+      const defectId = (r.defect_id as string) ?? null;
+      if (defectId) workOrderByDefect.set(defectId, r.id as string);
     }
   }
 
+  const defectIds = [...workOrderByDefect.keys()];
+
   // Defects link to a blade through their inspection (defect → inspection → blade).
   let defectRows: unknown[] = [];
-  if (defectIdsFromQuote.length > 0) {
+  if (defectIds.length > 0) {
     const { data } = await db
       .from('defect')
       .select(`
         id, type, severity, distance_from_root, width_cm, height_cm, side, description,
         inspection:inspection ( blade:blade ( position ) )
       `)
-      .in('id', defectIdsFromQuote);
+      .in('id', defectIds);
     defectRows = (data as unknown[]) ?? [];
   }
 
@@ -228,25 +231,69 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     };
   });
 
-  // 5. Selected repair photos (repair_selected = true, repair_stage set),
-  //    including defect_id so each defect shows its own repair evidence.
-  const { data: photoRows } = await db
-    .from('inspection_photo')
-    .select('defect_id, repair_stage, storage_path')
-    .eq('campaign_id', campaignId)
-    .eq('repair_selected', true)
-    .not('repair_stage', 'is', null)
-    .order('uploaded_at', { ascending: true });
-
+  // 5. Selected repair photos — NEW model: work_order → repair (work_order_id) →
+  //    repair_stage (sort_order) → repair_photo. Selection is stored in
+  //    repair_photo.metadata.selected_for_report. Group each photo to its defect
+  //    (via repair.work_order_id → defect) so each damage shows its own evidence.
   const photos: RepairPhotoForPdf[] = [];
-  for (const p of (photoRows as unknown[]) ?? []) {
-    const r = p as Record<string, unknown>;
-    const url = await resolveSignedUrl(r.storage_path as string);
-    photos.push({
-      defectId: (r.defect_id as string) ?? null,
-      repairStage: r.repair_stage as string,
-      url,
-    });
+  const workOrderIds = [...workOrderByDefect.values()];
+  if (workOrderIds.length > 0) {
+    const { data: repairRows } = await db
+      .from('repair')
+      .select('id, work_order_id')
+      .in('work_order_id', workOrderIds);
+
+    // repair_id → defect_id (reverse the work_order↔defect mapping).
+    const defectByWorkOrder = new Map<string, string>();
+    for (const [defectId, workOrderId] of workOrderByDefect.entries()) {
+      defectByWorkOrder.set(workOrderId, defectId);
+    }
+    const defectByRepair = new Map<string, string>();
+    const repairIds: string[] = [];
+    for (const rr of (repairRows as unknown[]) ?? []) {
+      const r = rr as Record<string, unknown>;
+      const repairId = r.id as string;
+      const woId = r.work_order_id as string;
+      repairIds.push(repairId);
+      const defectId = defectByWorkOrder.get(woId);
+      if (defectId) defectByRepair.set(repairId, defectId);
+    }
+
+    if (repairIds.length > 0) {
+      // Stages give us sort_order per stage; photos embed via repair_stage_id.
+      const { data: stageRows } = await db
+        .from('repair_stage')
+        .select(`
+          id, repair_id, stage_code, sort_order,
+          repair_photo ( storage_path, capture_order, metadata )
+        `)
+        .in('repair_id', repairIds)
+        .order('sort_order', { ascending: true });
+
+      for (const s of (stageRows as unknown[]) ?? []) {
+        const stage = s as Record<string, unknown>;
+        const repairId = stage.repair_id as string;
+        const defectId = defectByRepair.get(repairId) ?? null;
+        const sortOrder = Number(stage.sort_order) || 0;
+        const stageCode = (stage.stage_code as string) ?? '';
+        for (const p of (stage.repair_photo as unknown[]) ?? []) {
+          const ph = p as Record<string, unknown>;
+          const metadata = ph.metadata;
+          const selected =
+            !!metadata &&
+            typeof metadata === 'object' &&
+            Boolean((metadata as Record<string, unknown>).selected_for_report);
+          if (!selected) continue;
+          photos.push({
+            defectId,
+            stageCode,
+            sortOrder,
+            captureOrder: Number(ph.capture_order) || 0,
+            url: resolvePhotoUrl(ph.storage_path as string),
+          });
+        }
+      }
+    }
   }
 
   return {
@@ -387,8 +434,6 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
   doc.text(`PALA ${label}`, PAGE_WIDTH / 2, PAGE_HEIGHT / 2, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
-  const stageOrder = REPAIR_STAGES.map((s) => s.key);
-
   for (let i = 0; i < bladeDefects.length; i++) {
     const defect = bladeDefects[i]!;
     doc.addPage();
@@ -440,7 +485,7 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
     // 11 repair stages. Each defect shows its own repair evidence.
     const photosForDamage = ctx.photos
       .filter((p) => p.defectId === defect.id)
-      .sort((a, b) => stageOrder.indexOf(a.repairStage) - stageOrder.indexOf(b.repairStage));
+      .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.captureOrder - b.captureOrder));
     if (photosForDamage.length > 0) {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
