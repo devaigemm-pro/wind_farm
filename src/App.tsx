@@ -100,6 +100,9 @@ const QuoteDetailPage = lazy(() =>
 const TraceabilityPage = lazy(() =>
   import('@/pages/TraceabilityPage').then((m) => ({ default: m.TraceabilityPage })),
 );
+const RepairWorkflowPage = lazy(() =>
+  import('@/pages/RepairWorkflow').then((m) => ({ default: m.RepairWorkflow })),
+);
 
 
 
@@ -205,6 +208,9 @@ function AppRoutes() {
         <Route path="/quotes/new" element={<NewQuotePage />} />
         <Route path="/quotes/traceability" element={<TraceabilityPage />} />
         <Route path="/quotes/:id" element={<QuoteDetailPage />} />
+
+        {/* Repair workflow */}
+        <Route path="/repairs/:campaignId" element={<RepairWorkflowPage />} />
 
         <Route path="/profile" element={<ProfilePage />} />
       </Route>

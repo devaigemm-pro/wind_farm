@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, MoreHorizontal, Download, Loader2 } from 'lucide-react';
 import { Button, Badge } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
+import { useRepairSummary } from '@/hooks/useRepair';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
+import { generateAndDownloadRepairReport } from '@/services/repairReportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
 export interface CampaignAccordionProps {
@@ -30,8 +33,10 @@ export function CampaignAccordion({
   const [showMenu, setShowMenu] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  const isRepair = campaign.type === 'repair';
+
   // When a filter is active, always load inspections to show filtered results
-  const shouldLoadInspections = isExpanded || !!filterBySubasset;
+  const shouldLoadInspections = !isRepair && (isExpanded || !!filterBySubasset);
   const { data: inspections, isLoading } = useCampaignInspections(
     shouldLoadInspections ? campaign.id : undefined,
     campaign.windFarmId,
@@ -84,14 +89,16 @@ export function CampaignAccordion({
         </button>
 
         <div style={actionsStyle}>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onViewResults(campaign.id)}
-            style={{ backgroundColor: '#5A8F5A' }}
-          >
-            {t('campaigns.viewResults')}
-          </Button>
+          {!isRepair && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onViewResults(campaign.id)}
+              style={{ backgroundColor: '#5A8F5A' }}
+            >
+              {t('campaigns.viewResults')}
+            </Button>
+          )}
           {(onEdit || onDelete) && (
             <div style={{ position: 'relative' }}>
               <button
@@ -131,8 +138,15 @@ export function CampaignAccordion({
         </div>
       </div>
 
-      {/* Expanded Table */}
-      {effectiveExpanded && (
+      {/* Expanded Table — repair variant */}
+      {effectiveExpanded && isRepair && (
+        <div style={tableWrapperStyle}>
+          <RepairCampaignRows campaign={campaign} />
+        </div>
+      )}
+
+      {/* Expanded Table — inspection variant */}
+      {effectiveExpanded && !isRepair && (
         <div style={tableWrapperStyle}>
           {isLoading ? (
             <p style={loadingStyle}>{t('campaigns.loadingInspections')}</p>
@@ -213,6 +227,88 @@ export function CampaignAccordion({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Repair campaign rows ─────────────────────────────────────────────────────
+
+function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { data: summary, isLoading } = useRepairSummary(campaign.id);
+  const [downloading, setDownloading] = useState(false);
+
+  const formatDate = (date: string) => new Date(date).toLocaleDateString();
+
+  const getRepairStatusBadge = (status?: string | null) => {
+    const s = status || 'repair_open';
+    const map: Record<string, { bg: string; color: string; key: string }> = {
+      repair_open: { bg: '#FEF9C3', color: '#854D0E', key: 'repair.statusOpen' },
+      repair_in_progress: { bg: '#DBEAFE', color: '#1E40AF', key: 'repair.statusInProgress' },
+      repair_done: { bg: '#DEF7EC', color: '#03543F', key: 'repair.statusDone' },
+    };
+    const c = map[s] || map.repair_open!;
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: c.bg, color: c.color }}>
+        {t(c.key)}
+      </span>
+    );
+  };
+
+  const openRepair = () => navigate(`/repairs/${campaign.id}`);
+
+  return (
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>{t('subassetDetail.colInspectionDate')}</th>
+          <th style={thStyle}>{t('repair.colTurbine')}</th>
+          <th style={thStyle}>{t('subassetDetail.colStatus')}</th>
+          <th style={thStyle}>{t('subassetDetail.colType')}</th>
+          <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
+          <th style={thStyle}>{t('subassetDetail.colViewed')}</th>
+          <th style={thStyle}>{t('subassetDetail.colNotes')}</th>
+          <th style={thStyle}>{t('subassetDetail.colPdf')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style={{ cursor: 'pointer' }} onClick={openRepair}>
+          <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
+          <td style={tdStyle}>{campaign.name}</td>
+          <td style={tdStyle}>{getRepairStatusBadge(campaign.status)}</td>
+          <td style={tdStyle}>Blade</td>
+          <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
+          <td style={tdStyle}>{isLoading ? '…' : `${summary?.viewedPercent ?? 0}%`}</td>
+          <td style={{ ...tdStyle, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {isLoading ? '' : `${summary?.stagesWithPhotos ?? 0}/${summary?.totalStages ?? 0} ${t('repair.stagesWithPhotos')}`}
+          </td>
+          <td style={tdStyle}>
+            <button
+              style={pdfBtnStyle}
+              title={t('repair.downloadReport')}
+              disabled={downloading}
+              onClick={async (e) => {
+                e.stopPropagation();
+                setDownloading(true);
+                try {
+                  await generateAndDownloadRepairReport({ campaignId: campaign.id });
+                } catch (err) {
+                  alert((err as Error)?.message || 'Error generating PDF.');
+                } finally {
+                  setDownloading(false);
+                }
+              }}
+            >
+              {downloading ? (
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} color="var(--color-primary-500)" />
+              ) : (
+                <Download size={14} color="var(--color-primary-500)" />
+              )}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   );
 }
 
