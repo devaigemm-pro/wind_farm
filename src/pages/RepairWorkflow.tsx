@@ -168,7 +168,12 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
     0,
   );
   const bladeLabel = BLADE_LABELS[defect.bladePosition] || String(defect.bladePosition);
-  const notStarted = node.repairId === null;
+  const statusLabel =
+    node.repairStatus === 'completed'
+      ? t('repair.repairCompleted')
+      : node.repairStatus === 'in_progress'
+        ? t('repair.repairInProgress')
+        : null;
 
   return (
     <div style={defectCard}>
@@ -180,11 +185,10 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
             {t('repair.defect')} #{index + 1} · {formatDefectType(defect.type, locale)}
           </div>
           <div style={defectMeta}>
-            {t('repair.blade')} {bladeLabel}
+            {defect.turbineName ? defect.turbineName : `${t('repair.blade')} ${bladeLabel}`}
             {' · '}{t('repair.category')} {defect.severity || '—'}
-            {defect.side ? ` · ${defect.side}` : ''}
             {node.technicianName ? ` · ${node.technicianName}` : ''}
-            {notStarted ? ` · ${t('repair.notStarted')}` : ''}
+            {statusLabel ? ` · ${statusLabel}` : ''}
           </div>
         </div>
         <span style={defectCount}>
