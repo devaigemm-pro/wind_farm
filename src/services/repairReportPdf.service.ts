@@ -14,9 +14,11 @@ export interface RepairReportData {
 type RGB = [number, number, number];
 
 interface RepairPhotoForPdf {
+  /** repair_photo.photo_id (used only while resolving selection state). */
+  photoId?: string;
   defectId: string | null;
   stageCode: string;
-  /** repair_stage.sort_order for grouping/ordering photos by stage. */
+  /** repair stage_order for grouping/ordering photos by stage. */
   sortOrder: number;
   captureOrder: number;
   url: string;
@@ -122,6 +124,27 @@ function resolvePhotoUrl(storagePath: string): string {
 
 // ─── Data Fetching ────────────────────────────────────────────────────────────
 
+/** photos[] entry from get_repair_photos_by_stage. */
+interface RpcPhoto {
+  photo_id?: string;
+  storage_path?: string;
+  capture_order?: number;
+}
+
+/** Parse the photos[] value (array or JSON string) from a stage row. */
+function parseRpcPhotos(value: unknown): RpcPhoto[] {
+  if (Array.isArray(value)) return value as RpcPhoto[];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as RpcPhoto[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
   // 1. Campaign + turbine + wind farm
   const { data: campaign, error: campErr } = await db
@@ -182,116 +205,110 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     }
   }
 
-  // 4. Work orders + defects — via campaign.quote_id → work_order (quote_id) →
-  //    defect (work_order.defect_id). One work_order per defect being repaired.
-  let defects: DefectForPdf[] = [];
-  // Maps defect_id → work_order_id, so we can walk work_order → repair → photos.
-  const workOrderByDefect = new Map<string, string>();
+  // 4. Repairs / defects — via the official RPC get_repairs_for_quote. Each row is
+  //    one repair (= one defect being repaired). The repair_id groups its photos.
+  //    We NEVER read inspection_photo for repair evidence.
+  const defects: DefectForPdf[] = [];
+  const repairIds: string[] = [];
   if (campaign.quote_id) {
-    const { data: workOrders } = await db
-      .from('work_order')
-      .select('id, defect_id')
-      .eq('quote_id', campaign.quote_id);
-    for (const w of (workOrders as unknown[]) ?? []) {
-      const r = w as Record<string, unknown>;
-      const defectId = (r.defect_id as string) ?? null;
-      if (defectId) workOrderByDefect.set(defectId, r.id as string);
-    }
-  }
-
-  const defectIds = [...workOrderByDefect.keys()];
-
-  // Defects link to a blade through their inspection (defect → inspection → blade).
-  let defectRows: unknown[] = [];
-  if (defectIds.length > 0) {
-    const { data } = await db
-      .from('defect')
-      .select(`
-        id, type, severity, distance_from_root, width_cm, height_cm, side, description,
-        inspection:inspection ( blade:blade ( position ) )
-      `)
-      .in('id', defectIds);
-    defectRows = (data as unknown[]) ?? [];
-  }
-
-  defects = defectRows.map((d) => {
-    const r = d as Record<string, unknown>;
-    const inspection = (r.inspection as Record<string, unknown>) ?? {};
-    const blade = (inspection.blade as Record<string, unknown>) ?? {};
-    return {
-      id: r.id as string,
-      type: (r.type as string) ?? 'other',
-      severity: Number(r.severity) || 0,
-      distanceFromRoot: Number(r.distance_from_root) || 0,
-      widthCm: r.width_cm != null ? Number(r.width_cm) : null,
-      heightCm: r.height_cm != null ? Number(r.height_cm) : null,
-      side: (r.side as string) ?? null,
-      description: (r.description as string) ?? null,
-      bladePosition: Number(blade.position) || 1,
-    };
-  });
-
-  // 5. Selected repair photos — NEW model: work_order → repair (work_order_id) →
-  //    repair_stage (sort_order) → repair_photo. Selection is stored in
-  //    repair_photo.metadata.selected_for_report. Group each photo to its defect
-  //    (via repair.work_order_id → defect) so each damage shows its own evidence.
-  const photos: RepairPhotoForPdf[] = [];
-  const workOrderIds = [...workOrderByDefect.values()];
-  if (workOrderIds.length > 0) {
-    const { data: repairRows } = await db
-      .from('repair')
-      .select('id, work_order_id')
-      .in('work_order_id', workOrderIds);
-
-    // repair_id → defect_id (reverse the work_order↔defect mapping).
-    const defectByWorkOrder = new Map<string, string>();
-    for (const [defectId, workOrderId] of workOrderByDefect.entries()) {
-      defectByWorkOrder.set(workOrderId, defectId);
-    }
-    const defectByRepair = new Map<string, string>();
-    const repairIds: string[] = [];
+    const { data: repairRows, error: repErr } = await db.rpc('get_repairs_for_quote', {
+      quote_id_param: campaign.quote_id,
+    });
+    if (repErr) throw repErr;
     for (const rr of (repairRows as unknown[]) ?? []) {
       const r = rr as Record<string, unknown>;
-      const repairId = r.id as string;
-      const woId = r.work_order_id as string;
+      const repairId = (r.repair_id as string) ?? '';
+      if (!repairId) continue;
       repairIds.push(repairId);
-      const defectId = defectByWorkOrder.get(woId);
-      if (defectId) defectByRepair.set(repairId, defectId);
+      // The RPC groups by repair/defect. It doesn't carry a blade position or the
+      // fine defect dimensions, so we default bladePosition to 1 and leave the
+      // dimensional fields as N/A (rendered accordingly). id = repair_id so photos
+      // group to the right damage below.
+      defects.push({
+        id: repairId,
+        type: (r.defect_type as string) ?? 'other',
+        severity: Number(r.defect_severity) || 0,
+        distanceFromRoot: 0,
+        widthCm: null,
+        heightCm: null,
+        side: null,
+        description: null,
+        bladePosition: 1,
+      });
     }
+  }
 
-    if (repairIds.length > 0) {
-      // Stages give us sort_order per stage; photos embed via repair_stage_id.
-      const { data: stageRows } = await db
-        .from('repair_stage')
-        .select(`
-          id, repair_id, stage_code, sort_order,
-          repair_photo ( storage_path, capture_order, metadata )
-        `)
-        .in('repair_id', repairIds)
-        .order('sort_order', { ascending: true });
+  // 5. Selected repair photos — via get_repair_photos_by_stage per repair. The RPC
+  //    returns the 11 stages (in order) with a photos[] array each. Selection is
+  //    stored in repair_photo.metadata.selected_for_report, which the read-only RPC
+  //    doesn't expose, so we resolve it from repair_photo by photo_id. Photos are
+  //    grouped to their defect via repair_id (= defect.id).
+  const photos: RepairPhotoForPdf[] = [];
+  if (repairIds.length > 0) {
+    const stageRowsByRepair = await Promise.all(
+      repairIds.map(async (repairId) => {
+        const { data, error } = await db.rpc('get_repair_photos_by_stage', {
+          repair_id_param: repairId,
+        });
+        if (error) throw error;
+        return { repairId, rows: (data as unknown[]) ?? [] };
+      }),
+    );
 
-      for (const s of (stageRows as unknown[]) ?? []) {
+    // Collect all photo ids to resolve selection in a single query.
+    const candidates: RepairPhotoForPdf[] = [];
+    const allPhotoIds: string[] = [];
+    for (const { repairId, rows } of stageRowsByRepair) {
+      for (const s of rows) {
         const stage = s as Record<string, unknown>;
-        const repairId = stage.repair_id as string;
-        const defectId = defectByRepair.get(repairId) ?? null;
-        const sortOrder = Number(stage.sort_order) || 0;
+        const sortOrder = Number(stage.stage_order) || 0;
         const stageCode = (stage.stage_code as string) ?? '';
-        for (const p of (stage.repair_photo as unknown[]) ?? []) {
-          const ph = p as Record<string, unknown>;
-          const metadata = ph.metadata;
-          const selected =
-            !!metadata &&
-            typeof metadata === 'object' &&
-            Boolean((metadata as Record<string, unknown>).selected_for_report);
-          if (!selected) continue;
-          photos.push({
-            defectId,
+        for (const p of parseRpcPhotos(stage.photos)) {
+          const photoId = p.photo_id ?? '';
+          if (!photoId) continue;
+          allPhotoIds.push(photoId);
+          candidates.push({
+            photoId,
+            defectId: repairId,
             stageCode,
             sortOrder,
-            captureOrder: Number(ph.capture_order) || 0,
-            url: resolvePhotoUrl(ph.storage_path as string),
+            captureOrder: Number(p.capture_order) || 0,
+            url: resolvePhotoUrl(p.storage_path ?? ''),
           });
         }
+      }
+    }
+
+    // Resolve which photos are selected_for_report.
+    const selectedIds = new Set<string>();
+    const uniqueIds = [...new Set(allPhotoIds)];
+    if (uniqueIds.length > 0) {
+      const { data: metaRows } = await db
+        .from('repair_photo')
+        .select('id, metadata')
+        .in('id', uniqueIds);
+      for (const m of (metaRows as unknown[]) ?? []) {
+        const r = m as Record<string, unknown>;
+        const metadata = r.metadata;
+        if (
+          !!metadata &&
+          typeof metadata === 'object' &&
+          Boolean((metadata as Record<string, unknown>).selected_for_report)
+        ) {
+          selectedIds.add(r.id as string);
+        }
+      }
+    }
+
+    for (const c of candidates) {
+      if (c.photoId && selectedIds.has(c.photoId)) {
+        photos.push({
+          defectId: c.defectId,
+          stageCode: c.stageCode,
+          sortOrder: c.sortOrder,
+          captureOrder: c.captureOrder,
+          url: c.url,
+        });
       }
     }
   }

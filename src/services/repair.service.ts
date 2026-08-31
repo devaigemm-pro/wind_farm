@@ -5,9 +5,16 @@ import type { RepairCampaignStatus } from '@/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-// The technician app writes repair photos under the PUBLIC 'inspection-photos'
-// bucket at repairs/{repair_id}/{stage_code}/{filename}. repair_photo.storage_path
-// already holds the full path relative to the bucket, so we resolve public URLs.
+// Repair photos live in the repair_photo table ONLY (never inspection_photo).
+// The technician app writes them under the PUBLIC 'inspection-photos' bucket at
+// repairs/{repair_id}/{stage_code}/{filename}. repair_photo.storage_path already
+// holds the full path relative to the bucket, so we resolve public URLs.
+//
+// This service reads repair data EXCLUSIVELY through the official RPCs provided
+// by the mobile app team:
+//   - get_repairs_for_quote(quote_id_param)   → one row per repair/defect
+//   - get_repair_photos_by_stage(repair_id_param) → the 11 stages + photos[]
+// It never touches inspection_photo for repair photos.
 const PHOTO_BUCKET = 'inspection-photos';
 
 export class RepairServiceError extends Error {
@@ -35,10 +42,10 @@ export interface RepairCampaignDetail {
   turbineModel: string | null;
 }
 
-/** A defect being repaired in the campaign (via work_order → defect). */
+/** A defect being repaired in the campaign, as reported by get_repairs_for_quote. */
 export interface RepairDefect {
+  /** repair_id from the RPC (identifies the repair/defect node). */
   id: string;
-  workOrderId: string;
   type: string;
   severity: number;
   side: string | null;
@@ -47,9 +54,11 @@ export interface RepairDefect {
   heightCm: number | null;
   description: string | null;
   bladePosition: number;
+  /** Turbine name from the RPC (used as the blade/turbine label when no blade is known). */
+  turbineName: string | null;
 }
 
-/** A repair photo (repair_photo row). */
+/** A repair photo (from get_repair_photos_by_stage → photos[]). */
 export interface RepairPhoto {
   id: string;
   repairId: string | null;
@@ -60,7 +69,7 @@ export interface RepairPhoto {
   filename: string;
   captureOrder: number;
   capturedAt: string | null;
-  /** Whether the photo is marked for the PDF report (metadata.selected_for_report). */
+  /** Whether the photo is marked for the PDF report (repair_photo.metadata.selected_for_report). */
   repairSelected: boolean;
   /** Resolved public URL of the full-size photo (storage_path) for the lightbox. */
   url: string;
@@ -68,17 +77,17 @@ export interface RepairPhoto {
   thumbnailUrl: string;
 }
 
-/** One repair stage (of the 11) with its photos, scoped to a single defect/repair. */
+/** One repair stage (of the 11) with its photos, scoped to a single repair. */
 export interface RepairStageNode {
-  /** repair_stage.id when the repair exists, null when using the catalog fallback. */
+  /** repair_stage_id from the RPC, null when using the catalog fallback. */
   stageId: string | null;
   stageCode: string;
-  /** repair_stage.stage_label, or the catalog label. */
+  /** stage_label from the RPC, or the catalog label. */
   stageLabel: string;
   sortOrder: number;
-  /** Optional per-stage note written by the technician. */
+  /** Optional per-stage note written by the technician (stage_note). */
   note: string | null;
-  /** repair_stage.status ('pending' | 'in_progress' | 'done'), null when no repair yet. */
+  /** stage_status from the RPC, null when no repair yet. */
   status: string | null;
   photos: RepairPhoto[];
 }
@@ -86,7 +95,7 @@ export interface RepairStageNode {
 /** A defect with its full 11-stage repair cycle. */
 export interface RepairDefectNode {
   defect: RepairDefect;
-  /** The repair session for this work_order, if the technician already started it. */
+  /** The repair session id (= defect.id in the RPC model). */
   repairId: string | null;
   repairStatus: string | null;
   technicianName: string | null;
@@ -103,12 +112,37 @@ export interface RepairSummary {
   defectsCount: number;
   stagesWithPhotos: number;
   totalStages: number;
-  /** % of stages that are done or carry at least one photo (0-100). */
+  /** % of stages that carry at least one photo (0-100). */
   stagesProgressPercent: number;
   /** % of photos marked as viewed (kept for the panel column; always 0 in the new model). */
   viewedPercent: number;
   /** True if at least one repair session is completed. */
   hasCompletedRepair: boolean;
+}
+
+// ─── RPC row shapes ───────────────────────────────────────────────────────────
+
+interface RepairForQuoteRow {
+  repair_id: string;
+  defect_type?: string | null;
+  defect_severity?: number | null;
+  turbine_name?: string | null;
+  repair_status?: string | null;
+  technician_name?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  total_photos?: number | null;
+}
+
+interface RepairStageRow {
+  repair_stage_id: string;
+  stage_code: string;
+  stage_label?: string | null;
+  stage_order?: number | null;
+  stage_note?: string | null;
+  stage_status?: string | null;
+  photo_count?: number | null;
+  photos?: unknown;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -126,181 +160,136 @@ function isSelectedForReport(metadata: unknown): boolean {
   return Boolean((metadata as Record<string, unknown>).selected_for_report);
 }
 
-/** Map a raw repair_photo row (with resolved URLs) to a RepairPhoto. */
-function mapPhoto(row: Record<string, unknown>, repairId: string | null): RepairPhoto {
-  const storagePath = (row.storage_path as string) ?? '';
-  const thumbnailPath = (row.thumbnail_path as string) ?? null;
+/**
+ * Call get_repairs_for_quote and return its rows. Empty array when no quote.
+ */
+async function fetchRepairsForQuote(quoteId: string | null): Promise<RepairForQuoteRow[]> {
+  if (!quoteId) return [];
+  const { data, error } = await db.rpc('get_repairs_for_quote', { quote_id_param: quoteId });
+  if (error) throw new RepairServiceError(error.message, error.code);
+  return ((data as unknown[]) ?? []) as RepairForQuoteRow[];
+}
+
+/**
+ * Call get_repair_photos_by_stage for one repair and return its stage rows
+ * (the 11 stages in order, each with a photos[] JSON array).
+ */
+async function fetchStagesForRepair(repairId: string): Promise<RepairStageRow[]> {
+  const { data, error } = await db.rpc('get_repair_photos_by_stage', {
+    repair_id_param: repairId,
+  });
+  if (error) throw new RepairServiceError(error.message, error.code);
+  return ((data as unknown[]) ?? []) as RepairStageRow[];
+}
+
+/**
+ * Read repair_photo.metadata for a set of photo ids and return the set of ids
+ * that are selected_for_report. The RPCs are read-only and don't expose photo
+ * metadata, so we resolve the selection state directly from repair_photo.
+ */
+async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+  const selected = new Set<string>();
+  const unique = [...new Set(photoIds.filter(Boolean))];
+  if (unique.length === 0) return selected;
+
+  const { data, error } = await db
+    .from('repair_photo')
+    .select('id, metadata')
+    .in('id', unique);
+  if (error) throw new RepairServiceError(error.message, error.code);
+
+  for (const row of (data as unknown[]) ?? []) {
+    const r = row as Record<string, unknown>;
+    if (isSelectedForReport(r.metadata)) selected.add(r.id as string);
+  }
+  return selected;
+}
+
+/** Map a raw photo object (from the RPC photos[] array) to a RepairPhoto. */
+function mapPhoto(
+  raw: Record<string, unknown>,
+  repairId: string | null,
+  repairStageId: string | null,
+  stageCode: string,
+  selectedIds: Set<string>,
+): RepairPhoto {
+  const id = (raw.photo_id as string) ?? '';
+  const storagePath = (raw.storage_path as string) ?? '';
+  const thumbnailPath = (raw.thumbnail_path as string) ?? null;
   const url = publicUrl(storagePath);
   const thumbnailUrl = thumbnailPath ? publicUrl(thumbnailPath) : url;
   return {
-    id: row.id as string,
+    id,
     repairId,
-    repairStageId: (row.repair_stage_id as string) ?? null,
-    stageCode: (row.stage_code as string) ?? '',
+    repairStageId,
+    stageCode,
     storagePath,
     thumbnailPath,
-    filename: (row.filename as string) ?? '',
-    captureOrder: Number(row.capture_order) || 0,
-    capturedAt: (row.captured_at as string) ?? null,
-    repairSelected: isSelectedForReport(row.metadata),
+    filename: (raw.filename as string) ?? '',
+    captureOrder: Number(raw.capture_order) || 0,
+    capturedAt: (raw.captured_at as string) ?? null,
+    repairSelected: selectedIds.has(id),
     url,
     thumbnailUrl,
   };
 }
 
-interface WorkOrderWithDefect {
-  workOrderId: string;
-  defect: RepairDefect;
-}
-
-/**
- * Fetch the work_orders of a repair campaign via its approved quote, each with
- * its linked defect (+ the defect's blade via inspection). Ordered by blade
- * position then defect id (stable). campaign.quote_id → work_order (quote_id) →
- * defect (work_order.defect_id).
- */
-async function fetchWorkOrdersWithDefects(quoteId: string | null): Promise<WorkOrderWithDefect[]> {
-  if (!quoteId) return [];
-
-  const { data: workOrders, error: woErr } = await db
-    .from('work_order')
-    .select('id, defect_id')
-    .eq('quote_id', quoteId);
-
-  if (woErr) throw new RepairServiceError(woErr.message, woErr.code);
-
-  const rows = ((workOrders as unknown[]) ?? []).map((w) => {
-    const r = w as Record<string, unknown>;
-    return { workOrderId: r.id as string, defectId: (r.defect_id as string) ?? null };
-  });
-
-  const defectIds = rows.map((r) => r.defectId).filter((id): id is string => !!id);
-  if (defectIds.length === 0) return [];
-
-  const { data: defectRows, error: defErr } = await db
-    .from('defect')
-    .select(`
-      id, type, severity, side, distance_from_root, width_cm, height_cm, description,
-      inspection:inspection ( blade:blade ( position ) )
-    `)
-    .in('id', defectIds);
-
-  if (defErr) throw new RepairServiceError(defErr.message, defErr.code);
-
-  const defectById = new Map<string, Record<string, unknown>>();
-  for (const d of (defectRows as unknown[]) ?? []) {
-    const r = d as Record<string, unknown>;
-    defectById.set(r.id as string, r);
-  }
-
-  const result: WorkOrderWithDefect[] = [];
-  for (const wo of rows) {
-    if (!wo.defectId) continue;
-    const d = defectById.get(wo.defectId);
-    if (!d) continue;
-    const inspection = (d.inspection as Record<string, unknown>) ?? {};
-    const blade = (inspection.blade as Record<string, unknown>) ?? {};
-    result.push({
-      workOrderId: wo.workOrderId,
-      defect: {
-        id: d.id as string,
-        workOrderId: wo.workOrderId,
-        type: (d.type as string) ?? 'other',
-        severity: Number(d.severity) || 0,
-        side: (d.side as string) ?? null,
-        distanceFromRoot: Number(d.distance_from_root) || 0,
-        widthCm: d.width_cm != null ? Number(d.width_cm) : null,
-        heightCm: d.height_cm != null ? Number(d.height_cm) : null,
-        description: (d.description as string) ?? null,
-        bladePosition: Number(blade.position) || 1,
-      },
-    });
-  }
-
-  result.sort((a, b) => {
-    if (a.defect.bladePosition !== b.defect.bladePosition) {
-      return a.defect.bladePosition - b.defect.bladePosition;
+/** Parse the photos[] value from a stage row into an array of raw photo objects. */
+function parsePhotosArray(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
+    } catch {
+      return [];
     }
-    return a.defect.id.localeCompare(b.defect.id);
-  });
+  }
+  return [];
+}
 
-  return result;
+/** Collect all photo ids present across a repair's stage rows. */
+function collectPhotoIds(stageRows: RepairStageRow[]): string[] {
+  const ids: string[] = [];
+  for (const stage of stageRows) {
+    for (const p of parsePhotosArray(stage.photos)) {
+      const id = p.photo_id as string | undefined;
+      if (id) ids.push(id);
+    }
+  }
+  return ids;
 }
 
 /**
- * Fetch the repair sessions (repair rows) for a set of work_order ids, keyed by
- * work_order_id. One repair per work_order.
+ * Map a repair's stage rows (from get_repair_photos_by_stage) to RepairStageNode[],
+ * resolving photo selection state from `selectedIds`.
  */
-async function fetchRepairsByWorkOrder(
-  workOrderIds: string[],
-): Promise<Map<string, Record<string, unknown>>> {
-  const map = new Map<string, Record<string, unknown>>();
-  if (workOrderIds.length === 0) return map;
-
-  const { data, error } = await db
-    .from('repair')
-    .select('id, work_order_id, defect_id, technician_id, status, current_stage, started_at, completed_at')
-    .in('work_order_id', workOrderIds);
-
-  if (error) throw new RepairServiceError(error.message, error.code);
-
-  for (const row of (data as unknown[]) ?? []) {
-    const r = row as Record<string, unknown>;
-    map.set(r.work_order_id as string, r);
-  }
-  return map;
-}
-
-/** Resolve technician display names for a set of profile ids. */
-async function fetchTechnicianNames(ids: string[]): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  const unique = [...new Set(ids.filter(Boolean))];
-  if (unique.length === 0) return map;
-
-  const { data } = await db.from('profiles').select('id, name, email').in('id', unique);
-  for (const row of (data as unknown[]) ?? []) {
-    const r = row as Record<string, unknown>;
-    const name = (r.name as string) || (r.email as string) || '';
-    if (name) map.set(r.id as string, name);
-  }
-  return map;
-}
-
-/**
- * Fetch the stages (+ photos) of a single repair, ordered by sort_order and
- * capture_order. One PostgREST query with an embedded repair_photo select.
- */
-async function fetchStagesForRepair(repairId: string): Promise<RepairStageNode[]> {
-  const { data, error } = await db
-    .from('repair_stage')
-    .select(`
-      id, stage_code, stage_label, sort_order, note, status,
-      repair_photo ( id, repair_stage_id, stage_code, storage_path, thumbnail_path, filename, capture_order, captured_at, metadata )
-    `)
-    .eq('repair_id', repairId)
-    .order('sort_order', { ascending: true });
-
-  if (error) throw new RepairServiceError(error.message, error.code);
-
-  return ((data as unknown[]) ?? []).map((row) => {
-    const r = row as Record<string, unknown>;
-    const rawPhotos = ((r.repair_photo as unknown[]) ?? []).map((p) =>
-      mapPhoto(p as Record<string, unknown>, repairId),
-    );
-    rawPhotos.sort((a, b) => a.captureOrder - b.captureOrder);
+function mapStages(
+  repairId: string,
+  stageRows: RepairStageRow[],
+  selectedIds: Set<string>,
+): RepairStageNode[] {
+  const nodes = stageRows.map((stage) => {
+    const stageId = stage.repair_stage_id ?? null;
+    const stageCode = stage.stage_code ?? '';
+    const photos = parsePhotosArray(stage.photos)
+      .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds))
+      .sort((a, b) => a.captureOrder - b.captureOrder);
     return {
-      stageId: r.id as string,
-      stageCode: (r.stage_code as string) ?? '',
-      stageLabel: (r.stage_label as string) ?? '',
-      sortOrder: Number(r.sort_order) || 0,
-      note: (r.note as string) ?? null,
-      status: (r.status as string) ?? null,
-      photos: rawPhotos,
+      stageId,
+      stageCode,
+      stageLabel: (stage.stage_label as string) ?? '',
+      sortOrder: Number(stage.stage_order) || 0,
+      note: (stage.stage_note as string) ?? null,
+      status: (stage.stage_status as string) ?? null,
+      photos,
     };
   });
+  nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+  return nodes;
 }
 
-/** Build the 11 empty catalog stages for a defect that has no repair yet. */
+/** Build the 11 empty catalog stages for a repair with no stage data yet. */
 function catalogStages(): RepairStageNode[] {
   return REPAIR_STAGE_CATALOG.map((c) => ({
     stageId: null,
@@ -313,11 +302,30 @@ function catalogStages(): RepairStageNode[] {
   }));
 }
 
+/** Map a get_repairs_for_quote row to a RepairDefect. */
+function mapDefect(row: RepairForQuoteRow): RepairDefect {
+  return {
+    id: row.repair_id,
+    type: (row.defect_type as string) ?? 'other',
+    severity: Number(row.defect_severity) || 0,
+    side: null,
+    distanceFromRoot: 0,
+    widthCm: null,
+    heightCm: null,
+    description: null,
+    // The RPC doesn't carry a blade position; default to 1. turbine_name is used
+    // as the label in the UI/PDF where a blade name isn't available.
+    bladePosition: 1,
+    turbineName: (row.turbine_name as string) ?? null,
+  };
+}
+
 // ─── Service ────────────────────────────────────────────────────────────────
 
 export const repairService = {
   /**
    * Get the repair campaign header data with turbine + wind farm.
+   * (campaign + turbine + wind farm only — no photo access here.)
    */
   async getRepairCampaign(campaignId: string): Promise<RepairCampaignDetail> {
     const { data, error } = await db
@@ -355,15 +363,14 @@ export const repairService = {
   },
 
   /**
-   * Build the full repair tree following the new data model:
-   *   campaign.quote_id → work_order (quote_id) → repair (work_order_id)
-   *   → repair_stage (repair_id) → repair_photo (repair_stage_id).
+   * Build the full repair tree using the official RPCs:
+   *   1. campaign.quote_id
+   *   2. get_repairs_for_quote(quoteId)        → one node per repair/defect
+   *   3. get_repair_photos_by_stage(repairId)  → the 11 stages + photos[]
    *
-   * For each work_order/defect:
-   *   - if its `repair` exists, use its 11 repair_stage rows (with labels, notes,
-   *     status) and their repair_photo rows;
-   *   - if no repair yet (technician hasn't started), fall back to the 11 empty
-   *     catalog stages so the UI shows placeholders without breaking.
+   * Photos come EXCLUSIVELY from the RPCs (repair_photo), never inspection_photo.
+   * Selection state (metadata.selected_for_report) is resolved from repair_photo
+   * by photo_id, since the read-only RPCs don't expose metadata.
    */
   async getRepairTree(campaignId: string): Promise<RepairTree> {
     const { data: campaign, error } = await db
@@ -376,51 +383,44 @@ export const repairService = {
       throw new RepairServiceError(error?.message || 'Repair campaign not found', error?.code);
     }
 
-    const workOrders = await fetchWorkOrdersWithDefects((campaign.quote_id as string) ?? null);
-    if (workOrders.length === 0) return [];
+    const repairs = await fetchRepairsForQuote((campaign.quote_id as string) ?? null);
+    if (repairs.length === 0) return [];
 
-    const repairsByWo = await fetchRepairsByWorkOrder(workOrders.map((w) => w.workOrderId));
-
-    const technicianIds: string[] = [];
-    for (const repair of repairsByWo.values()) {
-      const tid = repair.technician_id as string | null;
-      if (tid) technicianIds.push(tid);
-    }
-    const technicianNames = await fetchTechnicianNames(technicianIds);
-
-    // Fetch every repair's stages+photos in parallel.
-    const stagesByRepair = new Map<string, RepairStageNode[]>();
+    // Fetch every repair's stages+photos in parallel via the RPC.
+    const stagesByRepair = new Map<string, RepairStageRow[]>();
     await Promise.all(
-      [...repairsByWo.values()].map(async (repair) => {
-        const repairId = repair.id as string;
-        stagesByRepair.set(repairId, await fetchStagesForRepair(repairId));
+      repairs.map(async (repair) => {
+        stagesByRepair.set(repair.repair_id, await fetchStagesForRepair(repair.repair_id));
       }),
     );
 
-    return workOrders.map((wo) => {
-      const repair = repairsByWo.get(wo.workOrderId) ?? null;
-      const repairId = repair ? (repair.id as string) : null;
-      const stages = repairId ? stagesByRepair.get(repairId) ?? [] : [];
-      const technicianId = repair ? ((repair.technician_id as string) ?? null) : null;
+    // Resolve selection state for every photo id across all repairs in one query.
+    const allPhotoIds: string[] = [];
+    for (const rows of stagesByRepair.values()) {
+      allPhotoIds.push(...collectPhotoIds(rows));
+    }
+    const selectedIds = await fetchSelectedPhotoIds(allPhotoIds);
 
+    return repairs.map((repair) => {
+      const stageRows = stagesByRepair.get(repair.repair_id) ?? [];
+      const stages = mapStages(repair.repair_id, stageRows, selectedIds);
       return {
-        defect: wo.defect,
-        repairId,
-        repairStatus: repair ? ((repair.status as string) ?? null) : null,
-        technicianName: technicianId ? technicianNames.get(technicianId) ?? null : null,
-        // Use the repair's stages when present; otherwise the empty catalog.
+        defect: mapDefect(repair),
+        repairId: repair.repair_id,
+        repairStatus: (repair.repair_status as string) ?? null,
+        technicianName: (repair.technician_name as string) ?? null,
         stages: stages.length > 0 ? stages : catalogStages(),
       };
     });
   },
 
   /**
-   * Toggle whether a photo is selected for the repair report. The new model has
-   * no dedicated column, so selection is persisted by merging
-   * metadata.selected_for_report into repair_photo.metadata (jsonb).
+   * Toggle whether a photo is selected for the repair report. The RPCs are
+   * read-only, so selection is persisted by merging metadata.selected_for_report
+   * into repair_photo.metadata (jsonb), reading the current metadata first so we
+   * don't drop other keys.
    */
   async setPhotoSelected(photoId: string, selected: boolean): Promise<void> {
-    // Read current metadata so we merge instead of overwriting other keys.
     const { data: current, error: readErr } = await db
       .from('repair_photo')
       .select('metadata')
@@ -444,8 +444,9 @@ export const repairService = {
 
   /**
    * Aggregate summary for the repair row in the campaigns panel:
-   * defects (= work_orders of the quote), total repair_photo, stages with photos,
-   * and progress (stages done or carrying photos).
+   * defects (= repairs from get_repairs_for_quote), total repair photos
+   * (sum of total_photos), and completion (any repair_status='completed').
+   * Stage-level progress is derived from get_repair_photos_by_stage.
    */
   async getRepairSummary(campaignId: string): Promise<RepairSummary> {
     const { data: campaign } = await db
@@ -454,55 +455,38 @@ export const repairService = {
       .eq('id', campaignId)
       .single();
 
-    const workOrders = await fetchWorkOrdersWithDefects((campaign?.quote_id as string) ?? null);
-    const defectsCount = workOrders.length;
+    const repairs = await fetchRepairsForQuote((campaign?.quote_id as string) ?? null);
+    const defectsCount = repairs.length;
     const totalStages = (defectsCount > 0 ? defectsCount : 1) * REPAIR_STAGE_CATALOG.length;
 
-    const repairsByWo = await fetchRepairsByWorkOrder(workOrders.map((w) => w.workOrderId));
-    const repairIds = [...repairsByWo.values()].map((r) => r.id as string);
-
     let photosCount = 0;
-    let selectedCount = 0;
-    let stagesWithPhotos = 0;
-    let stagesDone = 0;
     let hasCompletedRepair = false;
-
-    for (const repair of repairsByWo.values()) {
-      if ((repair.status as string) === 'completed') hasCompletedRepair = true;
+    for (const repair of repairs) {
+      photosCount += Number(repair.total_photos) || 0;
+      if ((repair.repair_status as string) === 'completed') hasCompletedRepair = true;
     }
 
-    if (repairIds.length > 0) {
-      // Count photos + selected (from metadata) across all repairs.
-      const { data: photoRows, error: photoErr } = await db
-        .from('repair_photo')
-        .select('id, repair_stage_id, metadata')
-        .in('repair_id', repairIds);
-      if (photoErr) throw new RepairServiceError(photoErr.message, photoErr.code);
-
-      const stageIdsWithPhotos = new Set<string>();
-      for (const p of (photoRows as unknown[]) ?? []) {
-        const r = p as Record<string, unknown>;
-        photosCount += 1;
-        if (isSelectedForReport(r.metadata)) selectedCount += 1;
-        const sid = r.repair_stage_id as string | null;
-        if (sid) stageIdsWithPhotos.add(sid);
+    // Per-stage detail (stages with photos + selection count) from the RPC.
+    let stagesWithPhotos = 0;
+    const allPhotoIds: string[] = [];
+    if (defectsCount > 0) {
+      const stageRowsByRepair = await Promise.all(
+        repairs.map((r) => fetchStagesForRepair(r.repair_id)),
+      );
+      for (const rows of stageRowsByRepair) {
+        for (const stage of rows) {
+          const photos = parsePhotosArray(stage.photos);
+          if (photos.length > 0) stagesWithPhotos += 1;
+          for (const p of photos) {
+            const id = p.photo_id as string | undefined;
+            if (id) allPhotoIds.push(id);
+          }
+        }
       }
-      stagesWithPhotos = stageIdsWithPhotos.size;
-
-      // Count stages marked done (progress reflects technician progress too).
-      const { data: stageRows } = await db
-        .from('repair_stage')
-        .select('id, status')
-        .in('repair_id', repairIds);
-      const doneStageIds = new Set<string>();
-      for (const s of (stageRows as unknown[]) ?? []) {
-        const r = s as Record<string, unknown>;
-        if ((r.status as string) === 'done') doneStageIds.add(r.id as string);
-      }
-      // A stage counts as "progressed" if it's done OR has photos.
-      const progressed = new Set<string>([...doneStageIds, ...stageIdsWithPhotos]);
-      stagesDone = progressed.size;
     }
+
+    const selectedIds = await fetchSelectedPhotoIds(allPhotoIds);
+    const selectedCount = selectedIds.size;
 
     return {
       photosCount,
@@ -510,7 +494,8 @@ export const repairService = {
       defectsCount,
       stagesWithPhotos,
       totalStages,
-      stagesProgressPercent: totalStages > 0 ? Math.round((stagesDone / totalStages) * 100) : 0,
+      stagesProgressPercent:
+        totalStages > 0 ? Math.round((stagesWithPhotos / totalStages) * 100) : 0,
       viewedPercent: 0,
       hasCompletedRepair,
     };
