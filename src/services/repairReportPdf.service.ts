@@ -112,11 +112,14 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 async function resolveSignedUrl(storagePath: string): Promise<string> {
-  const bucket = storagePath.startsWith('inspection-imports/')
-    ? 'asset-documents'
-    : 'inspection-photos';
-  const { data } = await supabase.storage.from(bucket).createSignedUrl(storagePath, 3600);
-  return data?.signedUrl ?? '';
+  // Imported photos → private 'asset-documents' bucket (signed URL).
+  // Native drone photos → public 'inspection-photos' bucket (public URL).
+  if (storagePath.startsWith('inspection-imports/')) {
+    const { data } = await supabase.storage.from('asset-documents').createSignedUrl(storagePath, 3600);
+    return data?.signedUrl ?? '';
+  }
+  const { data } = supabase.storage.from('inspection-photos').getPublicUrl(storagePath);
+  return data?.publicUrl ?? '';
 }
 
 // ─── Data Fetching ────────────────────────────────────────────────────────────
