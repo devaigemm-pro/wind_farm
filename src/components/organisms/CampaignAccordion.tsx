@@ -274,7 +274,7 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
       <tbody>
         <tr style={{ cursor: 'pointer' }} onClick={openRepair}>
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
-          <td style={tdStyle}>{campaign.name}</td>
+          <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
           <td style={tdStyle}>
             {getRepairStatusBadge(summary?.hasCompletedRepair ? 'repair_done' : campaign.status)}
           </td>

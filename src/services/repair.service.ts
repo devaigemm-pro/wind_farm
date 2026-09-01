@@ -107,6 +107,8 @@ export type RepairTree = RepairDefectNode[];
 
 /** Summary data for the repair row in the campaigns panel. */
 export interface RepairSummary {
+  /** Turbine name (for the "Turbina" column — just the name, not the campaign). */
+  turbineName: string | null;
   photosCount: number;
   selectedCount: number;
   defectsCount: number;
@@ -451,9 +453,12 @@ export const repairService = {
   async getRepairSummary(campaignId: string): Promise<RepairSummary> {
     const { data: campaign } = await db
       .from('campaign')
-      .select('quote_id')
+      .select('quote_id, turbine:turbine_id ( name )')
       .eq('id', campaignId)
       .single();
+
+    const turbineName =
+      ((campaign?.turbine as Record<string, unknown> | null)?.name as string) ?? null;
 
     const repairs = await fetchRepairsForQuote((campaign?.quote_id as string) ?? null);
     const defectsCount = repairs.length;
@@ -489,6 +494,7 @@ export const repairService = {
     const selectedCount = selectedIds.size;
 
     return {
+      turbineName,
       photosCount,
       selectedCount,
       defectsCount,
