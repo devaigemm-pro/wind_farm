@@ -90,7 +90,7 @@ const COLOR_HEADER_TABLE: RGB = [90, 143, 90];
 const NA = 'N/A';
 
 // Block (per-photo) palette — replicates the client's HG Windtec report image.
-const COLOR_BLOCK_LABEL_BG: RGB = [220, 228, 235]; // gris claro (etiquetas)
+const COLOR_BLOCK_LABEL_BG: RGB = [225, 238, 225]; // verde tenue claro (etiquetas)
 const COLOR_BLOCK_VALUE_BG: RGB = [255, 255, 255]; // blanco (valores)
 const COLOR_BLOCK_ORANGE: RGB = [255, 140, 0]; // naranja (categoría del daño)
 const COLOR_BLOCK_LABEL_TEXT: RGB = [0, 0, 0]; // negro bold (etiquetas)
@@ -522,7 +522,7 @@ async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(255, 255, 255);
   doc.text('Generado por', margin + 10, footerStartY);
-  doc.text(ctx.companyName, margin + 10, footerStartY + 5);
+  doc.text(ctx.windFarmName, margin + 10, footerStartY + 5);
   doc.text('Con tecnología', pageW - margin - 10, footerStartY, { align: 'right' });
   doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
 
@@ -629,6 +629,61 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
   doc.setFont('helvetica', 'italic');
   doc.text('[Diagrama de diseño de la pala]', PAGE_WIDTH / 2, y + 22, { align: 'center' });
   doc.setTextColor(0, 0, 0);
+  y += 40;
+
+  // 2.5 Categorización — replicates the inspection report categorization table.
+  y += 8;
+  if (y > PAGE_HEIGHT - 80) {
+    doc.addPage();
+    y = 28;
+  }
+  y = addSectionTitle(doc, '2.5 Categorización', y);
+
+  const catRows: string[][] = [
+    ['1', 'Cosmetica', 'Daño superficial sin impacto estructural', 'Turbina continua en operación. Sin acción requerida.'],
+    ['2', 'Menor', 'Daño menor con bajo riesgo', 'Turbina continua en operación. Planificar solo si hay otros daños a reparar. En caso de no realizar reparación, monitorear anualmente.'],
+    ['3', 'Moderada', 'Daño menor, sin compromiso estructural.', 'Turbina continua en operación. Planificar reparacion de daños en los proximos 3 meses. En caso de no realizar reparación, monitorear cada 3 meses.'],
+    ['4', 'Mayor', 'Daño significativo sin compromiso de operación de la turbina durante los proximos 3 meses. Requiere pronta atención.', 'Turbina continua en operación. Requiere soporte tecnico especializado de palas y planificar reparacion de daños inmediata. En caso de no realizar reparacion, monitorear mensualmente.'],
+    ['5', 'Critico', 'Daño severo que requiere accion inmediata.', 'Detener inmediata el Aerogenerador. ¡Seguridad no garantizada! Reparación urgente.'],
+  ];
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Cat', 'Severidad', 'Tipo de daño', 'Acción requerida']],
+    body: catRows,
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: [160, 160, 160], textColor: 255, fontStyle: 'bold' },
+    bodyStyles: { textColor: [0, 0, 0] },
+    margin: { left: MARGIN, right: MARGIN },
+    didParseCell: (data: any) => {
+      if (data.section === 'body') {
+        const catNum = parseInt(data.row.raw[0] as string, 10);
+        // Row colors from reference image: teal 1-2, amber 3, orange 4, red 5
+        const rowColors: Record<number, RGB> = {
+          1: [0, 139, 148],   // teal/cyan
+          2: [0, 139, 148],   // teal/cyan
+          3: [255, 179, 0],   // amber/gold
+          4: [255, 140, 0],   // orange
+          5: [255, 0, 0],     // red
+        };
+        if (rowColors[catNum]) {
+          data.cell.styles.fillColor = rowColors[catNum];
+          data.cell.styles.textColor = [255, 255, 255];
+        }
+        if (data.column.index === 0) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 14;
+        }
+        if (data.column.index === 1) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+      if (data.section === 'head') {
+        data.cell.styles.fillColor = [160, 160, 160];
+        data.cell.styles.textColor = [255, 255, 255];
+      }
+    },
+  });
 }
 
 /**
@@ -806,18 +861,22 @@ function renderSignaturePage(doc: jsPDF, ctx: RepairPdfContext) {
   doc.setTextColor(0, 0, 0);
 }
 
-function addFooters(doc: jsPDF, companyName: string) {
+function addFooters(doc: jsPDF, windFarmName: string) {
   const totalPages = doc.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
+  const footMargin = 20; // matches ExportPanel internal footer margin
+  // Page 1 is the cover (its own footer). Internal footer starts on page 2,
+  // replicating the inspection report footer (ExportPanel addHeaderFooter):
+  // separator line + wind farm (left) / page number (center) / CORE Insight (right).
+  for (let i = 2; i <= totalPages; i++) {
     doc.setPage(i);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(footMargin, PAGE_HEIGHT - 16, PAGE_WIDTH - footMargin, PAGE_HEIGHT - 16);
     doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(120, 120, 120);
-    doc.text(
-      `Elaborado por: ${companyName} - Página ${i} de ${totalPages}`,
-      PAGE_WIDTH / 2,
-      PAGE_HEIGHT - 8,
-      { align: 'center' },
-    );
+    doc.text(windFarmName, footMargin, PAGE_HEIGHT - 10);
+    doc.text(`${i}`, PAGE_WIDTH / 2, PAGE_HEIGHT - 10, { align: 'center' });
+    doc.text('CORE Insight', PAGE_WIDTH - footMargin, PAGE_HEIGHT - 10, { align: 'right' });
     doc.setTextColor(0, 0, 0);
   }
 }
@@ -862,7 +921,7 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   renderSignaturePage(doc, ctx);
 
   // 4. Footers on all pages
-  addFooters(doc, ctx.companyName);
+  addFooters(doc, ctx.windFarmName);
 
   const dateStr = formatDateES(ctx.createdAt).replace(/\//g, '-');
   const filename = `Informe_Reparacion_${ctx.turbineName}_${dateStr}.pdf`.replace(/\s+/g, '_');
