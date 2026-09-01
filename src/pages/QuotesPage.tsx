@@ -119,7 +119,14 @@ const header: React.CSSProperties = {
   gap: 16,
   flexWrap: 'wrap',
 };
-const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: C.text, margin: 0 };
+const title: React.CSSProperties = {
+  margin: 0,
+  fontSize: 'var(--text-xl)',
+  fontWeight: 700,
+  color: '#111827',
+  borderLeft: '4px solid #5A8F5A',
+  paddingLeft: '12px',
+};
 const subtitle: React.CSSProperties = { fontSize: 14, color: C.muted, margin: '4px 0 0' };
 const traceBtn: React.CSSProperties = {
   display: 'inline-flex',
