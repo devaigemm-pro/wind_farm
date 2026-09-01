@@ -424,67 +424,74 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
 }
 
 /**
- * Cover page (page 1). Replicates the inspection report cover layout
- * (green background, top overlay, centered two-line title, centered subtitles,
- * white footer band with "Con tecnología CORE Insight" + environmental note),
- * but adds the `repairs.jpg` hero image and the CORE Insight logo.
+ * Cover page (page 1). Replicates the inspection report cover layout EXACTLY
+ * (top overlay band, centered two-line title, centered subtitles, white footer
+ * band with "Con tecnología CORE Insight" + environmental note), with a single
+ * difference: instead of the solid green background, the `repairs.jpg` image
+ * covers the ENTIRE page, and a semi-transparent dark overlay is applied over
+ * the whole page so the white text stays legible. No graphic logo — brand
+ * identity is the "Con tecnología CORE Insight" footer text, same as inspection.
  * All subtitle data comes from BD (windFarmName / turbineName / repair date).
+ *
+ * Draw order (so text stays on top): image → overlay (full page) + top band →
+ * title → subtitles → white footer band + footer texts + environmental note.
  */
 async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
-  // Green background (same as inspection cover).
   const [r, g, b] = hexToRgb(COLOR_COVER_BG);
-  doc.setFillColor(r, g, b);
-  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
 
-  // Overlay (darker band at top) — same as inspection.
+  // 1) Full-page image (repairs.jpg). Fallback: solid green background so the
+  //    page is never blank if the image fails to load.
+  const heroBase64 = await loadImageAsBase64(`${window.location.origin}/repairs.jpg`);
+  let imageDrawn = false;
+  if (heroBase64) {
+    try {
+      doc.addImage(heroBase64, 'JPEG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+      imageDrawn = true;
+    } catch {
+      // fall through to green fallback
+    }
+  }
+  if (!imageDrawn) {
+    doc.setFillColor(r, g, b);
+    doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+  }
+
+  // 2) Semi-transparent dark overlay over the WHOLE page for legibility.
+  //    jsPDF exposes alpha via GState; cast to any in case types are missing.
+  const anyDoc = doc as any;
+  try {
+    if (typeof anyDoc.setGState === 'function' && typeof anyDoc.GState === 'function') {
+      anyDoc.setGState(anyDoc.GState({ opacity: 0.35 }));
+      doc.setFillColor(0, 0, 0);
+      doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+      anyDoc.setGState(anyDoc.GState({ opacity: 1 }));
+    }
+  } catch {
+    // GState unavailable — top band below still provides contrast.
+  }
+
+  // Top overlay band (kept for fidelity with the inspection cover).
   doc.setFillColor(r - 20, g - 20, b - 20);
   doc.rect(0, 0, PAGE_WIDTH, 50, 'F');
 
-  // CORE Insight logo — top center (brand identity).
-  const logoBase64 = await loadImageAsBase64(`${window.location.origin}/core-insight-logo.png`);
-  if (logoBase64) {
-    try {
-      const logoW = 60;
-      const logoH = 18;
-      doc.addImage(logoBase64, 'PNG', (PAGE_WIDTH - logoW) / 2, 16, logoW, logoH);
-    } catch {
-      // skip broken logo
-    }
-  }
-
-  // Main title (two lines, centered) — exact glosses.
+  // 3) Main title (two lines, centered) — exact positions/sizes as inspection.
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
-  doc.text('Palas de turbina eólica', PAGE_WIDTH / 2, 78, { align: 'center' });
-  doc.text('Informe de Reparación', PAGE_WIDTH / 2, 93, { align: 'center' });
+  doc.text('Palas de turbina eólica', PAGE_WIDTH / 2, 90, { align: 'center' });
+  doc.text('Informe de Reparación', PAGE_WIDTH / 2, 105, { align: 'center' });
 
-  // Hero image: repairs.jpg — centered band below the title, margin-to-margin.
-  const heroBase64 = await loadImageAsBase64(`${window.location.origin}/repairs.jpg`);
-  if (heroBase64) {
-    try {
-      const heroX = MARGIN;
-      const heroY = 104;
-      const heroW = PAGE_WIDTH - 2 * MARGIN;
-      const heroH = 90;
-      doc.addImage(heroBase64, 'JPEG', heroX, heroY, heroW, heroH);
-    } catch {
-      // skip broken hero image
-    }
-  }
-
-  // Subtitles (centered) — wind farm, turbine, repair date (all from BD).
+  // 4) Subtitles (centered) — wind farm, turbine, repair date (all from BD).
   const repairDateSource = ctx.repairCompletedAt || ctx.repairStartedAt || ctx.createdAt;
   const repairDate = formatDateLongES(repairDateSource);
 
-  doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.text(ctx.windFarmName, PAGE_WIDTH / 2, 210, { align: 'center' });
+  doc.text(ctx.windFarmName, PAGE_WIDTH / 2, 130, { align: 'center' });
 
   doc.setFontSize(12);
-  doc.text(`Turbina: ${ctx.turbineName}`, PAGE_WIDTH / 2, 222, { align: 'center' });
-  doc.text(repairDate, PAGE_WIDTH / 2, 234, { align: 'center' });
+  doc.text(`Turbina: ${ctx.turbineName}`, PAGE_WIDTH / 2, 142, { align: 'center' });
+  doc.text(repairDate, PAGE_WIDTH / 2, 154, { align: 'center' });
 
   // Footer white band (same as inspection cover).
   doc.setFillColor(255, 255, 255);
