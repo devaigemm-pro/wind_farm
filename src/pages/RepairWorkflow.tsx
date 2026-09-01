@@ -167,7 +167,8 @@ function DefectSection({
   onDownloadReport,
   downloading,
 }: DefectSectionProps) {
-  const [open, setOpen] = useState(true);
+  // Defects start COLLAPSED on page load; the user expands the ones they want.
+  const [open, setOpen] = useState(false);
   const { defect } = node;
 
   const totalPhotos = node.stages.reduce((acc, s) => acc + s.photos.length, 0);
