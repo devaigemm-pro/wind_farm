@@ -285,6 +285,7 @@ export const translations: TranslationMap = {
   'repair.workflowTitle': { en: 'Repair Workflow', es: 'Flujo de Reparación' },
   'repair.workflowHint': { en: 'For each repair stage, drag or click to select the preferred photos that will appear in the repair report.', es: 'Para cada etapa de reparación, arrastra o haz clic para seleccionar las fotos preferidas que aparecerán en el informe.' },
   'repair.downloadReport': { en: 'Download repair report', es: 'Descargar informe de reparación' },
+  'repair.generateReport': { en: 'Generate report', es: 'Generar informe' },
   'repair.pdfError': { en: 'Failed to generate the repair report.', es: 'Error al generar el informe de reparación.' },
   'repair.photos': { en: 'photos', es: 'fotos' },
   'repair.selected': { en: 'selected', es: 'seleccionadas' },
