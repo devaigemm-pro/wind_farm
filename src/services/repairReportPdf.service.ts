@@ -26,6 +26,10 @@ interface RepairPhotoForPdf {
   photoId: string;
   /** defect.id this photo belongs to (view.defect_id). */
   defectId: string | null;
+  /** repair.id this photo belongs to (view.repair_id). The RepairWorkflow UI
+   *  identifies each "defect node" by repair_id, so per-defect scoping filters
+   *  by this value, not by defect_id. */
+  repairId: string | null;
   /** repair stage code (view.stage_code) — used for ordering/labels. */
   stageCode: string;
   /** Human-readable stage name (shown as "Descripción" in the block). view.stage_label. */
@@ -303,6 +307,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
 
       const storagePath = (r.storage_path as string) ?? '';
       const defectId = (r.defect_id as string) ?? null;
+      const repairId = (r.repair_id as string) ?? null;
       if (defectId) defectIdsFromView.add(defectId);
 
       // Track repair timeframe from the BD (any row carries it).
@@ -321,6 +326,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
       photos.push({
         photoId,
         defectId,
+        repairId,
         stageCode,
         stageLabel,
         stageOrder: Number(r.stage_order) || 0,
@@ -957,15 +963,27 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
 
   const fullCtx = await fetchRepairData(data.campaignId);
 
-  // When a defectId is provided, scope the report to that single defect: only
-  // its defect entry and only the photos belonging to it.
-  const ctx: RepairPdfContext = data.defectId
-    ? {
-        ...fullCtx,
-        defects: fullCtx.defects.filter((d) => d.id === data.defectId),
-        photos: fullCtx.photos.filter((p) => p.defectId === data.defectId),
-      }
-    : fullCtx;
+  // When a defectId is provided, scope the report to that SINGLE repair/defect
+  // node. NOTE: the RepairWorkflow UI identifies each defect node by repair_id,
+  // so `data.defectId` actually carries a repair_id. Filter the photos by
+  // repairId, then keep only the defects those photos point to — this preserves
+  // ALL stages + detail tables + photos of that defect (nothing is dropped).
+  let ctx: RepairPdfContext = fullCtx;
+  if (data.defectId) {
+    const scopedPhotos = fullCtx.photos.filter((p) => p.repairId === data.defectId);
+    const scopedDefectIds = new Set(
+      scopedPhotos.map((p) => p.defectId).filter((id): id is string => id != null),
+    );
+    ctx = {
+      ...fullCtx,
+      // Keep the defects referenced by the scoped photos (fallback: all if the
+      // photos couldn't resolve a defect_id, so the block still renders).
+      defects: scopedDefectIds.size > 0
+        ? fullCtx.defects.filter((d) => scopedDefectIds.has(d.id))
+        : fullCtx.defects,
+      photos: scopedPhotos,
+    };
+  }
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
