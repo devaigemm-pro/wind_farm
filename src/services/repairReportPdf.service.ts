@@ -637,7 +637,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     doc.addPage();
     y = 28;
   }
-  y = addSectionTitle(doc, '2.5 Categorización', y);
+  y = addSectionTitle(doc, 'Categorización de Daños', y);
 
   const catRows: string[][] = [
     ['1', 'Cosmetica', 'Daño superficial sin impacto estructural', 'Turbina continua en operación. Sin acción requerida.'],
