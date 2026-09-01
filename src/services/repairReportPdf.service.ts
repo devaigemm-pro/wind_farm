@@ -875,18 +875,28 @@ function renderSignaturePage(doc: jsPDF, ctx: RepairPdfContext) {
   let y = addSectionTitle(doc, 'Derechos de informe:', 30);
   y += 6;
 
-  // Legal / rights text — project name is DYNAMIC (wind farm from BD).
+  // Legal / rights text — verbatim client text. The "finalidad" (project name)
+  // is DYNAMIC, sourced from the wind farm (BD).
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(40, 40, 40);
   const legal =
-    `El presente informe corresponde a la reparación de palas en turbina eólica en Proyecto Eólico ` +
-    `${ctx.windFarmName}. Este documento y su contenido son propiedad de la empresa emisora y se ` +
-    `entregan de forma confidencial al cliente. Queda prohibida su reproducción total o parcial, así ` +
-    `como su distribución a terceros, sin autorización expresa por escrito. La información contenida ` +
-    `refleja el estado de la reparación en la fecha indicada.`;
+    `\u201CEl cliente reconoce los derechos de Propiedad Intelectual del prestador sobre todo el ` +
+    `desarrollo intelectual del reporte técnico suministrado, tanto el objeto final del mismo como el ` +
+    `conjunto de documentos, diagramas, fotos, tablas, esquemas y demás elementos previos que lo ` +
+    `conforman. El prestador cede su desarrollo únicamente para su uso personal físico o jurídico, sin ` +
+    `exclusividad, por un tiempo determinado y únicamente para llevar a cabo la siguiente finalidad ` +
+    `\u201CReparación de palas en turbina eólica en Proyecto Eólico ${ctx.windFarmName}\u201D, no quedando ` +
+    `permitida en ningún caso su reproducción, cesión, venta, alquiler o préstamo, comprometiéndose el ` +
+    `usuario, a título enunciativo y no limitativo, a no ceder su uso parcial o total de ninguna forma, ` +
+    `así como a no divulgarlo, publicarlo, ni ponerlo de ninguna otra manera a disposición de otras ` +
+    `personas. El prestador garantiza al cliente que el desarrollo es absolutamente original y que ` +
+    `cuenta con la totalidad de los derechos de propiedad intelectual sobre el mismo, habiendo sido ` +
+    `completamente desarrollado por el prestador. Por lo que se puede garantizar que éste y las ` +
+    `herramientas con las que ha sido realizado no vulneran ninguna normativa, contrato, derecho, ` +
+    `interés o propiedad de terceros.\u201D`;
   const legalLines = doc.splitTextToSize(legal, PAGE_WIDTH - 2 * MARGIN);
-  doc.text(legalLines, MARGIN, y);
+  doc.text(legalLines, MARGIN, y, { align: 'justify', maxWidth: PAGE_WIDTH - 2 * MARGIN });
   y += legalLines.length * 5 + 40;
 
   // Empty signature line (left blank for a handwritten signature).
