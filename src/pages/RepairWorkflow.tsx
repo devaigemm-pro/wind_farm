@@ -46,7 +46,9 @@ export function RepairWorkflow() {
   const { data: tree, isLoading: treeLoading } = useRepairTree(campaignId);
   const setSelected = useSetPhotoSelected(campaignId);
 
-  const [downloading, setDownloading] = useState(false);
+  // defectId currently being generated (null = none). Scopes the spinner to
+  // the specific defect card whose report is being generated.
+  const [downloadingDefectId, setDownloadingDefectId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
 
   const handleSelect = (photo: RepairPhoto, selected: boolean) => {
@@ -58,15 +60,16 @@ export function RepairWorkflow() {
     if (photo.url) setLightbox(photo);
   };
 
-  const handleDownloadPdf = async () => {
+  // Generate a PDF report scoped to a SINGLE defect.
+  const handleDownloadDefectPdf = async (defectId: string) => {
     if (!campaignId) return;
-    setDownloading(true);
+    setDownloadingDefectId(defectId);
     try {
-      await generateAndDownloadRepairReport({ campaignId });
+      await generateAndDownloadRepairReport({ campaignId, defectId });
     } catch (err) {
       toast.error((err as Error)?.message || t('repair.pdfError'));
     } finally {
-      setDownloading(false);
+      setDownloadingDefectId(null);
     }
   };
 
@@ -88,14 +91,6 @@ export function RepairWorkflow() {
               {campaign?.windFarmName ? ` · ${campaign.windFarmName}` : ''}
             </p>
           </div>
-          <button style={pdfBtn} disabled={downloading} onClick={handleDownloadPdf}>
-            {downloading ? (
-              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <Download size={16} />
-            )}
-            {t('repair.downloadReport')}
-          </button>
         </div>
       </div>
 
@@ -116,6 +111,8 @@ export function RepairWorkflow() {
               t={t}
               onSelect={handleSelect}
               onPreview={handlePreview}
+              onDownloadReport={handleDownloadDefectPdf}
+              downloading={downloadingDefectId === node.defect.id}
             />
           ))}
         </div>
@@ -156,9 +153,20 @@ interface DefectSectionProps {
   t: (key: string) => string;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
+  onDownloadReport: (defectId: string) => void;
+  downloading: boolean;
 }
 
-function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSectionProps) {
+function DefectSection({
+  node,
+  index,
+  locale,
+  t,
+  onSelect,
+  onPreview,
+  onDownloadReport,
+  downloading,
+}: DefectSectionProps) {
   const [open, setOpen] = useState(true);
   const { defect } = node;
 
@@ -193,6 +201,30 @@ function DefectSection({ node, index, locale, t, onSelect, onPreview }: DefectSe
         </div>
         <span style={defectCount}>
           {totalPhotos} {t('repair.photos')} · {selectedPhotos} {t('repair.selected')}
+        </span>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-disabled={downloading}
+          style={{ ...defectPdfBtn, opacity: downloading ? 0.6 : 1 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!downloading) onDownloadReport(defect.id);
+          }}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !downloading) {
+              e.stopPropagation();
+              onDownloadReport(defect.id);
+            }
+          }}
+          title={t('repair.generateReport')}
+        >
+          {downloading ? (
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <Download size={14} />
+          )}
+          {t('repair.generateReport')}
         </span>
       </button>
 
@@ -400,10 +432,6 @@ const backBtn: React.CSSProperties = {
 const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1a1a', margin: 0 };
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 20 };
-const pdfBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 8, background: C.brand, color: '#fff',
-  border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-};
 const defectsWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 16 };
 const defectCard: React.CSSProperties = {
   border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', overflow: 'hidden',
@@ -420,6 +448,11 @@ const defectIndex: React.CSSProperties = {
 const defectTitle: React.CSSProperties = { fontSize: 15, fontWeight: 700, color: '#1a1a1a' };
 const defectMeta: React.CSSProperties = { fontSize: 12, color: C.muted, marginTop: 2 };
 const defectCount: React.CSSProperties = { fontSize: 12, color: C.muted, flexShrink: 0 };
+const defectPdfBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
+  borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+  flexShrink: 0, userSelect: 'none',
+};
 const stagesWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: 16 };
 const stageCard: React.CSSProperties = {
   border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, background: '#fff',
