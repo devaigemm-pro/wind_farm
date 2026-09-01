@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
+import { getStageCatalogLabel } from '@/constants/repair-stages';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -13,27 +14,53 @@ export interface RepairReportData {
 
 type RGB = [number, number, number];
 
+/**
+ * One selected repair photo, with ALL the context needed to render its block.
+ * Every field is sourced from the DB (repair_photos_detailed view + defect table).
+ * Fields that don't exist in the DB are left empty — never invented.
+ */
 interface RepairPhotoForPdf {
-  /** repair_photo.photo_id (used only while resolving selection state). */
-  photoId?: string;
+  /** repair_photo id (repair_photos_detailed.photo_id / id). */
+  photoId: string;
+  /** defect.id this photo belongs to (view.defect_id). */
   defectId: string | null;
+  /** repair stage code (view.stage_code) — used for ordering/labels. */
   stageCode: string;
+  /** Human-readable stage name (shown as "Descripción" in the block). view.stage_label. */
+  stageLabel: string;
   /** repair stage_order for grouping/ordering photos by stage. */
-  sortOrder: number;
+  stageOrder: number;
   captureOrder: number;
+  /** captured_at (or repair_completed_at) — used for the Fecha field. */
+  capturedAt: string | null;
+  repairCompletedAt: string | null;
+  /** blade side reported on the photo/stage (view.blade_side). */
+  bladeSide: string | null;
+  /** turbine name (view.turbine_name). */
+  turbineName: string | null;
+  /** public URL resolved from storage_path. */
   url: string;
+  /** whether metadata.selected_for_report is true. */
+  selected: boolean;
 }
 
+/**
+ * A defect (from the `defect` table, keyed by repair_photos_detailed.defect_id).
+ * Provides Largo/Ancho/lado and blade position for the block table.
+ */
 interface DefectForPdf {
   id: string;
   type: string;
-  severity: number;
-  distanceFromRoot: number;
+  severity: number | null;
+  distanceFromRoot: number | null;
   widthCm: number | null;
   heightCm: number | null;
   side: string | null;
   description: string | null;
+  /** blade position (1=A, 2=B, 3=C) resolved via defect→inspection→blade. */
   bladePosition: number;
+  /** blade serial number resolved via defect→inspection→blade. */
+  bladeSerial: string | null;
 }
 
 interface RepairPdfContext {
@@ -47,6 +74,9 @@ interface RepairPdfContext {
   companyName: string;
   technicianName: string;
   technicianEmail: string;
+  /** repair start/end dates from the view (BD), for portada/año. */
+  repairStartedAt: string | null;
+  repairCompletedAt: string | null;
   blades: { position: number; serialNumber: string | null; lengthMeters: number | null }[];
   defects: DefectForPdf[];
   photos: RepairPhotoForPdf[];
@@ -56,24 +86,19 @@ interface RepairPdfContext {
 
 const COLOR_PRIMARY = '#5A8F5A';
 const COLOR_HEADER_TABLE: RGB = [90, 143, 90];
-const COLOR_DAMAGE_BAND: RGB = [255, 140, 0]; // naranja
 const NA = 'N/A';
+
+// Block (per-photo) palette — replicates the client's HG Windtec report image.
+const COLOR_BLOCK_LABEL_BG: RGB = [220, 228, 235]; // gris claro (etiquetas)
+const COLOR_BLOCK_VALUE_BG: RGB = [255, 255, 255]; // blanco (valores)
+const COLOR_BLOCK_ORANGE: RGB = [255, 140, 0]; // naranja (categoría del daño)
+const COLOR_BLOCK_LABEL_TEXT: RGB = [0, 0, 0]; // negro bold (etiquetas)
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
 const MARGIN = 14;
 
 const BLADE_LABELS: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
-
-const DEFECT_TYPE_LABELS: Record<string, string> = {
-  le_erosion: 'Erosión LE',
-  vortex: 'Vortex (paneles faltantes)',
-  paint_defect: 'Daños de pintura',
-  crack: 'Grieta',
-  delamination: 'Delaminación',
-  lightning_damage: 'Daño por rayo',
-  other: 'Otros',
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,8 +119,36 @@ function formatDateES(dateStr: string | null | undefined): string {
   return `${day}/${month}/${d.getFullYear()}`;
 }
 
-function formatDefectType(type: string): string {
-  return DEFECT_TYPE_LABELS[type] || type.toUpperCase().replace(/_/g, ' ');
+const MONTHS_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** DD-Mon-YYYY (e.g. "05-Mar-2024") for the block "Fecha" field. Empty if no date. */
+function formatDateBlock(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${day}-${MONTHS_ABBR[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+/**
+ * Maps a defect side / blade_side value to the X marks for the block table.
+ * LE → B.Ataque, TE → B.Salida, PS/pressure → Lado de Alta, SS/suction → Lado de Baja.
+ * All others empty. Never invents a mark.
+ */
+function sideMarks(side: string | null | undefined): {
+  ladoAlta: string;
+  ladoBaja: string;
+  bAtaque: string;
+  bSalida: string;
+} {
+  const out = { ladoAlta: '', ladoBaja: '', bAtaque: '', bSalida: '' };
+  if (!side) return out;
+  const s = side.toString().trim().toLowerCase();
+  if (s === 'le' || s.includes('leading') || s.includes('ataque')) out.bAtaque = 'X';
+  else if (s === 'te' || s.includes('trailing') || s.includes('salida')) out.bSalida = 'X';
+  else if (s === 'ps' || s.includes('pressure') || s.includes('alta')) out.ladoAlta = 'X';
+  else if (s === 'ss' || s.includes('suction') || s.includes('baja')) out.ladoBaja = 'X';
+  return out;
 }
 
 async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -124,25 +177,27 @@ function resolvePhotoUrl(storagePath: string): string {
 
 // ─── Data Fetching ────────────────────────────────────────────────────────────
 
-/** photos[] entry from get_repair_photos_by_stage. */
-interface RpcPhoto {
-  photo_id?: string;
-  storage_path?: string;
-  capture_order?: number;
-}
-
-/** Parse the photos[] value (array or JSON string) from a stage row. */
-function parseRpcPhotos(value: unknown): RpcPhoto[] {
-  if (Array.isArray(value)) return value as RpcPhoto[];
-  if (typeof value === 'string') {
+/** Reads a possibly-JSON metadata value and returns whether selected_for_report is true. */
+function isSelectedForReport(metadata: unknown): boolean {
+  let obj: unknown = metadata;
+  if (typeof obj === 'string') {
     try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as RpcPhoto[]) : [];
+      obj = JSON.parse(obj);
     } catch {
-      return [];
+      return false;
     }
   }
-  return [];
+  if (!!obj && typeof obj === 'object') {
+    return Boolean((obj as Record<string, unknown>).selected_for_report);
+  }
+  return false;
+}
+
+/** Safe number parse → null when absent. */
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
 }
 
 async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
@@ -205,111 +260,121 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     }
   }
 
-  // 4. Repairs / defects — via the official RPC get_repairs_for_quote. Each row is
-  //    one repair (= one defect being repaired). The repair_id groups its photos.
-  //    We NEVER read inspection_photo for repair evidence.
-  const defects: DefectForPdf[] = [];
-  const repairIds: string[] = [];
+  // 4. Repair photos — from the OFFICIAL view `repair_photos_detailed` (one row per
+  //    photo, with all context). We filter by the campaign's quote_id and order by
+  //    stage_order then capture_order. We NEVER read inspection_photo for repair
+  //    evidence. Every value below comes from the view (BD) — nothing invented.
+  let photos: RepairPhotoForPdf[] = [];
+  let repairStartedAt: string | null = null;
+  let repairCompletedAt: string | null = null;
+  const defectIdsFromView = new Set<string>();
+
   if (campaign.quote_id) {
-    const { data: repairRows, error: repErr } = await db.rpc('get_repairs_for_quote', {
-      quote_id_param: campaign.quote_id,
-    });
-    if (repErr) throw repErr;
-    for (const rr of (repairRows as unknown[]) ?? []) {
+    const { data: viewRows, error: viewErr } = await db
+      .from('repair_photos_detailed')
+      .select('*')
+      .eq('quote_id', campaign.quote_id)
+      .order('stage_order')
+      .order('capture_order');
+    if (viewErr) throw viewErr;
+
+    for (const rr of (viewRows as unknown[]) ?? []) {
       const r = rr as Record<string, unknown>;
-      const repairId = (r.repair_id as string) ?? '';
-      if (!repairId) continue;
-      repairIds.push(repairId);
-      // The RPC groups by repair/defect. It doesn't carry a blade position or the
-      // fine defect dimensions, so we default bladePosition to 1 and leave the
-      // dimensional fields as N/A (rendered accordingly). id = repair_id so photos
-      // group to the right damage below.
-      defects.push({
-        id: repairId,
-        type: (r.defect_type as string) ?? 'other',
-        severity: Number(r.defect_severity) || 0,
-        distanceFromRoot: 0,
-        widthCm: null,
-        heightCm: null,
-        side: null,
-        description: null,
-        bladePosition: 1,
+      const photoId = (r.photo_id as string) ?? (r.id as string) ?? '';
+      if (!photoId) continue;
+
+      const storagePath = (r.storage_path as string) ?? '';
+      const defectId = (r.defect_id as string) ?? null;
+      if (defectId) defectIdsFromView.add(defectId);
+
+      // Track repair timeframe from the BD (any row carries it).
+      if (!repairStartedAt && r.repair_started_at) {
+        repairStartedAt = r.repair_started_at as string;
+      }
+      if (!repairCompletedAt && r.repair_completed_at) {
+        repairCompletedAt = r.repair_completed_at as string;
+      }
+
+      const stageCode = (r.stage_code as string) ?? '';
+      const stageLabel =
+        (r.stage_label as string) ||
+        (stageCode ? getStageCatalogLabel(stageCode, 'es') : '');
+
+      photos.push({
+        photoId,
+        defectId,
+        stageCode,
+        stageLabel,
+        stageOrder: Number(r.stage_order) || 0,
+        captureOrder: Number(r.capture_order) || 0,
+        capturedAt: (r.captured_at as string) ?? null,
+        repairCompletedAt: (r.repair_completed_at as string) ?? null,
+        bladeSide: (r.blade_side as string) ?? null,
+        turbineName: (r.turbine_name as string) ?? null,
+        url: resolvePhotoUrl(storagePath),
+        selected: isSelectedForReport(r.metadata),
       });
     }
   }
 
-  // 5. Selected repair photos — via get_repair_photos_by_stage per repair. The RPC
-  //    returns the 11 stages (in order) with a photos[] array each. Selection is
-  //    stored in repair_photo.metadata.selected_for_report, which the read-only RPC
-  //    doesn't expose, so we resolve it from repair_photo by photo_id. Photos are
-  //    grouped to their defect via repair_id (= defect.id).
-  const photos: RepairPhotoForPdf[] = [];
-  if (repairIds.length > 0) {
-    const stageRowsByRepair = await Promise.all(
-      repairIds.map(async (repairId) => {
-        const { data, error } = await db.rpc('get_repair_photos_by_stage', {
-          repair_id_param: repairId,
-        });
-        if (error) throw error;
-        return { repairId, rows: (data as unknown[]) ?? [] };
-      }),
-    );
+  // 4b. Filter to selected_for_report=true. If NONE selected, fall back to all.
+  const anySelected = photos.some((p) => p.selected);
+  if (anySelected) {
+    photos = photos.filter((p) => p.selected);
+  }
 
-    // Collect all photo ids to resolve selection in a single query.
-    const candidates: RepairPhotoForPdf[] = [];
-    const allPhotoIds: string[] = [];
-    for (const { repairId, rows } of stageRowsByRepair) {
-      for (const s of rows) {
-        const stage = s as Record<string, unknown>;
-        const sortOrder = Number(stage.stage_order) || 0;
-        const stageCode = (stage.stage_code as string) ?? '';
-        for (const p of parseRpcPhotos(stage.photos)) {
-          const photoId = p.photo_id ?? '';
-          if (!photoId) continue;
-          allPhotoIds.push(photoId);
-          candidates.push({
-            photoId,
-            defectId: repairId,
-            stageCode,
-            sortOrder,
-            captureOrder: Number(p.capture_order) || 0,
-            url: resolvePhotoUrl(p.storage_path ?? ''),
-          });
-        }
+  // 5. Defect dimensions/sides — read the `defect` table by the defect_id set from
+  //    the view. This populates Largo/Ancho/lados. Blade position + serial are
+  //    resolved via defect → inspection → blade.
+  const defects: DefectForPdf[] = [];
+  if (defectIdsFromView.size > 0) {
+    const defectIds = [...defectIdsFromView];
+    const { data: defectRows, error: defErr } = await db
+      .from('defect')
+      .select('id, type, severity, distance_from_root, width_cm, height_cm, side, description, inspection_id')
+      .in('id', defectIds);
+    if (defErr) throw defErr;
+
+    // Resolve blade (position + serial) per defect via inspection → blade.
+    const inspectionIds = [
+      ...new Set(
+        ((defectRows as unknown[]) ?? [])
+          .map((d) => (d as Record<string, unknown>).inspection_id as string)
+          .filter(Boolean),
+      ),
+    ];
+    const bladeByInspection: Record<string, { position: number; serial: string | null }> = {};
+    if (inspectionIds.length > 0) {
+      const { data: inspRows } = await db
+        .from('inspection')
+        .select('id, blade:blade_id ( position, serial_number )')
+        .in('id', inspectionIds);
+      for (const ir of (inspRows as unknown[]) ?? []) {
+        const r = ir as Record<string, unknown>;
+        const blade = (r.blade as Record<string, unknown>) ?? {};
+        bladeByInspection[r.id as string] = {
+          position: Number(blade.position) || 0,
+          serial: (blade.serial_number as string) ?? null,
+        };
       }
     }
 
-    // Resolve which photos are selected_for_report.
-    const selectedIds = new Set<string>();
-    const uniqueIds = [...new Set(allPhotoIds)];
-    if (uniqueIds.length > 0) {
-      const { data: metaRows } = await db
-        .from('repair_photo')
-        .select('id, metadata')
-        .in('id', uniqueIds);
-      for (const m of (metaRows as unknown[]) ?? []) {
-        const r = m as Record<string, unknown>;
-        const metadata = r.metadata;
-        if (
-          !!metadata &&
-          typeof metadata === 'object' &&
-          Boolean((metadata as Record<string, unknown>).selected_for_report)
-        ) {
-          selectedIds.add(r.id as string);
-        }
-      }
-    }
-
-    for (const c of candidates) {
-      if (c.photoId && selectedIds.has(c.photoId)) {
-        photos.push({
-          defectId: c.defectId,
-          stageCode: c.stageCode,
-          sortOrder: c.sortOrder,
-          captureOrder: c.captureOrder,
-          url: c.url,
-        });
-      }
+    for (const dr of (defectRows as unknown[]) ?? []) {
+      const r = dr as Record<string, unknown>;
+      const inspId = (r.inspection_id as string) ?? '';
+      const bladeInfo = bladeByInspection[inspId] ?? { position: 0, serial: null };
+      defects.push({
+        id: (r.id as string) ?? '',
+        type: (r.type as string) ?? 'other',
+        severity: numOrNull(r.severity),
+        distanceFromRoot: numOrNull(r.distance_from_root),
+        widthCm: numOrNull(r.width_cm),
+        heightCm: numOrNull(r.height_cm),
+        side: (r.side as string) ?? null,
+        description: (r.description as string) ?? null,
+        bladePosition: bladeInfo.position,
+        bladeSerial: bladeInfo.serial,
+      });
     }
   }
 
@@ -324,6 +389,8 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     companyName: 'HG Windtec',
     technicianName,
     technicianEmail,
+    repairStartedAt,
+    repairCompletedAt,
     blades,
     defects,
     photos,
@@ -356,6 +423,10 @@ function renderCoverAndGeneral(doc: jsPDF, ctx: RepairPdfContext) {
 
   let y = 44;
 
+  // Año — prefer repair dates from BD, fall back to campaign createdAt.
+  const anioSource = ctx.repairCompletedAt || ctx.repairStartedAt || ctx.createdAt;
+  const anioReporte = anioSource ? String(new Date(anioSource).getFullYear()) : NA;
+
   // General data table
   const bladesInRepair = ctx.blades.length > 0
     ? ctx.blades.map((bl) => `Pala ${BLADE_LABELS[bl.position] || bl.position}`).join(', ')
@@ -368,7 +439,7 @@ function renderCoverAndGeneral(doc: jsPDF, ctx: RepairPdfContext) {
       ['País', NA],
       ['Cliente', NA],
       ['Planta (P.E.)', ctx.windFarmName],
-      ['Año', ctx.createdAt ? String(new Date(ctx.createdAt).getFullYear()) : NA],
+      ['Año', anioReporte],
       ['Fabricante', NA],
       ['Tipo de turbina', ctx.turbineModel],
       ['N° de turbina', ctx.turbineName],
@@ -376,8 +447,8 @@ function renderCoverAndGeneral(doc: jsPDF, ctx: RepairPdfContext) {
       ['Estado turbina antes de la reparación', NA],
       ['Estado turbina después de la reparación', NA],
       ['Pala(s) en reparación', bladesInRepair],
-      ['Fecha inicio (Pala A / B / C)', NA],
-      ['Fecha fin (Pala A / B / C)', NA],
+      ['Fecha inicio', ctx.repairStartedAt ? formatDateES(ctx.repairStartedAt) : NA],
+      ['Fecha fin', ctx.repairCompletedAt ? formatDateES(ctx.repairCompletedAt) : NA],
       ['Daños reparados (cantidad)', String(ctx.defects.length)],
       ['Informe realizado por', ctx.technicianName + (ctx.technicianEmail ? ` (${ctx.technicianEmail})` : '')],
       ['Técnico(s) a cargo', ctx.technicianName],
@@ -437,11 +508,95 @@ function renderCoverAndGeneral(doc: jsPDF, ctx: RepairPdfContext) {
   doc.setTextColor(0, 0, 0);
 }
 
-/** Renders one blade separator page + per-damage detail with selected photos. */
+/**
+ * Renders the detail table for a single photo block, replicating the client's
+ * HG Windtec image: 4-column label/value grid built with autoTable colSpans and
+ * per-cell fill colors (labels gray, values white). Every value comes from BD.
+ * Returns the finalY after the table.
+ */
+function renderBlockTable(
+  doc: jsPDF,
+  startY: number,
+  defect: DefectForPdf | null,
+  photo: RepairPhotoForPdf,
+  bladeLabel: string,
+): number {
+  // Prefer the defect date context; fall back to captured/completed dates (BD).
+  const fecha = formatDateBlock(photo.capturedAt || photo.repairCompletedAt);
+  const serie = defect?.bladeSerial || '';
+  const turbina = photo.turbineName || '';
+  const marks = sideMarks(defect?.side || photo.bladeSide);
+  const largo = defect?.heightCm != null ? `${defect.heightCm}mm` : '';
+  const ancho = defect?.widthCm != null ? `${defect.widthCm}mm` : '';
+  const descripcion = photo.stageLabel || '';
+
+  // autoTable cell type: [text, fill]. Labels use gray bg + bold black; values
+  // use white bg. Fields with no BD data render as '' (empty), never invented.
+  const labelStyle = { fillColor: COLOR_BLOCK_LABEL_BG, textColor: COLOR_BLOCK_LABEL_TEXT, fontStyle: 'bold' as const };
+  const valueStyle = { fillColor: COLOR_BLOCK_VALUE_BG, textColor: [0, 0, 0] as RGB };
+
+  const L = (text: string) => ({ content: text, styles: labelStyle });
+  const V = (text: string) => ({ content: text, styles: valueStyle });
+
+  const colW = (PAGE_WIDTH - 2 * MARGIN) / 4;
+  autoTable(doc, {
+    startY,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2, lineColor: [180, 180, 180], lineWidth: 0.2, halign: 'left', valign: 'middle' },
+    columnStyles: {
+      0: { cellWidth: colW },
+      1: { cellWidth: colW },
+      2: { cellWidth: colW },
+      3: { cellWidth: colW },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+    body: [
+      // Row 1 — labels
+      [L('Fecha:'), L('Número de aspa:'), L('Serie del Aspa:'), L('Turbina:')],
+      // Row 1 — values
+      [V(fecha), V(`Pala ${bladeLabel}`), V(serie), V(turbina)],
+      // Row 2 — labels
+      [L('Lado de Alta:'), L('Lado de Baja:'), L('B. Ataque:'), L('B. Salida:')],
+      // Row 2 — values (X marks from BD side; others empty)
+      [V(marks.ladoAlta), V(marks.ladoBaja), V(marks.bAtaque), V(marks.bSalida)],
+      // Row 3 — labels
+      [L('Z1:'), L('Largo:'), L('Z2:'), L('BA1:')],
+      // Row 3 — values (Z1/Z2/BA1 empty — no BD field)
+      [V(''), V(largo), V(''), V('')],
+      // Row 4 — labels
+      [L('Ancho:'), L('BA2:'), { content: 'Reparación:', colSpan: 2, styles: labelStyle }],
+      // Row 4 — values (BA2 empty; Reparación default 'Externa' per client example)
+      [V(ancho), V(''), { content: 'Externa', colSpan: 2, styles: valueStyle }],
+      // Descripción — full-width label centered, then full-width value centered = stage_label
+      [{ content: 'Descripción:', colSpan: 4, styles: { ...labelStyle, halign: 'center' as const } }],
+      [{ content: descripcion, colSpan: 4, styles: { ...valueStyle, halign: 'center' as const } }],
+    ],
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (doc as any).lastAutoTable?.finalY ?? startY + 60;
+}
+
+/**
+ * Renders one blade separator page, then one BLOCK PER SELECTED PHOTO
+ * (each on its own page): bicolor header + detail table + one large photo.
+ * Damage index (#n) = the defect's index within the blade.
+ */
 async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePosition: number) {
   const label = BLADE_LABELS[bladePosition] || String(bladePosition);
   const bladeDefects = ctx.defects.filter((d) => d.bladePosition === bladePosition);
-  if (bladeDefects.length === 0) return;
+
+  // Photos of this blade = photos whose defect belongs to this blade position.
+  const bladeDefectIds = new Set(bladeDefects.map((d) => d.id));
+  const bladePhotos = ctx.photos
+    .filter((p) => p.defectId != null && bladeDefectIds.has(p.defectId))
+    .sort((a, b) => a.stageOrder - b.stageOrder || a.captureOrder - b.captureOrder);
+
+  if (bladePhotos.length === 0) return;
+
+  // #n index per defect within this blade.
+  const damageIndexByDefect = new Map<string, number>();
+  bladeDefects.forEach((d, idx) => damageIndexByDefect.set(d.id, idx + 1));
 
   // Separator page
   doc.addPage();
@@ -451,81 +606,52 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
   doc.text(`PALA ${label}`, PAGE_WIDTH / 2, PAGE_HEIGHT / 2, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
-  for (let i = 0; i < bladeDefects.length; i++) {
-    const defect = bladeDefects[i]!;
-    doc.addPage();
+  // Group photos by defect (in blade defect order), then render blocks.
+  for (const defect of bladeDefects) {
+    const photosForDefect = bladePhotos.filter((p) => p.defectId === defect.id);
+    const damageIndex = damageIndexByDefect.get(defect.id) ?? 1;
 
-    // Damage header + orange category band
-    let y = addSectionTitle(doc, `Pala ${label} ~ Daño #${i + 1}`, 24);
-    doc.setFillColor(...COLOR_DAMAGE_BAND);
-    doc.rect(MARGIN, y - 4, PAGE_WIDTH - 2 * MARGIN, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Categoría del daño: ${defect.severity || NA}`, MARGIN + 3, y + 1.5);
-    doc.setTextColor(0, 0, 0);
-    y += 10;
+    for (const photo of photosForDefect) {
+      doc.addPage();
 
-    // Damage detail table
-    autoTable(doc, {
-      startY: y,
-      head: [['Campo', 'Valor']],
-      body: [
-        ['Fecha', formatDateES(ctx.createdAt)],
-        ['N° de aspa', ctx.turbineName],
-        ['Serie del aspa', ctx.blades.find((b) => b.position === bladePosition)?.serialNumber || NA],
-        ['Turbina', ctx.turbineName],
-        ['Lado de Alta', NA],
-        ['Lado de Baja', NA],
-        ['B. Ataque', NA],
-        ['B. Salida', NA],
-        ['Z1', NA],
-        ['Largo', defect.heightCm != null ? `${defect.heightCm} cm` : NA],
-        ['Z2', NA],
-        ['BA1', NA],
-        ['Ancho', defect.widthCm != null ? `${defect.widthCm} cm` : NA],
-        ['BA2', NA],
-        ['Reparación', 'Externa'],
-        ['Descripción', defect.description || `${formatDefectType(defect.type)} a ${defect.distanceFromRoot.toFixed(1)} m del eje`],
-      ],
-      theme: 'grid',
-      headStyles: { fillColor: COLOR_HEADER_TABLE, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-      bodyStyles: { fontSize: 8 },
-      styles: { cellPadding: 2 },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
-      margin: { left: MARGIN, right: MARGIN },
-    });
+      // 1. Bicolor header row: left gray "Pala X ~ Daño #n", right orange category.
+      const headerY = 20;
+      const headerH = 9;
+      const halfW = (PAGE_WIDTH - 2 * MARGIN) / 2;
 
-    let imgY = ((doc as any).lastAutoTable?.finalY ?? y + 60) + 8;
-
-    // Selected photos for THIS defect, filtered by defect_id and ordered by the
-    // 11 repair stages. Each defect shows its own repair evidence.
-    const photosForDamage = ctx.photos
-      .filter((p) => p.defectId === defect.id)
-      .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.captureOrder - b.captureOrder));
-    if (photosForDamage.length > 0) {
-      doc.setFontSize(9);
+      // Left cell — gray bg, black bold.
+      doc.setFillColor(...COLOR_BLOCK_LABEL_BG);
+      doc.rect(MARGIN, headerY, halfW, headerH, 'F');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('Fotos seleccionadas de la reparación:', MARGIN, imgY);
-      imgY += 6;
+      doc.text(`Pala ${label} ~ Daño #${damageIndex}`, MARGIN + 3, headerY + headerH / 2 + 1.5);
 
-      let col = 0;
-      for (const photo of photosForDamage) {
+      // Right cell — orange bg, white bold.
+      doc.setFillColor(...COLOR_BLOCK_ORANGE);
+      doc.rect(MARGIN + halfW, headerY, halfW, headerH, 'F');
+      doc.setTextColor(255, 255, 255);
+      const categoria = defect.severity != null ? String(defect.severity) : '';
+      doc.text(`Categoría del daño: ${categoria}`, MARGIN + halfW + 3, headerY + headerH / 2 + 1.5);
+      doc.setTextColor(0, 0, 0);
+
+      // 2. Detail table (4-column label/value grid).
+      const tableY = renderBlockTable(doc, headerY + headerH, defect, photo, label);
+
+      // 3. One large photo, margin-to-margin, filling the lower half of the page.
+      const imgTop = tableY + 6;
+      const imgW = PAGE_WIDTH - 2 * MARGIN;
+      const imgBottom = PAGE_HEIGHT - 16; // leave room for footer
+      const imgH = Math.max(0, imgBottom - imgTop);
+      if (imgH > 20) {
         const base64 = await loadImageAsBase64(photo.url);
-        if (!base64) continue;
-        if (imgY + 55 > PAGE_HEIGHT - 15) {
-          doc.addPage();
-          imgY = 20;
-          col = 0;
+        if (base64) {
+          try {
+            doc.addImage(base64, 'JPEG', MARGIN, imgTop, imgW, imgH);
+          } catch {
+            // skip broken image
+          }
         }
-        const x = col === 0 ? MARGIN : MARGIN + 92;
-        try {
-          doc.addImage(base64, 'JPEG', x, imgY, 85, 50);
-        } catch {
-          // skip broken image
-        }
-        col = col === 0 ? 1 : 0;
-        if (col === 0) imgY += 56;
       }
     }
   }
@@ -592,10 +718,15 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   // 1. Cover + general data + blade data + findings + design
   renderCoverAndGeneral(doc, ctx);
 
-  // 2. Per-blade sections (separator + damage detail + selected photos)
-  const bladePositions = ctx.blades.length > 0
-    ? ctx.blades.map((b) => b.position)
-    : [...new Set(ctx.defects.map((d) => d.bladePosition))];
+  // 2. Per-blade sections. One block page per SELECTED photo, grouped by blade.
+  //    Combine turbine blade positions with any defect blade positions (incl. 0
+  //    when defect→inspection→blade couldn't be resolved) so no photos are lost.
+  const bladePositions = [
+    ...new Set([
+      ...ctx.blades.map((b) => b.position),
+      ...ctx.defects.map((d) => d.bladePosition),
+    ]),
+  ].sort((a, b) => a - b);
 
   for (const pos of bladePositions) {
     await renderBladeSection(doc, ctx, pos);
