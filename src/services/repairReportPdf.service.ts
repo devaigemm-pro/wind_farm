@@ -618,26 +618,20 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     ? `Se identificaron ${ctx.defects.length} daño(s) a reparar en la turbina ${ctx.turbineName}.`
     : 'Sin hallazgos registrados.';
   doc.text(doc.splitTextToSize(findings, PAGE_WIDTH - 2 * MARGIN), MARGIN, y);
+  // NOTE: "Diseño de la pala" now lives on its own dedicated page
+  // (renderBladeDesignPage) and "Categorización de Daños" follows it
+  // (renderDamageCategorizationPage), both called after renderGeneralData.
+}
 
-  // Blade design section (placeholder — exact diagram not replicated)
-  y += 16;
-  y = addSectionTitle(doc, 'Diseño de la pala', y);
-  doc.setFillColor(240, 240, 240);
-  doc.rect(MARGIN, y, PAGE_WIDTH - 2 * MARGIN, 40, 'F');
-  doc.setTextColor(150, 150, 150);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'italic');
-  doc.text('[Diagrama de diseño de la pala]', PAGE_WIDTH / 2, y + 22, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
-  y += 40;
-
-  // 2.5 Categorización — replicates the inspection report categorization table.
-  y += 8;
-  if (y > PAGE_HEIGHT - 80) {
-    doc.addPage();
-    y = 28;
-  }
-  y = addSectionTitle(doc, 'Categorización de Daños', y);
+/**
+ * "Categorización de Daños" table — replicates the inspection report
+ * categorization table. Rendered on its own page right AFTER the dedicated
+ * "Diseño de la pala" page (order: datos generales → Diseño de la pala →
+ * Categorización de Daños).
+ */
+function renderDamageCategorizationPage(doc: jsPDF) {
+  doc.addPage();
+  let y = addSectionTitle(doc, 'Categorización de Daños', 28);
 
   const catRows: string[][] = [
     ['1', 'Cosmetica', 'Daño superficial sin impacto estructural', 'Turbina continua en operación. Sin acción requerida.'],
@@ -684,6 +678,255 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
       }
     },
   });
+}
+
+/**
+ * "Diseño de la pala" — a FULL DEDICATED PAGE with the blade DEFINITIONS
+ * diagram, drawn entirely with jsPDF vector primitives (lines, rects, ellipses,
+ * triangles, text). Replicates the client's reference image but with cleaner
+ * lines, clearer typography and better spacing. Three sub-figures stacked
+ * vertically across the whole page:
+ *   1) Side view of the blade (root -> tip) with guide labels + red defect marks.
+ *   2) Cross-section (airfoil ellipse) with edge/side labels.
+ *   3) Root view (3D airfoil "teardrop") with pressure-side labels.
+ *
+ * Colors: brand green #5A8F5A for shading, dark blue [30,30,90] for labels,
+ * red for defect marks (as in the reference image).
+ */
+function renderBladeDesignPage(doc: jsPDF) {
+  doc.addPage();
+
+  // jsPDF implements ellipse()/triangle() at runtime (shapes module) but they
+  // are not in the shipped type defs — access them through a loose alias.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shape = doc as any as {
+    ellipse: (x: number, y: number, rx: number, ry: number, style?: string) => void;
+    triangle: (
+      x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, style?: string,
+    ) => void;
+  };
+
+  const LABEL: RGB = [30, 30, 90]; // dark blue label text
+  const DEFECT: RGB = [200, 30, 30]; // red defect marks
+  const OUTLINE: RGB = [40, 40, 40]; // dark outlines
+  const GUIDE: RGB = [90, 90, 90]; // thin guide lines
+  const [pgR, pgG, pgB] = hexToRgb(COLOR_PRIMARY);
+  const cx = PAGE_WIDTH / 2;
+
+  // Small helper: draws a thin guide line.
+  const guide = (x1: number, y1: number, x2: number, y2: number) => {
+    doc.setDrawColor(...GUIDE);
+    doc.setLineWidth(0.25);
+    doc.line(x1, y1, x2, y2);
+  };
+
+  // Small helper: draws a filled arrowhead (triangle) pointing in a direction.
+  // dir: 'up' | 'down' | 'left' | 'right'. (x, y) is the arrow TIP.
+  const arrowHead = (x: number, y: number, dir: 'up' | 'down' | 'left' | 'right', size = 2) => {
+    doc.setFillColor(...GUIDE);
+    if (dir === 'up') shape.triangle(x, y, x - size, y + size * 1.6, x + size, y + size * 1.6, 'F');
+    else if (dir === 'down') shape.triangle(x, y, x - size, y - size * 1.6, x + size, y - size * 1.6, 'F');
+    else if (dir === 'left') shape.triangle(x, y, x + size * 1.6, y - size, x + size * 1.6, y + size, 'F');
+    else shape.triangle(x, y, x - size * 1.6, y - size, x - size * 1.6, y + size, 'F');
+  };
+
+  const label = (text: string, x: number, y: number, align: 'left' | 'center' | 'right' = 'left') => {
+    doc.setTextColor(...LABEL);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.text(text, x, y, { align });
+  };
+
+  // -- Title: "Definiciones:" (centered, bold, underlined) --------------------
+  doc.setTextColor(...LABEL);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  const title = 'Definiciones:';
+  doc.text(title, cx, 26, { align: 'center' });
+  const titleW = doc.getTextWidth(title);
+  doc.setDrawColor(...LABEL);
+  doc.setLineWidth(0.4);
+  doc.line(cx - titleW / 2, 28.5, cx + titleW / 2, 28.5);
+
+  // -- FIGURE 1: Side view (profile) of the blade -----------------------------
+  const f1Top = 56;
+  const bladeLeft = MARGIN + 20;
+  const bladeRight = PAGE_WIDTH - MARGIN - 14;
+  const rootHalf = 12; // half-height at the root
+  const tipHalf = 1.4; // half-height at the tip
+  const midY = f1Top + rootHalf + 4;
+  const rootX = bladeLeft;
+  const tipX = bladeRight;
+
+  const steps = 24;
+  const topPts: [number, number][] = [];
+  const botPts: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = rootX + (tipX - rootX) * t;
+    const taper = Math.pow(1 - t, 0.85);
+    const half = tipHalf + (rootHalf - tipHalf) * taper;
+    topPts.push([x, midY - half]);
+    botPts.push([x, midY + half]);
+  }
+  doc.setDrawColor(...OUTLINE);
+  doc.setLineWidth(0.5);
+  doc.line(topPts[0]![0], topPts[0]![1], botPts[0]![0], botPts[0]![1]);
+  for (let i = 0; i < steps; i++) {
+    doc.line(topPts[i]![0], topPts[i]![1], topPts[i + 1]![0], topPts[i + 1]![1]);
+  }
+  for (let i = 0; i < steps; i++) {
+    doc.line(botPts[i]![0], botPts[i]![1], botPts[i + 1]![0], botPts[i + 1]![1]);
+  }
+  doc.setDrawColor(pgR, pgG, pgB);
+  doc.setLineWidth(0.3);
+  doc.line(rootX + 2, midY, tipX - 4, midY);
+
+  // Red defect marks (two short red lines on the blade).
+  doc.setDrawColor(...DEFECT);
+  doc.setLineWidth(1.1);
+  const d1x = rootX + (tipX - rootX) * 0.42;
+  const d2x = rootX + (tipX - rootX) * 0.62;
+  doc.line(d1x, midY - 5, d1x, midY - 1);
+  doc.line(d2x, midY + 1, d2x, midY + 4);
+
+  // "Encastre" — double-headed vertical arrow at the root (left extreme).
+  doc.setDrawColor(...GUIDE);
+  doc.setLineWidth(0.3);
+  const encTop = midY - rootHalf;
+  const encBot = midY + rootHalf;
+  const encX = rootX - 6;
+  doc.line(encX, encTop, encX, encBot);
+  arrowHead(encX, encTop, 'up');
+  arrowHead(encX, encBot, 'down');
+  label('Encastre', encX - 2, encTop - 3, 'center');
+
+  // "Borde de ataque" (top edge).
+  const baX = rootX + (tipX - rootX) * 0.28;
+  const baTopY = midY - (tipHalf + (rootHalf - tipHalf) * Math.pow(1 - 0.28, 0.85));
+  guide(baX, f1Top - 6, baX, baTopY);
+  arrowHead(baX, baTopY, 'down');
+  label('Borde de ataque', baX, f1Top - 8, 'center');
+
+  // "Borde de salida" (bottom edge).
+  const bsX = rootX + (tipX - rootX) * 0.28;
+  const bsBotY = midY + (tipHalf + (rootHalf - tipHalf) * Math.pow(1 - 0.28, 0.85));
+  const bsLabelY = midY + rootHalf + 12;
+  guide(bsX, bsBotY, bsX, bsLabelY - 3);
+  arrowHead(bsX, bsBotY, 'up');
+  label('Borde de salida', bsX, bsLabelY, 'center');
+
+  // "Tip" — arrow to the tip on the right.
+  const tipLabelX = tipX + 4;
+  guide(tipLabelX + 8, midY, tipX + 1, midY);
+  arrowHead(tipX + 1, midY, 'left');
+  label('Tip', tipLabelX + 10, midY + 1, 'left');
+
+  // -- FIGURE 2: Cross-section (airfoil ellipse) ------------------------------
+  const f2CY = midY + rootHalf + 54;
+  const rx = 34;
+  const ry = 9;
+  doc.setDrawColor(...OUTLINE);
+  doc.setLineWidth(0.5);
+  doc.setFillColor(238, 244, 238);
+  shape.ellipse(cx, f2CY, rx, ry, 'FD');
+  doc.setDrawColor(pgR, pgG, pgB);
+  doc.setLineWidth(0.3);
+  doc.line(cx - rx + 2, f2CY, cx + rx - 2, f2CY);
+
+  guide(cx - rx - 18, f2CY, cx - rx - 1, f2CY);
+  arrowHead(cx - rx - 1, f2CY, 'right');
+  label('Borde de ataque', cx - rx - 20, f2CY + 1, 'right');
+
+  guide(cx + rx + 1, f2CY, cx + rx + 18, f2CY);
+  arrowHead(cx + rx + 1, f2CY, 'left');
+  label('Borde de salida', cx + rx + 20, f2CY + 1, 'left');
+
+  guide(cx, f2CY - ry - 10, cx, f2CY - ry - 1);
+  arrowHead(cx, f2CY - ry - 1, 'down');
+  label('Lado de baja presión', cx, f2CY - ry - 12, 'center');
+
+  guide(cx, f2CY + ry + 1, cx, f2CY + ry + 10);
+  arrowHead(cx, f2CY + ry + 1, 'up');
+  label('Lado de Alta presión', cx, f2CY + ry + 15, 'center');
+
+  // -- FIGURE 3: "Vista desde la raíz" title + 3D airfoil teardrop ------------
+  const f3TitleY = f2CY + ry + 44;
+  doc.setTextColor(...LABEL);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  const t3 = 'Vista desde la raíz';
+  doc.text(t3, cx, f3TitleY, { align: 'center' });
+  const t3W = doc.getTextWidth(t3);
+  doc.setDrawColor(...LABEL);
+  doc.setLineWidth(0.4);
+  doc.line(cx - t3W / 2, f3TitleY + 2.5, cx + t3W / 2, f3TitleY + 2.5);
+
+  const aLeadX = cx - 52; // rounded leading edge
+  const aTrailX = cx + 58; // sharp trailing edge
+  const aCY = f3TitleY + 30;
+  const aThick = 15; // max half-thickness near the leading edge
+
+  const camberAt = (t: number) => -6 * Math.sin(Math.PI * t) * 0.6;
+
+  const n = 28;
+  const upper: [number, number][] = [];
+  const lower: [number, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = aLeadX + (aTrailX - aLeadX) * t;
+    const th = aThick * Math.sqrt(Math.max(0, 1 - t)) * (1 - 0.15 * t);
+    const camber = camberAt(t);
+    upper.push([x, aCY + camber - th]);
+    lower.push([x, aCY + camber + th]);
+  }
+
+  // Upper (suction, low pressure) surface fill — brand green.
+  doc.setFillColor(pgR, pgG, pgB);
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    shape.triangle(
+      upper[i]![0], upper[i]![1],
+      upper[i + 1]![0], upper[i + 1]![1],
+      (upper[i]![0] + upper[i + 1]![0]) / 2, aCY + camberAt(t),
+      'F',
+    );
+  }
+  // Lower (pressure) surface fill — gray.
+  doc.setFillColor(150, 150, 150);
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    shape.triangle(
+      lower[i]![0], lower[i]![1],
+      lower[i + 1]![0], lower[i + 1]![1],
+      (lower[i]![0] + lower[i + 1]![0]) / 2, aCY + camberAt(t),
+      'F',
+    );
+  }
+  // Clean outline around the airfoil.
+  doc.setDrawColor(...OUTLINE);
+  doc.setLineWidth(0.5);
+  for (let i = 0; i < n; i++) {
+    doc.line(upper[i]![0], upper[i]![1], upper[i + 1]![0], upper[i + 1]![1]);
+    doc.line(lower[i]![0], lower[i]![1], lower[i + 1]![0], lower[i + 1]![1]);
+  }
+  doc.line(upper[0]![0], upper[0]![1], lower[0]![0], lower[0]![1]);
+
+  // "Lado de baja presión" -> upper/green side.
+  const upPt = upper[Math.round(n * 0.35)]!;
+  guide(upPt[0], aCY - aThick - 16, upPt[0], upPt[1] - 1);
+  arrowHead(upPt[0], upPt[1] - 1, 'down');
+  label('Lado de baja presión', upPt[0], aCY - aThick - 18, 'center');
+
+  // "Lado de alta presión" -> lower/gray side.
+  const loPt = lower[Math.round(n * 0.35)]!;
+  guide(loPt[0], loPt[1] + 1, loPt[0], aCY + aThick + 16);
+  arrowHead(loPt[0], loPt[1] + 1, 'up');
+  label('Lado de alta presión', loPt[0], aCY + aThick + 21, 'center');
+
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.2);
 }
 
 /**
@@ -900,8 +1143,14 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   // 1. Cover page (page 1): repairs.jpg hero + title + subtitles + CORE Insight logo.
   await renderCoverPage(doc, ctx);
 
-  // 1b. General data + blade data + findings + design (page 2 onwards).
+  // 1b. General data + blade data + findings (page 2 onwards).
   renderGeneralData(doc, ctx);
+
+  // 1c. "Diseño de la pala" — dedicated full page with the vector definitions
+  //     diagram, then the "Categorización de Daños" table right after it.
+  //     Order: datos generales -> Diseño de la pala -> Categorización de Daños.
+  renderBladeDesignPage(doc);
+  renderDamageCategorizationPage(doc);
 
   // 2. Per-blade sections. One block page per SELECTED photo, grouped by blade.
   //    Combine turbine blade positions with any defect blade positions (incl. 0
