@@ -122,17 +122,15 @@ function formatDateES(dateStr: string | null | undefined): string {
 
 const MONTHS_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-const MONTHS_FULL = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
-];
-
-/** "5 de marzo de 2024" — Spanish long date for the cover subtitle. NA if empty/invalid. */
-function formatDateLongES(dateStr: string | null | undefined): string {
+/**
+ * es-CL short date (DD-MM-YYYY) for the cover subtitle — same format as the
+ * inspection cover (toLocaleDateString('es-CL')). NA if empty/invalid.
+ */
+function formatDateShortCL(dateStr: string | null | undefined): string {
   if (!dateStr) return NA;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return NA;
-  return `${d.getDate()} de ${MONTHS_FULL[d.getMonth()]} de ${d.getFullYear()}`;
+  return d.toLocaleDateString('es-CL');
 }
 
 /** DD-Mon-YYYY (e.g. "05-Mar-2024") for the block "Fecha" field. Empty if no date. */
@@ -424,93 +422,109 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
 }
 
 /**
- * Cover page (page 1). Replicates the inspection report cover layout EXACTLY
- * (top overlay band, centered two-line title, centered subtitles, white footer
- * band with "Con tecnología CORE Insight" + environmental note), with a single
- * difference: instead of the solid green background, the `repairs.jpg` image
- * covers the ENTIRE page, and a semi-transparent dark overlay is applied over
- * the whole page so the white text stays legible. No graphic logo — brand
- * identity is the "Con tecnología CORE Insight" footer text, same as inspection.
- * All subtitle data comes from BD (windFarmName / turbineName / repair date).
+ * Cover page (page 1). Ported EXACTLY from the inspection cover in
+ * ExportPanel.tsx (handleGeneratePDF → "PAGE 1: Cover"), so the repair cover is
+ * faithful to the real inspection cover, with two differences:
+ *   - the hero image is `/repairs.jpg` instead of `/portada.png`
+ *   - the title's second line is "Informe de Reparación"
  *
- * Draw order (so text stays on top): image → overlay (full page) + top band →
- * title → subtitles → white footer band + footer texts + environmental note.
+ * Layout: full-page hero image with the green overlay (rgba(90,143,90,0.55))
+ * baked into a canvas → CORE Insight logo (core-insight-logo.png) top-left →
+ * two-line right-aligned white title (30pt bold) in the lower half →
+ * right-aligned white subtitles (14pt: wind farm, turbine, repair date) →
+ * two-column white footer (no white band, no environmental note).
+ *
+ * All subtitle data comes from BD (windFarmName / turbineName / repair date).
  */
 async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
-  const [r, g, b] = hexToRgb(COLOR_COVER_BG);
+  // Local constants matching ExportPanel for pixel-faithful fidelity.
+  const pageW = PAGE_WIDTH; // 210
+  const pageH = PAGE_HEIGHT; // 297
+  const margin = 20; // ExportPanel uses 20 on the cover (not MARGIN=14)
 
-  // 1) Full-page image (repairs.jpg). Fallback: solid green background so the
-  //    page is never blank if the image fails to load.
-  const heroBase64 = await loadImageAsBase64(`${window.location.origin}/repairs.jpg`);
-  let imageDrawn = false;
-  if (heroBase64) {
-    try {
-      doc.addImage(heroBase64, 'JPEG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT);
-      imageDrawn = true;
-    } catch {
-      // fall through to green fallback
-    }
-  }
-  if (!imageDrawn) {
-    doc.setFillColor(r, g, b);
-    doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
-  }
-
-  // 2) Semi-transparent dark overlay over the WHOLE page for legibility.
-  //    jsPDF exposes alpha via GState; cast to any in case types are missing.
-  const anyDoc = doc as any;
+  // 1) Full-page hero image with the green overlay BAKED into a canvas
+  //    (same approach as inspection: no GState, no opaque top band).
+  let coverImageLoaded = false;
   try {
-    if (typeof anyDoc.setGState === 'function' && typeof anyDoc.GState === 'function') {
-      anyDoc.setGState(anyDoc.GState({ opacity: 0.35 }));
-      doc.setFillColor(0, 0, 0);
-      doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
-      anyDoc.setGState(anyDoc.GState({ opacity: 1 }));
+    const heroImg = new Image();
+    heroImg.crossOrigin = 'anonymous';
+    const heroLoaded = await new Promise<boolean>((resolve) => {
+      heroImg.onload = () => resolve(true);
+      heroImg.onerror = () => resolve(false);
+      heroImg.src = '/repairs.jpg';
+    });
+    if (heroLoaded && heroImg.naturalWidth > 0) {
+      const canvas = document.createElement('canvas');
+      canvas.width = heroImg.naturalWidth;
+      canvas.height = heroImg.naturalHeight;
+      const cctx = canvas.getContext('2d')!;
+      // Draw the original image, then bake the green overlay on top.
+      cctx.drawImage(heroImg, 0, 0);
+      cctx.fillStyle = 'rgba(90, 143, 90, 0.55)';
+      cctx.fillRect(0, 0, canvas.width, canvas.height);
+      const coverBase64 = canvas.toDataURL('image/jpeg', 0.92);
+      doc.addImage(coverBase64, 'JPEG', 0, 0, pageW, pageH);
+      coverImageLoaded = true;
     }
-  } catch {
-    // GState unavailable — top band below still provides contrast.
+  } catch (e) {
+    console.warn('[repairReportPdf] Could not load repairs.jpg:', e);
   }
 
-  // Top overlay band (kept for fidelity with the inspection cover).
-  doc.setFillColor(r - 20, g - 20, b - 20);
-  doc.rect(0, 0, PAGE_WIDTH, 50, 'F');
+  if (!coverImageLoaded) {
+    // Fallback: solid green rectangle (top 70% of the page).
+    const [r, g, b] = hexToRgb(COLOR_COVER_BG);
+    doc.setFillColor(r, g, b);
+    doc.rect(0, 0, pageW, pageH * 0.7, 'F');
+  }
 
-  // 3) Main title (two lines, centered) — exact positions/sizes as inspection.
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(28);
+  // 2) CORE Insight logo (core-insight-logo.png) in the top-left corner.
+  try {
+    const resp = await fetch('/core-insight-logo.png');
+    if (resp.ok) {
+      const arrayBuffer = await resp.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]!);
+      }
+      const logoBase64 = 'data:image/png;base64,' + btoa(binary);
+      doc.addImage(logoBase64, 'PNG', margin, 15, 60, 20);
+    }
+  } catch (e) {
+    console.warn('[repairReportPdf] Could not load core-insight-logo.png:', e);
+  }
+
+  // 3) Title — two lines, right-aligned, 30pt bold white, in the lower half.
+  doc.setFontSize(30);
   doc.setFont('helvetica', 'bold');
-  doc.text('Palas de turbina eólica', PAGE_WIDTH / 2, 90, { align: 'center' });
-  doc.text('Informe de Reparación', PAGE_WIDTH / 2, 105, { align: 'center' });
+  doc.setTextColor(255, 255, 255);
+  const titleLines = ['Palas de turbina eólica', 'Informe de Reparación'];
+  let titleY = pageH * 0.73;
+  for (const line of titleLines) {
+    doc.text(line, pageW - margin, titleY, { align: 'right' });
+    titleY += 11;
+  }
 
-  // 4) Subtitles (centered) — wind farm, turbine, repair date (all from BD).
+  // 4) Subtitles — right-aligned, 14pt white: wind farm, turbine, repair date.
   const repairDateSource = ctx.repairCompletedAt || ctx.repairStartedAt || ctx.createdAt;
-  const repairDate = formatDateLongES(repairDateSource);
+  const dateStr = formatDateShortCL(repairDateSource);
 
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.text(ctx.windFarmName, PAGE_WIDTH / 2, 130, { align: 'center' });
+  doc.setTextColor(255, 255, 255);
+  doc.text(ctx.windFarmName, pageW - margin, titleY + 6, { align: 'right' });
+  doc.text(`Turbina: ${ctx.turbineName}`, pageW - margin, titleY + 14, { align: 'right' });
+  doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
-  doc.setFontSize(12);
-  doc.text(`Turbina: ${ctx.turbineName}`, PAGE_WIDTH / 2, 142, { align: 'center' });
-  doc.text(repairDate, PAGE_WIDTH / 2, 154, { align: 'center' });
-
-  // Footer white band (same as inspection cover).
-  doc.setFillColor(255, 255, 255);
-  doc.rect(0, PAGE_HEIGHT - 35, PAGE_WIDTH, 35, 'F');
-
-  doc.setTextColor(80, 80, 80);
-  doc.setFontSize(8);
-  doc.text(`Generado por ${ctx.companyName}`, MARGIN, PAGE_HEIGHT - 20);
-  doc.text('Con tecnología CORE Insight', PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 20, { align: 'right' });
-
-  // Environmental note (same as inspection cover).
-  doc.setTextColor(34, 139, 34);
-  doc.setFontSize(7);
-  doc.text(
-    'Considere su responsabilidad medioambiental antes de imprimir este PDF',
-    PAGE_WIDTH / 2,
-    PAGE_HEIGHT - 10,
-    { align: 'center' },
-  );
+  // 5) Footer — two columns, white text, no white band, no environmental note.
+  const footerStartY = pageH - 15;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(255, 255, 255);
+  doc.text('Generado por', margin + 10, footerStartY);
+  doc.text(ctx.companyName, margin + 10, footerStartY + 5);
+  doc.text('Con tecnología', pageW - margin - 10, footerStartY, { align: 'right' });
+  doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
 
   doc.setTextColor(0, 0, 0);
 }
