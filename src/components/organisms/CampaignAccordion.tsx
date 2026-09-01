@@ -6,7 +6,6 @@ import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { useRepairSummary } from '@/hooks/useRepair';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
-import { generateAndDownloadRepairReport } from '@/services/repairReportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
 export interface CampaignAccordionProps {
@@ -236,7 +235,6 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { data: summary, isLoading } = useRepairSummary(campaign.id);
-  const [downloading, setDownloading] = useState(false);
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString();
 
@@ -268,7 +266,6 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
           <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
           <th style={thStyle}>{t('subassetDetail.colViewed')}</th>
           <th style={thStyle}>{t('subassetDetail.colNotes')}</th>
-          <th style={thStyle}>{t('subassetDetail.colPdf')}</th>
         </tr>
       </thead>
       <tbody>
@@ -285,30 +282,6 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
             {isLoading
               ? ''
               : `${summary?.defectsCount ?? 0} ${t('repair.defects')} · ${summary?.stagesWithPhotos ?? 0}/${summary?.totalStages ?? 0} ${t('repair.stagesWithPhotos')}`}
-          </td>
-          <td style={tdStyle}>
-            <button
-              style={pdfBtnStyle}
-              title={t('repair.downloadReport')}
-              disabled={downloading}
-              onClick={async (e) => {
-                e.stopPropagation();
-                setDownloading(true);
-                try {
-                  await generateAndDownloadRepairReport({ campaignId: campaign.id });
-                } catch (err) {
-                  alert((err as Error)?.message || 'Error generating PDF.');
-                } finally {
-                  setDownloading(false);
-                }
-              }}
-            >
-              {downloading ? (
-                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} color="var(--color-primary-500)" />
-              ) : (
-                <Download size={14} color="var(--color-primary-500)" />
-              )}
-            </button>
           </td>
         </tr>
       </tbody>
