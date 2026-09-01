@@ -265,7 +265,7 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
           <th style={thStyle}>{t('subassetDetail.colType')}</th>
           <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
           <th style={thStyle}>{t('subassetDetail.colViewed')}</th>
-          <th style={thStyle}>{t('subassetDetail.colNotes')}</th>
+          <th style={thStyle}>{t('repair.colDefectsCount')}</th>
         </tr>
       </thead>
       <tbody>
@@ -278,11 +278,7 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
           <td style={tdStyle}>Blade</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
           <td style={tdStyle}>{isLoading ? '…' : `${summary?.viewedPercent ?? 0}%`}</td>
-          <td style={{ ...tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {isLoading
-              ? ''
-              : `${summary?.defectsCount ?? 0} ${t('repair.defects')} · ${summary?.stagesWithPhotos ?? 0}/${summary?.totalStages ?? 0} ${t('repair.stagesWithPhotos')}`}
-          </td>
+          <td style={tdStyle}>{isLoading ? '…' : (summary?.defectsCount ?? 0)}</td>
         </tr>
       </tbody>
     </table>
