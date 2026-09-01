@@ -213,6 +213,7 @@ export const translations: TranslationMap = {
   'subassetDetail.colViewed': { en: 'Viewed %', es: '% Visto' },
   'subassetDetail.colDefects': { en: 'Defects', es: 'Defectos' },
   'subassetDetail.colNotes': { en: 'Notes', es: 'Notas' },
+  'repair.colDefectsCount': { en: 'Defects count', es: 'Cantidad de defectos' },
   'subassetDetail.colPdf': { en: 'PDF report', es: 'Reporte PDF' },
 
   // ─── Ongoing Inspections ────────────────────────────────────────────────────
