@@ -36,6 +36,40 @@ function formatDefectType(type: string, locale: 'es' | 'en'): string {
   return type.replace(/_/g, ' ');
 }
 
+interface BladeGroup {
+  position: number;
+  label: string;
+  nodes: RepairDefectNode[];
+}
+
+/**
+ * Group defect nodes by blade (A/B/C), ordered by blade position, and within
+ * each blade by the per-blade correlative (A1, A2, ...). Defects with an unknown
+ * blade (position 0) are grouped last under "—".
+ */
+function groupDefectsByBlade(tree: RepairDefectNode[]): BladeGroup[] {
+  const byPosition = new Map<number, RepairDefectNode[]>();
+  for (const node of tree) {
+    const pos = node.defect.bladePosition || 0;
+    if (!byPosition.has(pos)) byPosition.set(pos, []);
+    byPosition.get(pos)!.push(node);
+  }
+  const positions = [...byPosition.keys()].sort((a, b) => {
+    // Known blades (1,2,3) first in order; unknown (0) last.
+    if (a === 0) return 1;
+    if (b === 0) return -1;
+    return a - b;
+  });
+  return positions.map((position) => {
+    const nodes = byPosition.get(position)!.slice().sort((a, b) =>
+      (a.defect.defectNumber ?? '').localeCompare(b.defect.defectNumber ?? '', undefined, {
+        numeric: true,
+      }),
+    );
+    return { position, label: BLADE_LABELS[position] ?? '—', nodes };
+  });
+}
+
 export function RepairWorkflow() {
   const { campaignId } = useParams();
   const navigate = useNavigate();
@@ -102,18 +136,24 @@ export function RepairWorkflow() {
         <p style={{ color: C.muted, padding: 24 }}>{t('repair.noDefects')}</p>
       ) : (
         <div style={defectsWrap}>
-          {tree.map((node, idx) => (
-            <DefectSection
-              key={node.defect.id}
-              node={node}
-              index={idx}
-              locale={locale}
-              t={t}
-              onSelect={handleSelect}
-              onPreview={handlePreview}
-              onDownloadReport={handleDownloadDefectPdf}
-              downloading={downloadingDefectId === node.defect.id}
-            />
+          {groupDefectsByBlade(tree).map((group) => (
+            <div key={group.position} style={bladeGroup}>
+              <div style={bladeGroupTitle}>
+                {t('repair.blade')} {group.label}
+              </div>
+              {group.nodes.map((node) => (
+                <DefectSection
+                  key={node.defect.id}
+                  node={node}
+                  locale={locale}
+                  t={t}
+                  onSelect={handleSelect}
+                  onPreview={handlePreview}
+                  onDownloadReport={handleDownloadDefectPdf}
+                  downloading={downloadingDefectId === node.defect.id}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -148,7 +188,6 @@ export function RepairWorkflow() {
 
 interface DefectSectionProps {
   node: RepairDefectNode;
-  index: number;
   locale: 'es' | 'en';
   t: (key: string) => string;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
@@ -159,7 +198,6 @@ interface DefectSectionProps {
 
 function DefectSection({
   node,
-  index,
   locale,
   t,
   onSelect,
@@ -176,7 +214,9 @@ function DefectSection({
     (acc, s) => acc + s.photos.filter((p) => p.repairSelected).length,
     0,
   );
-  const bladeLabel = BLADE_LABELS[defect.bladePosition] || String(defect.bladePosition);
+  // Correlative matching the Analyze step (e.g. "A1"); falls back to blade letter.
+  const defectNumber =
+    defect.defectNumber ?? (BLADE_LABELS[defect.bladePosition] || '—');
   const statusLabel =
     node.repairStatus === 'completed'
       ? t('repair.repairCompleted')
@@ -188,14 +228,13 @@ function DefectSection({
     <div style={defectCard}>
       <button style={defectHeader} onClick={() => setOpen((o) => !o)}>
         {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-        <span style={defectIndex}>{index + 1}</span>
+        <span style={defectIndex}>{defectNumber}</span>
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={defectTitle}>
-            {t('repair.defect')} #{index + 1} · {formatDefectType(defect.type, locale)}
+            {defectNumber} · {formatDefectType(defect.type, locale)}
           </div>
           <div style={defectMeta}>
-            {defect.turbineName ? defect.turbineName : `${t('repair.blade')} ${bladeLabel}`}
-            {' · '}{t('repair.category')} {defect.severity || '—'}
+            {t('repair.category')} {defect.severity || '—'}
             {node.technicianName ? ` · ${node.technicianName}` : ''}
             {statusLabel ? ` · ${statusLabel}` : ''}
           </div>
@@ -433,7 +472,12 @@ const backBtn: React.CSSProperties = {
 const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1a1a', margin: 0 };
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 20 };
-const defectsWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 16 };
+const defectsWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 24 };
+const bladeGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
+const bladeGroupTitle: React.CSSProperties = {
+  fontSize: 16, fontWeight: 700, color: '#111827', margin: 0,
+  borderLeft: '4px solid #5A8F5A', paddingLeft: 10,
+};
 const defectCard: React.CSSProperties = {
   border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', overflow: 'hidden',
 };
@@ -443,8 +487,9 @@ const defectHeader: React.CSSProperties = {
   color: C.text,
 };
 const defectIndex: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26,
-  borderRadius: '50%', background: C.brand, color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, height: 26,
+  padding: '0 8px', borderRadius: 13, background: C.brand, color: '#fff', fontSize: 13, fontWeight: 700,
+  flexShrink: 0,
 };
 const defectTitle: React.CSSProperties = { fontSize: 15, fontWeight: 700, color: '#1a1a1a' };
 const defectMeta: React.CSSProperties = { fontSize: 12, color: C.muted, marginTop: 2 };
