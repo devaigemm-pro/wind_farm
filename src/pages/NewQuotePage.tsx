@@ -76,7 +76,12 @@ export function NewQuotePage() {
       map.get(blade)!.push(d);
     }
     for (const items of map.values()) {
-      items.sort((a, b) => (a.defectNumber ?? '').localeCompare(b.defectNumber ?? '', undefined, { numeric: true }));
+      // Sort by category (severity) descending; tie-break by defect code.
+      items.sort(
+        (a, b) =>
+          (b.severity || 0) - (a.severity || 0) ||
+          (a.defectNumber ?? '').localeCompare(b.defectNumber ?? '', undefined, { numeric: true }),
+      );
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [availableDefects]);
