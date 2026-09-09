@@ -209,8 +209,15 @@ function AppRoutes() {
         <Route path="/quotes/traceability" element={<TraceabilityPage />} />
         <Route path="/quotes/:id" element={<QuoteDetailPage />} />
 
-        {/* Repair workflow */}
-        <Route path="/repairs/:campaignId" element={<RepairWorkflowPage />} />
+        {/* Repair workflow — office/team roles only; client is blocked */}
+        <Route
+          path="/repairs/:campaignId"
+          element={
+            <RoleGuard allowedRoles={['inspector', 'supervisor', 'admin']}>
+              <RepairWorkflowPage />
+            </RoleGuard>
+          }
+        />
 
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
