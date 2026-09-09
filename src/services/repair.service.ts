@@ -44,7 +44,7 @@ export interface RepairCampaignDetail {
 
 /** A defect being repaired in the campaign, as reported by get_repairs_for_quote. */
 export interface RepairDefect {
-  /** repair_id from the RPC (identifies the repair/defect node). */
+  /** Real defect.id (falls back to the work_order id when no defect_id exists). */
   id: string;
   type: string;
   severity: number;
@@ -280,6 +280,82 @@ async function resolveBladeInfoByRepair(
 }
 
 /**
+ * Resolve the real blade position and the per-blade correlative (A1/A2/B1)
+ * directly for a set of defect ids, matching the Analyze step's numbering.
+ *
+ * Chain: defect.inspection_id → inspection.blade_id → blade.position (1/2/3 = A/B/C).
+ * The correlative is a per-blade sequential index; defects within a blade are
+ * ordered by their creation time to match the Analyze annotation order.
+ *
+ * Unlike resolveBladeInfoByRepair, this keys the result by defect_id, so it
+ * works for ALL defects of a campaign (including those without a repair yet).
+ */
+async function resolveBladeInfoByDefect(
+  defectIds: string[],
+): Promise<Map<string, RepairBladeInfo>> {
+  const result = new Map<string, RepairBladeInfo>();
+  const unique = [...new Set(defectIds.filter(Boolean))];
+  if (unique.length === 0) return result;
+
+  // 1. Load the defects (with inspection + creation order).
+  const { data: defectRows } = await db
+    .from('defect')
+    .select('id, inspection_id, created_at')
+    .in('id', unique);
+
+  const inspectionByDefect = new Map<string, string>();
+  const createdAtByDefect = new Map<string, string>();
+  const inspectionIds = new Set<string>();
+  for (const dr of (defectRows as unknown[]) ?? []) {
+    const r = dr as Record<string, unknown>;
+    const id = r.id as string;
+    const inspId = (r.inspection_id as string) ?? '';
+    inspectionByDefect.set(id, inspId);
+    createdAtByDefect.set(id, (r.created_at as string) ?? '');
+    if (inspId) inspectionIds.add(inspId);
+  }
+
+  // 2. Resolve blade position per inspection.
+  const positionByInspection = new Map<string, number>();
+  if (inspectionIds.size > 0) {
+    const { data: inspRows } = await db
+      .from('inspection')
+      .select('id, blade:blade_id ( position )')
+      .in('id', [...inspectionIds]);
+    for (const ir of (inspRows as unknown[]) ?? []) {
+      const r = ir as Record<string, unknown>;
+      const blade = (r.blade as Record<string, unknown>) ?? {};
+      positionByInspection.set(r.id as string, Number(blade.position) || 0);
+    }
+  }
+
+  // 3. Build per-blade correlatives (A1, A2, B1, ...). Order defects within a
+  //    blade by creation time to match the Analyze step's annotation order.
+  const defectsWithBlade = unique.map((defectId) => {
+    const inspId = inspectionByDefect.get(defectId) ?? '';
+    return {
+      defectId,
+      position: positionByInspection.get(inspId) ?? 0,
+      createdAt: createdAtByDefect.get(defectId) ?? '',
+    };
+  });
+  defectsWithBlade.sort(
+    (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt),
+  );
+
+  const counters: Record<number, number> = {};
+  for (const d of defectsWithBlade) {
+    counters[d.position] = (counters[d.position] || 0) + 1;
+    const letter = BLADE_LETTERS[d.position] ?? String(d.position);
+    result.set(d.defectId, {
+      bladePosition: d.position,
+      defectNumber: d.position > 0 ? `${letter}${counters[d.position]}` : null,
+    });
+  }
+  return result;
+}
+
+/**
  * Call get_repair_photos_by_stage for one repair and return its stage rows
  * (the 11 stages in order, each with a photos[] JSON array).
  */
@@ -483,6 +559,7 @@ export const repairService = {
    * by photo_id, since the read-only RPCs don't expose metadata.
    */
   async getRepairTree(campaignId: string): Promise<RepairTree> {
+    // 1. Campaign → quote_id.
     const { data: campaign, error } = await db
       .from('campaign')
       .select('quote_id')
@@ -494,39 +571,142 @@ export const repairService = {
     }
 
     const quoteId = (campaign.quote_id as string) ?? null;
-    const repairs = await fetchRepairsForQuote(quoteId);
-    if (repairs.length === 0) return [];
+    if (!quoteId) return [];
 
-    // Resolve real blade position + per-blade correlative (A1/A2/B1) for each
-    // repair, matching the Analyze step's numbering.
-    const bladeInfoByRepair = await resolveBladeInfoByRepair(quoteId);
+    // 2. ALL work_orders of the quote (one per defect of the campaign).
+    const { data: woRows, error: woErr } = await db
+      .from('work_order')
+      .select('id, defect_id, turbine_id, blade_side')
+      .eq('quote_id', quoteId);
+    if (woErr) throw new RepairServiceError(woErr.message, woErr.code);
 
-    // Fetch every repair's stages+photos in parallel via the RPC.
+    const workOrders = ((woRows as unknown[]) ?? []).map((w) => {
+      const r = w as Record<string, unknown>;
+      return {
+        id: r.id as string,
+        defectId: (r.defect_id as string) ?? null,
+        turbineId: (r.turbine_id as string) ?? null,
+        bladeSide: (r.blade_side as string) ?? null,
+      };
+    });
+    if (workOrders.length === 0) return [];
+
+    const workOrderIds = workOrders.map((w) => w.id).filter(Boolean);
+    const defectIds = [
+      ...new Set(workOrders.map((w) => w.defectId).filter((id): id is string => Boolean(id))),
+    ];
+
+    // 3. Repairs of those work_orders → Map<work_order_id, repairRow>.
+    const repairByWorkOrder = new Map<string, Record<string, unknown>>();
+    if (workOrderIds.length > 0) {
+      const { data: repairRows, error: repErr } = await db
+        .from('repair')
+        .select('id, work_order_id, defect_id, status, technician_id')
+        .in('work_order_id', workOrderIds);
+      if (repErr) throw new RepairServiceError(repErr.message, repErr.code);
+      for (const rr of (repairRows as unknown[]) ?? []) {
+        const r = rr as Record<string, unknown>;
+        const woId = r.work_order_id as string;
+        if (woId && !repairByWorkOrder.has(woId)) repairByWorkOrder.set(woId, r);
+      }
+    }
+
+    // 4. Real defect rows → Map<defect_id, defectRow>.
+    const defectById = new Map<string, Record<string, unknown>>();
+    if (defectIds.length > 0) {
+      const { data: defectRows, error: defErr } = await db
+        .from('defect')
+        .select(
+          'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at',
+        )
+        .in('id', defectIds);
+      if (defErr) throw new RepairServiceError(defErr.message, defErr.code);
+      for (const dr of (defectRows as unknown[]) ?? []) {
+        const r = dr as Record<string, unknown>;
+        defectById.set(r.id as string, r);
+      }
+    }
+
+    // 5. Blade position + correlative (A1/A2/B1) resolved BY defect_id.
+    const bladeInfoByDefect = await resolveBladeInfoByDefect(defectIds);
+
+    // 6. Turbine names for the turbines referenced by the work_orders.
+    const turbineNameById = new Map<string, string>();
+    const turbineIds = [
+      ...new Set(workOrders.map((w) => w.turbineId).filter((id): id is string => Boolean(id))),
+    ];
+    if (turbineIds.length > 0) {
+      const { data: turbineRows } = await db
+        .from('turbine')
+        .select('id, name')
+        .in('id', turbineIds);
+      for (const tr of (turbineRows as unknown[]) ?? []) {
+        const r = tr as Record<string, unknown>;
+        turbineNameById.set(r.id as string, (r.name as string) ?? '');
+      }
+    }
+
+    // 7. Fetch stages+photos only for work_orders that HAVE a repair (parallel).
     const stagesByRepair = new Map<string, RepairStageRow[]>();
     await Promise.all(
-      repairs.map(async (repair) => {
-        stagesByRepair.set(repair.repair_id, await fetchStagesForRepair(repair.repair_id));
+      [...repairByWorkOrder.values()].map(async (repair) => {
+        const repairId = repair.id as string;
+        stagesByRepair.set(repairId, await fetchStagesForRepair(repairId));
       }),
     );
 
-    // Resolve selection state for every photo id across all repairs in one query.
+    // 8. Resolve selection state for every photo id across all repairs in one query.
     const allPhotoIds: string[] = [];
     for (const rows of stagesByRepair.values()) {
       allPhotoIds.push(...collectPhotoIds(rows));
     }
     const selectedIds = await fetchSelectedPhotoIds(allPhotoIds);
 
-    return repairs.map((repair) => {
-      const stageRows = stagesByRepair.get(repair.repair_id) ?? [];
-      const stages = mapStages(repair.repair_id, stageRows, selectedIds);
-      return {
-        defect: mapDefect(repair, bladeInfoByRepair.get(repair.repair_id)),
-        repairId: repair.repair_id,
-        repairStatus: (repair.repair_status as string) ?? null,
-        technicianName: (repair.technician_name as string) ?? null,
+    // 9. Build one node per work_order (i.e. per defect of the campaign),
+    //    keeping the defect's created_at alongside for the final ordering.
+    const built = workOrders.map((wo) => {
+      const repairRow = repairByWorkOrder.get(wo.id);
+      const defectRow = wo.defectId ? defectById.get(wo.defectId) : undefined;
+      const bladeInfo = wo.defectId ? bladeInfoByDefect.get(wo.defectId) : undefined;
+
+      const repairId = repairRow ? (repairRow.id as string) : null;
+      const repairStatus = repairRow ? ((repairRow.status as string) ?? null) : null;
+      const stages = repairId
+        ? mapStages(repairId, stagesByRepair.get(repairId) ?? [], selectedIds)
+        : catalogStages();
+
+      const defect: RepairDefect = {
+        id: wo.defectId ?? wo.id,
+        type: (defectRow?.type as string) ?? 'other',
+        severity: Number(defectRow?.severity) || 0,
+        side: (defectRow?.side as string) ?? wo.bladeSide ?? null,
+        distanceFromRoot: Number(defectRow?.distance_from_root) || 0,
+        widthCm: defectRow?.width_cm != null ? Number(defectRow.width_cm) : null,
+        heightCm: defectRow?.height_cm != null ? Number(defectRow.height_cm) : null,
+        description: (defectRow?.description as string) ?? null,
+        bladePosition: bladeInfo?.bladePosition ?? 0,
+        defectNumber: bladeInfo?.defectNumber ?? null,
+        turbineName: wo.turbineId ? (turbineNameById.get(wo.turbineId) ?? null) : null,
+      };
+
+      const node: RepairDefectNode = {
+        defect,
+        repairId,
+        repairStatus,
+        technicianName: null,
         stages: stages.length > 0 ? stages : catalogStages(),
       };
+      return { node, createdAt: (defectRow?.created_at as string) ?? '' };
     });
+
+    // 10. Order by (bladePosition, defect.created_at) for correlative consistency.
+    built.sort((a, b) => {
+      const posDiff = a.node.defect.bladePosition - b.node.defect.bladePosition;
+      if (posDiff !== 0) return posDiff;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+
+    return built.map((b) => b.node);
   },
 
   /**
@@ -573,8 +753,22 @@ export const repairService = {
     const turbineName =
       ((campaign?.turbine as Record<string, unknown> | null)?.name as string) ?? null;
 
-    const repairs = await fetchRepairsForQuote((campaign?.quote_id as string) ?? null);
-    const defectsCount = repairs.length;
+    const quoteId = (campaign?.quote_id as string) ?? null;
+
+    // defectsCount = ALL defects of the campaign (one work_order per defect),
+    // not only those that already have a repair row.
+    let defectsCount = 0;
+    if (quoteId) {
+      const { data: woRows, error: woErr } = await db
+        .from('work_order')
+        .select('id')
+        .eq('quote_id', quoteId);
+      if (woErr) throw new RepairServiceError(woErr.message, woErr.code);
+      defectsCount = ((woRows as unknown[]) ?? []).length;
+    }
+
+    // Photos + completion are still derived from the existing repairs.
+    const repairs = await fetchRepairsForQuote(quoteId);
     const totalStages = (defectsCount > 0 ? defectsCount : 1) * REPAIR_STAGE_CATALOG.length;
 
     let photosCount = 0;
