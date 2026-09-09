@@ -273,7 +273,7 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
           <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
           <td style={tdStyle}>
-            {getRepairStatusBadge(summary?.hasCompletedRepair ? 'repair_done' : campaign.status)}
+            {getRepairStatusBadge(campaign.status)}
           </td>
           <td style={tdStyle}>Blade</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
