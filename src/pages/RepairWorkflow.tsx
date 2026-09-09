@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronRight, Download, Loader2, Star, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
+import { useAuth } from '@/hooks/useAuth';
 import {
   useRepairCampaignDetail,
   useRepairTree,
@@ -75,6 +76,10 @@ export function RepairWorkflow() {
   const navigate = useNavigate();
   const { t, locale } = useLanguage();
   const toast = useToast();
+  const { role } = useAuth();
+  // client can view photos and generate/download reports, but cannot select
+  // or move photos (read-only selection). RLS also blocks the write.
+  const isClient = role === 'client';
 
   const { data: campaign, isLoading: campaignLoading } = useRepairCampaignDetail(campaignId);
   const { data: tree, isLoading: treeLoading } = useRepairTree(campaignId);
@@ -86,6 +91,8 @@ export function RepairWorkflow() {
   const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
 
   const handleSelect = (photo: RepairPhoto, selected: boolean) => {
+    // client is read-only for selection.
+    if (isClient) return;
     if (photo.repairSelected === selected) return;
     setSelected.mutate({ photoId: photo.id, selected });
   };
@@ -149,6 +156,7 @@ export function RepairWorkflow() {
                   node={node}
                   locale={locale}
                   t={t}
+                  readOnly={isClient}
                   onSelect={handleSelect}
                   onPreview={handlePreview}
                   onDownloadReport={handleDownloadDefectPdf}
@@ -194,6 +202,7 @@ interface DefectSectionProps {
   node: RepairDefectNode;
   locale: 'es' | 'en';
   t: (key: string) => string;
+  readOnly: boolean;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
   onDownloadReport: (repairId: string) => void;
@@ -204,6 +213,7 @@ function DefectSection({
   node,
   locale,
   t,
+  readOnly,
   onSelect,
   onPreview,
   onDownloadReport,
@@ -294,6 +304,7 @@ function DefectSection({
               defectId={defect.id}
               stage={stage}
               t={t}
+              readOnly={readOnly}
               onSelect={onSelect}
               onPreview={onPreview}
             />
@@ -310,11 +321,12 @@ interface StageRowProps {
   defectId: string;
   stage: RepairStageNode;
   t: (key: string) => string;
+  readOnly: boolean;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
 }
 
-function StageRow({ defectId, stage, t, onSelect, onPreview }: StageRowProps) {
+function StageRow({ defectId, stage, t, readOnly, onSelect, onPreview }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
 
@@ -356,6 +368,7 @@ function StageRow({ defectId, stage, t, onSelect, onPreview }: StageRowProps) {
                     key={photo.id}
                     photo={photo}
                     dimmed={dragId === photo.id}
+                    readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
                     onDragEnd={() => setDragId(null)}
                     action="add"
@@ -372,20 +385,28 @@ function StageRow({ defectId, stage, t, onSelect, onPreview }: StageRowProps) {
           <div
             style={{ ...col, ...(dropActive ? colDropActive : {}) }}
             data-drop={dropKey}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              setDropActive(true);
-            }}
-            onDragLeave={() => setDropActive(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDropActive(false);
-              const id = e.dataTransfer.getData('text/plain') || dragId;
-              const photo = photos.find((p) => p.id === id);
-              if (photo) onSelect(photo, true);
-              setDragId(null);
-            }}
+            onDragOver={
+              readOnly
+                ? undefined
+                : (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    setDropActive(true);
+                  }
+            }
+            onDragLeave={readOnly ? undefined : () => setDropActive(false)}
+            onDrop={
+              readOnly
+                ? undefined
+                : (e) => {
+                    e.preventDefault();
+                    setDropActive(false);
+                    const id = e.dataTransfer.getData('text/plain') || dragId;
+                    const photo = photos.find((p) => p.id === id);
+                    if (photo) onSelect(photo, true);
+                    setDragId(null);
+                  }
+            }
           >
             <div style={colTitle}>
               <Star size={13} color={C.brand} /> {t('repair.selectedForReport')}
@@ -399,6 +420,7 @@ function StageRow({ defectId, stage, t, onSelect, onPreview }: StageRowProps) {
                     key={photo.id}
                     photo={photo}
                     dimmed={dragId === photo.id}
+                    readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
                     onDragEnd={() => setDragId(null)}
                     action="remove"
@@ -423,6 +445,7 @@ interface PhotoCardProps {
   photo: RepairPhoto;
   dimmed: boolean;
   selected?: boolean;
+  readOnly?: boolean;
   action: 'add' | 'remove';
   actionLabel: string;
   onDragStart: () => void;
@@ -435,6 +458,7 @@ function PhotoCard({
   photo,
   dimmed,
   selected,
+  readOnly,
   action,
   actionLabel,
   onDragStart,
@@ -444,16 +468,25 @@ function PhotoCard({
 }: PhotoCardProps) {
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', photo.id);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
+      draggable={!readOnly}
+      onDragStart={
+        readOnly
+          ? undefined
+          : (e) => {
+              e.dataTransfer.setData('text/plain', photo.id);
+              e.dataTransfer.effectAllowed = 'move';
+              onDragStart();
+            }
+      }
+      onDragEnd={readOnly ? undefined : onDragEnd}
       onClick={onPreview}
-      onDoubleClick={onAction}
-      style={{ ...photoCard, opacity: dimmed ? 0.5 : 1, borderColor: selected ? C.brand : C.border }}
+      onDoubleClick={readOnly ? undefined : onAction}
+      style={{
+        ...photoCard,
+        opacity: dimmed ? 0.5 : 1,
+        borderColor: selected ? C.brand : C.border,
+        cursor: readOnly ? 'zoom-in' : 'grab',
+      }}
       title={photo.filename}
     >
       {photo.thumbnailUrl ? (
@@ -467,17 +500,20 @@ function PhotoCard({
       ) : (
         <div style={photoBroken}>—</div>
       )}
-      <button
-        style={{ ...photoActionBtn, background: action === 'remove' ? '#EF4444' : C.brand }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onAction();
-        }}
-        aria-label={actionLabel}
-        title={actionLabel}
-      >
-        {action === 'remove' ? <X size={13} /> : <Star size={13} />}
-      </button>
+      {/* Selection control (star/remove) is hidden for read-only (client). */}
+      {!readOnly && (
+        <button
+          style={{ ...photoActionBtn, background: action === 'remove' ? '#EF4444' : C.brand }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAction();
+          }}
+          aria-label={actionLabel}
+          title={actionLabel}
+        >
+          {action === 'remove' ? <X size={13} /> : <Star size={13} />}
+        </button>
+      )}
     </div>
   );
 }

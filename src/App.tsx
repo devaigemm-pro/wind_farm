@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
 import { ThemeProvider, LanguageProvider } from '@/components/design-system';
 import { AuthGuard } from '@/components/AuthGuard';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Layout } from '@/components/organisms';
 import { AppLayout } from '@/components/layout/app-layout';
 import { getFeatureFlags } from '@/lib/feature-flags';
@@ -223,15 +222,10 @@ function AppRoutes() {
         <Route path="/quotes/traceability" element={<TraceabilityPage />} />
         <Route path="/quotes/:id" element={<QuoteDetailPage />} />
 
-        {/* Repair workflow — office/team roles only; client is blocked */}
-        <Route
-          path="/repairs/:campaignId"
-          element={
-            <RoleGuard allowedRoles={['inspector', 'supervisor', 'admin']}>
-              <RepairWorkflowPage />
-            </RoleGuard>
-          }
-        />
+        {/* Repair workflow — accessible to all authenticated roles.
+            client can only generate/download reports; photo selection is
+            disabled in the UI (and blocked by RLS). */}
+        <Route path="/repairs/:campaignId" element={<RepairWorkflowPage />} />
 
         <Route path="/profile" element={<ProfilePage />} />
       </Route>

@@ -5,7 +5,6 @@ import { Button, Badge } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { useRepairSummary } from '@/hooks/useRepair';
-import { useAuth } from '@/hooks/useAuth';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
@@ -235,12 +234,7 @@ export function CampaignAccordion({
 function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { role } = useAuth();
   const { data: summary, isLoading } = useRepairSummary(campaign.id);
-
-  // Client role cannot access the repair workflow screen — disable navigation
-  // so they are not sent to an "Access Denied" page.
-  const canOpenRepair = role !== 'client';
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString();
 
@@ -260,7 +254,6 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
   };
 
   const openRepair = () => {
-    if (!canOpenRepair) return;
     navigate(`/repairs/${campaign.id}`);
   };
 
@@ -279,8 +272,8 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
       </thead>
       <tbody>
         <tr
-          style={{ cursor: canOpenRepair ? 'pointer' : 'default' }}
-          onClick={canOpenRepair ? openRepair : undefined}
+          style={{ cursor: 'pointer' }}
+          onClick={openRepair}
         >
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
           <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
