@@ -603,6 +603,7 @@ export interface QuotableDefect {
   severity: number;
   side: string;
   bladePosition: string;
+  defectNumber: string | null;
   distanceFromRoot: number;
   widthCm: number | null;
   heightCm: number | null;

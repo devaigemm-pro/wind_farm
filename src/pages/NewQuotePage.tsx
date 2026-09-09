@@ -55,15 +55,19 @@ export function NewQuotePage() {
     [selectedIds, all],
   );
 
-  // Group available defects by category (severity 5 → 1).
+  // Group available defects by blade (A / B / C), sorted A → B → C, and within
+  // each group by defect code (A1, A2, ...).
   const grouped = useMemo(() => {
-    const map = new Map<number, QuotableDefect[]>();
+    const map = new Map<string, QuotableDefect[]>();
     for (const d of availableDefects) {
-      const cat = d.severity || 0;
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(d);
+      const blade = d.bladePosition || '—';
+      if (!map.has(blade)) map.set(blade, []);
+      map.get(blade)!.push(d);
     }
-    return Array.from(map.entries()).sort((a, b) => b[0] - a[0]);
+    for (const items of map.values()) {
+      items.sort((a, b) => (a.defectNumber ?? '').localeCompare(b.defectNumber ?? '', undefined, { numeric: true }));
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [availableDefects]);
 
   const addToQuote = (id: string) => {
@@ -118,11 +122,10 @@ export function NewQuotePage() {
                   {all.length === 0 ? t('newQuote.noDefects') : t('newQuote.allSelected')}
                 </p>
               ) : (
-                grouped.map(([cat, items]) => (
-                  <div key={cat} style={{ marginBottom: 14 }}>
+                grouped.map(([blade, items]) => (
+                  <div key={blade} style={{ marginBottom: 14 }}>
                     <div style={catHeader}>
-                      <span style={{ ...catDot, background: C.cat[cat] ?? C.muted }} />
-                      {t('newQuote.category')} {cat} ({items.length})
+                      {t('newQuote.blade')} {blade} ({items.length})
                     </div>
                     {items.map((d) => (
                       <div
@@ -140,7 +143,10 @@ export function NewQuotePage() {
                       >
                         <GripVertical size={16} color={C.muted} style={{ flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={defectTitle}>{d.typeLabel}</div>
+                          <div style={defectTitle}>
+                            {d.defectNumber ? <span style={codeBadge}>{d.defectNumber}</span> : null}
+                            {d.typeLabel}
+                          </div>
                           <div style={defectMeta}>
                             {t('newQuote.blade')} {d.bladePosition || '—'} · {t('newQuote.side')}{' '}
                             {d.side || '—'} · {sizeLabel(d)}
@@ -178,6 +184,7 @@ export function NewQuotePage() {
                     <span style={{ ...catDot, background: C.cat[d.severity] ?? C.muted }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={defectTitle}>
+                        {d.defectNumber ? <span style={codeBadge}>{d.defectNumber}</span> : null}
                         {d.typeLabel} · {t('newQuote.category')} {d.severity}
                       </div>
                       <div style={defectMeta}>
@@ -288,6 +295,21 @@ const defectTitle: React.CSSProperties = {
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
+};
+const codeBadge: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 24,
+  height: 18,
+  padding: '0 6px',
+  marginRight: 6,
+  borderRadius: 9,
+  background: C.brand,
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: 700,
+  verticalAlign: 'middle',
 };
 const defectMeta: React.CSSProperties = { fontSize: 11.5, color: C.muted, marginTop: 2 };
 const dropPlaceholder: React.CSSProperties = {
