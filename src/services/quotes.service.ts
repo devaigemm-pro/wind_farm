@@ -78,9 +78,10 @@ function isUuid(value: string): boolean {
  */
 async function buildCampaignAnnotationCodeMap(
   turbineInspectionIds: string[],
-): Promise<Map<string, string>> {
+): Promise<{ codeMap: Map<string, string>; bladeMap: Map<string, string> }> {
   const codeMap = new Map<string, string>();
-  if (turbineInspectionIds.length === 0) return codeMap;
+  const bladeMap = new Map<string, string>();
+  if (turbineInspectionIds.length === 0) return { codeMap, bladeMap };
 
   // 1. Resolve the full set of inspection IDs for the campaign(s) that the
   //    turbine inspections belong to. Analyze numbers over the whole campaign,
@@ -120,7 +121,7 @@ async function buildCampaignAnnotationCodeMap(
     id: string;
     thumbnail_id: string | null;
   }>;
-  if (annRows.length === 0) return codeMap;
+  if (annRows.length === 0) return { codeMap, bladeMap };
 
   // 3. Build photoId(thumbnail_id) → bladeLetter.
   const thumbnailIds = Array.from(
@@ -162,9 +163,12 @@ async function buildCampaignAnnotationCodeMap(
     if (!letter) continue;
     counters[letter] = (counters[letter] || 0) + 1;
     codeMap.set(a.id, `${letter}${counters[letter]}`);
+    // The real blade of the defect is the blade of its annotation's photo,
+    // NOT inspection.blade_id (which points to a single blade per turbine).
+    bladeMap.set(a.id, letter);
   }
 
-  return codeMap;
+  return { codeMap, bladeMap };
 }
 
 /**
@@ -232,10 +236,17 @@ export const quotesService = {
     // annotations of the whole CAMPAIGN (not just this turbine), ordered by
     // created_at ASC, keeping a per-blade counter. The defect ↔ annotation link
     // is `defect.description` = annotation.id (a 36-char UUID).
-    const codeMap = await buildCampaignAnnotationCodeMap(inspectionIds);
+    const { codeMap, bladeMap } = await buildCampaignAnnotationCodeMap(inspectionIds);
     for (const d of defects) {
       const annId = d.description ?? '';
-      d.defectNumber = isUuid(annId) ? codeMap.get(annId) ?? null : null;
+      if (isUuid(annId)) {
+        d.defectNumber = codeMap.get(annId) ?? null;
+        const bl = bladeMap.get(annId);
+        // Override the fallback bladePosition (inspection.blade.position) with
+        // the REAL blade of the annotation's photo, so grouping/label match the
+        // code prefix (e.g. "C13" → blade C).
+        if (bl) d.bladePosition = bl;
+      }
     }
 
     return defects;
@@ -352,7 +363,7 @@ export const quotesService = {
       .select(`
         *,
         defect:defect(
-          id, type, severity, side, distance_from_root, width_cm, height_cm, description,
+          id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id,
           inspection:inspection(blade:blade(position))
         )
       `)
@@ -361,11 +372,36 @@ export const quotesService = {
 
     if (itemsErr) throw new QuoteServiceError(itemsErr.message, itemsErr.code);
 
+    // Resolve the REAL blade per defect (from the annotation's photo) so the
+    // detail matches the quotable-defects list. Same source as the code prefix.
+    const quoteInspectionIds = Array.from(
+      new Set(
+        ((itemRows as unknown[]) ?? [])
+          .map((row) => {
+            const defect = (row as Record<string, unknown>).defect as Record<string, unknown> | null;
+            return defect?.inspection_id as string | undefined;
+          })
+          .filter((v): v is string => !!v),
+      ),
+    );
+    const { bladeMap: quoteBladeMap } =
+      quoteInspectionIds.length > 0
+        ? await buildCampaignAnnotationCodeMap(quoteInspectionIds)
+        : { bladeMap: new Map<string, string>() };
+
     const items: QuoteItem[] = ((itemRows as unknown[]) ?? []).map((row) => {
       const r = row as Record<string, unknown>;
       const defect = r.defect as Record<string, unknown> | null;
       const inspection = defect?.inspection as Record<string, unknown> | null;
       const blade = inspection?.blade as Record<string, unknown> | null;
+      // Fallback blade from inspection.blade.position; overridden below when the
+      // defect's annotation photo resolves a real blade letter.
+      let bladePosition = bladeLabelFromPosition(Number(blade?.position) || 0);
+      const annId = (defect?.description as string) ?? '';
+      if (isUuid(annId)) {
+        const bl = quoteBladeMap.get(annId);
+        if (bl) bladePosition = bl;
+      }
       const materials = Array.isArray(r.materials)
         ? (r.materials as QuoteMaterial[])
         : [];
@@ -390,7 +426,7 @@ export const quotesService = {
               distanceFromRoot: Number(defect.distance_from_root) || 0,
               widthCm: defect.width_cm != null ? Number(defect.width_cm) : null,
               heightCm: defect.height_cm != null ? Number(defect.height_cm) : null,
-              bladePosition: bladeLabelFromPosition(Number(blade?.position) || 0),
+              bladePosition,
               description: (defect.description as string) ?? null,
             }
           : null,
