@@ -535,6 +535,7 @@ export interface QuoteItem {
   quote_id: string;
   defect_id: string | null;
   labor_hours: number;
+  technicians: number;
   hourly_rate: number;
   labor_subtotal: number;
   materials: QuoteMaterial[];

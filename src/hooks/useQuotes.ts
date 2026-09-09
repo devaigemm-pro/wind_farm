@@ -93,6 +93,7 @@ export function useSubmitQuoteResponse() {
       items: {
         id: string;
         labor_hours: number;
+        technicians: number;
         hourly_rate: number;
         materials: QuoteMaterial[];
       }[];

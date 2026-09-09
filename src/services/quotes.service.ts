@@ -443,6 +443,7 @@ export const quotesService = {
         quote_id: r.quote_id as string,
         defect_id: (r.defect_id as string) ?? null,
         labor_hours: Number(r.labor_hours) || 0,
+        technicians: Number(r.technicians) || 1,
         hourly_rate: Number(r.hourly_rate) || 0,
         labor_subtotal: Number(r.labor_subtotal) || 0,
         materials,
@@ -489,6 +490,7 @@ export const quotesService = {
     items: {
       id: string;
       labor_hours: number;
+      technicians: number;
       hourly_rate: number;
       materials: QuoteMaterial[];
     }[],
@@ -499,8 +501,9 @@ export const quotesService = {
     let total = 0;
     for (const item of items) {
       const laborHours = Number(item.labor_hours) || 0;
+      const technicians = Number(item.technicians) || 1;
       const hourlyRate = Number(item.hourly_rate) || 0;
-      const laborSubtotal = laborHours * hourlyRate;
+      const laborSubtotal = laborHours * technicians * hourlyRate;
       const materials = (item.materials ?? []).map((m) => ({
         description: m.description ?? '',
         quantity: Number(m.quantity) || 0,
@@ -515,6 +518,7 @@ export const quotesService = {
         .from('quote_item')
         .update({
           labor_hours: laborHours,
+          technicians,
           hourly_rate: hourlyRate,
           labor_subtotal: laborSubtotal,
           materials,

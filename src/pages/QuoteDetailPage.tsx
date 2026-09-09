@@ -52,6 +52,7 @@ const REPAIR_BADGE: Record<RepairCampaignStatus, BadgeVariant> = {
 interface EditableItem {
   id: string;
   labor_hours: number;
+  technicians: number;
   hourly_rate: number;
   materials: QuoteMaterial[];
 }
@@ -89,6 +90,7 @@ export function QuoteDetailPage() {
         (quote.items ?? []).map((it) => ({
           id: it.id,
           labor_hours: it.labor_hours,
+          technicians: it.technicians ?? 1,
           hourly_rate: it.hourly_rate,
           materials: it.materials.map((m) => ({ ...m })),
         })),
@@ -104,7 +106,7 @@ export function QuoteDetailPage() {
     let total = 0;
     const perItem: Record<string, { labor: number; materials: number; total: number }> = {};
     for (const item of items) {
-      const labor = (Number(item.labor_hours) || 0) * (Number(item.hourly_rate) || 0);
+      const labor = (Number(item.labor_hours) || 0) * (Number(item.technicians) || 1) * (Number(item.hourly_rate) || 0);
       const materials = item.materials.reduce(
         (sum, m) => sum + (Number(m.quantity) || 0) * (Number(m.unit_cost) || 0),
         0,
@@ -159,6 +161,7 @@ export function QuoteDetailPage() {
         items: items.map((it) => ({
           id: it.id,
           labor_hours: Number(it.labor_hours) || 0,
+          technicians: Number(it.technicians) || 1,
           hourly_rate: Number(it.hourly_rate) || 0,
           materials: it.materials,
         })),
@@ -278,6 +281,21 @@ export function QuoteDetailPage() {
                     />
                   ) : (
                     <div style={readValue}>{it.labor_hours}</div>
+                  )}
+                </label>
+                <label style={fieldLabel}>
+                  {t('quoteDetail.technicians')}
+                  {canEdit ? (
+                    <input
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={editable?.technicians ?? 1}
+                      onChange={(e) => updateItem(it.id, { technicians: Number(e.target.value) })}
+                      style={input}
+                    />
+                  ) : (
+                    <div style={readValue}>{it.technicians ?? 1}</div>
                   )}
                 </label>
                 <label style={fieldLabel}>
