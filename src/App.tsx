@@ -9,6 +9,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { getFeatureFlags } from '@/lib/feature-flags';
 import { ToastContainer } from '@/components/organisms';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthBootstrap } from '@/hooks/useAuthBootstrap';
 import { LoadingSplash } from '@/components/atoms/LoadingSplash';
 
 const Login = lazy(() => import('@/pages/LoginV2'));
@@ -164,6 +165,19 @@ function TurbineRedirect() {
 }
 
 /**
+ * Runs the global auth side effects exactly once for the whole app:
+ * the onAuthStateChange subscription (+ INITIAL_SESSION safety timer) and the
+ * activity listeners + inactivity timeout. Mounted a single time here so the
+ * ~30 components consuming `useAuth()` only read the store — they no longer
+ * each open their own subscription or register global window listeners.
+ * Renders nothing.
+ */
+function AuthBootstrap() {
+  useAuthBootstrap();
+  return null;
+}
+
+/**
  * Single AuthGuard wrapping all protected routes prevents
  * multiple independent useAuth subscriptions and eliminates
  * the staggered loading sequence that causes flickering.
@@ -234,6 +248,7 @@ export default function App() {
       <ThemeProvider>
         <LanguageProvider>
         <BrowserRouter>
+          <AuthBootstrap />
           <Suspense fallback={<LoadingSplash />}>
             <AppRoutes />
           </Suspense>
