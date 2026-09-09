@@ -60,6 +60,113 @@ async function getTurbineInspectionIds(turbineId: string): Promise<string[]> {
   return Array.from(idSet);
 }
 
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+function isUuid(value: string): boolean {
+  return value.length === 36 && UUID_RE.test(value);
+}
+
+/**
+ * Reproduce the Analyze step numbering (A1, A34, B4, ...) over the whole
+ * campaign, returning a map annotationId → code.
+ *
+ * Analyze loads ALL annotations of ALL inspections of the CAMPAIGN, ordered by
+ * created_at ASC, and keeps a per-blade counter incremented for EVERY
+ * annotation (whether or not it is a quotable defect). The blade letter of an
+ * annotation is derived from its photo: annotation.thumbnail_id →
+ * inspection_photo.id → inspection_photo.blade_id → blade.position (1→A,2→B,3→C).
+ */
+async function buildCampaignAnnotationCodeMap(
+  turbineInspectionIds: string[],
+): Promise<Map<string, string>> {
+  const codeMap = new Map<string, string>();
+  if (turbineInspectionIds.length === 0) return codeMap;
+
+  // 1. Resolve the full set of inspection IDs for the campaign(s) that the
+  //    turbine inspections belong to. Analyze numbers over the whole campaign,
+  //    which is why numbers can be high (e.g. A34).
+  const { data: turbineInsps } = await supabase
+    .from('inspection')
+    .select('id, campaign_id')
+    .in('id', turbineInspectionIds);
+
+  const campaignIds = new Set<string>();
+  for (const i of (turbineInsps ?? [])) {
+    const cid = (i as { campaign_id: string | null }).campaign_id;
+    if (cid) campaignIds.add(cid);
+  }
+
+  const allInspectionIds = new Set<string>(turbineInspectionIds);
+  if (campaignIds.size > 0) {
+    const { data: campaignInsps } = await supabase
+      .from('inspection')
+      .select('id, campaign_id')
+      .in('campaign_id', Array.from(campaignIds));
+    for (const i of (campaignInsps ?? [])) {
+      allInspectionIds.add((i as { id: string }).id);
+    }
+  }
+  // Defects in inspections without a campaign_id keep the turbine inspection
+  // set (already seeded above), so they are never lost.
+
+  // 2. Load ALL annotations of that inspection set, ordered EXACTLY like Analyze.
+  const { data: annotations } = await supabase
+    .from('annotation')
+    .select('id, thumbnail_id, inspection_id, created_at')
+    .in('inspection_id', Array.from(allInspectionIds))
+    .order('created_at', { ascending: true });
+
+  const annRows = (annotations ?? []) as Array<{
+    id: string;
+    thumbnail_id: string | null;
+  }>;
+  if (annRows.length === 0) return codeMap;
+
+  // 3. Build photoId(thumbnail_id) → bladeLetter.
+  const thumbnailIds = Array.from(
+    new Set(annRows.map((a) => a.thumbnail_id).filter((v): v is string => !!v)),
+  );
+
+  const { data: photos } = thumbnailIds.length > 0
+    ? await db.from('inspection_photo').select('id, blade_id').in('id', thumbnailIds)
+    : { data: [] };
+  const photoRows = (photos ?? []) as Array<{ id: string; blade_id: string | null }>;
+
+  const bladeIds = Array.from(
+    new Set(photoRows.map((p) => p.blade_id).filter((v): v is string => !!v)),
+  );
+
+  const { data: blades } = bladeIds.length > 0
+    ? await supabase.from('blade').select('id, position').in('id', bladeIds)
+    : { data: [] };
+  const bladeRows = (blades ?? []) as Array<{ id: string; position: number | null }>;
+
+  const bladeLetterById = new Map<string, string>();
+  for (const b of bladeRows) {
+    const pos = Number(b.position) || 0;
+    bladeLetterById.set(b.id, BLADE_LETTERS[pos] ?? String(pos));
+  }
+
+  const letterByPhotoId = new Map<string, string>();
+  for (const p of photoRows) {
+    if (p.blade_id) {
+      const letter = bladeLetterById.get(p.blade_id);
+      if (letter) letterByPhotoId.set(p.id, letter);
+    }
+  }
+
+  // 4. Reproduce the per-blade counter, incrementing for EVERY annotation.
+  const counters: Record<string, number> = {};
+  for (const a of annRows) {
+    const letter = a.thumbnail_id ? letterByPhotoId.get(a.thumbnail_id) : undefined;
+    if (!letter) continue;
+    counters[letter] = (counters[letter] || 0) + 1;
+    codeMap.set(a.id, `${letter}${counters[letter]}`);
+  }
+
+  return codeMap;
+}
+
 /**
  * Map a raw defect row (with nested inspection/blade) to a QuotableDefect.
  */
@@ -120,31 +227,15 @@ export const quotesService = {
     const rows = ((data as unknown[]) ?? []).map((r) => r as Record<string, unknown>);
     const defects = rows.map((r) => mapDefectRow(r));
 
-    // Derive the per-blade defect code (A1, A2, B1, ...) exactly like the
-    // Analyze step: number defects within each blade ordered by blade position
-    // (numeric ASC) and then by creation time (ASC). The correlative is
-    // computed over that order, but each defect keeps its assigned defectNumber
-    // — the list order consumed by the UI is not changed.
-    const ordered = rows.map((r, index) => {
-      const inspection = r.inspection as Record<string, unknown> | null;
-      const blade = inspection?.blade as Record<string, unknown> | null;
-      return {
-        index,
-        position: Number(blade?.position) || 0,
-        createdAt: (r.created_at as string) ?? '',
-      };
-    });
-    ordered.sort(
-      (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt),
-    );
-
-    const counters: Record<number, number> = {};
-    for (const o of ordered) {
-      if (o.position <= 0) continue;
-      counters[o.position] = (counters[o.position] || 0) + 1;
-      const letter = BLADE_LETTERS[o.position] ?? String(o.position);
-      const target = defects[o.index];
-      if (target) target.defectNumber = `${letter}${counters[o.position]}`;
+    // Derive the per-blade defect code (A1, A34, B4, ...) reproducing EXACTLY
+    // the numbering that the Analyze step performs. Analyze numbers over ALL
+    // annotations of the whole CAMPAIGN (not just this turbine), ordered by
+    // created_at ASC, keeping a per-blade counter. The defect ↔ annotation link
+    // is `defect.description` = annotation.id (a 36-char UUID).
+    const codeMap = await buildCampaignAnnotationCodeMap(inspectionIds);
+    for (const d of defects) {
+      const annId = d.description ?? '';
+      d.defectNumber = isUuid(annId) ? codeMap.get(annId) ?? null : null;
     }
 
     return defects;
