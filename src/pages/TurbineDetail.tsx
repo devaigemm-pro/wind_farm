@@ -651,7 +651,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
             {t('button.planNextInspection')}
           </button>
           {/* Request quote — only outside the shared/public view */}
-          {!isSharedView && (
+          {!isSharedView && role === 'client' && (
             <button
               style={requestQuoteBtn}
               onClick={() =>
