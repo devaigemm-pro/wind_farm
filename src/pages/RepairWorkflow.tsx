@@ -457,7 +457,13 @@ function PhotoCard({
       title={photo.filename}
     >
       {photo.thumbnailUrl ? (
-        <img src={photo.thumbnailUrl} alt={photo.filename} style={photoImg} loading="lazy" />
+        <img
+          src={photo.thumbnailUrl}
+          alt={photo.filename}
+          style={{ ...photoImg, WebkitUserDrag: 'none', userSelect: 'none' } as React.CSSProperties}
+          loading="lazy"
+          draggable={false}
+        />
       ) : (
         <div style={photoBroken}>—</div>
       )}
