@@ -165,7 +165,7 @@ export function NewQuotePage() {
                             {d.typeLabel}
                           </div>
                           <div style={defectMeta}>
-                            {t('newQuote.blade')} {d.bladePosition || '—'} · {t('newQuote.side')}{' '}
+                            {t('newQuote.category')} {d.severity || '—'} · {t('newQuote.side')}{' '}
                             {d.side || '—'} · {sizeLabel(d)}
                           </div>
                         </div>
@@ -203,10 +203,10 @@ export function NewQuotePage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={defectTitle}>
                         {d.defectNumber ? <span style={codeBadge}>{d.defectNumber}</span> : null}
-                        {d.typeLabel} · {t('newQuote.category')} {d.severity}
+                        {d.typeLabel}
                       </div>
                       <div style={defectMeta}>
-                        {t('newQuote.blade')} {d.bladePosition || '—'} · {t('newQuote.side')}{' '}
+                        {t('newQuote.category')} {d.severity || '—'} · {t('newQuote.side')}{' '}
                         {d.side || '—'} · {sizeLabel(d)}
                       </div>
                     </div>
