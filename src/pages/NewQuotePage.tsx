@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, GripVertical, X, Send } from 'lucide-react';
+import { ArrowLeft, GripVertical, X, Send, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useQuotableDefects, useCreateQuote } from '@/hooks/useQuotes';
@@ -42,6 +42,17 @@ export function NewQuotePage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
+  // Blades collapsed in the "available" column. Empty = all expanded (default).
+  const [collapsedBlades, setCollapsedBlades] = useState<Set<string>>(new Set());
+
+  const toggleBlade = (blade: string) => {
+    setCollapsedBlades((prev) => {
+      const next = new Set(prev);
+      if (next.has(blade)) next.delete(blade);
+      else next.add(blade);
+      return next;
+    });
+  };
 
   const all = useMemo(() => defects ?? [], [defects]);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -122,12 +133,18 @@ export function NewQuotePage() {
                   {all.length === 0 ? t('newQuote.noDefects') : t('newQuote.allSelected')}
                 </p>
               ) : (
-                grouped.map(([blade, items]) => (
+                grouped.map(([blade, items]) => {
+                  const collapsed = collapsedBlades.has(blade);
+                  return (
                   <div key={blade} style={{ marginBottom: 14 }}>
-                    <div style={catHeader}>
+                    <div
+                      style={{ ...catHeader, cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => toggleBlade(blade)}
+                    >
+                      {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                       {t('newQuote.blade')} {blade} ({items.length})
                     </div>
-                    {items.map((d) => (
+                    {!collapsed && items.map((d) => (
                       <div
                         key={d.id}
                         draggable
@@ -155,7 +172,8 @@ export function NewQuotePage() {
                       </div>
                     ))}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
