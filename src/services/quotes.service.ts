@@ -36,6 +36,8 @@ function bladeLabelFromPosition(position: number | null | undefined): string {
   return BLADE_POSITION_LABELS[pos] ?? (pos ? String(pos) : '');
 }
 
+const BLADE_LETTERS: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
+
 /**
  * Resolve the set of inspection IDs for a turbine (both blade path and
  * direct turbine_id path), mirroring the pattern used across the app.
@@ -72,6 +74,7 @@ function mapDefectRow(row: Record<string, unknown>): QuotableDefect {
     severity: Number(row.severity) || 0,
     side: (row.side as string) ?? '',
     bladePosition: bladeLabelFromPosition(bladePos),
+    defectNumber: null,
     distanceFromRoot: Number(row.distance_from_root) || 0,
     widthCm: row.width_cm != null ? Number(row.width_cm) : null,
     heightCm: row.height_cm != null ? Number(row.height_cm) : null,
@@ -102,6 +105,7 @@ export const quotesService = {
         height_cm,
         side,
         resolved,
+        created_at,
         inspection_id,
         inspection:inspection!inner(
           blade:blade(position)
@@ -113,7 +117,37 @@ export const quotesService = {
 
     if (error) throw new QuoteServiceError(error.message, error.code);
 
-    return ((data as unknown[]) ?? []).map((r) => mapDefectRow(r as Record<string, unknown>));
+    const rows = ((data as unknown[]) ?? []).map((r) => r as Record<string, unknown>);
+    const defects = rows.map((r) => mapDefectRow(r));
+
+    // Derive the per-blade defect code (A1, A2, B1, ...) exactly like the
+    // Analyze step: number defects within each blade ordered by blade position
+    // (numeric ASC) and then by creation time (ASC). The correlative is
+    // computed over that order, but each defect keeps its assigned defectNumber
+    // — the list order consumed by the UI is not changed.
+    const ordered = rows.map((r, index) => {
+      const inspection = r.inspection as Record<string, unknown> | null;
+      const blade = inspection?.blade as Record<string, unknown> | null;
+      return {
+        index,
+        position: Number(blade?.position) || 0,
+        createdAt: (r.created_at as string) ?? '',
+      };
+    });
+    ordered.sort(
+      (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt),
+    );
+
+    const counters: Record<number, number> = {};
+    for (const o of ordered) {
+      if (o.position <= 0) continue;
+      counters[o.position] = (counters[o.position] || 0) + 1;
+      const letter = BLADE_LETTERS[o.position] ?? String(o.position);
+      const target = defects[o.index];
+      if (target) target.defectNumber = `${letter}${counters[o.position]}`;
+    }
+
+    return defects;
   },
 
   /**
