@@ -231,13 +231,46 @@ export const quotesService = {
     const rows = ((data as unknown[]) ?? []).map((r) => r as Record<string, unknown>);
     const defects = rows.map((r) => mapDefectRow(r));
 
+    // Exclude defects that are already quoted (with a live quote) or in repair.
+    // A defect stays AVAILABLE only if it was never quoted or its quote was
+    // REJECTED. If it has a live quote (status requested/quoted/approved) or an
+    // active work_order (not cancelled), it must NOT appear.
+    const defectIds = defects.map((d) => d.id);
+    if (defectIds.length === 0) return [];
+
+    // Defectos con una cotización viva (no rechazada): requested/quoted/approved.
+    const { data: quotedRows } = await db
+      .from('quote_item')
+      .select('defect_id, quote:quote!inner(status)')
+      .in('defect_id', defectIds)
+      .neq('quote.status', 'rejected');
+
+    // Defectos con work_order activo (en reparación) — refuerzo defensivo.
+    const { data: woRows } = await db
+      .from('work_order')
+      .select('defect_id')
+      .in('defect_id', defectIds)
+      .neq('status', 'cancelled');
+
+    const blocked = new Set<string>();
+    for (const r of (quotedRows ?? [])) {
+      const id = (r as { defect_id: string | null }).defect_id;
+      if (id) blocked.add(id);
+    }
+    for (const r of (woRows ?? [])) {
+      const id = (r as { defect_id: string | null }).defect_id;
+      if (id) blocked.add(id);
+    }
+
+    const available = defects.filter((d) => !blocked.has(d.id));
+
     // Derive the per-blade defect code (A1, A34, B4, ...) reproducing EXACTLY
     // the numbering that the Analyze step performs. Analyze numbers over ALL
     // annotations of the whole CAMPAIGN (not just this turbine), ordered by
     // created_at ASC, keeping a per-blade counter. The defect ↔ annotation link
     // is `defect.description` = annotation.id (a 36-char UUID).
     const { codeMap, bladeMap } = await buildCampaignAnnotationCodeMap(inspectionIds);
-    for (const d of defects) {
+    for (const d of available) {
       const annId = d.description ?? '';
       if (isUuid(annId)) {
         d.defectNumber = codeMap.get(annId) ?? null;
@@ -249,7 +282,7 @@ export const quotesService = {
       }
     }
 
-    return defects;
+    return available;
   },
 
   /**
