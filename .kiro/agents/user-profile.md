@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 257
+- **Sesiones analizadas**: 258
 - **Última actualización**: 2026-09-08
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -95,6 +95,7 @@
 
 ---
 
+- **"un ejemplo concreto = especificación exacta"** — cuando el usuario da un ejemplo de datos (ej. códigos "A1, A34, B4, B6" no consecutivos), ese ejemplo DEFINE el comportamiento esperado al detalle. Los números no consecutivos indicaban que el código debía ser el ORIGINAL de la pantalla de referencia (ANALYZE), no un correlativo nuevo. No interpretar de forma laxa: reproducir el patrón exacto que el ejemplo implica. Correlaciona con "usar el mismo método que X" y "diagnosticar más profundo".
 ## 8. Historial de Observaciones por Sesión
 
 ### Sesión 1 - 2026-07-21 (madrugada)
@@ -1550,3 +1551,12 @@
   - "implementa en prod" = instrucción EXPLÍCITA que autoriza merge a main + push (según checklist). Ejecuté: commit logs → fetch + rebase origin/main → checkout main → merge --no-ff → push origin main → volver a branch de sesión. Vercel deploya automáticamente al push a main (no se usa Vercel CLI).
   - Limitación recurrente: la verificación visual en prod requiere login y no hay credenciales de test ni sesión guardada en agent-browser. Pedí la contraseña en vez de inventar. (Correlaciona con "se riguroso": no reportar éxito visual sin verificar).
 - **Patrones confirmados**: español directo, alta autonomía, iteración incremental (implementa local → valida → "implementa en prod"), confía en el criterio del compañero, replicar patrones existentes en vez de inventar, deploy solo con instrucción explícita.
+
+### Sesión 258 - 2026-09-08
+- **Tarea principal**: (compañero) Corregir /quotes/new: la lista con títulos A/B/C y bajo cada uno los defectos con el CÓDIGO EXACTO de 3.ANALYZE (ej A1, A34, B4, B6 — no consecutivos). Luego "dejalo en prod".
+- **Observaciones nuevas**:
+  - El ejemplo del usuario "A1, A34, B4, B6" (números NO consecutivos) fue la pista clave: el código NO es un correlativo nuevo por pala, sino el número original de ANALYZE. Cuando el usuario da un ejemplo concreto, ese ejemplo define el comportamiento exacto (correlaciona con "usar el mismo método que X" y "te equivocas mucho: si da un ejemplo, replicar ese patrón").
+  - Diagnóstico correcto vía context-gatherer: ANALYZE numera sobre TODAS las anotaciones de la CAMPAÑA (no del turbine) ordenadas por created_at, contador por pala; defect↔annotation se enlaza por defect.description = annotation.id. La 1a implementación (sesión 257) numeraba sobre defects quotable → estaba mal. Esto refuerza "diagnosticar más profundo" antes de parchar.
+  - El desarrollador de nuevo no pudo correr terminal; yo (compañero) ejecuté build, encontré 2 errores TS (tabla inspection_photo no está en el tipo tipado de supabase → usar el cliente untyped `db = supabase as any` que ya existe en el módulo), corregí y build OK.
+  - "dejalo en prod" = misma semántica que "implementa en prod": commit → rebase origin/main → merge --no-ff a main → push. Deploy automático de Vercel.
+- **Patrones confirmados**: ejemplos concretos = especificación exacta; replicar el patrón real existente en vez de inventar; diagnosticar la raíz cuando el 1er intento no cumple; deploy solo con instrucción explícita; verificación visual en prod bloqueada por falta de credenciales (pido, no invento).
