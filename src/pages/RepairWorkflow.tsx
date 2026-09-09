@@ -94,12 +94,14 @@ export function RepairWorkflow() {
     if (photo.url) setLightbox(photo);
   };
 
-  // Generate a PDF report scoped to a SINGLE defect.
-  const handleDownloadDefectPdf = async (defectId: string) => {
-    if (!campaignId) return;
-    setDownloadingDefectId(defectId);
+  // Generate a PDF report scoped to a SINGLE repair. The PDF service scopes by
+  // repair_id (RepairReportData.defectId carries the repair_id), so we pass the
+  // node's repairId — not the (now real) defect_id.
+  const handleDownloadDefectPdf = async (repairId: string) => {
+    if (!campaignId || !repairId) return;
+    setDownloadingDefectId(repairId);
     try {
-      await generateAndDownloadRepairReport({ campaignId, defectId });
+      await generateAndDownloadRepairReport({ campaignId, defectId: repairId });
     } catch (err) {
       toast.error((err as Error)?.message || t('repair.pdfError'));
     } finally {
@@ -150,7 +152,9 @@ export function RepairWorkflow() {
                   onSelect={handleSelect}
                   onPreview={handlePreview}
                   onDownloadReport={handleDownloadDefectPdf}
-                  downloading={downloadingDefectId === node.defect.id}
+                  downloading={
+                    node.repairId != null && downloadingDefectId === node.repairId
+                  }
                 />
               ))}
             </div>
@@ -192,7 +196,7 @@ interface DefectSectionProps {
   t: (key: string) => string;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
-  onDownloadReport: (defectId: string) => void;
+  onDownloadReport: (repairId: string) => void;
   downloading: boolean;
 }
 
@@ -242,30 +246,44 @@ function DefectSection({
         <span style={defectCount}>
           {totalPhotos} {t('repair.photos')} · {selectedPhotos} {t('repair.selected')}
         </span>
-        <span
-          role="button"
-          tabIndex={0}
-          aria-disabled={downloading}
-          style={{ ...defectPdfBtn, opacity: downloading ? 0.6 : 1 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!downloading) onDownloadReport(defect.id);
-          }}
-          onKeyDown={(e) => {
-            if ((e.key === 'Enter' || e.key === ' ') && !downloading) {
-              e.stopPropagation();
-              onDownloadReport(defect.id);
-            }
-          }}
-          title={t('repair.generateReport')}
-        >
-          {downloading ? (
-            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-          ) : (
-            <Download size={14} />
-          )}
-          {t('repair.generateReport')}
-        </span>
+        {(() => {
+          // A defect with no repair yet has no report → disable the PDF button.
+          const hasRepair = node.repairId != null;
+          const disabled = downloading || !hasRepair;
+          const triggerDownload = () => {
+            if (!disabled && node.repairId) onDownloadReport(node.repairId);
+          };
+          return (
+            <span
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-disabled={disabled}
+              style={{
+                ...defectPdfBtn,
+                opacity: disabled ? 0.5 : 1,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerDownload();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                  triggerDownload();
+                }
+              }}
+              title={hasRepair ? t('repair.generateReport') : t('repair.notStarted')}
+            >
+              {downloading ? (
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Download size={14} />
+              )}
+              {t('repair.generateReport')}
+            </span>
+          );
+        })()}
       </button>
 
       {open && (
