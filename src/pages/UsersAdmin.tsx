@@ -14,7 +14,7 @@ import {
   useDeleteUser,
   useUserFarms,
 } from '@/hooks/useUsers';
-import { validateRut } from '@/utils/validation';
+import { validateRut, validatePassword } from '@/utils/validation';
 import { USER_ROLES, type Profile, type UserRole } from '@/types';
 
 // Roles offered by the maintainer. 'client' is excluded because the DB check
@@ -207,6 +207,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
   const [role, setRole] = useState<UserRole>((user?.role as UserRole) ?? 'inspector');
   const [selectedFarms, setSelectedFarms] = useState<Set<string>>(new Set());
   const [rutError, setRutError] = useState<string | undefined>(undefined);
+  const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
 
   // Seed selected farms once the existing assignments load (edit mode).
   useEffect(() => {
@@ -238,6 +239,14 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
       toast.error(t('users.nameRequired'));
       return;
     }
+
+    // Password strength (required on create; on edit only when a new one is typed).
+    const pwd = password.trim();
+    if ((!isEdit || pwd) && !validatePassword(pwd)) {
+      setPasswordError(t('users.passwordWeak'));
+      return;
+    }
+    setPasswordError(undefined);
 
     try {
       if (isEdit && user) {
@@ -324,13 +333,18 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
             <label style={labelStyle}>
               {t('users.password')} {isEdit ? `(${t('users.passwordOptional')})` : '*'}
             </label>
+            <span style={{ ...errorTextStyle, color: 'var(--color-neutral-400)' }}>{t('users.passwordHint')}</span>
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, borderColor: passwordError ? 'var(--color-danger-500)' : 'var(--color-neutral-300)' }}
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordError) setPasswordError(undefined);
+              }}
               autoComplete="new-password"
             />
+            {passwordError && <span style={errorTextStyle}>{passwordError}</span>}
           </div>
         </div>
 

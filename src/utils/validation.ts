@@ -104,3 +104,20 @@ export function validateRut(rut: string): boolean {
 
   return expected === verifier;
 }
+
+// ─── Password strength (medium) ─────────────────────────────────────────────
+
+/**
+ * Validate a medium-strength password:
+ *  - at least 8 characters
+ *  - at least one lowercase letter
+ *  - at least one uppercase letter
+ *  - at least one digit
+ */
+export function validatePassword(password: string): boolean {
+  if (!password || password.length < 8) return false;
+  if (!/[a-z]/.test(password)) return false;
+  if (!/[A-Z]/.test(password)) return false;
+  if (!/\d/.test(password)) return false;
+  return true;
+}

@@ -954,6 +954,14 @@ export const translations: TranslationMap = {
     es: '¿Seguro que deseas eliminar este usuario? Esta acción no se puede deshacer.',
   },
   'users.rutInvalid': { en: 'Invalid RUT', es: 'RUT inválido' },
+  'users.passwordWeak': {
+    en: 'Password must be at least 8 characters and include uppercase, lowercase and a number',
+    es: 'La contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula y un número',
+  },
+  'users.passwordHint': {
+    en: 'Min. 8 chars, with uppercase, lowercase and a number',
+    es: 'Mín. 8 caracteres, con mayúscula, minúscula y un número',
+  },
   'users.nameRequired': { en: 'Name is required', es: 'El nombre es obligatorio' },
   'users.credentialsRequired': {
     en: 'Email and password are required',
