@@ -63,7 +63,9 @@ BEGIN
       END AS letter
     FROM public.annotation a
     JOIN campaign_inspections ci ON ci.inspection_id = a.inspection_id
-    LEFT JOIN public.inspection_photo p ON p.id = a.thumbnail_id
+    -- annotation.thumbnail_id is text while inspection_photo.id is uuid, so
+    -- cast the uuid to text for the join (mirrors the TS lookup by id string).
+    LEFT JOIN public.inspection_photo p ON p.id::text = a.thumbnail_id
     LEFT JOIN public.blade b ON b.id = p.blade_id
   ),
   numbered AS (
