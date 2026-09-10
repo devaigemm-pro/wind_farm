@@ -6,6 +6,7 @@ import {
   Clock,
   FileText,
   ClipboardList,
+  Users,
   User,
   LogOut,
   ChevronsLeft,
@@ -65,6 +66,14 @@ export function Sidebar({
         { icon: FileText, label: t('sidebar.reports'), path: '/inspections/reports' },
       ],
     },
+    ...(role === 'admin'
+      ? [
+          {
+            title: t('sidebar.administration'),
+            items: [{ icon: Users, label: t('sidebar.users'), path: '/admin/users' }],
+          },
+        ]
+      : []),
     {
       title: t('sidebar.account'),
       items: [

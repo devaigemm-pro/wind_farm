@@ -103,6 +103,9 @@ const TraceabilityPage = lazy(() =>
 const RepairWorkflowPage = lazy(() =>
   import('@/pages/RepairWorkflow').then((m) => ({ default: m.RepairWorkflow })),
 );
+const UsersAdminPage = lazy(() =>
+  import('@/pages/UsersAdmin').then((m) => ({ default: m.UsersAdmin })),
+);
 
 
 
@@ -228,6 +231,16 @@ function AppRoutes() {
         <Route path="/repairs/:campaignId" element={<RepairWorkflowPage />} />
 
         <Route path="/profile" element={<ProfilePage />} />
+
+        {/* Admin-only user maintainer, guarded by its own role check */}
+        <Route
+          path="/admin/users"
+          element={
+            <AuthGuard requiredRoles={['admin']}>
+              <UsersAdminPage />
+            </AuthGuard>
+          }
+        />
       </Route>
 
       {/* Catch-all redirects to dashboard (AuthGuard will handle if not logged in) */}

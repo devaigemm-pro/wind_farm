@@ -520,27 +520,66 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          last_name: string | null
           name: string
           role: string
+          rut: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           email: string
           id: string
+          last_name?: string | null
           name: string
           role?: string
+          rut?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           email?: string
           id?: string
+          last_name?: string | null
           name?: string
           role?: string
+          rut?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      wind_farm_user: {
+        Row: {
+          created_at: string
+          user_id: string
+          wind_farm_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+          wind_farm_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+          wind_farm_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wind_farm_user_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wind_farm_user_wind_farm_id_fkey"
+            columns: ["wind_farm_id"]
+            isOneToOne: false
+            referencedRelation: "wind_farm"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report: {
         Row: {
