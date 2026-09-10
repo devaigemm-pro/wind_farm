@@ -105,6 +105,41 @@ export async function fetchDefectImageMap(defectIds: string[]): Promise<Record<s
   return result;
 }
 
+// ─── Defect number recompute (campaign-wide correlative) ─────────────────────
+
+/**
+ * Recompute and persist the per-blade defect correlative (A27, A28, ...) for
+ * the campaign that owns the given inspection. The number depends on the WHOLE
+ * campaign, so it must be recomputed at campaign level whenever a defect of the
+ * campaign is created/updated/deleted.
+ *
+ * Resolves campaign_id from inspection_id, then calls the SQL RPC
+ * `recompute_campaign_defect_numbers`. Fully tolerant to failures: it never
+ * throws, so it can't break the defect create/delete flow (older defects simply
+ * fall back to runtime numbering until a successful recompute).
+ */
+async function recomputeDefectNumbersForInspection(inspectionId: string): Promise<void> {
+  try {
+    const { data: insp } = await supabase
+      .from('inspection')
+      .select('campaign_id')
+      .eq('id', inspectionId)
+      .single();
+
+    const campaignId = (insp as { campaign_id: string | null } | null)?.campaign_id ?? null;
+    if (!campaignId) return; // no campaign → nothing to (re)number
+
+    const { error } = await db.rpc('recompute_campaign_defect_numbers', {
+      p_campaign_id: campaignId,
+    });
+    if (error) {
+      console.error('[defects.service] recompute_campaign_defect_numbers failed:', error);
+    }
+  } catch (recomputeError) {
+    console.error('[defects.service] Failed to recompute defect numbers:', recomputeError);
+  }
+}
+
 // ─── Custom Error ───────────────────────────────────────────────────────────
 
 export class DefectServiceError extends Error {
@@ -199,6 +234,10 @@ export const defectsService = {
       console.error('[defects.service] Failed to update inspection stage:', stageError);
     }
 
+    // Freeze the campaign-wide defect correlative (A27, A28, ...) in the DB so
+    // any app can read defect.defect_number directly. Tolerant to failures.
+    await recomputeDefectNumbersForInspection(input.inspection_id);
+
     return data as unknown as Defect;
   },
 
@@ -234,6 +273,11 @@ export const defectsService = {
       .single();
 
     if (error) throw new DefectServiceError(error.message, error.code);
+
+    // A defect edit can change its annotation link (description) → renumber.
+    const updatedInspectionId = (data as { inspection_id?: string } | null)?.inspection_id;
+    if (updatedInspectionId) await recomputeDefectNumbersForInspection(updatedInspectionId);
+
     return data as unknown as Defect;
   },
 
@@ -241,8 +285,18 @@ export const defectsService = {
    * Delete a defect. Cascade on defect_image handles link cleanup.
    */
   async deleteDefect(id: string): Promise<void> {
+    // Resolve the inspection first so we can renumber the campaign afterwards.
+    const { data: existing } = await supabase
+      .from('defect')
+      .select('inspection_id')
+      .eq('id', id)
+      .single();
+
     const { error } = await supabase.from('defect').delete().eq('id', id);
     if (error) throw new DefectServiceError(error.message, error.code);
+
+    const inspId = (existing as { inspection_id?: string } | null)?.inspection_id;
+    if (inspId) await recomputeDefectNumbersForInspection(inspId);
   },
 
   /**
@@ -524,12 +578,21 @@ export const defectsService = {
    * Delete a defect by ID (uses typed client).
    */
   async deleteDefectById(id: string): Promise<void> {
+    const { data: existing } = await db
+      .from('defect')
+      .select('inspection_id')
+      .eq('id', id)
+      .single();
+
     const { error } = await db
       .from('defect')
       .delete()
       .eq('id', id);
 
     if (error) throw new DefectServiceError(error.message, error.code);
+
+    const inspId = (existing as { inspection_id?: string } | null)?.inspection_id;
+    if (inspId) await recomputeDefectNumbersForInspection(inspId);
   },
 
   /**
