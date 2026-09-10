@@ -6,7 +6,7 @@ import type { Tables } from './supabase';
 
 // ─── Shared Type Aliases (union types matching DB constraints) ───────────────
 
-export type UserRole = 'inspector' | 'supervisor' | 'admin' | 'client';
+export type UserRole = 'inspector' | 'supervisor' | 'admin' | 'client' | 'technician';
 
 export type InspectionStatus = 'in_progress' | 'completed' | 'approved';
 
@@ -29,7 +29,7 @@ export type MimeType = 'image/jpeg' | 'image/png';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-export const USER_ROLES: readonly UserRole[] = ['inspector', 'supervisor', 'admin', 'client'] as const;
+export const USER_ROLES: readonly UserRole[] = ['inspector', 'supervisor', 'admin', 'client', 'technician'] as const;
 
 export const INSPECTION_STATUSES: readonly InspectionStatus[] = [
   'in_progress',
