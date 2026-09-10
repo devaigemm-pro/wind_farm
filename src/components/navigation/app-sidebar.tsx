@@ -7,6 +7,7 @@ import {
   Clock,
   FileText,
   ClipboardList,
+  Users,
   User,
   LogOut,
 } from 'lucide-react';
@@ -53,6 +54,14 @@ export function AppSidebar({ currentPath, onNavigate }: AppSidebarProps) {
         { icon: FileText, label: t('sidebar.reports'), path: '/inspections/reports' },
       ],
     },
+    ...(role === 'admin'
+      ? [
+          {
+            title: t('sidebar.administration'),
+            items: [{ icon: Users, label: t('sidebar.users'), path: '/admin/users' }],
+          },
+        ]
+      : []),
   ];
 
   const bottomItems: NavItem[] = [
