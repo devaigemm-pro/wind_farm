@@ -73,7 +73,9 @@ function mapDefectRow(row: Record<string, unknown>): QuotableDefect {
     severity: Number(row.severity) || 0,
     side: (row.side as string) ?? '',
     bladePosition: bladeLabelFromPosition(bladePos),
-    defectNumber: null,
+    // Persisted campaign-wide correlative (source of truth). Runtime numbering
+    // below only fills the gaps for defects not yet recomputed (null column).
+    defectNumber: (row.defect_number as string) ?? null,
     distanceFromRoot: Number(row.distance_from_root) || 0,
     widthCm: row.width_cm != null ? Number(row.width_cm) : null,
     heightCm: row.height_cm != null ? Number(row.height_cm) : null,
@@ -105,6 +107,7 @@ export const quotesService = {
         side,
         resolved,
         created_at,
+        defect_number,
         inspection_id,
         inspection:inspection!inner(
           blade:blade(position)
@@ -157,11 +160,18 @@ export const quotesService = {
     // annotations of the whole CAMPAIGN (not just this turbine), ordered by
     // created_at ASC, keeping a per-blade counter. The defect ↔ annotation link
     // is `defect.description` = annotation.id (a 36-char UUID).
+    //
+    // SOURCE OF TRUTH: defect.defect_number (persisted by the recompute RPC).
+    // The runtime map is only computed as a FALLBACK for defects whose column
+    // is still null (older defects not yet recomputed), so nothing breaks while
+    // we migrate softly. We still use the annotation blade map to keep the
+    // grouping/label prefix consistent with the code (e.g. "C13" → blade C).
     const { codeMap, bladeMap } = await buildCampaignAnnotationCodeMap(inspectionIds);
     for (const d of available) {
       const annId = d.description ?? '';
       if (isUuid(annId)) {
-        d.defectNumber = codeMap.get(annId) ?? null;
+        // Prefer the persisted number; fall back to runtime when column is null.
+        if (!d.defectNumber) d.defectNumber = codeMap.get(annId) ?? null;
         const bl = bladeMap.get(annId);
         // Override the fallback bladePosition (inspection.blade.position) with
         // the REAL blade of the annotation's photo, so grouping/label match the

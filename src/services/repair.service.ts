@@ -618,7 +618,7 @@ export const repairService = {
       const { data: defectRows, error: defErr } = await db
         .from('defect')
         .select(
-          'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at',
+          'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at, defect_number',
         )
         .in('id', defectIds);
       if (defErr) throw new RepairServiceError(defErr.message, defErr.code);
@@ -670,6 +670,22 @@ export const repairService = {
       const fallback = defectId ? bladeInfoByDefect.get(defectId) : undefined;
       const defectRow = defectId ? defectById.get(defectId) : undefined;
       const annId = (defectRow?.description as string) ?? '';
+
+      // SOURCE OF TRUTH: defect.defect_number persisted by the recompute RPC.
+      // When present, derive the blade position from its letter prefix so the
+      // label matches the code (e.g. "A27" → blade A). Fall through to the
+      // runtime annotation numbering only when the column is null (older
+      // defects not yet recomputed), preserving the previous behaviour.
+      const persisted = (defectRow?.defect_number as string) ?? null;
+      if (persisted) {
+        const letter = persisted.charAt(0);
+        const pos = positionByLetter.get(letter);
+        return {
+          defectNumber: persisted,
+          bladePosition: pos ?? fallback?.bladePosition ?? 0,
+        };
+      }
+
       if (annId && isUuid(annId)) {
         const code = annotationCodeMap.get(annId);
         if (code) {

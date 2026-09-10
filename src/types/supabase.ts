@@ -250,6 +250,7 @@ export type Database = {
           action_text: string | null
           action_urgency: string | null
           created_at: string
+          defect_number: string | null
           description: string | null
           distance_from_root: number
           height_cm: number | null
@@ -269,6 +270,7 @@ export type Database = {
           action_text?: string | null
           action_urgency?: string | null
           created_at?: string
+          defect_number?: string | null
           description?: string | null
           distance_from_root: number
           height_cm?: number | null
@@ -288,6 +290,7 @@ export type Database = {
           action_text?: string | null
           action_urgency?: string | null
           created_at?: string
+          defect_number?: string | null
           description?: string | null
           distance_from_root?: number
           height_cm?: number | null
