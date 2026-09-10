@@ -79,7 +79,12 @@ serve(withCors(async (req) => {
 
     // ─── create ──────────────────────────────────────────────────────────────
     if (action === 'create') {
-      const { email, password, name, last_name, rut, role, windFarmIds } = body
+      const { email, password, name, role, windFarmIds } = body
+      // Normalise empty strings to null so the partial unique index on
+      // profiles.rut (WHERE rut IS NOT NULL) does not treat multiple blank
+      // ruts as colliding values.
+      const last_name = body.last_name?.trim() ? body.last_name.trim() : null
+      const rut = body.rut?.trim() ? body.rut.trim() : null
       if (!email || !password) {
         return json({ error: 'email and password are required' }, 400)
       }
@@ -90,8 +95,8 @@ serve(withCors(async (req) => {
         email_confirm: true,
         user_metadata: {
           name: name ?? null,
-          last_name: last_name ?? null,
-          rut: rut ?? null,
+          last_name,
+          rut,
           role: role ?? 'inspector',
         },
       })
@@ -110,12 +115,15 @@ serve(withCors(async (req) => {
           id: newId,
           email,
           name: name ?? email.split('@')[0],
-          last_name: last_name ?? null,
-          rut: rut ?? null,
+          last_name,
+          rut,
           role: role ?? 'inspector',
         })
       if (profileUpsertError) {
-        return json({ error: 'User created but profile update failed' }, 500)
+        // Roll back the auth user so a failed profile write does not leave an
+        // orphan account that blocks recreating the same email.
+        await supabaseAdmin.auth.admin.deleteUser(newId)
+        return json({ error: profileUpsertError.message ?? 'User created but profile update failed' }, 400)
       }
 
       const ids: string[] = Array.isArray(windFarmIds) ? windFarmIds : []
@@ -137,11 +145,12 @@ serve(withCors(async (req) => {
         return json({ error: 'userId is required' }, 400)
       }
 
-      // Build profile update from provided fields only.
+      // Build profile update from provided fields only. Empty strings for
+      // last_name/rut are stored as null (see create note on the unique index).
       const profileUpdate: Record<string, unknown> = {}
       if (name !== undefined) profileUpdate.name = name
-      if (last_name !== undefined) profileUpdate.last_name = last_name
-      if (rut !== undefined) profileUpdate.rut = rut
+      if (last_name !== undefined) profileUpdate.last_name = last_name?.trim() ? last_name.trim() : null
+      if (rut !== undefined) profileUpdate.rut = rut?.trim() ? rut.trim() : null
       if (role !== undefined) profileUpdate.role = role
 
       if (Object.keys(profileUpdate).length > 0) {
@@ -150,7 +159,7 @@ serve(withCors(async (req) => {
           .update(profileUpdate)
           .eq('id', userId)
         if (updateError) {
-          return json({ error: 'Failed to update profile' }, 500)
+          return json({ error: updateError.message ?? 'Failed to update profile' }, 400)
         }
       }
 
