@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { REPAIR_STAGE_CATALOG } from '@/constants/repair-stages';
 import type { RepairCampaignStatus } from '@/types';
+import { buildCampaignAnnotationCodeMap, isUuid, BLADE_LETTERS as ANNOTATION_BLADE_LETTERS } from './defectNumbering';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -627,8 +628,64 @@ export const repairService = {
       }
     }
 
-    // 5. Blade position + correlative (A1/A2/B1) resolved BY defect_id.
+    // 5. Blade position + correlative (A27/A28/B4...) resolved via the SHARED
+    //    numbering module, so the repair workflow shows EXACTLY the same code as
+    //    the quote (the source of truth). The numbering counts ALL annotations
+    //    of the whole campaign; the defect ↔ annotation link is
+    //    `defect.description` = annotation.id (a 36-char UUID).
+    //
+    //    We seed buildCampaignAnnotationCodeMap with the inspection ids of the
+    //    repair's defects; the function expands to the full campaign internally.
+    const repairInspectionIds = [
+      ...new Set(
+        [...defectById.values()]
+          .map((d) => (d.inspection_id as string) ?? '')
+          .filter(Boolean),
+      ),
+    ];
+    const { codeMap: annotationCodeMap, bladeMap: annotationBladeMap } =
+      repairInspectionIds.length > 0
+        ? await buildCampaignAnnotationCodeMap(repairInspectionIds)
+        : { codeMap: new Map<string, string>(), bladeMap: new Map<string, string>() };
+
+    // Fallback (per-defect counting from 1) ONLY for defects whose description
+    // is not a valid annotation UUID, so we never lose a number.
     const bladeInfoByDefect = await resolveBladeInfoByDefect(defectIds);
+
+    // Reverse map blade letter (A/B/C) → position (1/2/3) to keep bladePosition
+    // consistent with the annotation-derived code.
+    const positionByLetter = new Map<string, number>();
+    for (const [pos, letter] of Object.entries(ANNOTATION_BLADE_LETTERS)) {
+      positionByLetter.set(letter, Number(pos));
+    }
+
+    /**
+     * Resolve { defectNumber, bladePosition } for a defect, preferring the
+     * shared annotation numbering (A27/A28) and falling back to the per-defect
+     * resolver when the defect has no valid annotation link.
+     */
+    const numberingForDefect = (
+      defectId: string | null,
+    ): { defectNumber: string | null; bladePosition: number } => {
+      const fallback = defectId ? bladeInfoByDefect.get(defectId) : undefined;
+      const defectRow = defectId ? defectById.get(defectId) : undefined;
+      const annId = (defectRow?.description as string) ?? '';
+      if (annId && isUuid(annId)) {
+        const code = annotationCodeMap.get(annId);
+        if (code) {
+          const letter = annotationBladeMap.get(annId);
+          const pos = letter ? positionByLetter.get(letter) : undefined;
+          return {
+            defectNumber: code,
+            bladePosition: pos ?? fallback?.bladePosition ?? 0,
+          };
+        }
+      }
+      return {
+        defectNumber: fallback?.defectNumber ?? null,
+        bladePosition: fallback?.bladePosition ?? 0,
+      };
+    };
 
     // 6. Turbine names for the turbines referenced by the work_orders.
     const turbineNameById = new Map<string, string>();
@@ -667,7 +724,7 @@ export const repairService = {
     const built = workOrders.map((wo) => {
       const repairRow = repairByWorkOrder.get(wo.id);
       const defectRow = wo.defectId ? defectById.get(wo.defectId) : undefined;
-      const bladeInfo = wo.defectId ? bladeInfoByDefect.get(wo.defectId) : undefined;
+      const numbering = numberingForDefect(wo.defectId);
 
       const repairId = repairRow ? (repairRow.id as string) : null;
       const repairStatus = repairRow ? ((repairRow.status as string) ?? null) : null;
@@ -684,8 +741,8 @@ export const repairService = {
         widthCm: defectRow?.width_cm != null ? Number(defectRow.width_cm) : null,
         heightCm: defectRow?.height_cm != null ? Number(defectRow.height_cm) : null,
         description: (defectRow?.description as string) ?? null,
-        bladePosition: bladeInfo?.bladePosition ?? 0,
-        defectNumber: bladeInfo?.defectNumber ?? null,
+        bladePosition: numbering.bladePosition,
+        defectNumber: numbering.defectNumber,
         turbineName: wo.turbineId ? (turbineNameById.get(wo.turbineId) ?? null) : null,
       };
 
