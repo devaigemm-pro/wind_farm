@@ -27,8 +27,8 @@ const MANAGED_ROLES: UserRole[] = USER_ROLES.filter(
 // Human-readable labels for roles whose internal value is not display-friendly.
 // Roles not listed here fall back to their raw value.
 const ROLE_LABELS: Partial<Record<UserRole, string>> = {
-  analyst_ss: 'Analista SS',
-  analyst_sr: 'Analista SR',
+  analyst_ss: 'analista ss',
+  analyst_sr: 'analista sr',
 };
 
 const roleLabel = (r: UserRole): string => ROLE_LABELS[r] ?? r;
