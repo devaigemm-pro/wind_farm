@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
+import { fullName } from '@/utils/fullName';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ interface TurbineInfo {
 
 interface InspectorInfo {
   name: string;
+  last_name?: string | null;
   email: string;
 }
 
@@ -218,12 +220,13 @@ async function fetchReportData(inspectionId: string) {
   // 6. Get inspector info
   const { data: inspector } = await supabase
     .from('profiles')
-    .select('name, email')
+    .select('name, last_name, email')
     .eq('id', inspection.inspector_id)
     .single();
 
   const inspectorInfo: InspectorInfo = {
     name: inspector?.name || 'N/D',
+    last_name: inspector?.last_name ?? null,
     email: inspector?.email || '',
   };
 
@@ -669,7 +672,7 @@ function renderInspectionDetails(
     body: [
       ['Método', 'Inspección con dron (CORE Insight)'],
       ['Fecha/hora', formatDateES(inspectionDate)],
-      ['Inspector', inspectorInfo.name],
+      ['Inspector', fullName(inspectorInfo)],
       ['GSD medio', 'N/D'],
     ],
     theme: 'grid',
@@ -692,8 +695,8 @@ function renderInspectionDetails(
     head: [['Campo', 'Valor']],
     body: [
       ['Fecha del informe', formatDateES(now.toISOString())],
-      ['Generado por', inspectorInfo.name],
-      ['Analizado por', inspectorInfo.name],
+      ['Generado por', fullName(inspectorInfo)],
+      ['Analizado por', fullName(inspectorInfo)],
     ],
     theme: 'grid',
     headStyles: { fillColor: COLOR_HEADER_TABLE, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },

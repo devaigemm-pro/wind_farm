@@ -56,7 +56,7 @@ serve(withCors(async (req) => {
             wind_farm:wind_farm!turbine_wind_farm_id_fkey(id, name, location)
           )
         ),
-        inspector:profiles!inspection_inspector_id_fkey(id, name, email),
+        inspector:profiles!inspection_inspector_id_fkey(id, name, last_name, email),
         defects:defect(*),
         evidence(*)
       `)
@@ -92,7 +92,7 @@ serve(withCors(async (req) => {
       `Stage:            ${inspection.stage}`,
       `Scheduled Date:   ${inspection.scheduled_date || 'N/A'}`,
       `Completed At:     ${inspection.completed_at || 'N/A'}`,
-      `Inspector:        ${inspection.inspector?.name || 'Unknown'} (${inspection.inspector?.email || ''})`,
+      `Inspector:        ${inspection.inspector?.name || 'Unknown'}${inspection.inspector?.last_name ? ' ' + inspection.inspector.last_name : ''} (${inspection.inspector?.email || ''})`,
       '',
       '───────────────────────────────────────────────────────────────',
       'ASSET INFORMATION',

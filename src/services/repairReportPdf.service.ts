@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
 import { getStageCatalogLabel } from '@/constants/repair-stages';
+import { fullName } from '@/utils/fullName';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -273,11 +274,11 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
   if (quotedById) {
     const { data: prof } = await db
       .from('profiles')
-      .select('name, email')
+      .select('name, last_name, email')
       .eq('id', quotedById)
       .single();
     if (prof) {
-      technicianName = (prof.name as string) || NA;
+      technicianName = fullName({ name: prof.name as string, last_name: prof.last_name as string | null }) || NA;
       technicianEmail = (prof.email as string) || '';
     }
   }

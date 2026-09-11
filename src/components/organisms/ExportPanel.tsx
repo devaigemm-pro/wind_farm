@@ -3,6 +3,7 @@ import { FileDown, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { savePdfBlob } from '@/utils/pdfStorage';
+import { fullName } from '@/utils/fullName';
 import type { ResultsDefect } from '@/types';
 
 export interface ExportPanelProps {
@@ -1454,21 +1455,32 @@ export function ExportPanel({
       y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
 
       // 3.2 Report Details
-      // Get current user's full name from auth metadata
+      // Get current user's full name — prefer the profile (name + last_name),
+      // fall back to auth metadata, then email.
       let userFullName = 'Inspector';
       try {
         const { data: authUser } = await supabase.auth.getUser();
         if (authUser?.user) {
-          const meta = authUser.user.user_metadata || {};
-          // Try full_name, then name, then construct from first/last
-          if (meta.full_name) {
-            userFullName = meta.full_name;
-          } else if (meta.name) {
-            userFullName = meta.name;
-          } else if (meta.first_name || meta.last_name) {
-            userFullName = `${meta.first_name || ''} ${meta.last_name || ''}`.trim();
+          // 1) Try the user's profile (name + last_name).
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name, last_name')
+            .eq('id', authUser.user.id)
+            .single();
+          if (profile?.name) {
+            userFullName = fullName(profile);
+          } else {
+            // 2) Fall back to auth metadata.
+            const meta = authUser.user.user_metadata || {};
+            if (meta.full_name) {
+              userFullName = meta.full_name;
+            } else if (meta.name) {
+              userFullName = meta.name;
+            } else if (meta.first_name || meta.last_name) {
+              userFullName = `${meta.first_name || ''} ${meta.last_name || ''}`.trim();
+            }
           }
-          // Only fall back to email if nothing else available
+          // 3) Only fall back to email if nothing else available.
           if (userFullName === 'Inspector' && authUser.user.email) {
             userFullName = authUser.user.email.split('@')[0] || authUser.user.email;
           }

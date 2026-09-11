@@ -59,7 +59,7 @@ export const inspectionsService = {
           id, name,
           wind_farm:wind_farm!turbine_wind_farm_id_fkey(id, name)
         ),
-        inspector:profiles!inspection_inspector_id_fkey(id, name, email)
+        inspector:profiles!inspection_inspector_id_fkey(id, name, last_name, email)
       `,
         { count: 'exact' },
       )
@@ -122,8 +122,8 @@ export const inspectionsService = {
           *,
           wind_farm:wind_farm!turbine_wind_farm_id_fkey(*)
         ),
-        inspector:profiles!inspection_inspector_id_fkey(id, name, email, role),
-        approved_by_profile:profiles!inspection_approved_by_fkey(id, name, email, role),
+        inspector:profiles!inspection_inspector_id_fkey(id, name, last_name, email, role),
+        approved_by_profile:profiles!inspection_approved_by_fkey(id, name, last_name, email, role),
         evidence(*),
         defects:defect(*)
       `,
