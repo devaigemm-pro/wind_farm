@@ -245,7 +245,39 @@ serve(withCors(async (req) => {
       if (!userId) {
         return json({ error: 'userId is required' }, 400)
       }
-      // The auth.users → profiles → wind_farm_user cascade handles cleanup.
+
+      // A user with historical records (inspections, reports, comments, etc.)
+      // cannot be deleted because those FKs are ON DELETE NO ACTION — deleting
+      // would orphan audit history. Detect this up front and return a clear,
+      // actionable message instead of a cryptic FK violation.
+      const historyChecks: { table: string; column: string }[] = [
+        { table: 'inspection', column: 'inspector_id' },
+        { table: 'inspection', column: 'approved_by' },
+        { table: 'report', column: 'generated_by' },
+        { table: 'campaign', column: 'created_by' },
+        { table: 'asset_document', column: 'uploaded_by' },
+        { table: 'defect_comment', column: 'author_id' },
+        { table: 'repair', column: 'technician_id' },
+      ]
+      for (const check of historyChecks) {
+        const { count, error: countError } = await supabaseAdmin
+          .from(check.table)
+          .select('*', { count: 'exact', head: true })
+          .eq(check.column, userId)
+        if (countError) continue // table may not exist in some envs; skip
+        if ((count ?? 0) > 0) {
+          return json(
+            {
+              error:
+                'No se puede eliminar: el usuario tiene registros históricos asociados (inspecciones, reportes u otros). Preserva la trazabilidad manteniendo el usuario.',
+              code: 'HAS_HISTORY',
+            },
+            409,
+          )
+        }
+      }
+
+      // The auth.users → profiles → wind_farm_user / user_roles cascade handles cleanup.
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
       if (deleteError) {
         return json({ error: deleteError.message ?? 'Failed to delete user' }, 500)

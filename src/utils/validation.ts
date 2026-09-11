@@ -121,3 +121,22 @@ export function validatePassword(password: string): boolean {
   if (!/\d/.test(password)) return false;
   return true;
 }
+
+// ─── Chilean RUT auto-format ────────────────────────────────────────────────
+
+/**
+ * Format a Chilean RUT as the user types, inserting the hyphen before the
+ * verifier digit. Strips dots/hyphens first, keeps only digits + optional
+ * trailing K, then rejoins as "<body>-<verifier>". Examples:
+ *   "123456785"   -> "12345678-5"
+ *   "12345678k"   -> "12345678-K"
+ *   "1"           -> "1" (too short to split yet)
+ */
+export function formatRut(value: string): string {
+  // Keep digits and K/k only.
+  const clean = value.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length <= 1) return clean;
+  const body = clean.slice(0, -1);
+  const verifier = clean.slice(-1);
+  return `${body}-${verifier}`;
+}

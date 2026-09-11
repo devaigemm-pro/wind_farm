@@ -15,7 +15,7 @@ import {
   useUserFarms,
   useUserRoles,
 } from '@/hooks/useUsers';
-import { validateRut, validatePassword } from '@/utils/validation';
+import { validateRut, validatePassword, formatRut } from '@/utils/validation';
 import { USER_ROLES, type Profile, type UserRole } from '@/types';
 
 // Roles offered by the maintainer. 'client' is excluded because the DB check
@@ -66,8 +66,9 @@ export const UsersAdmin = () => {
     try {
       await deleteUser.mutateAsync(toDelete.id);
       toast.success(t('users.deleted'));
-    } catch {
-      toast.error(t('users.deleteFailed'));
+    } catch (err) {
+      // Show the real reason (e.g. user has historical records) when available.
+      toast.error(err instanceof Error ? err.message : t('users.deleteFailed'));
     } finally {
       setToDelete(null);
     }
@@ -357,7 +358,8 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
               style={{ ...inputStyle, borderColor: rutError ? 'var(--color-danger-500)' : 'var(--color-neutral-300)' }}
               value={rut}
               onChange={(e) => {
-                const value = e.target.value;
+                // Auto-insert the hyphen before the verifier digit as the user types.
+                const value = formatRut(e.target.value);
                 setRut(value);
                 // Live validation: required + Chilean RUT format.
                 const trimmed = value.trim();
