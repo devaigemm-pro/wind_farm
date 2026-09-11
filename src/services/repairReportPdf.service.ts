@@ -530,6 +530,54 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
   };
 }
 
+/**
+ * Resolves the "Técnico(s) a cargo" string over an EXPLICIT scope.
+ *
+ * Precedence:
+ *   1. When `repairIds` is provided (and non-empty), query `repair` by
+ *      `id IN (repairIds)` — this is the most precise, since the report scope
+ *      is defined by repair_id (photos[].repairId).
+ *   2. Otherwise fall back to `defectIds` → `repair.defect_id IN (defectIds)`.
+ *
+ * From the matched repairs, take the DISTINCT non-null `technician_id`, resolve
+ * `profiles (name, last_name)` and join their `fullName()` with ", ".
+ * Returns '' when there are no technicians (the render already falls back to NA).
+ */
+async function resolveTechnicians(repairIds?: string[], defectIds?: string[]): Promise<string> {
+  const ids = (repairIds ?? []).filter(Boolean);
+  const defIds = (defectIds ?? []).filter(Boolean);
+
+  let repairRows: unknown[] | null = null;
+  if (ids.length > 0) {
+    const { data } = await db.from('repair').select('technician_id').in('id', ids);
+    repairRows = (data as unknown[]) ?? [];
+  } else if (defIds.length > 0) {
+    const { data } = await db.from('repair').select('technician_id').in('defect_id', defIds);
+    repairRows = (data as unknown[]) ?? [];
+  }
+
+  const techIds = [
+    ...new Set(
+      (repairRows ?? [])
+        .map((r) => (r as Record<string, unknown>).technician_id as string)
+        .filter(Boolean),
+    ),
+  ];
+  if (techIds.length === 0) return '';
+
+  const { data: techProfiles } = await db
+    .from('profiles')
+    .select('name, last_name')
+    .in('id', techIds);
+  const names = ((techProfiles as unknown[]) ?? [])
+    .map((p) => {
+      const r = p as Record<string, unknown>;
+      return fullName({ name: r.name as string, last_name: r.last_name as string | null });
+    })
+    .filter(Boolean);
+  return names.join(', ');
+}
+
 // ─── PDF Renderers ──────────────────────────────────────────────────────────
 
 function addSectionTitle(doc: jsPDF, title: string, y: number): number {
@@ -1097,7 +1145,7 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   // so `data.defectId` actually carries a repair_id. Filter the photos by
   // repairId, then keep only the defects those photos point to — this preserves
   // ALL stages + detail tables + photos of that defect (nothing is dropped).
-  let ctx: RepairPdfContext = fullCtx;
+  let ctx: RepairPdfContext = { ...fullCtx };
   if (data.defectId) {
     const scopedPhotos = fullCtx.photos.filter((p) => p.repairId === data.defectId);
     const scopedDefectIds = new Set(
@@ -1113,6 +1161,21 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
       photos: scopedPhotos,
     };
   }
+
+  // Recalculate "Técnico(s) a cargo" OVER THE FINAL SCOPED CONTEXT (robust for
+  // both the full and per-defect PDF). The report scope is defined by repair_id
+  // (photos[].repairId), so we resolve technicians by repair.id whenever we have
+  // repair ids in scope. For the per-defect case, `data.defectId` IS a repair_id.
+  const scopedRepairIds = [
+    ...new Set(
+      [
+        ...(data.defectId ? [data.defectId] : []),
+        ...ctx.photos.map((p) => p.repairId).filter((id): id is string => id != null),
+      ].filter(Boolean),
+    ),
+  ];
+  const scopedDefectIdList = ctx.defects.map((d) => d.id).filter(Boolean);
+  ctx.techniciansInCharge = await resolveTechnicians(scopedRepairIds, scopedDefectIdList);
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
