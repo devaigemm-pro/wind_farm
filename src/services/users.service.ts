@@ -39,6 +39,25 @@ export class UserServiceError extends Error {
   }
 }
 
+// supabase.functions.invoke returns a generic "non-2xx status code" error for
+// any 4xx/5xx and does NOT parse the JSON body, so our clear server messages
+// (e.g. "user has history") get lost. This helper reads the real message from
+// the response body when present, falling back to the generic message.
+async function throwInvokeError(
+  error: { message: string; context?: { json?: () => Promise<unknown> } },
+  data: { error?: string } | null,
+): Promise<never> {
+  if (data?.error) throw new UserServiceError(data.error);
+  try {
+    const body = (await error.context?.json?.()) as { error?: string } | undefined;
+    if (body?.error) throw new UserServiceError(body.error);
+  } catch (e) {
+    if (e instanceof UserServiceError) throw e;
+    // ignore parse errors, fall through to the generic message
+  }
+  throw new UserServiceError(error.message);
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const usersService = {
@@ -79,7 +98,7 @@ export const usersService = {
     const { data, error } = await supabase.functions.invoke('admin-users', {
       body: { action: 'listFarms' },
     });
-    if (error) throw new UserServiceError(error.message);
+    if (error) await throwInvokeError(error, data);
     if (data?.error) throw new UserServiceError(data.error);
     return (data?.farms ?? []) as AdminWindFarm[];
   },
@@ -97,7 +116,7 @@ export const usersService = {
         windFarmIds: input.windFarmIds,
       },
     });
-    if (error) throw new UserServiceError(error.message);
+    if (error) await throwInvokeError(error, data);
     if (data?.error) throw new UserServiceError(data.error);
   },
 
@@ -114,7 +133,7 @@ export const usersService = {
         windFarmIds: input.windFarmIds,
       },
     });
-    if (error) throw new UserServiceError(error.message);
+    if (error) await throwInvokeError(error, data);
     if (data?.error) throw new UserServiceError(data.error);
   },
 
@@ -122,7 +141,7 @@ export const usersService = {
     const { data, error } = await supabase.functions.invoke('admin-users', {
       body: { action: 'delete', userId },
     });
-    if (error) throw new UserServiceError(error.message);
+    if (error) await throwInvokeError(error, data);
     if (data?.error) throw new UserServiceError(data.error);
   },
 };
