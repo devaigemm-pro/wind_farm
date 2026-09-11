@@ -376,6 +376,10 @@ export const translations: TranslationMap = {
   // ─── Wind Farm Form ─────────────────────────────────────────────────────────
   'windFarmForm.name': { en: 'Name', es: 'Nombre' },
   'windFarmForm.location': { en: 'Location', es: 'Ubicación' },
+  'windFarmForm.country': { en: 'Country', es: 'País' },
+  'windFarmForm.client': { en: 'Client', es: 'Cliente' },
+  'windFarmForm.countryPlaceholder': { en: 'e.g. Chile', es: 'ej. Chile' },
+  'windFarmForm.clientPlaceholder': { en: 'e.g. Enel Green Power', es: 'ej. Enel Green Power' },
   'windFarmForm.latitude': { en: 'Latitude', es: 'Latitud' },
   'windFarmForm.longitude': { en: 'Longitude', es: 'Longitud' },
   'windFarmForm.updateWindFarm': { en: 'Update Wind Farm', es: 'Actualizar Parque Eólico' },
@@ -390,6 +394,8 @@ export const translations: TranslationMap = {
   // ─── Turbine Form ───────────────────────────────────────────────────────────
   'turbineForm.name': { en: 'Name', es: 'Nombre' },
   'turbineForm.model': { en: 'Model', es: 'Modelo' },
+  'turbineForm.manufacturer': { en: 'Manufacturer', es: 'Fabricante' },
+  'turbineForm.manufacturerPlaceholder': { en: 'e.g. Vestas', es: 'ej. Vestas' },
   'turbineForm.updateTurbine': { en: 'Update Turbine', es: 'Actualizar Turbina' },
   'turbineForm.createTurbine': { en: 'Create Turbine', es: 'Crear Turbina' },
   'turbineForm.namePlaceholder': { en: 'e.g. Turbine A-01', es: 'ej. Turbina A-01' },

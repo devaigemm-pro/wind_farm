@@ -13,7 +13,7 @@ export function useCreateTurbine() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { wind_farm_id: string; name: string; model?: string }) =>
+    mutationFn: (input: { wind_farm_id: string; name: string; model?: string; manufacturer?: string }) =>
       assetsService.createTurbine(input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['turbines', variables.wind_farm_id] });
@@ -31,7 +31,7 @@ export function useUpdateTurbine() {
       input,
     }: {
       id: string;
-      input: Partial<{ name: string; model: string | null; wind_farm_id: string }>;
+      input: Partial<{ name: string; model: string | null; manufacturer: string | null; wind_farm_id: string }>;
     }) => assetsService.updateTurbine(id, input),
     onSuccess: (_data, variables) => {
       // Invalidate all turbine lists since wind_farm_id might have changed

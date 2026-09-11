@@ -12,6 +12,8 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 export const windFarmSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   location: z.string().min(1, 'Location is required'),
+  country: z.string().optional(),
+  client: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
 });
@@ -22,6 +24,7 @@ export const turbineSchema = z.object({
   wind_farm_id: z.string().uuid(),
   name: z.string().min(1, 'Name is required'),
   model: z.string().optional(),
+  manufacturer: z.string().optional(),
 });
 
 export type TurbineFormData = z.infer<typeof turbineSchema>;

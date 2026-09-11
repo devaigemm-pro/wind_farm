@@ -652,6 +652,7 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          manufacturer: string | null
           model: string | null
           name: string
           power_kw: number | null
@@ -667,6 +668,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          manufacturer?: string | null
           model?: string | null
           name: string
           power_kw?: number | null
@@ -682,6 +684,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          manufacturer?: string | null
           model?: string | null
           name?: string
           power_kw?: number | null
@@ -703,6 +706,8 @@ export type Database = {
       }
       wind_farm: {
         Row: {
+          client: string | null
+          country: string | null
           created_at: string
           id: string
           latitude: number | null
@@ -713,6 +718,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client?: string | null
+          country?: string | null
           created_at?: string
           id?: string
           latitude?: number | null
@@ -723,6 +730,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client?: string | null
+          country?: string | null
           created_at?: string
           id?: string
           latitude?: number | null

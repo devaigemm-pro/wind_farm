@@ -76,6 +76,18 @@ interface RepairPdfContext {
   createdAt: string;
   windFarmName: string;
   windFarmLocation: string;
+  /** wind_farm.country (dynamic, from DB). '' when not yet loaded. */
+  country: string;
+  /** wind_farm.client (dynamic, from DB). '' when not yet loaded. */
+  client: string;
+  /** turbine.manufacturer (dynamic, from DB). '' when not yet loaded. */
+  manufacturer: string;
+  /** Total man-hours (HH) = Σ(quote_item.labor_hours × coalesce(technicians,1)). null when no quote/items. */
+  totalHH: number | null;
+  /** Name of the user who GENERATES the report (auth.uid → profiles). NA fallback. */
+  reportedBy: string;
+  /** Distinct technicians who performed the repairs (repair.technician_id → profiles). '' when none. */
+  techniciansInCharge: string;
   /** wind_farm.manager_name (dynamic, from DB) — signer on the signature page. */
   managerName: string;
   /** wind_farm.manager_role (dynamic, from DB) — signer's role/title. */
@@ -111,6 +123,21 @@ const PAGE_HEIGHT = 297;
 const MARGIN = 14;
 
 const BLADE_LABELS: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
+
+// Human-readable defect type labels (mirrors reportPdf.service.ts DEFECT_TYPE_LABELS).
+const DEFECT_TYPE_LABELS: Record<string, string> = {
+  le_erosion: 'Erosión LE',
+  vortex: 'Vortex (paneles faltantes)',
+  paint_defect: 'Daños de pintura',
+  crack: 'Grieta',
+  delamination: 'Delaminación',
+  lightning_damage: 'Daño por rayo',
+  other: 'Otros',
+};
+
+function formatDefectType(type: string): string {
+  return DEFECT_TYPE_LABELS[type] || type.toUpperCase().replace(/_/g, ' ');
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -229,8 +256,8 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     .from('campaign')
     .select(`
       id, name, status, created_at, quote_id, turbine_id,
-      wind_farm:wind_farm_id ( name, location, manager_name, manager_role ),
-      turbine:turbine_id ( id, name, model )
+      wind_farm:wind_farm_id ( name, location, manager_name, manager_role, country, client ),
+      turbine:turbine_id ( id, name, model, manufacturer )
     `)
     .eq('id', campaignId)
     .single();
@@ -403,12 +430,91 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     }
   }
 
+  // 6. Total man-hours (HH) — Σ(quote_item.labor_hours × coalesce(technicians,1))
+  //    over the quote's items. null when there's no quote or no items.
+  let totalHH: number | null = null;
+  if (campaign.quote_id) {
+    const { data: quoteItems } = await db
+      .from('quote_item')
+      .select('labor_hours, technicians')
+      .eq('quote_id', campaign.quote_id);
+    const items = (quoteItems as unknown[]) ?? [];
+    if (items.length > 0) {
+      totalHH = items.reduce((sum: number, it) => {
+        const r = it as Record<string, unknown>;
+        const hours = numOrNull(r.labor_hours) ?? 0;
+        const techs = numOrNull(r.technicians) ?? 1;
+        return sum + hours * techs;
+      }, 0);
+    }
+  }
+
+  // 7. "Informe realizado por" — the CURRENT authenticated user who generates the
+  //    PDF (auth.uid → profiles), NOT the quote's quoted_by.
+  let reportedBy = NA;
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+    const authUid = authData?.user?.id ?? null;
+    if (authUid) {
+      const { data: prof } = await db
+        .from('profiles')
+        .select('name, last_name')
+        .eq('id', authUid)
+        .single();
+      if (prof) {
+        reportedBy =
+          fullName({ name: prof.name as string, last_name: prof.last_name as string | null }) || NA;
+      }
+    }
+  } catch {
+    reportedBy = NA;
+  }
+
+  // 8. "Técnico(s) a cargo" — distinct technicians who performed the repairs,
+  //    from the `repair` table filtered by the defect_id set we already have.
+  let techniciansInCharge = '';
+  if (defects.length > 0) {
+    const defectIds = defects.map((d) => d.id).filter(Boolean);
+    if (defectIds.length > 0) {
+      const { data: repairRows } = await db
+        .from('repair')
+        .select('technician_id')
+        .in('defect_id', defectIds);
+      const techIds = [
+        ...new Set(
+          ((repairRows as unknown[]) ?? [])
+            .map((r) => (r as Record<string, unknown>).technician_id as string)
+            .filter(Boolean),
+        ),
+      ];
+      if (techIds.length > 0) {
+        const { data: techProfiles } = await db
+          .from('profiles')
+          .select('name, last_name')
+          .in('id', techIds);
+        const names = ((techProfiles as unknown[]) ?? [])
+          .map((p) => {
+            const r = p as Record<string, unknown>;
+            return fullName({ name: r.name as string, last_name: r.last_name as string | null });
+          })
+          .filter(Boolean);
+        techniciansInCharge = names.join(', ');
+      }
+    }
+  }
+
   return {
     campaignName: (campaign.name as string) ?? NA,
     status: (campaign.status as string) ?? NA,
     createdAt: (campaign.created_at as string) ?? '',
     windFarmName: (wf.name as string) ?? NA,
     windFarmLocation: (wf.location as string) ?? NA,
+    country: (wf.country as string) ?? '',
+    client: (wf.client as string) ?? '',
+    manufacturer: (turbine.manufacturer as string) ?? '',
+    totalHH,
+    reportedBy,
+    techniciansInCharge,
     managerName: (wf.manager_name as string) ?? '',
     managerRole: (wf.manager_role as string) ?? '',
     turbineName: (turbine.name as string) ?? NA,
@@ -565,31 +671,53 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
   const anioSource = ctx.repairCompletedAt || ctx.repairStartedAt || ctx.createdAt;
   const anioReporte = anioSource ? String(new Date(anioSource).getFullYear()) : NA;
 
-  // General data table
-  const bladesInRepair = ctx.blades.length > 0
-    ? ctx.blades.map((bl) => `Pala ${BLADE_LABELS[bl.position] || bl.position}`).join(', ')
+  // Palas en reparación — SERIAL NUMBERS of the blades involved (not the position).
+  // Prefer the blades that have defects being repaired; fall back to all turbine
+  // blades. Uses serial_number; if a serial is null, falls back to its position.
+  const defectBladePositions = new Set(
+    ctx.defects.map((d) => d.bladePosition).filter((p) => p && p > 0),
+  );
+  const bladesForRepair = defectBladePositions.size > 0
+    ? ctx.blades.filter((bl) => defectBladePositions.has(bl.position))
+    : ctx.blades;
+  const bladeSerials = bladesForRepair
+    .map((bl) => bl.serialNumber || `Pala ${BLADE_LABELS[bl.position] || bl.position}`)
+    .filter(Boolean);
+  const bladesInRepair = bladeSerials.length > 0 ? bladeSerials.join(', ') : NA;
+
+  // Estado turbina ANTES — defect type(s) + category, e.g. "Grieta (Cat 3), ...".
+  const stateBefore = ctx.defects.length > 0
+    ? ctx.defects
+        .map((d) => {
+          const label = formatDefectType(d.type);
+          return d.severity != null ? `${label} (Cat ${d.severity})` : label;
+        })
+        .join(', ')
     : NA;
+
+  // Horas de producción — totalHH from quote items.
+  const productionHours = ctx.totalHH != null ? `${ctx.totalHH} HH` : NA;
 
   autoTable(doc, {
     startY: y,
     head: [['Datos generales', '']],
     body: [
-      ['País', NA],
-      ['Cliente', NA],
+      ['País', ctx.country || NA],
+      ['Cliente', ctx.client || NA],
       ['Planta (P.E.)', ctx.windFarmName],
       ['Año', anioReporte],
-      ['Fabricante', NA],
+      ['Fabricante', ctx.manufacturer || NA],
       ['Tipo de turbina', ctx.turbineModel],
       ['N° de turbina', ctx.turbineName],
-      ['Horas de producción', NA],
-      ['Estado turbina antes de la reparación', NA],
-      ['Estado turbina después de la reparación', NA],
+      ['Horas de producción', productionHours],
+      ['Estado turbina antes de la reparación', stateBefore],
+      ['Estado turbina después de la reparación', ctx.defects.length > 0 ? 'Defecto reparado' : NA],
       ['Pala(s) en reparación', bladesInRepair],
       ['Fecha inicio', ctx.repairStartedAt ? formatDateES(ctx.repairStartedAt) : NA],
       ['Fecha fin', ctx.repairCompletedAt ? formatDateES(ctx.repairCompletedAt) : NA],
       ['Daños reparados (cantidad)', String(ctx.defects.length)],
-      ['Informe realizado por', ctx.technicianName + (ctx.technicianEmail ? ` (${ctx.technicianEmail})` : '')],
-      ['Técnico(s) a cargo', ctx.technicianName],
+      ['Informe realizado por', ctx.reportedBy],
+      ['Técnico(s) a cargo', ctx.techniciansInCharge || NA],
     ],
     theme: 'grid',
     headStyles: { fillColor: COLOR_HEADER_TABLE, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },

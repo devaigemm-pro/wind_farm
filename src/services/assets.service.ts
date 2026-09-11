@@ -55,6 +55,8 @@ export const assetsService = {
   async createWindFarm(input: {
     name: string;
     location: string;
+    country?: string;
+    client?: string;
     latitude?: number;
     longitude?: number;
   }): Promise<WindFarm> {
@@ -63,6 +65,8 @@ export const assetsService = {
       .insert({
         name: input.name,
         location: input.location,
+        country: input.country ?? null,
+        client: input.client ?? null,
         latitude: input.latitude ?? null,
         longitude: input.longitude ?? null,
       })
@@ -74,7 +78,7 @@ export const assetsService = {
 
   async updateWindFarm(
     id: string,
-    input: Partial<{ name: string; location: string; latitude: number | null; longitude: number | null }>,
+    input: Partial<{ name: string; location: string; country: string | null; client: string | null; latitude: number | null; longitude: number | null }>,
   ): Promise<WindFarm> {
     const { data, error } = await supabase
       .from('wind_farm')
@@ -107,6 +111,7 @@ export const assetsService = {
     wind_farm_id: string;
     name: string;
     model?: string;
+    manufacturer?: string;
   }): Promise<Turbine> {
     const { data, error } = await supabase
       .from('turbine')
@@ -114,6 +119,7 @@ export const assetsService = {
         wind_farm_id: input.wind_farm_id,
         name: input.name,
         model: input.model ?? null,
+        manufacturer: input.manufacturer ?? null,
       })
       .select()
       .single();
@@ -123,7 +129,7 @@ export const assetsService = {
 
   async updateTurbine(
     id: string,
-    input: Partial<{ name: string; model: string | null; wind_farm_id: string }>,
+    input: Partial<{ name: string; model: string | null; manufacturer: string | null; wind_farm_id: string }>,
   ): Promise<Turbine> {
     const { data, error } = await supabase
       .from('turbine')

@@ -17,6 +17,7 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
   const { t } = useLanguage();
   const [name, setName] = useState(initialData?.name ?? '');
   const [model, setModel] = useState(initialData?.model ?? '');
+  const [manufacturer, setManufacturer] = useState(initialData?.manufacturer ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +31,10 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
 
     if (model.trim()) {
       formData.model = model.trim();
+    }
+
+    if (manufacturer.trim()) {
+      formData.manufacturer = manufacturer.trim();
     }
 
     const result = turbineSchema.safeParse(formData);
@@ -73,6 +78,13 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
         onChange={(e) => setName(e.target.value)}
         error={errors.name}
         placeholder={t('turbineForm.namePlaceholder')}
+      />
+      <FormField
+        label={t('turbineForm.manufacturer')}
+        value={manufacturer}
+        onChange={(e) => setManufacturer(e.target.value)}
+        error={errors.manufacturer}
+        placeholder={t('turbineForm.manufacturerPlaceholder')}
       />
       <FormField
         label={t('turbineForm.model')}

@@ -16,6 +16,8 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
   const { t } = useLanguage();
   const [name, setName] = useState(initialData?.name ?? '');
   const [location, setLocation] = useState(initialData?.location ?? '');
+  const [country, setCountry] = useState(initialData?.country ?? '');
+  const [client, setClient] = useState(initialData?.client ?? '');
   const [latitude, setLatitude] = useState(initialData?.latitude?.toString() ?? '');
   const [longitude, setLongitude] = useState(initialData?.longitude?.toString() ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -28,6 +30,14 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
       name: name.trim(),
       location: location.trim(),
     };
+
+    if (country.trim()) {
+      formData.country = country.trim();
+    }
+
+    if (client.trim()) {
+      formData.client = client.trim();
+    }
 
     if (latitude.trim()) {
       const parsed = parseFloat(latitude.trim());
@@ -97,6 +107,22 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
         error={errors.location}
         placeholder={t('windFarmForm.locationPlaceholder')}
       />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+        <FormField
+          label={t('windFarmForm.country')}
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
+          error={errors.country}
+          placeholder={t('windFarmForm.countryPlaceholder')}
+        />
+        <FormField
+          label={t('windFarmForm.client')}
+          value={client}
+          onChange={(e) => setClient(e.target.value)}
+          error={errors.client}
+          placeholder={t('windFarmForm.clientPlaceholder')}
+        />
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
         <FormField
           label={t('windFarmForm.latitude')}

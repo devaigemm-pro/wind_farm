@@ -20,7 +20,7 @@ export function useCreateWindFarm() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { name: string; location: string; latitude?: number; longitude?: number }) =>
+    mutationFn: (input: { name: string; location: string; country?: string; client?: string; latitude?: number; longitude?: number }) =>
       assetsService.createWindFarm(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wind-farms'] });
@@ -38,7 +38,7 @@ export function useUpdateWindFarm() {
       input,
     }: {
       id: string;
-      input: Partial<{ name: string; location: string; latitude: number | null; longitude: number | null }>;
+      input: Partial<{ name: string; location: string; country: string | null; client: string | null; latitude: number | null; longitude: number | null }>;
     }) => assetsService.updateWindFarm(id, input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['wind-farms'] });
