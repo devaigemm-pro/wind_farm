@@ -35,7 +35,7 @@ interface AppSidebarProps {
 export function AppSidebar({ currentPath, onNavigate }: AppSidebarProps) {
   const [expanded, setExpanded] = useState(false);
   const { t } = useLanguage();
-  const { role } = useAuth();
+  const { hasRole } = useAuth();
 
   const sections: NavSection[] = [
     {
@@ -54,7 +54,7 @@ export function AppSidebar({ currentPath, onNavigate }: AppSidebarProps) {
         { icon: FileText, label: t('sidebar.reports'), path: '/inspections/reports' },
       ],
     },
-    ...(role === 'admin'
+    ...(hasRole('admin')
       ? [
           {
             title: t('sidebar.administration'),

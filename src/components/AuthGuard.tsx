@@ -16,7 +16,7 @@ interface AuthGuardProps {
  * - Optionally enforces role-based access via `requiredRoles`.
  */
 export function AuthGuard({ children, requiredRoles }: AuthGuardProps) {
-  const { isLoading, isAuthenticated, role } = useAuth();
+  const { isLoading, isAuthenticated, roles } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -28,7 +28,7 @@ export function AuthGuard({ children, requiredRoles }: AuthGuardProps) {
   }
 
   if (requiredRoles && requiredRoles.length > 0) {
-    if (!role || !requiredRoles.includes(role)) {
+    if (!roles.some((r) => requiredRoles.includes(r))) {
       return (
         <div
           style={{

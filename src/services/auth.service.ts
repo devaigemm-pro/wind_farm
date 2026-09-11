@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Profile } from '@/types';
+import type { Profile, UserRole } from '@/types';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 export const authService = {
@@ -46,6 +46,26 @@ export const authService = {
       if (error.code === 'PGRST116') return null; // not found
       throw error;
     }
-    return data as Profile;
+    if (!data) return null;
+
+    // Multi-role: compose the roles array from user_roles. Fall back to the
+    // legacy profiles.role if the join returns nothing (backwards compat).
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+
+    const roles = (roleRows ?? [])
+      .map((r) => r.role as UserRole)
+      .filter((r): r is UserRole => !!r);
+
+    const legacyRole = (data as { role?: UserRole }).role;
+    const finalRoles = roles.length > 0 ? roles : legacyRole ? [legacyRole] : [];
+
+    return {
+      ...(data as Omit<Profile, 'roles' | 'role'>),
+      roles: finalRoles,
+      role: finalRoles[0],
+    } as Profile;
   },
 };

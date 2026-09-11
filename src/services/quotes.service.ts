@@ -235,7 +235,7 @@ export const quotesService = {
    * - admin/supervisor: all quotes (they need to see requested ones to quote).
    */
   async listQuotes(params: {
-    role: string | null;
+    roles: string[];
     userId: string | null;
   }): Promise<Quote[]> {
     let query = db
@@ -249,7 +249,12 @@ export const quotesService = {
       `)
       .order('created_at', { ascending: false });
 
-    if (params.role === 'client' && params.userId) {
+    // Multi-role: a user who is a client but NOT also admin/supervisor only
+    // sees the quotes they requested. Admins/supervisors see all quotes.
+    const roles = params.roles ?? [];
+    const isClientOnly =
+      roles.includes('client') && !roles.some((r) => r === 'admin' || r === 'supervisor');
+    if (isClientOnly && params.userId) {
       query = query.eq('requested_by', params.userId);
     }
 

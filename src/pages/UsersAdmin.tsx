@@ -13,6 +13,7 @@ import {
   useUpdateUser,
   useDeleteUser,
   useUserFarms,
+  useUserRoles,
 } from '@/hooks/useUsers';
 import { validateRut, validatePassword } from '@/utils/validation';
 import { USER_ROLES, type Profile, type UserRole } from '@/types';
@@ -29,6 +30,8 @@ const ROLE_LABELS: Partial<Record<UserRole, string>> = {
   analyst_ss: 'Analista SS',
   analyst_sr: 'Analista SR',
 };
+
+const roleLabel = (r: UserRole): string => ROLE_LABELS[r] ?? r;
 
 export const UsersAdmin = () => {
   const { t } = useLanguage();
@@ -108,7 +111,7 @@ export const UsersAdmin = () => {
                   <th style={styles.th}>{t('users.lastName')}</th>
                   <th style={styles.th}>{t('users.rut')}</th>
                   <th style={styles.th}>{t('users.email')}</th>
-                  <th style={styles.th}>{t('users.role')}</th>
+                  <th style={styles.th}>{t('users.roles')}</th>
                   <th style={styles.th}>{t('users.assignedFarms')}</th>
                   <th style={{ ...styles.th, width: '110px' }}>{t('users.actions')}</th>
                 </tr>
@@ -161,11 +164,20 @@ interface UserRowProps {
 
 function UserRow({ user, farmNameById, onEdit, onDelete }: UserRowProps) {
   const { data: farmIds } = useUserFarms(user.id);
+  const { data: userRoles } = useUserRoles(user.id);
 
   const farmsLabel =
     farmIds && farmIds.length > 0
       ? farmIds.map((id) => farmNameById.get(id) ?? '—').join(', ')
       : '—';
+
+  // Prefer the fetched multi-role set; fall back to the legacy single role.
+  const rolesLabel =
+    userRoles && userRoles.length > 0
+      ? userRoles.map((r) => roleLabel(r)).join(', ')
+      : user.role
+        ? roleLabel(user.role as UserRole)
+        : '—';
 
   return (
     <tr style={styles.row}>
@@ -173,7 +185,7 @@ function UserRow({ user, farmNameById, onEdit, onDelete }: UserRowProps) {
       <td style={styles.td}>{user.last_name ?? '—'}</td>
       <td style={styles.td}>{user.rut ?? '—'}</td>
       <td style={styles.td}>{user.email}</td>
-      <td style={styles.td}>{ROLE_LABELS[user.role as UserRole] ?? user.role}</td>
+      <td style={styles.td}>{rolesLabel}</td>
       <td style={{ ...styles.td, whiteSpace: 'normal', maxWidth: '260px' }}>{farmsLabel}</td>
       <td style={styles.td}>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -203,6 +215,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
 
   const { data: farms } = useAdminWindFarms();
   const { data: existingFarmIds } = useUserFarms(user?.id);
+  const { data: existingRoles } = useUserRoles(user?.id);
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
 
@@ -211,9 +224,13 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
   const [rut, setRut] = useState(user?.rut ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>((user?.role as UserRole) ?? 'inspector');
+  // Multi-role: track a set of selected roles. Default to inspector on create.
+  const [roles, setRoles] = useState<Set<UserRole>>(
+    new Set(user?.role ? [user.role as UserRole] : ['inspector']),
+  );
   const [selectedFarms, setSelectedFarms] = useState<Set<string>>(new Set());
   const [rutError, setRutError] = useState<string | undefined>(undefined);
+  const [rolesError, setRolesError] = useState<string | undefined>(undefined);
   const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
 
   // Seed selected farms once the existing assignments load (edit mode).
@@ -223,6 +240,13 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
     }
   }, [existingFarmIds]);
 
+  // Seed selected roles once the existing roles load (edit mode).
+  useEffect(() => {
+    if (existingRoles && existingRoles.length > 0) {
+      setRoles(new Set(existingRoles));
+    }
+  }, [existingRoles]);
+
   const toggleFarm = (id: string) => {
     setSelectedFarms((prev) => {
       const next = new Set(prev);
@@ -230,6 +254,16 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
       else next.add(id);
       return next;
     });
+  };
+
+  const toggleRole = (r: UserRole) => {
+    setRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(r)) next.delete(r);
+      else next.add(r);
+      return next;
+    });
+    if (rolesError) setRolesError(undefined);
   };
 
   const isSaving = createUser.isPending || updateUser.isPending;
@@ -247,6 +281,13 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
       return;
     }
 
+    // At least one role must be selected.
+    if (roles.size === 0) {
+      setRolesError(t('users.rolesRequired'));
+      return;
+    }
+    setRolesError(undefined);
+
     // Password strength (required on create; on edit only when a new one is typed).
     const pwd = password.trim();
     if ((!isEdit || pwd) && !validatePassword(pwd)) {
@@ -255,6 +296,9 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
     }
     setPasswordError(undefined);
 
+    // Preserve a stable role order (matching the checkbox list order).
+    const rolesList = MANAGED_ROLES.filter((r) => roles.has(r));
+
     try {
       if (isEdit && user) {
         await updateUser.mutateAsync({
@@ -262,7 +306,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
           name: name.trim(),
           last_name: lastName.trim(),
           rut: rut.trim(),
-          role,
+          roles: rolesList,
           password: password.trim() || undefined,
           windFarmIds: Array.from(selectedFarms),
         });
@@ -278,7 +322,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
           name: name.trim(),
           last_name: lastName.trim(),
           rut: rut.trim(),
-          role,
+          roles: rolesList,
           windFarmIds: Array.from(selectedFarms),
         });
         toast.success(t('users.created'));
@@ -317,14 +361,26 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
             {rutError && <span style={errorTextStyle}>{rutError}</span>}
           </div>
           <div>
-            <label style={labelStyle}>{t('users.role')}</label>
-            <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+            <label style={labelStyle}>{t('users.roles')} *</label>
+            <div
+              style={{
+                ...farmsBoxStyle,
+                maxHeight: '160px',
+                borderColor: rolesError ? 'var(--color-danger-500)' : 'var(--color-neutral-200)',
+              }}
+            >
               {MANAGED_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABELS[r] ?? r}
-                </option>
+                <label key={r} style={farmItemStyle}>
+                  <input
+                    type="checkbox"
+                    checked={roles.has(r)}
+                    onChange={() => toggleRole(r)}
+                  />
+                  <span>{roleLabel(r)}</span>
+                </label>
               ))}
-            </select>
+            </div>
+            {rolesError && <span style={errorTextStyle}>{rolesError}</span>}
           </div>
           <div>
             <label style={labelStyle}>{t('users.email')} {isEdit ? '' : '*'}</label>

@@ -35,21 +35,21 @@ serve(withCors(async (req) => {
       })
     }
 
-    // Verify user has supervisor or admin role
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
+    // Verify user has supervisor or admin among their roles (multi-role).
+    const { data: userRoles, error: rolesError } = await supabaseAdmin
+      .from('user_roles')
       .select('role')
-      .eq('id', user.id)
-      .single()
+      .eq('user_id', user.id)
 
-    if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'User profile not found' }), {
-        status: 404,
+    if (rolesError) {
+      return new Response(JSON.stringify({ error: 'Failed to resolve user roles' }), {
+        status: 403,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    if (profile.role !== 'supervisor' && profile.role !== 'admin') {
+    const canGenerate = userRoles?.some((r) => r.role === 'supervisor' || r.role === 'admin')
+    if (!canGenerate) {
       return new Response(JSON.stringify({ error: 'Only supervisors and admins can generate consolidated reports' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },

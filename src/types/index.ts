@@ -65,9 +65,13 @@ export const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 // ─── Application-Level Interfaces ───────────────────────────────────────────
 
-/** Profile (user) with typed role */
+/**
+ * Profile (user) with typed roles. Multi-role: `roles` is the source of truth.
+ * `role` is kept optional for backwards compatibility / display (= roles[0]).
+ */
 export interface Profile extends Omit<Tables<'profiles'>, 'role'> {
-  role: UserRole;
+  roles: UserRole[];
+  role?: UserRole;
 }
 
 /** Wind farm with optional nested turbines */

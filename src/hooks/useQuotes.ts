@@ -24,10 +24,10 @@ export function useQuotableDefects(turbineId: string | undefined) {
 // ─── Quotes list (role-aware) ────────────────────────────────────────────────
 
 export function useQuotes() {
-  const { role, user } = useAuth();
+  const { roles, user } = useAuth();
   return useQuery<Quote[]>({
-    queryKey: ['quotes', role, user?.id],
-    queryFn: () => quotesService.listQuotes({ role, userId: user?.id ?? null }),
+    queryKey: ['quotes', roles, user?.id],
+    queryFn: () => quotesService.listQuotes({ roles, userId: user?.id ?? null }),
   });
 }
 

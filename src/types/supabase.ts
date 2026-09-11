@@ -581,6 +581,32 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report: {
         Row: {
           filename: string
@@ -745,6 +771,8 @@ export type Database = {
         }[]
       }
       get_user_role: { Args: never; Returns: string }
+      user_has_any_role: { Args: { roles: string[] }; Returns: boolean }
+      user_roles_array: { Args: never; Returns: string[] }
       get_wind_farm_detail: {
         Args: { p_wind_farm_id: string }
         Returns: {

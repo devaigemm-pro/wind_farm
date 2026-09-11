@@ -13,6 +13,15 @@ export function useUsersList() {
   });
 }
 
+/** Roles assigned to a specific user (multi-role). */
+export function useUserRoles(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['user-roles', userId],
+    queryFn: () => usersService.getUserRoles(userId as string),
+    enabled: !!userId,
+  });
+}
+
 /** Wind farm ids assigned to a specific user. */
 export function useUserFarms(userId: string | undefined) {
   return useQuery({
@@ -47,6 +56,7 @@ export function useUpdateUser() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['user-farms', variables.userId] });
+      queryClient.invalidateQueries({ queryKey: ['user-roles', variables.userId] });
     },
   });
 }

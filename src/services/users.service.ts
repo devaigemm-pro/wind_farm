@@ -16,7 +16,7 @@ export interface CreateUserInput {
   name: string;
   last_name: string;
   rut: string;
-  role: UserRole;
+  roles: UserRole[];
   windFarmIds: string[];
 }
 
@@ -25,7 +25,7 @@ export interface UpdateUserInput {
   name?: string;
   last_name?: string;
   rut?: string;
-  role?: UserRole;
+  roles?: UserRole[];
   password?: string;
   windFarmIds?: string[];
 }
@@ -50,6 +50,16 @@ export const usersService = {
       .order('name');
     if (error) throw error;
     return data as Profile[];
+  },
+
+  /** Roles assigned to a given user (multi-role). */
+  async getUserRoles(userId: string): Promise<UserRole[]> {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    if (error) throw error;
+    return (data ?? []).map((r) => r.role as UserRole);
   },
 
   /** Wind farm ids assigned to a given user. */
@@ -83,7 +93,7 @@ export const usersService = {
         name: input.name,
         last_name: input.last_name,
         rut: input.rut,
-        role: input.role,
+        roles: input.roles,
         windFarmIds: input.windFarmIds,
       },
     });
@@ -99,7 +109,7 @@ export const usersService = {
         name: input.name,
         last_name: input.last_name,
         rut: input.rut,
-        role: input.role,
+        roles: input.roles,
         password: input.password,
         windFarmIds: input.windFarmIds,
       },

@@ -35,21 +35,21 @@ serve(withCors(async (req) => {
       })
     }
 
-    // Check user role is supervisor or admin
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
+    // Check user has supervisor or admin among their roles (multi-role).
+    const { data: userRoles, error: rolesError } = await supabaseAdmin
+      .from('user_roles')
       .select('role')
-      .eq('id', user.id)
-      .single()
+      .eq('user_id', user.id)
 
-    if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'User profile not found' }), {
+    if (rolesError) {
+      return new Response(JSON.stringify({ error: 'Failed to resolve user roles' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    if (profile.role !== 'supervisor' && profile.role !== 'admin') {
+    const canApprove = userRoles?.some((r) => r.role === 'supervisor' || r.role === 'admin')
+    if (!canApprove) {
       return new Response(JSON.stringify({ error: 'Only supervisors and admins can approve inspections' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },

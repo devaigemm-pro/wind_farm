@@ -40,7 +40,7 @@ export function Sidebar({
   currentPath,
   onNavigate,
 }: SidebarProps) {
-  const { role } = useAuth();
+  const { roles, hasRole, hasAnyRole } = useAuth();
   const { t } = useLanguage();
 
   const navSectionsAll: NavSection[] = [
@@ -66,7 +66,7 @@ export function Sidebar({
         { icon: FileText, label: t('sidebar.reports'), path: '/inspections/reports' },
       ],
     },
-    ...(role === 'admin'
+    ...(hasRole('admin')
       ? [
           {
             title: t('sidebar.administration'),
@@ -83,10 +83,13 @@ export function Sidebar({
     },
   ];
 
+  // admin sees everything (navSectionsAll includes the admin section).
+  // A supervisor WITHOUT a higher role sees the reduced menu. Anyone else
+  // (or a supervisor who is also admin) falls through to navSectionsAll.
   const visibleSections: NavSection[] =
-    !role
+    roles.length === 0
       ? []
-      : role === 'supervisor'
+      : hasRole('supervisor') && !hasAnyRole(['admin'])
         ? [
             {
               title: t('sidebar.overview'),

@@ -940,6 +940,8 @@ export const translations: TranslationMap = {
   'users.password': { en: 'Password', es: 'Contraseña' },
   'users.passwordOptional': { en: 'leave blank to keep', es: 'dejar en blanco para mantener' },
   'users.role': { en: 'Role', es: 'Rol' },
+  'users.roles': { en: 'Roles', es: 'Roles' },
+  'users.rolesRequired': { en: 'Select at least one role', es: 'Selecciona al menos un rol' },
   'users.farms': { en: 'Assigned wind farms', es: 'Parques asignados' },
   'users.assignedFarms': { en: 'Assigned farms', es: 'Parques asignados' },
   'users.actions': { en: 'Actions', es: 'Acciones' },

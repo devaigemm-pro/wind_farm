@@ -44,17 +44,17 @@ serve(withCors(async (req) => {
       return json({ error: 'Invalid or expired token' }, 401)
     }
 
-    // Only admins may use this function.
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
+    // Only admins may use this function. Authorization is now sourced from
+    // user_roles (multi-role): the caller must have the 'admin' role among theirs.
+    const { data: callerRoles, error: rolesError } = await supabaseAdmin
+      .from('user_roles')
       .select('role')
-      .eq('id', user.id)
-      .single()
+      .eq('user_id', user.id)
 
-    if (profileError || !profile) {
-      return json({ error: 'User profile not found' }, 403)
+    if (rolesError) {
+      return json({ error: 'Failed to resolve caller roles' }, 403)
     }
-    if (profile.role !== 'admin') {
+    if (!callerRoles?.some((r) => r.role === 'admin')) {
       return json({ error: 'Only admins can manage users' }, 403)
     }
 
@@ -64,6 +64,14 @@ serve(withCors(async (req) => {
     }
 
     const { action } = body
+
+    // Normalise a roles input that may arrive as `roles: string[]` or, for
+    // backwards compatibility, as a single `role: string`.
+    const resolveRoles = (raw: unknown, singular: unknown): string[] => {
+      if (Array.isArray(raw)) return raw.filter((r) => typeof r === 'string' && r.length > 0)
+      if (typeof singular === 'string' && singular.length > 0) return [singular]
+      return []
+    }
 
     // ─── listFarms ─────────────────────────────────────────────────────────
     // Uses the service role so an admin without farm assignments still sees the
@@ -79,7 +87,7 @@ serve(withCors(async (req) => {
 
     // ─── create ──────────────────────────────────────────────────────────────
     if (action === 'create') {
-      const { email, password, name, role, windFarmIds } = body
+      const { email, password, name, windFarmIds } = body
       // Normalise empty strings to null so the partial unique index on
       // profiles.rut (WHERE rut IS NOT NULL) does not treat multiple blank
       // ruts as colliding values.
@@ -89,6 +97,11 @@ serve(withCors(async (req) => {
         return json({ error: 'email and password are required' }, 400)
       }
 
+      // Multi-role: accept `roles: string[]` (or legacy `role: string`).
+      const roles = resolveRoles(body.roles, body.role)
+      const rolesToAssign = roles.length > 0 ? roles : ['inspector']
+      const primaryRole = rolesToAssign[0]
+
       const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -97,7 +110,8 @@ serve(withCors(async (req) => {
           name: name ?? null,
           last_name,
           rut,
-          role: role ?? 'inspector',
+          role: primaryRole,
+          roles: rolesToAssign,
         },
       })
 
@@ -108,7 +122,8 @@ serve(withCors(async (req) => {
       const newId = created.user.id
 
       // The handle_new_user() trigger inserts the profile. Upsert explicitly so
-      // every column is guaranteed to reflect the provided values.
+      // every column is guaranteed to reflect the provided values. profiles.role
+      // keeps the primary role for compat/display.
       const { error: profileUpsertError } = await supabaseAdmin
         .from('profiles')
         .upsert({
@@ -117,13 +132,23 @@ serve(withCors(async (req) => {
           name: name ?? email.split('@')[0],
           last_name,
           rut,
-          role: role ?? 'inspector',
+          role: primaryRole,
         })
       if (profileUpsertError) {
         // Roll back the auth user so a failed profile write does not leave an
         // orphan account that blocks recreating the same email.
         await supabaseAdmin.auth.admin.deleteUser(newId)
         return json({ error: profileUpsertError.message ?? 'User created but profile update failed' }, 400)
+      }
+
+      // Replace user_roles with exactly the requested set. The trigger already
+      // seeded the primary role; delete+insert guarantees the full set.
+      await supabaseAdmin.from('user_roles').delete().eq('user_id', newId)
+      const roleRows = rolesToAssign.map((r) => ({ user_id: newId, role: r }))
+      const { error: rolesInsertError } = await supabaseAdmin.from('user_roles').insert(roleRows)
+      if (rolesInsertError) {
+        await supabaseAdmin.auth.admin.deleteUser(newId)
+        return json({ error: 'User created but role assignment failed' }, 500)
       }
 
       const ids: string[] = Array.isArray(windFarmIds) ? windFarmIds : []
@@ -140,10 +165,15 @@ serve(withCors(async (req) => {
 
     // ─── update ────────────────────────────────────────────────────────────
     if (action === 'update') {
-      const { userId, name, last_name, rut, role, password, windFarmIds } = body
+      const { userId, name, last_name, rut, password, windFarmIds } = body
       if (!userId) {
         return json({ error: 'userId is required' }, 400)
       }
+
+      // Multi-role: `roles?: string[]` (or legacy `role?: string`). Only touch
+      // roles when provided.
+      const rolesProvided = body.roles !== undefined || body.role !== undefined
+      const roles = resolveRoles(body.roles, body.role)
 
       // Build profile update from provided fields only. Empty strings for
       // last_name/rut are stored as null (see create note on the unique index).
@@ -151,7 +181,8 @@ serve(withCors(async (req) => {
       if (name !== undefined) profileUpdate.name = name
       if (last_name !== undefined) profileUpdate.last_name = last_name?.trim() ? last_name.trim() : null
       if (rut !== undefined) profileUpdate.rut = rut?.trim() ? rut.trim() : null
-      if (role !== undefined) profileUpdate.role = role
+      // profiles.role keeps the primary role for compat/display.
+      if (rolesProvided && roles.length > 0) profileUpdate.role = roles[0]
 
       if (Object.keys(profileUpdate).length > 0) {
         const { error: updateError } = await supabaseAdmin
@@ -160,6 +191,22 @@ serve(withCors(async (req) => {
           .eq('id', userId)
         if (updateError) {
           return json({ error: updateError.message ?? 'Failed to update profile' }, 400)
+        }
+      }
+
+      // Replace user_roles when roles were provided.
+      if (rolesProvided && roles.length > 0) {
+        const { error: deleteRolesError } = await supabaseAdmin
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+        if (deleteRolesError) {
+          return json({ error: 'Failed to clear roles' }, 500)
+        }
+        const roleRows = roles.map((r) => ({ user_id: userId, role: r }))
+        const { error: rolesInsertError } = await supabaseAdmin.from('user_roles').insert(roleRows)
+        if (rolesInsertError) {
+          return json({ error: 'Failed to set roles' }, 500)
         }
       }
 

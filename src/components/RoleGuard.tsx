@@ -14,14 +14,14 @@ interface RoleGuardProps {
  * access denied message. Waits for auth to finish loading before deciding.
  */
 export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) {
-  const { role, isLoading } = useAuth();
+  const { roles, isLoading } = useAuth();
 
-  // While auth is loading, don't show access denied — wait for role to resolve
+  // While auth is loading, don't show access denied — wait for roles to resolve
   if (isLoading) {
     return null;
   }
 
-  if (!role || !allowedRoles.includes(role)) {
+  if (!roles.some((r) => allowedRoles.includes(r))) {
     if (fallback) {
       return <>{fallback}</>;
     }

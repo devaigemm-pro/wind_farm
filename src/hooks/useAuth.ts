@@ -34,7 +34,13 @@ export function useAuth() {
     clearAuth();
   };
 
-  const role: UserRole | null = user?.role ?? null;
+  // Multi-role: `roles` is the source of truth. `role` is kept (= roles[0])
+  // for backwards compatibility with older callers.
+  const roles: UserRole[] = user?.roles ?? [];
+  const role: UserRole | null = roles[0] ?? user?.role ?? null;
+
+  const hasRole = (r: UserRole): boolean => roles.includes(r);
+  const hasAnyRole = (rs: UserRole[]): boolean => roles.some((r) => rs.includes(r));
 
   return {
     user,
@@ -44,5 +50,8 @@ export function useAuth() {
     login,
     logout,
     role,
+    roles,
+    hasRole,
+    hasAnyRole,
   };
 }
