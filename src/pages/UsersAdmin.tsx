@@ -270,7 +270,11 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
 
   const handleSave = async () => {
     // RUT validation (only when a value is provided).
-    if (rut.trim() && !validateRut(rut.trim())) {
+    if (!rut.trim()) {
+      setRutError(t('users.rutRequired'));
+      return;
+    }
+    if (!validateRut(rut.trim())) {
       setRutError(t('users.rutInvalid'));
       return;
     }
@@ -348,13 +352,22 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
             <input style={inputStyle} value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
           <div>
-            <label style={labelStyle}>{t('users.rut')}</label>
+            <label style={labelStyle}>{t('users.rut')} *</label>
             <input
               style={{ ...inputStyle, borderColor: rutError ? 'var(--color-danger-500)' : 'var(--color-neutral-300)' }}
               value={rut}
               onChange={(e) => {
-                setRut(e.target.value);
-                if (rutError) setRutError(undefined);
+                const value = e.target.value;
+                setRut(value);
+                // Live validation: required + Chilean RUT format.
+                const trimmed = value.trim();
+                if (!trimmed) {
+                  setRutError(t('users.rutRequired'));
+                } else if (!validateRut(trimmed)) {
+                  setRutError(t('users.rutInvalid'));
+                } else {
+                  setRutError(undefined);
+                }
               }}
               placeholder="12.345.678-5"
             />
