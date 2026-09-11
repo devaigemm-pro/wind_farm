@@ -55,6 +55,9 @@ export interface RepairDefect {
   heightCm: number | null;
   description: string | null;
   bladePosition: number;
+  /** Blade serial number (blade.serial_number), resolved via
+   *  defect→inspection→blade. Null when the blade or serial can't be resolved. */
+  bladeSerial: string | null;
   /** Per-blade sequential correlative (e.g. "A1", "A2", "B1"), matching the
    *  numbering shown in the Analyze step. Resolved via defect→inspection→blade. */
   defectNumber: string | null;
@@ -180,6 +183,8 @@ async function fetchRepairsForQuote(quoteId: string | null): Promise<RepairForQu
 interface RepairBladeInfo {
   bladePosition: number;
   defectNumber: string | null;
+  /** blade.serial_number resolved in parallel to the position. */
+  bladeSerial: string | null;
 }
 
 const BLADE_LETTERS: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
@@ -239,17 +244,19 @@ async function resolveBladeInfoByRepair(
     if (inspId) inspectionIds.add(inspId);
   }
 
-  // 3. Resolve blade position per inspection.
+  // 3. Resolve blade position + serial per inspection.
   const positionByInspection = new Map<string, number>();
+  const serialByInspection = new Map<string, string | null>();
   if (inspectionIds.size > 0) {
     const { data: inspRows } = await db
       .from('inspection')
-      .select('id, blade:blade_id ( position )')
+      .select('id, blade:blade_id ( position, serial_number )')
       .in('id', [...inspectionIds]);
     for (const ir of (inspRows as unknown[]) ?? []) {
       const r = ir as Record<string, unknown>;
       const blade = (r.blade as Record<string, unknown>) ?? {};
       positionByInspection.set(r.id as string, Number(blade.position) || 0);
+      serialByInspection.set(r.id as string, (blade.serial_number as string) ?? null);
     }
   }
 
@@ -261,6 +268,7 @@ async function resolveBladeInfoByRepair(
       repairId,
       defectId,
       position: positionByInspection.get(inspId) ?? 0,
+      serial: serialByInspection.get(inspId) ?? null,
       createdAt: createdAtByDefect.get(defectId) ?? '',
     };
   });
@@ -275,6 +283,7 @@ async function resolveBladeInfoByRepair(
     result.set(d.repairId, {
       bladePosition: d.position,
       defectNumber: d.position > 0 ? `${letter}${counters[d.position]}` : null,
+      bladeSerial: d.serial,
     });
   }
   return result;
@@ -316,17 +325,19 @@ async function resolveBladeInfoByDefect(
     if (inspId) inspectionIds.add(inspId);
   }
 
-  // 2. Resolve blade position per inspection.
+  // 2. Resolve blade position + serial per inspection.
   const positionByInspection = new Map<string, number>();
+  const serialByInspection = new Map<string, string | null>();
   if (inspectionIds.size > 0) {
     const { data: inspRows } = await db
       .from('inspection')
-      .select('id, blade:blade_id ( position )')
+      .select('id, blade:blade_id ( position, serial_number )')
       .in('id', [...inspectionIds]);
     for (const ir of (inspRows as unknown[]) ?? []) {
       const r = ir as Record<string, unknown>;
       const blade = (r.blade as Record<string, unknown>) ?? {};
       positionByInspection.set(r.id as string, Number(blade.position) || 0);
+      serialByInspection.set(r.id as string, (blade.serial_number as string) ?? null);
     }
   }
 
@@ -337,6 +348,7 @@ async function resolveBladeInfoByDefect(
     return {
       defectId,
       position: positionByInspection.get(inspId) ?? 0,
+      serial: serialByInspection.get(inspId) ?? null,
       createdAt: createdAtByDefect.get(defectId) ?? '',
     };
   });
@@ -351,6 +363,7 @@ async function resolveBladeInfoByDefect(
     result.set(d.defectId, {
       bladePosition: d.position,
       defectNumber: d.position > 0 ? `${letter}${counters[d.position]}` : null,
+      bladeSerial: d.serial,
     });
   }
   return result;
@@ -502,6 +515,7 @@ function mapDefect(row: RepairForQuoteRow, bladeInfo?: RepairBladeInfo): RepairD
     heightCm: null,
     description: null,
     bladePosition: bladeInfo?.bladePosition ?? 0,
+    bladeSerial: bladeInfo?.bladeSerial ?? null,
     defectNumber: bladeInfo?.defectNumber ?? null,
     turbineName: (row.turbine_name as string) ?? null,
   };
@@ -758,6 +772,7 @@ export const repairService = {
         heightCm: defectRow?.height_cm != null ? Number(defectRow.height_cm) : null,
         description: (defectRow?.description as string) ?? null,
         bladePosition: numbering.bladePosition,
+        bladeSerial: wo.defectId ? (bladeInfoByDefect.get(wo.defectId)?.bladeSerial ?? null) : null,
         defectNumber: numbering.defectNumber,
         turbineName: wo.turbineId ? (turbineNameById.get(wo.turbineId) ?? null) : null,
       };

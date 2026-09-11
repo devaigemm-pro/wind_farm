@@ -300,6 +300,7 @@ export const translations: TranslationMap = {
   'repair.defect': { en: 'Defect', es: 'Defecto' },
   'repair.defects': { en: 'defects', es: 'defectos' },
   'repair.blade': { en: 'Blade', es: 'Pala' },
+  'repair.bladeNo': { en: 'Blade No.', es: 'Pala Nº' },
   'repair.category': { en: 'Category', es: 'Categoría' },
   'repair.noDefects': { en: 'This repair campaign has no defects linked to its quote yet.', es: 'Esta campaña de reparación aún no tiene defectos vinculados a su presupuesto.' },
   'repair.colTurbine': { en: 'Turbine', es: 'Turbina' },

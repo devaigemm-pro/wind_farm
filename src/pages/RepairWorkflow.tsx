@@ -40,6 +40,8 @@ function formatDefectType(type: string, locale: 'es' | 'en'): string {
 interface BladeGroup {
   position: number;
   label: string;
+  /** Blade serial number shared by every defect of the blade (from the first node). */
+  serial: string | null;
   nodes: RepairDefectNode[];
 }
 
@@ -67,7 +69,9 @@ function groupDefectsByBlade(tree: RepairDefectNode[]): BladeGroup[] {
         numeric: true,
       }),
     );
-    return { position, label: BLADE_LABELS[position] ?? '—', nodes };
+    // All defects of a blade share the same serial → take it from the first node.
+    const serial = nodes[0]?.defect.bladeSerial ?? null;
+    return { position, label: BLADE_LABELS[position] ?? '—', serial, nodes };
   });
 }
 
@@ -148,7 +152,9 @@ export function RepairWorkflow() {
           {groupDefectsByBlade(tree).map((group) => (
             <div key={group.position} style={bladeGroup}>
               <div style={bladeGroupTitle}>
-                {t('repair.blade')} {group.label}
+                {group.serial
+                  ? `${t('repair.bladeNo')} ${group.serial}`
+                  : `${t('repair.blade')} ${group.label}`}
               </div>
               {group.nodes.map((node) => (
                 <DefectSection
