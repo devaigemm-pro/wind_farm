@@ -23,6 +23,13 @@ const MANAGED_ROLES: UserRole[] = USER_ROLES.filter(
   (r): r is UserRole => r !== 'client',
 );
 
+// Human-readable labels for roles whose internal value is not display-friendly.
+// Roles not listed here fall back to their raw value.
+const ROLE_LABELS: Partial<Record<UserRole, string>> = {
+  analyst_ss: 'Analista SS',
+  analyst_sr: 'Analista SR',
+};
+
 export const UsersAdmin = () => {
   const { t } = useLanguage();
   const toast = useToast();
@@ -166,7 +173,7 @@ function UserRow({ user, farmNameById, onEdit, onDelete }: UserRowProps) {
       <td style={styles.td}>{user.last_name ?? '—'}</td>
       <td style={styles.td}>{user.rut ?? '—'}</td>
       <td style={styles.td}>{user.email}</td>
-      <td style={styles.td}>{user.role}</td>
+      <td style={styles.td}>{ROLE_LABELS[user.role as UserRole] ?? user.role}</td>
       <td style={{ ...styles.td, whiteSpace: 'normal', maxWidth: '260px' }}>{farmsLabel}</td>
       <td style={styles.td}>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -314,7 +321,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
             <select style={inputStyle} value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
               {MANAGED_ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {ROLE_LABELS[r] ?? r}
                 </option>
               ))}
             </select>
