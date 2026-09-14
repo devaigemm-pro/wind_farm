@@ -631,8 +631,12 @@ async function createRepairCampaign(quote: Quote, userId: string | null): Promis
   try {
     const turbineName = quote.turbineName?.trim()
       || (quote.turbine_id ? `turbina ${quote.turbine_id.slice(0, 8)}` : 'turbina');
-    const dateLabel = new Date().toLocaleDateString('es-CL');
-    const name = `Reparación - ${turbineName} - ${dateLabel}`;
+    // Campaign ID: "CI" + 3 random digits (e.g. CI482), then turbine name and
+    // creation date (dd-mm-yyyy). Example: "CI482 - WTG-23 - 10-09-2026".
+    const ci = `CI${Math.floor(100 + Math.random() * 900)}`;
+    const now = new Date();
+    const dateLabel = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+    const name = `${ci} - ${turbineName} - ${dateLabel}`;
 
     const { error } = await db.from('campaign').insert({
       type: 'repair',
