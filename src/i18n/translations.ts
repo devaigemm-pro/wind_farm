@@ -535,6 +535,30 @@ export const translations: TranslationMap = {
     es: 'Las sincronizaciones de fotos del agente de drone aparecerán aquí.',
   },
   'uploads.moreTurbines': { en: 'more', es: 'más' },
+  // Repair campaign import (Excel)
+  'uploads.importRepair': {
+    en: 'Upload repair campaign',
+    es: 'Cargar campaña de reparación',
+  },
+  'uploads.importRepairHint': {
+    en: 'Upload an .xlsx file with defects to build a repair campaign.',
+    es: 'Sube un archivo .xlsx con defectos para armar una campaña de reparación.',
+  },
+  'uploads.importing': { en: 'Processing…', es: 'Procesando…' },
+  'uploads.importSuccess': {
+    en: '{ok} defects loaded in {campaigns} campaign(s)',
+    es: '{ok} defectos cargados en {campaigns} campaña(s)',
+  },
+  'uploads.importPartial': {
+    en: '{ok} OK, {errors} with error',
+    es: '{ok} OK, {errors} con error',
+  },
+  'uploads.importFailed': {
+    en: 'Could not process the file',
+    es: 'No se pudo procesar el archivo',
+  },
+  'uploads.importErrors': { en: 'Rows with error', es: 'Filas con error' },
+  'uploads.importRow': { en: 'Row', es: 'Fila' },
 
   // ─── Annotate Step (additional) ─────────────────────────────────────────────
   'annotate.blade': { en: 'Blade: ', es: 'Pala: ' },

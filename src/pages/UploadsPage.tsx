@@ -1,13 +1,16 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import { Button, Badge, Skeleton } from '@/components/atoms';
 import { EmptyState } from '@/components/molecules';
 import { useLanguage } from '@/components/design-system';
+import { useToast } from '@/store/toastStore';
+import { useImportRepairCampaign } from '@/hooks/useImportRepairCampaign';
 import { droneUploadService } from '@/services/drone-upload.service';
 import type { CampaignStatus, UploadRecord } from '@/types';
 import type { BadgeVariant } from '@/components/atoms';
+import type { RepairImportRowError } from '@/services/repair-import.service';
 
 /**
  * Upload sync status derived from campaign.status:
@@ -28,9 +31,50 @@ const SYNC_STATE_BADGE_MAP: Record<SyncState, BadgeVariant> = {
 export function UploadsPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const toast = useToast();
 
   const [page, setPage] = useState(1);
   const pageSize = 20;
+
+  // ─── Repair campaign import (Excel) ───────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [rowErrors, setRowErrors] = useState<RepairImportRowError[]>([]);
+  const importRepair = useImportRepairCampaign();
+
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Reset the input so selecting the same file again re-triggers change.
+      e.target.value = '';
+      if (!file) return;
+
+      setRowErrors([]);
+      try {
+        const summary = await importRepair.mutateAsync(file);
+        setRowErrors(summary.errores);
+        if (summary.errores.length === 0) {
+          toast.success(
+            t('uploads.importSuccess')
+              .replace('{ok}', String(summary.ok))
+              .replace('{campaigns}', String(summary.campanias.length)),
+          );
+        } else {
+          toast.warning(
+            t('uploads.importPartial')
+              .replace('{ok}', String(summary.ok))
+              .replace('{errors}', String(summary.errores.length)),
+          );
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('uploads.importFailed'));
+      }
+    },
+    [importRepair, toast, t],
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ['upload-records'],
@@ -166,7 +210,55 @@ export function UploadsPage() {
       {/* Header */}
       <div style={headerStyle}>
         <h1 style={headerTitleStyle}>{t('page.uploads')}</h1>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            onChange={handleFileSelected}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Upload}
+            onClick={handleImportClick}
+            loading={importRepair.isPending}
+            title={t('uploads.importRepairHint')}
+          >
+            {importRepair.isPending ? t('uploads.importing') : t('uploads.importRepair')}
+          </Button>
+        </div>
       </div>
+
+      {/* Row-level import errors */}
+      {rowErrors.length > 0 && (
+        <div
+          style={{
+            margin: 'var(--space-4)',
+            marginBottom: 0,
+            padding: 'var(--space-3) var(--space-4)',
+            border: '1px solid var(--color-danger-500)',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--color-danger-50, #fef2f2)',
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-neutral-800)',
+          }}
+          role="alert"
+        >
+          <div style={{ fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+            {t('uploads.importErrors')} ({rowErrors.length})
+          </div>
+          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            {rowErrors.map((err) => (
+              <li key={err.fila}>
+                {t('uploads.importRow')} {err.fila}: {err.motivo}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {showEmptyState ? (
         <EmptyState
