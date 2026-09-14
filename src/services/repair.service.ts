@@ -104,6 +104,8 @@ export interface RepairDefectNode {
   defect: RepairDefect;
   /** The repair session id (= defect.id in the RPC model). */
   repairId: string | null;
+  /** The work_order id driving this node (needed to delete the defect). */
+  workOrderId: string | null;
   repairStatus: string | null;
   technicianName: string | null;
   stages: RepairStageNode[];
@@ -780,6 +782,7 @@ export const repairService = {
       const node: RepairDefectNode = {
         defect,
         repairId,
+        workOrderId: wo.id,
         repairStatus,
         technicianName: null,
         stages: stages.length > 0 ? stages : catalogStages(),
@@ -823,6 +826,67 @@ export const repairService = {
       .eq('id', photoId);
 
     if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
+   * Permanently delete a defect from a repair campaign. The tree is driven by
+   * work_order, not defect, so we delete the whole chain children→parents:
+   *   repair_photo → repair_stage → repair → work_order → quote_item → defect.
+   * repair/repair_stage/repair_photo belong to the mobile team and are NOT
+   * guaranteed to cascade, so they're deleted explicitly by repair_id.
+   */
+  async deleteRepairDefect({
+    workOrderId,
+    repairId,
+    defectId,
+  }: {
+    workOrderId: string | null;
+    repairId: string | null;
+    defectId: string | null;
+  }): Promise<void> {
+    if (repairId) {
+      const { error: photoErr } = await db
+        .from('repair_photo')
+        .delete()
+        .eq('repair_id', repairId);
+      if (photoErr) throw new RepairServiceError(photoErr.message, photoErr.code);
+
+      const { error: stageErr } = await db
+        .from('repair_stage')
+        .delete()
+        .eq('repair_id', repairId);
+      if (stageErr) throw new RepairServiceError(stageErr.message, stageErr.code);
+
+      const { error: repairErr } = await db
+        .from('repair')
+        .delete()
+        .eq('id', repairId);
+      if (repairErr) throw new RepairServiceError(repairErr.message, repairErr.code);
+    }
+
+    if (workOrderId) {
+      if (defectId) {
+        const { error: quoteItemErr } = await db
+          .from('quote_item')
+          .delete()
+          .eq('defect_id', defectId);
+        if (quoteItemErr) throw new RepairServiceError(quoteItemErr.message, quoteItemErr.code);
+      }
+
+      const { error: woErr } = await db
+        .from('work_order')
+        .delete()
+        .eq('id', workOrderId);
+      if (woErr) throw new RepairServiceError(woErr.message, woErr.code);
+    }
+
+    if (defectId) {
+      const { error: defectErr } = await db
+        .from('defect')
+        .delete()
+        .eq('id', defectId);
+      if (defectErr) throw new RepairServiceError(defectErr.message, defectErr.code);
+    }
   },
 
   /**

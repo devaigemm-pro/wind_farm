@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, Download, Loader2, Star, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Download, Loader2, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +8,7 @@ import {
   useRepairCampaignDetail,
   useRepairTree,
   useSetPhotoSelected,
+  useDeleteRepairDefect,
 } from '@/hooks/useRepair';
 import { generateAndDownloadRepairReport } from '@/services/repairReportPdf.service';
 import type { RepairDefectNode, RepairPhoto, RepairStageNode } from '@/services/repair.service';
@@ -88,6 +89,7 @@ export function RepairWorkflow() {
   const { data: campaign, isLoading: campaignLoading } = useRepairCampaignDetail(campaignId);
   const { data: tree, isLoading: treeLoading } = useRepairTree(campaignId);
   const setSelected = useSetPhotoSelected(campaignId);
+  const deleteDefect = useDeleteRepairDefect(campaignId);
 
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
@@ -118,6 +120,24 @@ export function RepairWorkflow() {
     } finally {
       setDownloadingDefectId(null);
     }
+  };
+
+  // Permanently delete a defect from the campaign (whole work_order chain).
+  const handleDeleteDefect = (node: RepairDefectNode) => {
+    if (isClient) return;
+    if (!window.confirm(t('repair.deleteDefectConfirm'))) return;
+    deleteDefect.mutate(
+      {
+        workOrderId: node.workOrderId,
+        repairId: node.repairId,
+        defectId: node.defect.id,
+      },
+      {
+        onSuccess: () => toast.success(t('repair.deleteDefectSuccess')),
+        onError: (err) =>
+          toast.error((err as Error)?.message || t('repair.deleteDefectError')),
+      },
+    );
   };
 
   if (campaignLoading) {
@@ -166,6 +186,7 @@ export function RepairWorkflow() {
                   onSelect={handleSelect}
                   onPreview={handlePreview}
                   onDownloadReport={handleDownloadDefectPdf}
+                  onDelete={isClient ? undefined : handleDeleteDefect}
                   downloading={
                     node.repairId != null && downloadingDefectId === node.repairId
                   }
@@ -212,6 +233,7 @@ interface DefectSectionProps {
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
   onDownloadReport: (repairId: string) => void;
+  onDelete?: (node: RepairDefectNode) => void;
   downloading: boolean;
 }
 
@@ -223,6 +245,7 @@ function DefectSection({
   onSelect,
   onPreview,
   onDownloadReport,
+  onDelete,
   downloading,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
@@ -300,6 +323,27 @@ function DefectSection({
             </span>
           );
         })()}
+        {!readOnly && onDelete && (
+          <span
+            role="button"
+            tabIndex={0}
+            style={defectDeleteBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(node);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                onDelete(node);
+              }
+            }}
+            title={t('repair.deleteDefect')}
+          >
+            <Trash2 size={14} />
+            {t('repair.deleteDefect')}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -564,6 +608,9 @@ const defectPdfBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
   borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
   flexShrink: 0, userSelect: 'none',
+};
+const defectDeleteBtn: React.CSSProperties = {
+  ...defectPdfBtn, background: '#EF4444',
 };
 const stagesWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: 16 };
 const stageCard: React.CSSProperties = {
