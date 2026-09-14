@@ -10,7 +10,6 @@ export interface RepairImportRow {
   fila: number;
   turbina: string;
   serialPala: string;
-  numeroDanio: string;
   lado: string;
   ubicacionMm: string;
   tipoEspanol: string;
@@ -68,7 +67,7 @@ function mapDefectType(tipoEspanol: string): string {
  * Parse the first worksheet of an .xlsx File into RepairImportRow[].
  * Uses the dynamic-import ExcelJS pattern (same as ExportPanel.tsx).
  * Column order (row 1 = header):
- *   1 Turbina | 2 Pala(serial) | 3 Numero daño | 4 Lado | 5 Ubicacion mm | 6 Tipo
+ *   1 Turbina | 2 Pala(serial) | 3 Lado | 4 Ubicacion mm | 5 Tipo
  */
 export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const ExcelJS = (await import('exceljs')).default;
@@ -97,13 +96,12 @@ export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
     if (n === 1) return; // header
     const turbina = cellText(row.getCell(1).value);
     const serialPala = cellText(row.getCell(2).value);
-    const numeroDanio = cellText(row.getCell(3).value);
-    const lado = cellText(row.getCell(4).value);
-    const ubicacionMm = cellText(row.getCell(5).value);
-    const tipoEspanol = cellText(row.getCell(6).value);
+    const lado = cellText(row.getCell(3).value);
+    const ubicacionMm = cellText(row.getCell(4).value);
+    const tipoEspanol = cellText(row.getCell(5).value);
     // Skip fully empty rows.
-    if (!turbina && !serialPala && !numeroDanio && !lado && !ubicacionMm && !tipoEspanol) return;
-    rows.push({ fila: n, turbina, serialPala, numeroDanio, lado, ubicacionMm, tipoEspanol });
+    if (!turbina && !serialPala && !lado && !ubicacionMm && !tipoEspanol) return;
+    rows.push({ fila: n, turbina, serialPala, lado, ubicacionMm, tipoEspanol });
   });
   return rows;
 }
@@ -290,7 +288,7 @@ export const repairImportService = {
             severity: 3,
             distance_from_root: distanceFromRoot,
             side: lado || null,
-            description: row.numeroDanio || null,
+            description: null,
             width_cm: null,
             height_cm: null,
             resolved: false,
