@@ -59,6 +59,30 @@ export function useSetPhotoSelected(campaignId: string | undefined) {
   });
 }
 
+/**
+ * Permanently delete a defect from the repair campaign (whole chain:
+ * repair_photo → repair_stage → repair → work_order → quote_item → defect),
+ * then refresh tree + summary via react-query invalidation.
+ */
+export function useDeleteRepairDefect(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      workOrderId,
+      repairId,
+      defectId,
+    }: {
+      workOrderId: string | null;
+      repairId: string | null;
+      defectId: string | null;
+    }) => repairService.deleteRepairDefect({ workOrderId, repairId, defectId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+    },
+  });
+}
+
 /** Update repair campaign status, then refresh detail + summary. */
 export function useUpdateRepairStatus(campaignId: string | undefined) {
   const queryClient = useQueryClient();
