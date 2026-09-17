@@ -1365,17 +1365,29 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   const dateStr = formatDateES(ctx.createdAt).replace(/\//g, '-');
   const filename = `Informe_Reparacion_${ctx.turbineName}_${dateStr}.pdf`.replace(/\s+/g, '_');
 
-  // Download immediately (unchanged behavior).
-  doc.save(filename);
+  // Capturar el blob UNA sola vez, ANTES de descargar (patrón de inspección,
+  // ExportPanel.tsx). Sacar el blob del doc antes de cualquier mutación evita el
+  // problema de obtenerlo tras doc.save() y permite reutilizarlo para persistir.
+  const blob = doc.output('blob') as Blob;
+
+  // Descargar inmediatamente desde el blob capturado (equivalente a doc.save,
+  // sin mutar el doc antes de obtener el blob).
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 
   // Persist the report in the SAME `report` table used by inspections, with
   // type='repair'. The reference_id is the repair_id (data.defectId), so the
   // RepairWorkflow UI can later query which repairs already have a report and
-  // show a "Download report" button. All of this runs in the background and is
-  // wrapped in try/catch so a persistence failure never breaks the download.
+  // show a "Download report" button. Se hace AWAIT (no fire-and-forget) para que
+  // upload+insert completen; la persistencia sigue siendo best-effort porque su
+  // try/catch interno no propaga errores (la descarga ya ocurrió antes).
   const repairId = data.defectId ?? null;
   if (repairId) {
-    void persistRepairReport(doc, repairId, filename, session.user?.id ?? null);
+    await persistRepairReport(blob, repairId, filename, session.user?.id ?? null);
   }
 }
 
@@ -1387,14 +1399,12 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
  * Best-effort: any error is swallowed so the on-the-fly download is unaffected.
  */
 async function persistRepairReport(
-  doc: jsPDF,
+  blob: Blob,
   repairId: string,
   filename: string,
   userId: string | null,
 ): Promise<void> {
   try {
-    const blob = doc.output('blob') as Blob;
-
     // Remove previous repair report(s) for this repairId (storage + DB rows),
     // so only the most recent one remains.
     try {
