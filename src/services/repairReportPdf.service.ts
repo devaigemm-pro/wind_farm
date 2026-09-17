@@ -1037,7 +1037,7 @@ function renderBlockTable(
       // Row 1 — values
       [V(fecha), V(`Pala ${bladeLabel}`), V(serie), V(turbina)],
       // Row 2 — labels
-      [L('Lado de Alta:'), L('Lado de Baja:'), L('B. Ataque:'), L('B. Salida:')],
+      [L('Lado de Alta (PS):'), L('Lado de Baja (SS):'), L('B. Ataque (LE):'), L('B. Salida (TE):')],
       // Row 2 — values (X marks from BD side; others empty)
       [V(marks.ladoAlta), V(marks.ladoBaja), V(marks.bAtaque), V(marks.bSalida)],
       // Row 3 — labels
