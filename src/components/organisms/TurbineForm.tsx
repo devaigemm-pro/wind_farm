@@ -18,6 +18,8 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
   const [name, setName] = useState(initialData?.name ?? '');
   const [model, setModel] = useState(initialData?.model ?? '');
   const [manufacturer, setManufacturer] = useState(initialData?.manufacturer ?? '');
+  const [powerKw, setPowerKw] = useState(initialData?.power_kw?.toString() ?? '');
+  const [serialNumber, setSerialNumber] = useState(initialData?.serial_number ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,6 +37,19 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
 
     if (manufacturer.trim()) {
       formData.manufacturer = manufacturer.trim();
+    }
+
+    if (powerKw.trim()) {
+      const parsed = parseFloat(powerKw.trim());
+      if (isNaN(parsed)) {
+        setErrors({ power_kw: t('turbineForm.powerKwError') });
+        return;
+      }
+      formData.power_kw = parsed;
+    }
+
+    if (serialNumber.trim()) {
+      formData.serial_number = serialNumber.trim();
     }
 
     const result = turbineSchema.safeParse(formData);
@@ -93,6 +108,24 @@ export function TurbineForm({ windFarmId, initialData, onSubmit, onCancel, loadi
         error={errors.model}
         placeholder={t('turbineForm.modelPlaceholder')}
       />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+        <FormField
+          label={t('turbineForm.powerKw')}
+          type="text"
+          inputMode="decimal"
+          value={powerKw}
+          onChange={(e) => setPowerKw(e.target.value)}
+          error={errors.power_kw}
+          placeholder={t('turbineForm.powerKwPlaceholder')}
+        />
+        <FormField
+          label={t('turbineForm.serialNumber')}
+          value={serialNumber}
+          onChange={(e) => setSerialNumber(e.target.value)}
+          error={errors.serial_number}
+          placeholder={t('turbineForm.serialNumberPlaceholder')}
+        />
+      </div>
       <div style={actionsStyle}>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>
           {t('button.cancel')}

@@ -405,6 +405,19 @@ export const translations: TranslationMap = {
   'turbineForm.createTurbine': { en: 'Create Turbine', es: 'Crear Turbina' },
   'turbineForm.namePlaceholder': { en: 'e.g. Turbine A-01', es: 'ej. Turbina A-01' },
   'turbineForm.modelPlaceholder': { en: 'e.g. Vestas V164-9.5 MW', es: 'ej. Vestas V164-9.5 MW' },
+  'turbineForm.powerKw': { en: 'Power (kW)', es: 'Potencia (kW)' },
+  'turbineForm.powerKwPlaceholder': { en: 'e.g. 3500', es: 'ej. 3500' },
+  'turbineForm.powerKwError': { en: 'Power must be a valid number', es: 'La potencia debe ser un número válido' },
+  'turbineForm.serialNumber': { en: 'Serial number', es: 'Número de serie' },
+  'turbineForm.serialNumberPlaceholder': { en: 'e.g. TRB-000123', es: 'ej. TRB-000123' },
+
+  // ─── Blade Form ─────────────────────────────────────────────────────────────
+  'bladeForm.serialNumber': { en: 'Serial number', es: 'Número de serie' },
+  'bladeForm.serialNumberPlaceholder': { en: 'e.g. BLD-000123', es: 'ej. BLD-000123' },
+  'bladeForm.lengthMeters': { en: 'Length (m)', es: 'Longitud (m)' },
+  'bladeForm.lengthPlaceholder': { en: 'e.g. 63.5', es: 'ej. 63.5' },
+  'bladeForm.lengthError': { en: 'Length must be a valid number', es: 'La longitud debe ser un número válido' },
+  'bladeForm.updateBlade': { en: 'Update Blade', es: 'Actualizar Pala' },
 
   // ─── Chart Card ─────────────────────────────────────────────────────────────
   'chart.failed': { en: 'Failed to load chart data.', es: 'Error al cargar datos del gráfico.' },
@@ -964,6 +977,7 @@ export const translations: TranslationMap = {
   // ─── Sidebar (admin) ─────────────────────────────────────────────────────────
   'sidebar.administration': { en: 'Administration', es: 'Administración' },
   'sidebar.users': { en: 'Users', es: 'Usuarios' },
+  'sidebar.assetsAdmin': { en: 'Assets', es: 'Assets' },
 
   // ─── Users maintainer ─────────────────────────────────────────────────────────
   'users.title': { en: 'Users', es: 'Usuarios' },
@@ -1016,4 +1030,41 @@ export const translations: TranslationMap = {
   'users.deleted': { en: 'User deleted', es: 'Usuario eliminado' },
   'users.saveFailed': { en: 'Failed to save user', es: 'Error al guardar el usuario' },
   'users.deleteFailed': { en: 'Failed to delete user', es: 'Error al eliminar el usuario' },
+
+  // ─── Assets maintainer ────────────────────────────────────────────────────────
+  'assetsAdmin.title': { en: 'Assets Administration', es: 'Administración de Assets' },
+  'assetsAdmin.newFarm': { en: 'New wind farm', es: 'Nuevo parque' },
+  'assetsAdmin.editFarm': { en: 'Edit wind farm', es: 'Editar parque' },
+  'assetsAdmin.deleteFarm': { en: 'Delete wind farm', es: 'Eliminar parque' },
+  'assetsAdmin.newTurbine': { en: 'New turbine', es: 'Nueva turbina' },
+  'assetsAdmin.editTurbine': { en: 'Edit turbine', es: 'Editar turbina' },
+  'assetsAdmin.deleteTurbine': { en: 'Delete turbine', es: 'Eliminar turbina' },
+  'assetsAdmin.editBlade': { en: 'Edit blade', es: 'Editar pala' },
+  'assetsAdmin.blade': { en: 'Blade', es: 'Pala' },
+  'assetsAdmin.noTurbines': { en: 'No turbines in this wind farm', es: 'Este parque no tiene turbinas' },
+  'assetsAdmin.noBlades': { en: 'No blades for this turbine', es: 'Esta turbina no tiene palas' },
+  'assetsAdmin.delete': { en: 'Delete', es: 'Eliminar' },
+  'assetsAdmin.cancel': { en: 'Cancel', es: 'Cancelar' },
+  'assetsAdmin.confirmDeleteFarm': {
+    en: 'Are you sure you want to delete this wind farm? This action cannot be undone.',
+    es: '¿Seguro que deseas eliminar este parque? Esta acción no se puede deshacer.',
+  },
+  'assetsAdmin.confirmDeleteTurbine': {
+    en: 'Are you sure you want to delete this turbine? This action cannot be undone.',
+    es: '¿Seguro que deseas eliminar esta turbina? Esta acción no se puede deshacer.',
+  },
+  'assetsAdmin.empty': { en: 'No wind farms yet', es: 'Aún no hay parques' },
+  'assetsAdmin.emptyDesc': {
+    en: 'Create the first wind farm to get started.',
+    es: 'Crea el primer parque para comenzar.',
+  },
+  'assetsAdmin.farmCreated': { en: 'Wind farm created', es: 'Parque creado' },
+  'assetsAdmin.farmSaved': { en: 'Wind farm updated', es: 'Parque actualizado' },
+  'assetsAdmin.farmDeleted': { en: 'Wind farm deleted', es: 'Parque eliminado' },
+  'assetsAdmin.turbineCreated': { en: 'Turbine created', es: 'Turbina creada' },
+  'assetsAdmin.turbineSaved': { en: 'Turbine updated', es: 'Turbina actualizada' },
+  'assetsAdmin.turbineDeleted': { en: 'Turbine deleted', es: 'Turbina eliminada' },
+  'assetsAdmin.bladeSaved': { en: 'Blade updated', es: 'Pala actualizada' },
+  'assetsAdmin.saveFailed': { en: 'Failed to save', es: 'Error al guardar' },
+  'assetsAdmin.deleteFailed': { en: 'Failed to delete', es: 'Error al eliminar' },
 };

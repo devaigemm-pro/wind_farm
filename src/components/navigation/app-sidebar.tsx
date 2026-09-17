@@ -58,7 +58,10 @@ export function AppSidebar({ currentPath, onNavigate }: AppSidebarProps) {
       ? [
           {
             title: t('sidebar.administration'),
-            items: [{ icon: Users, label: t('sidebar.users'), path: '/admin/users' }],
+            items: [
+              { icon: Users, label: t('sidebar.users'), path: '/admin/users' },
+              { icon: Wind, label: t('sidebar.assetsAdmin'), path: '/admin/assets' },
+            ],
           },
         ]
       : []),
