@@ -64,6 +64,11 @@ interface DefectForPdf {
   heightCm: number | null;
   side: string | null;
   description: string | null;
+  /** Per-blade correlative (e.g. "A27") persisted on defect.defect_number. */
+  defectNumber: string | null;
+  /** Optional per-defect identifier loaded from the defects spreadsheet
+   *  (defect.defect_identifier). Null until populated. */
+  defectIdentifier: string | null;
   /** blade position (1=A, 2=B, 3=C) resolved via defect→inspection→blade. */
   bladePosition: number;
   /** blade serial number resolved via defect→inspection→blade. */
@@ -103,6 +108,9 @@ interface RepairPdfContext {
   blades: { position: number; serialNumber: string | null; lengthMeters: number | null }[];
   defects: DefectForPdf[];
   photos: RepairPhotoForPdf[];
+  /** Z1/Z2 of the `analisis_falla` stage, keyed by repair_id. Damage location
+   *  is computed as (z1 + z2) / 2. Null components when not yet entered. */
+  failureZByRepair: Record<string, { z1: number | null; z2: number | null }>;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -137,6 +145,24 @@ const DEFECT_TYPE_LABELS: Record<string, string> = {
 
 function formatDefectType(type: string): string {
   return DEFECT_TYPE_LABELS[type] || type.toUpperCase().replace(/_/g, ' ');
+}
+
+/**
+ * Compose the defect display name exactly like the technician app (doc §6):
+ *   type + " " + defect_number + "-" + defect_identifier
+ * The type is separated by a space; number and identifier are joined with a
+ * dash; empty parts are omitted (e.g. "Grieta A27-XYZ" or "Grieta A27").
+ */
+function composeDefectName(
+  type: string,
+  defectNumber: string | null,
+  defectIdentifier: string | null,
+): string {
+  const typeLabel = formatDefectType(type);
+  const num = defectNumber?.trim() || '';
+  const ident = defectIdentifier?.trim() || '';
+  const numberPart = [num, ident].filter(Boolean).join('-');
+  return [typeLabel, numberPart].filter(Boolean).join(' ');
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -383,7 +409,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     const defectIds = [...defectIdsFromView];
     const { data: defectRows, error: defErr } = await db
       .from('defect')
-      .select('id, type, severity, distance_from_root, width_cm, height_cm, side, description, inspection_id')
+      .select('id, type, severity, distance_from_root, width_cm, height_cm, side, description, defect_number, defect_identifier, inspection_id')
       .in('id', defectIds);
     if (defErr) throw defErr;
 
@@ -424,9 +450,33 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
         heightCm: numOrNull(r.height_cm),
         side: (r.side as string) ?? null,
         description: (r.description as string) ?? null,
+        defectNumber: (r.defect_number as string) ?? null,
+        defectIdentifier: (r.defect_identifier as string) ?? null,
         bladePosition: bladeInfo.position,
         bladeSerial: bladeInfo.serial,
       });
+    }
+  }
+
+  // 5b. Z1/Z2 of the `analisis_falla` stage per repair — the damage location is
+  //     (z1 + z2) / 2 (doc §4). z1/z2 live ONLY on the analisis_falla row of
+  //     repair_stage; they may be null when the technician hasn't entered them.
+  const failureZByRepair: Record<string, { z1: number | null; z2: number | null }> = {};
+  const repairIdsForZ = [
+    ...new Set(photos.map((p) => p.repairId).filter((id): id is string => Boolean(id))),
+  ];
+  if (repairIdsForZ.length > 0) {
+    const { data: stageRows } = await db
+      .from('repair_stage')
+      .select('repair_id, z1, z2')
+      .eq('stage_code', 'analisis_falla')
+      .in('repair_id', repairIdsForZ);
+    for (const sr of (stageRows as unknown[]) ?? []) {
+      const r = sr as Record<string, unknown>;
+      const repairId = r.repair_id as string;
+      if (repairId && !(repairId in failureZByRepair)) {
+        failureZByRepair[repairId] = { z1: numOrNull(r.z1), z2: numOrNull(r.z2) };
+      }
     }
   }
 
@@ -527,6 +577,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     blades,
     defects,
     photos,
+    failureZByRepair,
   };
 }
 
@@ -737,7 +788,8 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
   const stateBefore = ctx.defects.length > 0
     ? ctx.defects
         .map((d) => {
-          const label = formatDefectType(d.type);
+          // Composed defect name (type + number-identifier, doc §6) + category.
+          const label = composeDefectName(d.type, d.defectNumber, d.defectIdentifier);
           return d.severity != null ? `${label} (Cat ${d.severity})` : label;
         })
         .join(', ')
@@ -916,6 +968,7 @@ function renderBlockTable(
   defect: DefectForPdf | null,
   photo: RepairPhotoForPdf,
   bladeLabel: string,
+  failureZ: { z1: number | null; z2: number | null } | null,
 ): number {
   // Prefer the defect date context; fall back to captured/completed dates (BD).
   const fecha = formatDateBlock(photo.capturedAt || photo.repairCompletedAt);
@@ -925,6 +978,15 @@ function renderBlockTable(
   const largo = defect?.heightCm != null ? `${defect.heightCm}mm` : '';
   const ancho = defect?.widthCm != null ? `${defect.widthCm}mm` : '';
   const descripcion = photo.stageLabel || '';
+
+  // Z1/Z2 come from the analisis_falla stage (BD). Empty when not entered.
+  const z1 = failureZ?.z1 ?? null;
+  const z2 = failureZ?.z2 ?? null;
+  const z1Str = z1 != null ? `${z1}` : '';
+  const z2Str = z2 != null ? `${z2}` : '';
+  // Damage location = (z1 + z2) / 2 (doc §4). Only when both are present.
+  const damageLocation =
+    z1 != null && z2 != null ? `${(z1 + z2) / 2}` : '';
 
   // autoTable cell type: [text, fill]. Labels use gray bg + bold black; values
   // use white bg. Fields with no BD data render as '' (empty), never invented.
@@ -956,9 +1018,9 @@ function renderBlockTable(
       // Row 2 — values (X marks from BD side; others empty)
       [V(marks.ladoAlta), V(marks.ladoBaja), V(marks.bAtaque), V(marks.bSalida)],
       // Row 3 — labels
-      [L('Z1:'), L('Largo:'), L('Z2:'), L('BA1:')],
-      // Row 3 — values (Z1/Z2/BA1 empty — no BD field)
-      [V(''), V(largo), V(''), V('')],
+      [L('Z1:'), L('Largo:'), L('Z2:'), L('Ubicación del daño:')],
+      // Row 3 — values (Z1/Z2 from analisis_falla; ubicación = (z1+z2)/2)
+      [V(z1Str), V(largo), V(z2Str), V(damageLocation)],
       // Row 4 — labels
       [L('Ancho:'), L('BA2:'), { content: 'Reparación:', colSpan: 2, styles: labelStyle }],
       // Row 4 — values (BA2 empty; Reparación default 'Externa' per client example)
@@ -1021,7 +1083,13 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Pala ${label} ~ Daño #${damageIndex}`, MARGIN + 3, headerY + headerH / 2 + 1.5);
+      // Compose the defect name (type + number-identifier, doc §6) next to the
+      // per-blade damage index, e.g. "Pala A ~ Daño #1 · Grieta A27-XYZ".
+      const defectName = composeDefectName(defect.type, defect.defectNumber, defect.defectIdentifier);
+      const headerLeft = defectName
+        ? `Pala ${label} ~ Daño #${damageIndex} · ${defectName}`
+        : `Pala ${label} ~ Daño #${damageIndex}`;
+      doc.text(headerLeft, MARGIN + 3, headerY + headerH / 2 + 1.5);
 
       // Right cell — orange bg, white bold.
       doc.setFillColor(...COLOR_BLOCK_ORANGE);
@@ -1031,8 +1099,10 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
       doc.text(`Categoría del daño: ${categoria}`, MARGIN + halfW + 3, headerY + headerH / 2 + 1.5);
       doc.setTextColor(0, 0, 0);
 
-      // 2. Detail table (4-column label/value grid).
-      const tableY = renderBlockTable(doc, headerY + headerH, defect, photo, label);
+      // 2. Detail table (4-column label/value grid). Z1/Z2 come from the photo's
+      //    repair (analisis_falla stage); damage location = (z1 + z2) / 2.
+      const failureZ = photo.repairId ? (ctx.failureZByRepair[photo.repairId] ?? null) : null;
+      const tableY = renderBlockTable(doc, headerY + headerH, defect, photo, label, failureZ);
 
       // 3. One large photo, margin-to-margin, filling the lower half of the page.
       const imgTop = tableY + 6;
