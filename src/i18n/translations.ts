@@ -977,7 +977,7 @@ export const translations: TranslationMap = {
   // ─── Sidebar (admin) ─────────────────────────────────────────────────────────
   'sidebar.administration': { en: 'Administration', es: 'Administración' },
   'sidebar.users': { en: 'Users', es: 'Usuarios' },
-  'sidebar.assetsAdmin': { en: 'Assets', es: 'Assets' },
+  'sidebar.assetsAdmin': { en: 'Parks', es: 'Parques' },
 
   // ─── Users maintainer ─────────────────────────────────────────────────────────
   'users.title': { en: 'Users', es: 'Usuarios' },
