@@ -416,10 +416,8 @@ function DefectSection({
                 }}
                 title={hasRepair ? generateLabel : t('repair.notStarted')}
               >
-                {downloading ? (
+                {downloading && (
                   <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <Download size={14} />
                 )}
                 {generateLabel}
               </span>
