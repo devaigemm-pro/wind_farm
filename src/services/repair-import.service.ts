@@ -9,9 +9,10 @@ export interface RepairImportRow {
   /** Excel row number (1-based, header excluded) — for error reporting. */
   fila: number;
   turbina: string;
+  /** External identifier from the Excel (e.g. "DAÑO 1"), stored in defect.defect_identifier. */
+  defectIdentifier: string;
   serialPala: string;
   lado: string;
-  ubicacionMm: string;
   tipoEspanol: string;
 }
 
@@ -67,7 +68,7 @@ function mapDefectType(tipoEspanol: string): string {
  * Parse the first worksheet of an .xlsx File into RepairImportRow[].
  * Uses the dynamic-import ExcelJS pattern (same as ExportPanel.tsx).
  * Column order (row 1 = header):
- *   1 Turbina | 2 Pala(serial) | 3 Lado | 4 Ubicacion mm | 5 Tipo
+ *   1 Turbina | 2 Identificador Defecto | 3 Pala(serial) | 4 Lado | 5 Tipo
  */
 export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const ExcelJS = (await import('exceljs')).default;
@@ -95,13 +96,13 @@ export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   sheet.eachRow((row, n) => {
     if (n === 1) return; // header
     const turbina = cellText(row.getCell(1).value);
-    const serialPala = cellText(row.getCell(2).value);
-    const lado = cellText(row.getCell(3).value);
-    const ubicacionMm = cellText(row.getCell(4).value);
+    const defectIdentifier = cellText(row.getCell(2).value);
+    const serialPala = cellText(row.getCell(3).value);
+    const lado = cellText(row.getCell(4).value);
     const tipoEspanol = cellText(row.getCell(5).value);
     // Skip fully empty rows.
-    if (!turbina && !serialPala && !lado && !ubicacionMm && !tipoEspanol) return;
-    rows.push({ fila: n, turbina, serialPala, lado, ubicacionMm, tipoEspanol });
+    if (!turbina && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
+    rows.push({ fila: n, turbina, defectIdentifier, serialPala, lado, tipoEspanol });
   });
   return rows;
 }
@@ -277,18 +278,20 @@ export const repairImportService = {
         // 4. Defect type mapping
         const type = mapDefectType(row.tipoEspanol);
 
-        // 5. Defect (distance in meters = mm / 1000)
-        const ubicacionMm = Number(String(row.ubicacionMm).replace(',', '.'));
-        const distanceFromRoot = Number.isFinite(ubicacionMm) ? ubicacionMm / 1000 : 0;
+        // 5. Defect. The Excel no longer carries the root distance ("Ubicacion mm"
+        //    was removed) — distance_from_root is computed later by the app from
+        //    the technician's z1/z2 inputs, so it starts at 0. The external
+        //    identifier ("DAÑO 1") is stored verbatim in defect_identifier.
         const { data: defect, error: defectErr } = await db
           .from('defect')
           .insert({
             inspection_id: inspectionId,
             type,
             severity: 3,
-            distance_from_root: distanceFromRoot,
+            distance_from_root: 0,
             side: lado || null,
             description: null,
+            defect_identifier: row.defectIdentifier || null,
             width_cm: null,
             height_cm: null,
             resolved: false,
