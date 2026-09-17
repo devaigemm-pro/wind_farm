@@ -106,6 +106,9 @@ const RepairWorkflowPage = lazy(() =>
 const UsersAdminPage = lazy(() =>
   import('@/pages/UsersAdmin').then((m) => ({ default: m.UsersAdmin })),
 );
+const AssetsAdminPage = lazy(() =>
+  import('@/pages/AssetsAdmin').then((m) => ({ default: m.AssetsAdmin })),
+);
 
 
 
@@ -238,6 +241,14 @@ function AppRoutes() {
           element={
             <AuthGuard requiredRoles={['admin']}>
               <UsersAdminPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin/assets"
+          element={
+            <AuthGuard requiredRoles={['admin']}>
+              <AssetsAdminPage />
             </AuthGuard>
           }
         />

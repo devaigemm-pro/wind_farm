@@ -27,6 +27,9 @@ export type { WindFarmFormProps } from './WindFarmForm';
 export { TurbineForm } from './TurbineForm';
 export type { TurbineFormProps } from './TurbineForm';
 
+export { BladeForm } from './BladeForm';
+export type { BladeFormProps } from './BladeForm';
+
 export { EvidenceGallery } from './EvidenceGallery';
 export type { EvidenceGalleryProps } from './EvidenceGallery';
 

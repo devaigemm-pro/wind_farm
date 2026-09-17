@@ -73,7 +73,25 @@ export const assetsService = {
       .select()
       .single();
     if (error) handleMutationError(error);
-    return data as WindFarm;
+
+    const windFarm = data as WindFarm;
+
+    // Auto-assign the new farm to the current admin so it appears immediately
+    // (the wind_farm SELECT RLS policy requires an explicit assignment).
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+    if (userId) {
+      const { error: assignError } = await supabase
+        .from('wind_farm_user')
+        .insert({ wind_farm_id: windFarm.id, user_id: userId });
+      // A missing assignment shouldn't fail the whole creation; ignore
+      // duplicate-key errors (already assigned) but surface anything unexpected.
+      if (assignError && assignError.code !== '23505') {
+        throw assignError;
+      }
+    }
+
+    return windFarm;
   },
 
   async updateWindFarm(
@@ -112,6 +130,8 @@ export const assetsService = {
     name: string;
     model?: string;
     manufacturer?: string;
+    power_kw?: number;
+    serial_number?: string;
   }): Promise<Turbine> {
     const { data, error } = await supabase
       .from('turbine')
@@ -120,6 +140,8 @@ export const assetsService = {
         name: input.name,
         model: input.model ?? null,
         manufacturer: input.manufacturer ?? null,
+        power_kw: input.power_kw ?? null,
+        serial_number: input.serial_number ?? null,
       })
       .select()
       .single();
@@ -129,7 +151,14 @@ export const assetsService = {
 
   async updateTurbine(
     id: string,
-    input: Partial<{ name: string; model: string | null; manufacturer: string | null; wind_farm_id: string }>,
+    input: Partial<{
+      name: string;
+      model: string | null;
+      manufacturer: string | null;
+      power_kw: number | null;
+      serial_number: string | null;
+      wind_farm_id: string;
+    }>,
   ): Promise<Turbine> {
     const { data, error } = await supabase
       .from('turbine')
@@ -156,6 +185,20 @@ export const assetsService = {
       .order('position');
     if (error) throw error;
     return data as Blade[];
+  },
+
+  async updateBlade(
+    id: string,
+    input: Partial<{ serial_number: string | null; length_meters: number | null }>,
+  ): Promise<Blade> {
+    const { data, error } = await supabase
+      .from('blade')
+      .update(input)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) handleMutationError(error);
+    return data as Blade;
   },
 
   // Asset Tree (nested query)

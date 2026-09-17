@@ -25,9 +25,20 @@ export const turbineSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   model: z.string().optional(),
   manufacturer: z.string().optional(),
+  power_kw: z.number().optional(),
+  serial_number: z.string().optional(),
 });
 
 export type TurbineFormData = z.infer<typeof turbineSchema>;
+
+// ─── Blade Schema ───────────────────────────────────────────────────────────
+
+export const bladeSchema = z.object({
+  serial_number: z.string().optional(),
+  length_meters: z.number().optional(),
+});
+
+export type BladeFormData = z.infer<typeof bladeSchema>;
 
 // ─── Inspection Schemas ─────────────────────────────────────────────────────
 
