@@ -1422,17 +1422,40 @@ async function persistRepairReport(
     const { error: uploadError } = await supabase.storage
       .from('reports')
       .upload(storagePath, blob, { contentType: 'application/pdf', upsert: false });
-    if (!uploadError) finalStoragePath = storagePath;
+    if (uploadError) {
+      // Best-effort: the DB row is still inserted (with a pending/ path) so the
+      // "Download report" button reappears. Log for diagnosis.
+      console.error('[repairReport] persist upload failed:', uploadError);
+    } else {
+      finalStoragePath = storagePath;
+    }
 
-    await db.from('report').insert({
+    // The `report` INSERT policy enforces `with check (generated_by = auth.uid())`.
+    // If the passed-in userId isn't exactly auth.uid() (or is null), the INSERT is
+    // rejected by RLS. Resolve the uid straight from the session to guarantee the
+    // check passes; fall back to the received userId only if getUser() fails.
+    let generatedBy: string | null = userId;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      generatedBy = authData?.user?.id ?? userId;
+    } catch (authErr) {
+      console.error('[repairReport] getUser failed, using fallback userId:', authErr);
+    }
+
+    const { error: insertError } = await db.from('report').insert({
       reference_id: repairId,
       type: 'repair',
-      generated_by: userId,
+      generated_by: generatedBy,
       generated_at: new Date().toISOString(),
       filename,
       storage_path: finalStoragePath || `pending/${repairId}/${filename}`,
     });
-  } catch {
-    /* silent — persistence must never break the download */
+    if (insertError) {
+      console.error('[repairReport] persist insert failed:', insertError);
+    }
+  } catch (err) {
+    // Best-effort: persistence must never break the on-the-fly download, but we
+    // log the failure instead of swallowing it silently.
+    console.error('[repairReport] persist unexpected error:', err);
   }
 }
