@@ -409,6 +409,57 @@ async function fetchStagesForRepair(repairId: string): Promise<RepairStageRow[]>
   return ((data as unknown[]) ?? []) as RepairStageRow[];
 }
 
+/** Optional-group flags + Z coords for a single stage, read from repair_stage. */
+interface RepairStageFlags {
+  optional: boolean;
+  enabled: boolean;
+  z1: number | null;
+  z2: number | null;
+}
+
+/**
+ * Read the optional/enabled/z1/z2 flags DIRECTLY from the `repair_stage` table
+ * for a set of repairs, keyed by repair_id → stage_code → flags.
+ *
+ * The read-only RPC get_repair_photos_by_stage does NOT return these columns,
+ * so the visibility rule (hide optional groups the technician didn't enable)
+ * has to source them from repair_stage. One batched query for all repairs.
+ */
+async function fetchStageFlagsByRepair(
+  repairIds: string[],
+): Promise<Map<string, Map<string, RepairStageFlags>>> {
+  const result = new Map<string, Map<string, RepairStageFlags>>();
+  const unique = [...new Set(repairIds.filter(Boolean))];
+  if (unique.length === 0) return result;
+
+  const { data, error } = await db
+    .from('repair_stage')
+    .select('repair_id, stage_code, optional, enabled, z1, z2')
+    .in('repair_id', unique);
+  if (error) throw new RepairServiceError(error.message, error.code);
+
+  for (const row of (data as unknown[]) ?? []) {
+    const r = row as Record<string, unknown>;
+    const repairId = r.repair_id as string;
+    const stageCode = (r.stage_code as string) ?? '';
+    if (!repairId || !stageCode) continue;
+    let byStage = result.get(repairId);
+    if (!byStage) {
+      byStage = new Map<string, RepairStageFlags>();
+      result.set(repairId, byStage);
+    }
+    byStage.set(stageCode, {
+      optional: r.optional === true,
+      // Optional groups default to DISABLED unless the technician enabled them;
+      // mandatory stages (optional=false) are always considered enabled below.
+      enabled: r.enabled == null ? true : r.enabled === true,
+      z1: numOrNull(r.z1),
+      z2: numOrNull(r.z2),
+    });
+  }
+  return result;
+}
+
 /**
  * Read repair_photo.metadata for a set of photo ids and return the set of ids
  * that are selected_for_report. The RPCs are read-only and don't expose photo
@@ -495,6 +546,7 @@ function mapStages(
   repairId: string,
   stageRows: RepairStageRow[],
   selectedIds: Set<string>,
+  stageFlags?: Map<string, RepairStageFlags>,
 ): RepairStageNode[] {
   const nodes = stageRows.map((stage) => {
     const stageId = stage.repair_stage_id ?? null;
@@ -502,10 +554,14 @@ function mapStages(
     const photos = parsePhotosArray(stage.photos)
       .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds))
       .sort((a, b) => a.captureOrder - b.captureOrder);
-    // Optional/enabled default to a MANDATORY, enabled stage when the RPC row
-    // doesn't carry the flag (older repairs / non-optional stages).
-    const optional = stage.optional === true;
-    const enabled = stage.enabled == null ? true : stage.enabled === true;
+    // Optional/enabled/z1/z2 come from repair_stage (the RPC does NOT return
+    // them). When a stage_code isn't present in repair_stage, default to a
+    // MANDATORY, enabled stage so nothing breaks (optional=false/enabled=true).
+    const flags = stageFlags?.get(stageCode);
+    const optional = flags?.optional === true;
+    const enabled = flags == null ? true : flags.enabled;
+    const z1 = flags ? flags.z1 : numOrNull(stage.z1);
+    const z2 = flags ? flags.z2 : numOrNull(stage.z2);
     return {
       stageId,
       stageCode,
@@ -515,8 +571,8 @@ function mapStages(
       status: (stage.stage_status as string) ?? null,
       optional,
       enabled,
-      z1: numOrNull(stage.z1),
-      z2: numOrNull(stage.z2),
+      z1,
+      z2,
       photos,
     };
   });
@@ -791,6 +847,11 @@ export const repairService = {
       }),
     );
 
+    // 7b. Optional-group flags (optional/enabled/z1/z2) read DIRECTLY from
+    //     repair_stage for all repairs — the RPC doesn't return these columns,
+    //     so the visibility rule (hide disabled optional groups) needs them here.
+    const stageFlagsByRepair = await fetchStageFlagsByRepair([...stagesByRepair.keys()]);
+
     // 8. Resolve selection state for every photo id across all repairs in one query.
     const allPhotoIds: string[] = [];
     for (const rows of stagesByRepair.values()) {
@@ -808,7 +869,12 @@ export const repairService = {
       const repairId = repairRow ? (repairRow.id as string) : null;
       const repairStatus = repairRow ? ((repairRow.status as string) ?? null) : null;
       const stages = repairId
-        ? mapStages(repairId, stagesByRepair.get(repairId) ?? [], selectedIds)
+        ? mapStages(
+            repairId,
+            stagesByRepair.get(repairId) ?? [],
+            selectedIds,
+            stageFlagsByRepair.get(repairId),
+          )
         : catalogStages();
 
       const defect: RepairDefect = {
@@ -986,15 +1052,22 @@ export const repairService = {
     let stagesWithPhotos = 0;
     const allPhotoIds: string[] = [];
     if (defectsCount > 0) {
-      const stageRowsByRepair = await Promise.all(
-        repairs.map((r) => fetchStagesForRepair(r.repair_id)),
-      );
-      for (const rows of stageRowsByRepair) {
+      const repairIds = repairs.map((r) => r.repair_id).filter(Boolean);
+      const [stageRowsByRepair, stageFlagsByRepair] = await Promise.all([
+        Promise.all(repairs.map((r) => fetchStagesForRepair(r.repair_id))),
+        // Optional/enabled flags come from repair_stage (the RPC omits them),
+        // so disabled optional groups don't inflate the progress numerator.
+        fetchStageFlagsByRepair(repairIds),
+      ]);
+      repairs.forEach((repair, i) => {
+        const rows = stageRowsByRepair[i] ?? [];
+        const flags = stageFlagsByRepair.get(repair.repair_id);
         for (const stage of rows) {
           // Skip disabled optional stages so they don't count toward progress
-          // (same visibility rule as the tree/report).
-          const optional = stage.optional === true;
-          const enabled = stage.enabled == null ? true : stage.enabled === true;
+          // (same visibility rule as the tree/report). Flags from repair_stage.
+          const f = flags?.get(stage.stage_code ?? '');
+          const optional = f?.optional === true;
+          const enabled = f == null ? true : f.enabled;
           if (optional && !enabled) continue;
           const photos = parsePhotosArray(stage.photos);
           if (photos.length > 0) stagesWithPhotos += 1;
@@ -1003,7 +1076,7 @@ export const repairService = {
             if (id) allPhotoIds.push(id);
           }
         }
-      }
+      });
     }
 
     const selectedIds = await fetchSelectedPhotoIds(allPhotoIds);

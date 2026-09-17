@@ -462,23 +462,46 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
   //     (z1 + z2) / 2 (doc §4). z1/z2 live ONLY on the analisis_falla row of
   //     repair_stage; they may be null when the technician hasn't entered them.
   const failureZByRepair: Record<string, { z1: number | null; z2: number | null }> = {};
+  // Optional groups the technician did NOT enable (optional=true AND
+  // enabled=false), keyed by repair_id → Set<stage_code>. Their photos must be
+  // excluded from the report. Sourced from repair_stage in the SAME query as Z.
+  const disabledStagesByRepair: Record<string, Set<string>> = {};
   const repairIdsForZ = [
     ...new Set(photos.map((p) => p.repairId).filter((id): id is string => Boolean(id))),
   ];
   if (repairIdsForZ.length > 0) {
+    // One query to repair_stage per scope: Z1/Z2 (analisis_falla) AND the
+    // optional/enabled flags for every stage, so we can drop disabled groups.
     const { data: stageRows } = await db
       .from('repair_stage')
-      .select('repair_id, z1, z2')
-      .eq('stage_code', 'analisis_falla')
+      .select('repair_id, stage_code, optional, enabled, z1, z2')
       .in('repair_id', repairIdsForZ);
     for (const sr of (stageRows as unknown[]) ?? []) {
       const r = sr as Record<string, unknown>;
       const repairId = r.repair_id as string;
-      if (repairId && !(repairId in failureZByRepair)) {
+      if (!repairId) continue;
+      const stageCode = (r.stage_code as string) ?? '';
+
+      if (stageCode === 'analisis_falla' && !(repairId in failureZByRepair)) {
         failureZByRepair[repairId] = { z1: numOrNull(r.z1), z2: numOrNull(r.z2) };
+      }
+
+      // Hide rule: optional group that the technician did NOT enable.
+      const optional = r.optional === true;
+      const enabled = r.enabled == null ? true : r.enabled === true;
+      if (optional && !enabled && stageCode) {
+        (disabledStagesByRepair[repairId] ??= new Set<string>()).add(stageCode);
       }
     }
   }
+
+  // Drop photos belonging to a disabled optional group (by repair_id + stage_code)
+  // so the report reflects only the work actually executed (doc §3).
+  photos = photos.filter((p) => {
+    if (!p.repairId) return true;
+    const disabled = disabledStagesByRepair[p.repairId];
+    return !disabled || !disabled.has(p.stageCode);
+  });
 
   // 6. Total man-hours (HH) — Σ(quote_item.labor_hours × coalesce(technicians,1))
   //    over the quote's items. null when there's no quote or no items.
