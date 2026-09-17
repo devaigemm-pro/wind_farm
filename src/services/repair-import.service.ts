@@ -8,6 +8,8 @@ const db = supabase as any;
 export interface RepairImportRow {
   /** Excel row number (1-based, header excluded) — for error reporting. */
   fila: number;
+  /** Wind farm name (wind_farm.name) — used with `turbina` to resolve the exact turbine. */
+  parque: string;
   turbina: string;
   /** External identifier from the Excel (e.g. "DAÑO 1"), stored in defect.defect_identifier. */
   defectIdentifier: string;
@@ -68,7 +70,7 @@ function mapDefectType(tipoEspanol: string): string {
  * Parse the first worksheet of an .xlsx File into RepairImportRow[].
  * Uses the dynamic-import ExcelJS pattern (same as ExportPanel.tsx).
  * Column order (row 1 = header):
- *   1 Turbina | 2 Identificador Defecto | 3 Pala(serial) | 4 Lado | 5 Tipo
+ *   1 Parque | 2 Turbina | 3 Identificador Defecto | 4 Pala(serial) | 5 Lado | 6 Tipo
  */
 export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const ExcelJS = (await import('exceljs')).default;
@@ -95,14 +97,15 @@ export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const rows: RepairImportRow[] = [];
   sheet.eachRow((row, n) => {
     if (n === 1) return; // header
-    const turbina = cellText(row.getCell(1).value);
-    const defectIdentifier = cellText(row.getCell(2).value);
-    const serialPala = cellText(row.getCell(3).value);
-    const lado = cellText(row.getCell(4).value);
-    const tipoEspanol = cellText(row.getCell(5).value);
+    const parque = cellText(row.getCell(1).value);
+    const turbina = cellText(row.getCell(2).value);
+    const defectIdentifier = cellText(row.getCell(3).value);
+    const serialPala = cellText(row.getCell(4).value);
+    const lado = cellText(row.getCell(5).value);
+    const tipoEspanol = cellText(row.getCell(6).value);
     // Skip fully empty rows.
-    if (!turbina && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
-    rows.push({ fila: n, turbina, defectIdentifier, serialPala, lado, tipoEspanol });
+    if (!parque && !turbina && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
+    rows.push({ fila: n, parque, turbina, defectIdentifier, serialPala, lado, tipoEspanol });
   });
   return rows;
 }
@@ -218,24 +221,36 @@ export const repairImportService = {
 
     for (const row of rows) {
       try {
+        const parque = row.parque.trim();
         const turbina = row.turbina.trim();
         const serialPala = row.serialPala.trim();
         const lado = row.lado.trim().toUpperCase();
 
+        if (!parque) throw new Error('Parque vacío');
         if (!turbina) throw new Error('Turbina vacía');
         if (!serialPala) throw new Error('Serial de pala vacío');
 
-        // 1. Turbine
+        // 1. Wind farm (by name) → resolves the exact turbine (park + turbine),
+        //    since turbine names can repeat across parks.
+        const { data: windFarm } = await db
+          .from('wind_farm')
+          .select('id')
+          .eq('name', parque)
+          .maybeSingle();
+        if (!windFarm) throw new Error(`Parque "${parque}" no encontrado`);
+        const windFarmId = windFarm.id as string;
+
+        // 2. Turbine (by name WITHIN the wind farm).
         const { data: turbine } = await db
           .from('turbine')
-          .select('id, wind_farm_id')
+          .select('id')
           .eq('name', turbina)
+          .eq('wind_farm_id', windFarmId)
           .maybeSingle();
-        if (!turbine) throw new Error('Turbina no encontrada');
+        if (!turbine) throw new Error(`Turbina "${turbina}" no encontrada en "${parque}"`);
         const turbineId = turbine.id as string;
-        const windFarmId = (turbine.wind_farm_id as string) ?? null;
 
-        // 2. Blade (by serial within the turbine)
+        // 3. Blade (by serial within the turbine)
         const { data: blade } = await db
           .from('blade')
           .select('id, position')
@@ -245,7 +260,7 @@ export const repairImportService = {
         if (!blade) throw new Error(`Pala ${serialPala} no encontrada en ${turbina}`);
         const bladeId = blade.id as string;
 
-        // 3. Inspection of that blade (latest) or create one.
+        // 4. Inspection of that blade (latest) or create one.
         let inspectionId: string;
         const { data: insp } = await db
           .from('inspection')
@@ -275,10 +290,10 @@ export const repairImportService = {
           inspectionId = newInsp.id as string;
         }
 
-        // 4. Defect type mapping
+        // 5. Defect type mapping
         const type = mapDefectType(row.tipoEspanol);
 
-        // 5. Defect. The Excel no longer carries the root distance ("Ubicacion mm"
+        // 6. Defect. The Excel no longer carries the root distance ("Ubicacion mm"
         //    was removed) — distance_from_root is computed later by the app from
         //    the technician's z1/z2 inputs, so it starts at 0. The external
         //    identifier ("DAÑO 1") is stored verbatim in defect_identifier.
@@ -301,7 +316,7 @@ export const repairImportService = {
         if (defectErr) throw new Error(defectErr.message);
         const defectId = defect.id as string;
 
-        // 6. Repair campaign (one per turbine per run)
+        // 7. Repair campaign (one per turbine per run)
         const campaign = await getOrCreateRepairCampaign(
           campaignCache,
           turbineId,
@@ -311,7 +326,7 @@ export const repairImportService = {
         );
         campaignTurbineName.set(campaign.campaignId, turbina);
 
-        // 7. Link defect into the repair tree:
+        // 8. Link defect into the repair tree:
         //    quote_item → work_order → repair
         const now = new Date().toISOString();
         const { data: quoteItem, error: qiErr } = await db
