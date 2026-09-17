@@ -998,7 +998,6 @@ function renderBlockTable(
   const serie = defect?.bladeSerial || '';
   const turbina = photo.turbineName || '';
   const marks = sideMarks(defect?.side || photo.bladeSide);
-  const largo = defect?.heightCm != null ? `${defect.heightCm}mm` : '';
   const ancho = defect?.widthCm != null ? `${defect.widthCm}mm` : '';
   const descripcion = photo.stageLabel || '';
 
@@ -1007,9 +1006,11 @@ function renderBlockTable(
   const z2 = failureZ?.z2 ?? null;
   const z1Str = z1 != null ? `${z1}mm` : '';
   const z2Str = z2 != null ? `${z2}mm` : '';
-  // Damage location = (z1 + z2) / 2 (doc §4). Only when both are present.
-  const damageLocation =
-    z1 != null && z2 != null ? `${(z1 + z2) / 2}mm` : '';
+  // Largo = (z1 + z2) / 2. Only when both Z values are present.
+  const largo = z1 != null && z2 != null ? `${(z1 + z2) / 2}mm` : '';
+  // Ubicación del daño = defect.distance_from_root (mm, from Excel).
+  const ubicacionDanio =
+    defect?.distanceFromRoot != null ? `${defect.distanceFromRoot}mm` : '';
 
   // autoTable cell type: [text, fill]. Labels use gray bg + bold black; values
   // use white bg. Fields with no BD data render as '' (empty), never invented.
@@ -1042,8 +1043,8 @@ function renderBlockTable(
       [V(marks.ladoAlta), V(marks.ladoBaja), V(marks.bAtaque), V(marks.bSalida)],
       // Row 3 — labels
       [L('Z1:'), L('Largo:'), L('Z2:'), L('Ubicación del daño:')],
-      // Row 3 — values (Z1/Z2 from analisis_falla; ubicación = (z1+z2)/2)
-      [V(z1Str), V(largo), V(z2Str), V(damageLocation)],
+      // Row 3 — values (Z1/Z2 from analisis_falla; largo = (z1+z2)/2; ubicación = distance_from_root)
+      [V(z1Str), V(largo), V(z2Str), V(ubicacionDanio)],
       // Row 4 — labels
       [L('Ancho:'), L('BA2:'), { content: 'Reparación:', colSpan: 2, styles: labelStyle }],
       // Row 4 — values (BA2 empty; Reparación default 'Externa' per client example)
@@ -1075,10 +1076,6 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
 
   if (bladePhotos.length === 0) return;
 
-  // #n index per defect within this blade.
-  const damageIndexByDefect = new Map<string, number>();
-  bladeDefects.forEach((d, idx) => damageIndexByDefect.set(d.id, idx + 1));
-
   // Separator page
   doc.addPage();
   doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
@@ -1090,7 +1087,6 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
   // Group photos by defect (in blade defect order), then render blocks.
   for (const defect of bladeDefects) {
     const photosForDefect = bladePhotos.filter((p) => p.defectId === defect.id);
-    const damageIndex = damageIndexByDefect.get(defect.id) ?? 1;
 
     for (const photo of photosForDefect) {
       doc.addPage();
@@ -1106,12 +1102,12 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      // Compose the defect name (type + number-identifier, doc §6) next to the
-      // per-blade damage index, e.g. "Pala A ~ Daño #1 · Grieta A27-XYZ".
+      // Compose the defect name (type + number-identifier, doc §6),
+      // e.g. "Pala A · Grieta A27-XYZ".
       const defectName = composeDefectName(defect.type, defect.defectNumber, defect.defectIdentifier);
       const headerLeft = defectName
-        ? `Pala ${label} ~ Daño #${damageIndex} · ${defectName}`
-        : `Pala ${label} ~ Daño #${damageIndex}`;
+        ? `Pala ${label} · ${defectName}`
+        : `Pala ${label}`;
       doc.text(headerLeft, MARGIN + 3, headerY + headerH / 2 + 1.5);
 
       // Right cell — orange bg, white bold.

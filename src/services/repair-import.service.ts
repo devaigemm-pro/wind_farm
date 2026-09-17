@@ -11,6 +11,8 @@ export interface RepairImportRow {
   /** Wind farm name (wind_farm.name) — used with `turbina` to resolve the exact turbine. */
   parque: string;
   turbina: string;
+  /** Raw "Ubicacion del daño" cell from the Excel (number as string, e.g. "43000"); parsed on insert. */
+  ubicacionDanio: string;
   /** External identifier from the Excel (e.g. "DAÑO 1"), stored in defect.defect_identifier. */
   defectIdentifier: string;
   serialPala: string;
@@ -64,13 +66,21 @@ function mapDefectType(tipoEspanol: string): string {
   return DEFECT_TYPE_ES_MAP[normalize(tipoEspanol)] ?? 'other';
 }
 
+/** Parse the "Ubicacion del daño" Excel cell to a number (mm). Null when empty/invalid. */
+function parseUbicacion(value: string): number | null {
+  const v = (value ?? '').toString().trim().replace(',', '.');
+  if (!v) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
 // ─── Row parsing from a File (first worksheet) ───────────────────────────────
 
 /**
  * Parse the first worksheet of an .xlsx File into RepairImportRow[].
  * Uses the dynamic-import ExcelJS pattern (same as ExportPanel.tsx).
  * Column order (row 1 = header):
- *   1 Parque | 2 Turbina | 3 Identificador Defecto | 4 Pala(serial) | 5 Lado | 6 Tipo
+ *   1 Parque | 2 Turbina | 3 Ubicacion del daño (mm) | 4 Identificador Defecto | 5 Pala(serial) | 6 Lado | 7 Tipo
  */
 export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const ExcelJS = (await import('exceljs')).default;
@@ -99,13 +109,14 @@ export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
     if (n === 1) return; // header
     const parque = cellText(row.getCell(1).value);
     const turbina = cellText(row.getCell(2).value);
-    const defectIdentifier = cellText(row.getCell(3).value);
-    const serialPala = cellText(row.getCell(4).value);
-    const lado = cellText(row.getCell(5).value);
-    const tipoEspanol = cellText(row.getCell(6).value);
+    const ubicacionDanio = cellText(row.getCell(3).value);
+    const defectIdentifier = cellText(row.getCell(4).value);
+    const serialPala = cellText(row.getCell(5).value);
+    const lado = cellText(row.getCell(6).value);
+    const tipoEspanol = cellText(row.getCell(7).value);
     // Skip fully empty rows.
-    if (!parque && !turbina && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
-    rows.push({ fila: n, parque, turbina, defectIdentifier, serialPala, lado, tipoEspanol });
+    if (!parque && !turbina && !ubicacionDanio && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
+    rows.push({ fila: n, parque, turbina, ubicacionDanio, defectIdentifier, serialPala, lado, tipoEspanol });
   });
   return rows;
 }
@@ -293,9 +304,8 @@ export const repairImportService = {
         // 5. Defect type mapping
         const type = mapDefectType(row.tipoEspanol);
 
-        // 6. Defect. The Excel no longer carries the root distance ("Ubicacion mm"
-        //    was removed) — distance_from_root is computed later by the app from
-        //    the technician's z1/z2 inputs, so it starts at 0. The external
+        // 6. Defect. distance_from_root now comes directly from the Excel
+        //    ("Ubicacion del daño" column, in mm) via parseUbicacion. The external
         //    identifier ("DAÑO 1") is stored verbatim in defect_identifier.
         const { data: defect, error: defectErr } = await db
           .from('defect')
@@ -303,7 +313,7 @@ export const repairImportService = {
             inspection_id: inspectionId,
             type,
             severity: 3,
-            distance_from_root: 0,
+            distance_from_root: parseUbicacion(row.ubicacionDanio),
             side: lado || null,
             description: null,
             defect_identifier: row.defectIdentifier || null,
