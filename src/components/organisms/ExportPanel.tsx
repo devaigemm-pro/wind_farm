@@ -2239,10 +2239,13 @@ export function ExportPanel({
       return;
     }
     // Otherwise download a PREVIOUSLY generated report persisted in Supabase.
+    // The `reports` bucket is PRIVATE → use a signed URL instead of a public one.
     if (previousReportPath) {
-      const { data } = supabase.storage.from('reports').getPublicUrl(previousReportPath);
-      if (data?.publicUrl) {
-        window.open(data.publicUrl, '_blank');
+      const { data } = await supabase.storage
+        .from('reports')
+        .createSignedUrl(previousReportPath, 3600);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
         return;
       }
     }
