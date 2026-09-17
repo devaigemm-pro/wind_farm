@@ -171,9 +171,13 @@ export function RepairWorkflow() {
     if (!campaignId || !repairId) return;
     setDownloadingDefectId(repairId);
     try {
+      // El await ahora incluye descarga + persistencia COMPLETA (sin timeout):
+      // el spinner gira mientras el PDF sube al storage (unos segundos) y solo
+      // se apaga en el finally cuando upload+insert terminaron de verdad. Así la
+      // fila queda con el storage_path REAL (repair/...), no 'pending/'.
       await generateAndDownloadRepairReport({ campaignId, defectId: repairId });
-      // The report is now persisted (in background) — reflect it in the UI so the
-      // button switches to "Download report" without needing a reload.
+      // La persistencia ya completó → reflejarlo en la UI para que el botón
+      // cambie a "Download report" sin necesidad de recargar.
       setRepairsWithReport((prev) => new Set(prev).add(repairId));
     } catch (err) {
       toast.error((err as Error)?.message || t('repair.pdfError'));
