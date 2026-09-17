@@ -1283,7 +1283,9 @@ export async function downloadPersistedRepairReport(repairId: string): Promise<b
  * Generate and download the repair report PDF (HG Windtec format).
  * Uses jsPDF + autoTable following reportPdf.service.ts patterns.
  */
-export async function generateAndDownloadRepairReport(data: RepairReportData): Promise<void> {
+export async function generateAndDownloadRepairReport(
+  data: RepairReportData,
+): Promise<{ blob: Blob; repairId: string | null; filename: string }> {
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session) {
     throw new Error('Sesión expirada. Por favor inicie sesión nuevamente.');
@@ -1379,24 +1381,14 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   a.click();
   URL.revokeObjectURL(url);
 
-  // Persist the report in the SAME `report` table used by inspections, with
-  // type='repair'. The reference_id is the repair_id (data.defectId), so the
-  // RepairWorkflow UI can later query which repairs already have a report and
-  // show a "Download report" button. Se hace AWAIT (no fire-and-forget) para que
-  // upload+insert completen; la persistencia sigue siendo best-effort porque su
-  // try/catch interno no propaga errores (la descarga ya ocurrió antes).
+  // NO persistimos aquí. Un IIFE/promise dentro de un service se trunca cuando
+  // esta función retorna (no está anclado a ningún componente React montado).
+  // Devolvemos el blob + repairId + filename para que el COMPONENTE montado
+  // (RepairWorkflow) dispare la persistencia en un IIFE background — exactamente
+  // como hace ExportPanel en inspección (el componente sigue montado mientras el
+  // usuario está en la pantalla, así el upload+insert completan aunque tarden).
   const repairId = data.defectId ?? null;
-  if (repairId) {
-    // AWAIT real (SIN timeout): el PDF de reparación es pesado (imágenes
-    // full-size) y el upload puede tardar 30-40s. Un timeout que gane la
-    // carrera hacía retornar esta función y dejaba persistRepairReport
-    // huérfana → el upload se abortaba a medio camino → la fila quedaba con
-    // storage_path 'pending/'. persistRepairReport tiene try/catch interno y
-    // nunca rechaza, así que este await SIEMPRE resuelve cuando upload+insert
-    // terminan (o fallan y se loguean). La descarga ya ocurrió arriba, por lo
-    // que el usuario ya tiene el PDF mientras la persistencia completa.
-    await persistRepairReport(blob, repairId, filename, session.user?.id ?? null);
-  }
+  return { blob, repairId, filename };
 }
 
 /**
@@ -1406,12 +1398,11 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
  * only the most recent one remains — mirroring the inspection flow.
  * Best-effort: any error is swallowed so the on-the-fly download is unaffected.
  */
-async function persistRepairReport(
+export async function persistRepairReport(
   blob: Blob,
   repairId: string,
   filename: string,
-  userId: string | null,
-): Promise<void> {
+): Promise<string | null> {
   try {
     // Remove previous repair report(s) for this repairId (storage + DB rows),
     // so only the most recent one remains.
@@ -1449,31 +1440,35 @@ async function persistRepairReport(
     }
 
     // The `report` INSERT policy enforces `with check (generated_by = auth.uid())`.
-    // If the passed-in userId isn't exactly auth.uid() (or is null), the INSERT is
-    // rejected by RLS. Resolve the uid straight from the session to guarantee the
-    // check passes; fall back to the received userId only if getUser() fails.
-    let generatedBy: string | null = userId;
+    // Resolve the uid straight from the session so the RLS check passes.
+    let generatedBy: string | null = null;
     try {
       const { data: authData } = await supabase.auth.getUser();
-      generatedBy = authData?.user?.id ?? userId;
+      generatedBy = authData?.user?.id ?? null;
     } catch (authErr) {
-      console.error('[repairReport] getUser failed, using fallback userId:', authErr);
+      console.error('[repairReport] getUser failed:', authErr);
     }
 
+    const persistedPath = finalStoragePath || `pending/${repairId}/${filename}`;
     const { error: insertError } = await db.from('report').insert({
       reference_id: repairId,
       type: 'repair',
       generated_by: generatedBy,
       generated_at: new Date().toISOString(),
       filename,
-      storage_path: finalStoragePath || `pending/${repairId}/${filename}`,
+      storage_path: persistedPath,
     });
     if (insertError) {
       console.error('[repairReport] persist insert failed:', insertError);
     }
+
+    // Return the REAL storage path when the upload succeeded, or null when it
+    // failed (so the caller can revert the optimistic "download" button).
+    return finalStoragePath;
   } catch (err) {
     // Best-effort: persistence must never break the on-the-fly download, but we
     // log the failure instead of swallowing it silently.
     console.error('[repairReport] persist unexpected error:', err);
+    return null;
   }
 }

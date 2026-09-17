@@ -14,6 +14,7 @@ import {
   generateAndDownloadRepairReport,
   getRepairsWithReport,
   downloadPersistedRepairReport,
+  persistRepairReport,
 } from '@/services/repairReportPdf.service';
 import type { RepairDefectNode, RepairPhoto, RepairStageNode } from '@/services/repair.service';
 
@@ -171,17 +172,38 @@ export function RepairWorkflow() {
     if (!campaignId || !repairId) return;
     setDownloadingDefectId(repairId);
     try {
-      // El await ahora incluye descarga + persistencia COMPLETA (sin timeout):
-      // el spinner gira mientras el PDF sube al storage (unos segundos) y solo
-      // se apaga en el finally cuando upload+insert terminaron de verdad. Así la
-      // fila queda con el storage_path REAL (repair/...), no 'pending/'.
-      await generateAndDownloadRepairReport({ campaignId, defectId: repairId });
-      // La persistencia ya completó → reflejarlo en la UI para que el botón
-      // cambie a "Download report" sin necesidad de recargar.
+      // 1. Generar + descargar el PDF (el service ya NO persiste, solo devuelve
+      //    el blob). Réplica exacta del patrón de inspección (ExportPanel).
+      const { blob, filename } = await generateAndDownloadRepairReport({
+        campaignId,
+        defectId: repairId,
+      });
+      // 2. Apagar el spinner DE INMEDIATO tras generar+descargar (igual que
+      //    inspección) — NO esperamos a la persistencia.
+      setDownloadingDefectId(null);
+      // 3. Optimista: mostrar el botón "Download report" ya.
       setRepairsWithReport((prev) => new Set(prev).add(repairId));
+      // 4. Persistencia en IIFE background SIN await, anclada a ESTE componente
+      //    montado (RepairWorkflow sigue montado mientras el usuario está en
+      //    /repairs/:campaignId, así el upload+insert completan aunque tarden).
+      (async () => {
+        try {
+          const storagePath = await persistRepairReport(blob, repairId, filename);
+          if (!storagePath || storagePath.startsWith('pending/')) {
+            // Si el upload falló, revertir el optimismo para no mostrar un botón
+            // de descarga que no descargaría nada real.
+            setRepairsWithReport((prev) => {
+              const n = new Set(prev);
+              n.delete(repairId);
+              return n;
+            });
+          }
+        } catch {
+          /* silent */
+        }
+      })();
     } catch (err) {
       toast.error((err as Error)?.message || t('repair.pdfError'));
-    } finally {
       setDownloadingDefectId(null);
     }
   };
@@ -193,13 +215,35 @@ export function RepairWorkflow() {
     setDownloadingDefectId(repairId);
     try {
       const opened = await downloadPersistedRepairReport(repairId);
-      if (!opened) {
-        await generateAndDownloadRepairReport({ campaignId, defectId: repairId });
-        setRepairsWithReport((prev) => new Set(prev).add(repairId));
+      if (opened) {
+        setDownloadingDefectId(null);
+        return;
       }
+      // Fallback: no había archivo persistido → regenerar (mismo patrón que
+      // handleGenerateDefectPdf: generar + descargar, spinner off, persistir en
+      // IIFE background sin await).
+      const { blob, filename } = await generateAndDownloadRepairReport({
+        campaignId,
+        defectId: repairId,
+      });
+      setDownloadingDefectId(null);
+      setRepairsWithReport((prev) => new Set(prev).add(repairId));
+      (async () => {
+        try {
+          const storagePath = await persistRepairReport(blob, repairId, filename);
+          if (!storagePath || storagePath.startsWith('pending/')) {
+            setRepairsWithReport((prev) => {
+              const n = new Set(prev);
+              n.delete(repairId);
+              return n;
+            });
+          }
+        } catch {
+          /* silent */
+        }
+      })();
     } catch (err) {
       toast.error((err as Error)?.message || t('repair.pdfError'));
-    } finally {
       setDownloadingDefectId(null);
     }
   };
