@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronRight, Download, Loader2, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
@@ -10,7 +10,11 @@ import {
   useSetPhotoSelected,
   useDeleteRepairDefect,
 } from '@/hooks/useRepair';
-import { generateAndDownloadRepairReport } from '@/services/repairReportPdf.service';
+import {
+  generateAndDownloadRepairReport,
+  getRepairsWithReport,
+  downloadPersistedRepairReport,
+} from '@/services/repairReportPdf.service';
 import type { RepairDefectNode, RepairPhoto, RepairStageNode } from '@/services/repair.service';
 
 const C = {
@@ -114,6 +118,26 @@ export function RepairWorkflow() {
   // the specific defect card whose report is being generated.
   const [downloadingDefectId, setDownloadingDefectId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
+  // repair_ids that already have a persisted report (type='repair') in the DB.
+  // Drives whether each defect shows "Download report" vs "Generate report".
+  const [repairsWithReport, setRepairsWithReport] = useState<Set<string>>(new Set());
+
+  // Whenever the tree loads/changes, refresh which repairs already have a report.
+  useEffect(() => {
+    if (!tree || tree.length === 0) {
+      setRepairsWithReport(new Set());
+      return;
+    }
+    let cancelled = false;
+    const repairIds = tree
+      .map((n) => n.repairId)
+      .filter((id): id is string => Boolean(id));
+    (async () => {
+      const withReport = await getRepairsWithReport(repairIds);
+      if (!cancelled) setRepairsWithReport(withReport);
+    })();
+    return () => { cancelled = true; };
+  }, [tree]);
 
   const handleSelect = (photo: RepairPhoto, selected: boolean) => {
     // client is read-only for selection.
@@ -129,11 +153,32 @@ export function RepairWorkflow() {
   // Generate a PDF report scoped to a SINGLE repair. The PDF service scopes by
   // repair_id (RepairReportData.defectId carries the repair_id), so we pass the
   // node's repairId — not the (now real) defect_id.
-  const handleDownloadDefectPdf = async (repairId: string) => {
+  const handleGenerateDefectPdf = async (repairId: string) => {
     if (!campaignId || !repairId) return;
     setDownloadingDefectId(repairId);
     try {
       await generateAndDownloadRepairReport({ campaignId, defectId: repairId });
+      // The report is now persisted (in background) — reflect it in the UI so the
+      // button switches to "Download report" without needing a reload.
+      setRepairsWithReport((prev) => new Set(prev).add(repairId));
+    } catch (err) {
+      toast.error((err as Error)?.message || t('repair.pdfError'));
+    } finally {
+      setDownloadingDefectId(null);
+    }
+  };
+
+  // Download a PREVIOUSLY generated report from storage, without regenerating.
+  // Falls back to regenerating if the persisted file could not be resolved.
+  const handleDownloadDefectPdf = async (repairId: string) => {
+    if (!campaignId || !repairId) return;
+    setDownloadingDefectId(repairId);
+    try {
+      const opened = await downloadPersistedRepairReport(repairId);
+      if (!opened) {
+        await generateAndDownloadRepairReport({ campaignId, defectId: repairId });
+        setRepairsWithReport((prev) => new Set(prev).add(repairId));
+      }
     } catch (err) {
       toast.error((err as Error)?.message || t('repair.pdfError'));
     } finally {
@@ -204,7 +249,11 @@ export function RepairWorkflow() {
                   readOnly={isClient}
                   onSelect={handleSelect}
                   onPreview={handlePreview}
+                  onGenerateReport={handleGenerateDefectPdf}
                   onDownloadReport={handleDownloadDefectPdf}
+                  hasReport={
+                    node.repairId != null && repairsWithReport.has(node.repairId)
+                  }
                   onDelete={isClient ? undefined : handleDeleteDefect}
                   downloading={
                     node.repairId != null && downloadingDefectId === node.repairId
@@ -251,7 +300,10 @@ interface DefectSectionProps {
   readOnly: boolean;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
+  onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
+  /** True when this repair already has a persisted report → show "Download". */
+  hasReport: boolean;
   onDelete?: (node: RepairDefectNode) => void;
   downloading: boolean;
 }
@@ -263,7 +315,9 @@ function DefectSection({
   readOnly,
   onSelect,
   onPreview,
+  onGenerateReport,
   onDownloadReport,
+  hasReport,
   onDelete,
   downloading,
 }: DefectSectionProps) {
@@ -308,8 +362,14 @@ function DefectSection({
           // A defect with no repair yet has no report → disable the PDF button.
           const hasRepair = node.repairId != null;
           const disabled = downloading || !hasRepair;
-          const triggerDownload = () => {
-            if (!disabled && node.repairId) onDownloadReport(node.repairId);
+          // When a report was already generated for this repair, the button
+          // becomes a "Download report" action (fetches the persisted PDF);
+          // otherwise it keeps the current "Generate report" behavior.
+          const label = hasReport ? t('repair.downloadReport') : t('repair.generateReport');
+          const trigger = () => {
+            if (disabled || !node.repairId) return;
+            if (hasReport) onDownloadReport(node.repairId);
+            else onGenerateReport(node.repairId);
           };
           return (
             <span
@@ -323,22 +383,22 @@ function DefectSection({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                triggerDownload();
+                trigger();
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.stopPropagation();
-                  triggerDownload();
+                  trigger();
                 }
               }}
-              title={hasRepair ? t('repair.generateReport') : t('repair.notStarted')}
+              title={hasRepair ? label : t('repair.notStarted')}
             >
               {downloading ? (
                 <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
               ) : (
                 <Download size={14} />
               )}
-              {t('repair.generateReport')}
+              {label}
             </span>
           );
         })()}

@@ -9,7 +9,7 @@ export const translations: TranslationMap = {
   'sidebar.inspections': { en: 'Inspections', es: 'Inspecciones' },
   'sidebar.reports': { en: 'Reports', es: 'Reportes' },
   'sidebar.windFarms': { en: 'Wind Farms', es: 'Parques Eólicos' },
-  'sidebar.assets': { en: 'Assets', es: 'Activos' },
+  'sidebar.assets': { en: 'Parks', es: 'Parques' },
   'sidebar.campaigns': { en: 'Campaigns', es: 'Campañas' },
   'sidebar.profile': { en: 'Profile', es: 'Perfil' },
   'sidebar.logout': { en: 'Logout', es: 'Cerrar Sesión' },

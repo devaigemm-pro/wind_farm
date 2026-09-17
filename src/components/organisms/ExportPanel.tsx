@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, type CSSProperties } from 'react';
 import { FileDown, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { savePdfBlob } from '@/utils/pdfStorage';
+import { savePdfBlob, getPdfBlob } from '@/utils/pdfStorage';
 import { fullName } from '@/utils/fullName';
 import type { ResultsDefect } from '@/types';
 
@@ -818,6 +818,10 @@ export function ExportPanel({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
+  // Storage path of a PREVIOUSLY generated report (persisted in the `report`
+  // table). When present, the "Download PDF" button is shown from mount — even
+  // across sessions/users — without needing to regenerate.
+  const [previousReportPath, setPreviousReportPath] = useState<string | null>(null);
 
   // Cleanup blob URL on unmount to prevent memory leaks
   useEffect(() => {
@@ -825,6 +829,34 @@ export function ExportPanel({
       if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     };
   }, [pdfBlobUrl]);
+
+  // On mount, check whether a report already exists for this inspection in the
+  // `report` table (Supabase). If so, expose the "Download PDF" button using the
+  // most recent record's storage_path (ignoring 'pending/' uploads that failed).
+  useEffect(() => {
+    if (!inspectionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await (supabase as any)
+          .from('report')
+          .select('storage_path, generated_at')
+          .eq('reference_id', inspectionId)
+          .eq('type', 'inspection')
+          .order('generated_at', { ascending: false });
+        if (cancelled || !data) return;
+        const latest = (data as { storage_path: string | null; generated_at: string | null }[])
+          .find((r) => !!r.storage_path && !r.storage_path.startsWith('pending/'));
+        if (latest?.storage_path) {
+          setPreviousReportPath(latest.storage_path);
+          if (latest.generated_at) {
+            setLastGeneratedAt(new Date(latest.generated_at).toLocaleString());
+          }
+        }
+      } catch { /* ignore — button simply won't appear */ }
+    })();
+    return () => { cancelled = true; };
+  }, [inspectionId]);
 
   // Sections collapsed state
   const [resolvedOpen, setResolvedOpen] = useState(true);
@@ -2174,7 +2206,12 @@ export function ExportPanel({
             const { error: uploadError } = await supabase.storage
               .from('reports')
               .upload(storagePath, blob, { contentType: 'application/pdf', upsert: false });
-            if (!uploadError) finalStoragePath = storagePath;
+            if (!uploadError) {
+              finalStoragePath = storagePath;
+              // Reflect the freshly persisted report so the download button
+              // survives beyond the current blob (e.g. after a reload).
+              setPreviousReportPath(storagePath);
+            }
 
             await (supabase as any).from('report').insert({
               reference_id: inspectionId,
@@ -2193,12 +2230,27 @@ export function ExportPanel({
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    // Prefer the freshly generated blob from the current session.
     if (pdfBlobUrl) {
       // Open PDF in a new browser tab so clicks on links inside (e.g. Google Maps)
       // navigate that tab — not the main app tab
       window.open(pdfBlobUrl, '_blank');
+      return;
     }
+    // Otherwise download a PREVIOUSLY generated report persisted in Supabase.
+    if (previousReportPath) {
+      const { data } = supabase.storage.from('reports').getPublicUrl(previousReportPath);
+      if (data?.publicUrl) {
+        window.open(data.publicUrl, '_blank');
+        return;
+      }
+    }
+    // Last-resort fallback: a blob cached in IndexedDB for this inspection.
+    try {
+      const blob = await getPdfBlob(inspectionId);
+      if (blob) window.open(URL.createObjectURL(blob), '_blank');
+    } catch { /* ignore */ }
   };
 
   const handleDownloadCSV = async () => {
@@ -2372,7 +2424,7 @@ export function ExportPanel({
             )}
           </button>
 
-          {pdfBlobUrl && (
+          {(pdfBlobUrl || previousReportPath) && (
             <button style={downloadPdfBtnStyle} onClick={handleDownloadPDF}>
               <Download size={14} />
               PDF

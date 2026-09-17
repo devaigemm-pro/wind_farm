@@ -1215,6 +1215,65 @@ function addFooters(doc: jsPDF, windFarmName: string) {
   }
 }
 
+// ─── Persisted-report helpers ─────────────────────────────────────────────────
+
+/**
+ * Given a list of repair_ids, returns the set of ids that ALREADY have a
+ * persisted report (type='repair') in the `report` table — used by the UI to
+ * decide whether to show "Generate report" vs "Download report".
+ * A row only counts when its storage_path is a real upload (not 'pending/').
+ */
+export async function getRepairsWithReport(repairIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(repairIds.filter(Boolean))];
+  if (ids.length === 0) return new Set();
+  try {
+    const { data } = await db
+      .from('report')
+      .select('reference_id, storage_path')
+      .eq('type', 'repair')
+      .in('reference_id', ids);
+    const withReport = new Set<string>();
+    for (const row of (data as { reference_id: string; storage_path: string | null }[]) ?? []) {
+      if (row.storage_path && !row.storage_path.startsWith('pending/')) {
+        withReport.add(row.reference_id);
+      }
+    }
+    return withReport;
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Opens the PREVIOUSLY persisted repair report for a repair_id in a new tab,
+ * without regenerating it. Resolves the most recent record's storage_path from
+ * the `report` table and opens its public URL. Returns true when it opened a
+ * report, false when none was available (so the caller can fall back).
+ */
+export async function downloadPersistedRepairReport(repairId: string): Promise<boolean> {
+  if (!repairId) return false;
+  try {
+    const { data } = await db
+      .from('report')
+      .select('storage_path, generated_at')
+      .eq('reference_id', repairId)
+      .eq('type', 'repair')
+      .order('generated_at', { ascending: false });
+    const latest = ((data as { storage_path: string | null }[]) ?? []).find(
+      (r) => !!r.storage_path && !r.storage_path.startsWith('pending/'),
+    );
+    if (!latest?.storage_path) return false;
+    const { data: urlData } = supabase.storage.from('reports').getPublicUrl(latest.storage_path);
+    if (urlData?.publicUrl) {
+      window.open(urlData.publicUrl, '_blank');
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
 /**
@@ -1302,5 +1361,75 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
 
   const dateStr = formatDateES(ctx.createdAt).replace(/\//g, '-');
   const filename = `Informe_Reparacion_${ctx.turbineName}_${dateStr}.pdf`.replace(/\s+/g, '_');
+
+  // Download immediately (unchanged behavior).
   doc.save(filename);
+
+  // Persist the report in the SAME `report` table used by inspections, with
+  // type='repair'. The reference_id is the repair_id (data.defectId), so the
+  // RepairWorkflow UI can later query which repairs already have a report and
+  // show a "Download report" button. All of this runs in the background and is
+  // wrapped in try/catch so a persistence failure never breaks the download.
+  const repairId = data.defectId ?? null;
+  if (repairId) {
+    void persistRepairReport(doc, repairId, filename, session.user?.id ?? null);
+  }
+}
+
+/**
+ * Upload the generated repair PDF to the `reports` storage bucket and upsert a
+ * row in the `report` table (type='repair', reference_id=repairId). Before
+ * inserting, it removes any previous repair report for the same repairId so
+ * only the most recent one remains — mirroring the inspection flow.
+ * Best-effort: any error is swallowed so the on-the-fly download is unaffected.
+ */
+async function persistRepairReport(
+  doc: jsPDF,
+  repairId: string,
+  filename: string,
+  userId: string | null,
+): Promise<void> {
+  try {
+    const blob = doc.output('blob') as Blob;
+
+    // Remove previous repair report(s) for this repairId (storage + DB rows),
+    // so only the most recent one remains.
+    try {
+      const { data: prevReports } = await db
+        .from('report')
+        .select('storage_path')
+        .eq('reference_id', repairId)
+        .eq('type', 'repair');
+
+      const pathsToRemove = ((prevReports as { storage_path: string | null }[]) || [])
+        .map((r) => r.storage_path)
+        .filter((p): p is string => !!p && !p.startsWith('pending/'));
+
+      if (pathsToRemove.length > 0) {
+        await supabase.storage.from('reports').remove(pathsToRemove);
+      }
+
+      await db.from('report').delete().eq('reference_id', repairId).eq('type', 'repair');
+    } catch {
+      /* ignore cleanup errors */
+    }
+
+    const storagePath = `repair/${repairId}/${filename}`;
+    let finalStoragePath: string | null = null;
+    const { error: uploadError } = await supabase.storage
+      .from('reports')
+      .upload(storagePath, blob, { contentType: 'application/pdf', upsert: false });
+    if (!uploadError) finalStoragePath = storagePath;
+
+    await db.from('report').insert({
+      reference_id: repairId,
+      type: 'repair',
+      generated_by: userId,
+      generated_at: new Date().toISOString(),
+      filename,
+      storage_path: finalStoragePath || `pending/${repairId}/${filename}`,
+    });
+  } catch {
+    /* silent — persistence must never break the download */
+  }
 }
