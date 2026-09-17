@@ -52,9 +52,40 @@ export function useSetPhotoSelected(campaignId: string | undefined) {
   return useMutation({
     mutationFn: ({ photoId, selected }: { photoId: string; selected: boolean }) =>
       repairService.setPhotoSelected(photoId, selected),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+    // Optimistically flip the photo between columns so it moves instantly,
+    // without waiting for the heavy getRepairTree pipeline to refetch.
+    onMutate: async ({ photoId, selected }) => {
+      const treeKey = ['repair-tree', campaignId];
+      await queryClient.cancelQueries({ queryKey: treeKey });
+      const prev = queryClient.getQueryData<RepairTree>(treeKey);
+      if (prev) {
+        const next: RepairTree = prev.map((node) => ({
+          ...node,
+          stages: node.stages.map((stage) => ({
+            ...stage,
+            photos: stage.photos.map((photo) =>
+              photo.id === photoId ? { ...photo, repairSelected: selected } : photo,
+            ),
+          })),
+        }));
+        queryClient.setQueryData(treeKey, next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['repair-tree', campaignId], context.prev);
+      }
+    },
+    onSettled: () => {
+      // The DB write already happened and the optimistic update left the photo
+      // in the correct column. Refresh the summary (selected counter), but only
+      // mark the tree stale (no immediate refetch) to avoid a reorder/flicker.
       queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+      queryClient.invalidateQueries({
+        queryKey: ['repair-tree', campaignId],
+        refetchType: 'none',
+      });
     },
   });
 }
