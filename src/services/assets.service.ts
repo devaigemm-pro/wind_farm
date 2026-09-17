@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
 import type { WindFarm, Turbine, Blade, WindFarmDashboardRow } from '@/types';
 
 // ─── Custom Error ───────────────────────────────────────────────────────────
@@ -60,38 +62,25 @@ export const assetsService = {
     latitude?: number;
     longitude?: number;
   }): Promise<WindFarm> {
-    const { data, error } = await supabase
-      .from('wind_farm')
-      .insert({
-        name: input.name,
-        location: input.location,
-        country: input.country ?? null,
-        client: input.client ?? null,
-        latitude: input.latitude ?? null,
-        longitude: input.longitude ?? null,
-      })
-      .select()
-      .single();
+    // Atomic create via SECURITY DEFINER RPC: inserts the wind_farm row AND the
+    // creator's wind_farm_user assignment in a single transaction, then returns
+    // the created row. This avoids the insert→select→assign RLS race that made a
+    // plain .insert().select().single() fail with 403 (the SELECT policy needs
+    // an assignment that didn't exist yet). See migration create_wind_farm().
+    const { data, error } = await db.rpc('create_wind_farm', {
+      p_name: input.name,
+      p_location: input.location,
+      p_country: input.country ?? null,
+      p_client: input.client ?? null,
+      p_latitude: input.latitude ?? null,
+      p_longitude: input.longitude ?? null,
+    });
     if (error) handleMutationError(error);
 
-    const windFarm = data as WindFarm;
-
-    // Auto-assign the new farm to the current admin so it appears immediately
-    // (the wind_farm SELECT RLS policy requires an explicit assignment).
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-    if (userId) {
-      const { error: assignError } = await supabase
-        .from('wind_farm_user')
-        .insert({ wind_farm_id: windFarm.id, user_id: userId });
-      // A missing assignment shouldn't fail the whole creation; ignore
-      // duplicate-key errors (already assigned) but surface anything unexpected.
-      if (assignError && assignError.code !== '23505') {
-        throw assignError;
-      }
-    }
-
-    return windFarm;
+    // The RPC returns the wind_farm row (setof exposes an array; a scalar row
+    // comes back as the object directly). Normalize to a single WindFarm.
+    const row = Array.isArray(data) ? data[0] : data;
+    return row as WindFarm;
   },
 
   async updateWindFarm(
