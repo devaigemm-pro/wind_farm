@@ -1387,12 +1387,15 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   // try/catch interno no propaga errores (la descarga ya ocurrió antes).
   const repairId = data.defectId ?? null;
   if (repairId) {
-    // Persist without letting a hung network call freeze the caller's
-    // spinner. Best-effort with a hard timeout.
-    await Promise.race([
-      persistRepairReport(blob, repairId, filename, session.user?.id ?? null),
-      new Promise<void>((resolve) => setTimeout(resolve, 15000)),
-    ]);
+    // AWAIT real (SIN timeout): el PDF de reparación es pesado (imágenes
+    // full-size) y el upload puede tardar 30-40s. Un timeout que gane la
+    // carrera hacía retornar esta función y dejaba persistRepairReport
+    // huérfana → el upload se abortaba a medio camino → la fila quedaba con
+    // storage_path 'pending/'. persistRepairReport tiene try/catch interno y
+    // nunca rechaza, así que este await SIEMPRE resuelve cuando upload+insert
+    // terminan (o fallan y se loguean). La descarga ya ocurrió arriba, por lo
+    // que el usuario ya tiene el PDF mientras la persistencia completa.
+    await persistRepairReport(blob, repairId, filename, session.user?.id ?? null);
   }
 }
 
