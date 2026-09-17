@@ -61,6 +61,9 @@ export interface RepairDefect {
   /** Per-blade sequential correlative (e.g. "A1", "A2", "B1"), matching the
    *  numbering shown in the Analyze step. Resolved via defect→inspection→blade. */
   defectNumber: string | null;
+  /** Optional per-defect identifier loaded from the defects spreadsheet
+   *  (defect.defect_identifier). Null until populated. */
+  defectIdentifier: string | null;
   /** Turbine name from the RPC (used as the blade/turbine label when no blade is known). */
   turbineName: string | null;
 }
@@ -96,6 +99,16 @@ export interface RepairStageNode {
   note: string | null;
   /** stage_status from the RPC, null when no repair yet. */
   status: string | null;
+  /** True when the stage belongs to an optional group (Interior lamination /
+   *  Core installation). From the RPC; defaults to false when absent. */
+  optional: boolean;
+  /** Whether the optional group was activated by the technician. From the RPC;
+   *  defaults to true when absent (mandatory stages are always enabled). */
+  enabled: boolean;
+  /** Z1 coordinate (only present on the `analisis_falla` stage). null otherwise. */
+  z1: number | null;
+  /** Z2 coordinate (only present on the `analisis_falla` stage). null otherwise. */
+  z2: number | null;
   photos: RepairPhoto[];
 }
 
@@ -154,9 +167,22 @@ interface RepairStageRow {
   stage_status?: string | null;
   photo_count?: number | null;
   photos?: unknown;
+  /** Optional-group flags returned by get_repair_photos_by_stage. */
+  optional?: boolean | null;
+  enabled?: boolean | null;
+  /** Z1/Z2 coordinates (only on the `analisis_falla` stage). */
+  z1?: number | null;
+  z2?: number | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Safe number parse → null when absent/blank/NaN. */
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
 
 /** Resolve a public URL for a storage path in the public inspection-photos bucket. */
 function publicUrl(storagePath: string | null): string {
@@ -476,6 +502,10 @@ function mapStages(
     const photos = parsePhotosArray(stage.photos)
       .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds))
       .sort((a, b) => a.captureOrder - b.captureOrder);
+    // Optional/enabled default to a MANDATORY, enabled stage when the RPC row
+    // doesn't carry the flag (older repairs / non-optional stages).
+    const optional = stage.optional === true;
+    const enabled = stage.enabled == null ? true : stage.enabled === true;
     return {
       stageId,
       stageCode,
@@ -483,22 +513,38 @@ function mapStages(
       sortOrder: Number(stage.stage_order) || 0,
       note: (stage.stage_note as string) ?? null,
       status: (stage.stage_status as string) ?? null,
+      optional,
+      enabled,
+      z1: numOrNull(stage.z1),
+      z2: numOrNull(stage.z2),
       photos,
     };
   });
-  nodes.sort((a, b) => a.sortOrder - b.sortOrder);
-  return nodes;
+  // Visibility rule (report / work actually executed, doc §3): keep a stage only
+  // when it's mandatory OR its optional group was enabled by the technician.
+  // Disabled optional groups (header + sub-stages) are dropped entirely.
+  const visible = nodes.filter((n) => !n.optional || n.enabled);
+  visible.sort((a, b) => a.sortOrder - b.sortOrder);
+  return visible;
 }
 
-/** Build the 11 empty catalog stages for a repair with no stage data yet. */
+/**
+ * Build the empty catalog stages for a repair with no stage data yet. Only the
+ * mandatory stages are shown (optional groups are hidden until the technician
+ * activates them), matching the report/work-executed visibility rule.
+ */
 function catalogStages(): RepairStageNode[] {
-  return REPAIR_STAGE_CATALOG.map((c) => ({
+  return REPAIR_STAGE_CATALOG.filter((c) => !c.optional).map((c) => ({
     stageId: null,
     stageCode: c.code,
     stageLabel: c.labelEs,
     sortOrder: c.sortOrder,
     note: null,
     status: null,
+    optional: c.optional,
+    enabled: !c.optional,
+    z1: null,
+    z2: null,
     photos: [],
   }));
 }
@@ -519,6 +565,7 @@ function mapDefect(row: RepairForQuoteRow, bladeInfo?: RepairBladeInfo): RepairD
     bladePosition: bladeInfo?.bladePosition ?? 0,
     bladeSerial: bladeInfo?.bladeSerial ?? null,
     defectNumber: bladeInfo?.defectNumber ?? null,
+    defectIdentifier: null,
     turbineName: (row.turbine_name as string) ?? null,
   };
 }
@@ -634,7 +681,7 @@ export const repairService = {
       const { data: defectRows, error: defErr } = await db
         .from('defect')
         .select(
-          'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at, defect_number',
+          'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at, defect_number, defect_identifier',
         )
         .in('id', defectIds);
       if (defErr) throw new RepairServiceError(defErr.message, defErr.code);
@@ -776,6 +823,7 @@ export const repairService = {
         bladePosition: numbering.bladePosition,
         bladeSerial: wo.defectId ? (bladeInfoByDefect.get(wo.defectId)?.bladeSerial ?? null) : null,
         defectNumber: numbering.defectNumber,
+        defectIdentifier: (defectRow?.defect_identifier as string) ?? null,
         turbineName: wo.turbineId ? (turbineNameById.get(wo.turbineId) ?? null) : null,
       };
 
@@ -921,7 +969,11 @@ export const repairService = {
 
     // Photos + completion are still derived from the existing repairs.
     const repairs = await fetchRepairsForQuote(quoteId);
-    const totalStages = (defectsCount > 0 ? defectsCount : 1) * REPAIR_STAGE_CATALOG.length;
+    // Only the MANDATORY stages count toward progress: optional groups
+    // (Interior lamination / Core installation) only exist when the technician
+    // enables them, so they must not inflate the denominator.
+    const mandatoryStageCount = REPAIR_STAGE_CATALOG.filter((c) => !c.optional).length;
+    const totalStages = (defectsCount > 0 ? defectsCount : 1) * mandatoryStageCount;
 
     let photosCount = 0;
     let hasCompletedRepair = false;
@@ -939,6 +991,11 @@ export const repairService = {
       );
       for (const rows of stageRowsByRepair) {
         for (const stage of rows) {
+          // Skip disabled optional stages so they don't count toward progress
+          // (same visibility rule as the tree/report).
+          const optional = stage.optional === true;
+          const enabled = stage.enabled == null ? true : stage.enabled === true;
+          if (optional && !enabled) continue;
           const photos = parsePhotosArray(stage.photos);
           if (photos.length > 0) stagesWithPhotos += 1;
           for (const p of photos) {

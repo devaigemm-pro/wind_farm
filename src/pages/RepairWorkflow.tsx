@@ -38,6 +38,25 @@ function formatDefectType(type: string, locale: 'es' | 'en'): string {
   return type.replace(/_/g, ' ');
 }
 
+/**
+ * Compose the defect display name exactly like the technician app (doc §6):
+ *   type + " " + defect_number + "-" + defect_identifier
+ * The type is separated by a space; number and identifier are joined with a
+ * dash; empty parts are omitted (e.g. "Grieta A27-XYZ" or "Grieta A27").
+ */
+function composeDefectName(
+  type: string,
+  defectNumber: string | null,
+  defectIdentifier: string | null,
+  locale: 'es' | 'en',
+): string {
+  const typeLabel = formatDefectType(type, locale);
+  const num = defectNumber?.trim() || '';
+  const ident = defectIdentifier?.trim() || '';
+  const numberPart = [num, ident].filter(Boolean).join('-');
+  return [typeLabel, numberPart].filter(Boolean).join(' ');
+}
+
 interface BladeGroup {
   position: number;
   label: string;
@@ -274,7 +293,7 @@ function DefectSection({
         <span style={defectIndex}>{defectNumber}</span>
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={defectTitle}>
-            {defectNumber} · {formatDefectType(defect.type, locale)}
+            {composeDefectName(defect.type, defect.defectNumber, defect.defectIdentifier, locale)}
           </div>
           <div style={defectMeta}>
             {t('repair.category')} {defect.severity || '—'}
