@@ -412,7 +412,7 @@ function DefectSection({
                   tabIndex={disabled ? -1 : 0}
                   aria-disabled={disabled}
                   style={{
-                    ...defectPdfBtn,
+                    ...defectPdfIconBtn,
                     opacity: disabled ? 0.5 : 1,
                     cursor: disabled ? 'not-allowed' : 'pointer',
                   }}
@@ -427,13 +427,13 @@ function DefectSection({
                     }
                   }}
                   title={downloadLabel}
+                  aria-label={downloadLabel}
                 >
                   {downloading ? (
                     <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
                   ) : (
                     <Download size={14} />
                   )}
-                  {downloadLabel}
                 </span>
               )}
             </>
@@ -724,6 +724,11 @@ const defectPdfBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
   borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
   flexShrink: 0, userSelect: 'none',
+};
+// Compact icon-only variant of defectPdfBtn: square, no text, brand green (#5A8F5A).
+const defectPdfIconBtn: React.CSSProperties = {
+  ...defectPdfBtn, gap: 0, padding: 7, width: 32, height: 32, justifyContent: 'center',
+  background: '#5A8F5A',
 };
 const defectDeleteBtn: React.CSSProperties = {
   ...defectPdfBtn, background: '#EF4444',
