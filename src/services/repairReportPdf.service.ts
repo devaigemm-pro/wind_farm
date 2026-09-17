@@ -1005,11 +1005,11 @@ function renderBlockTable(
   // Z1/Z2 come from the analisis_falla stage (BD). Empty when not entered.
   const z1 = failureZ?.z1 ?? null;
   const z2 = failureZ?.z2 ?? null;
-  const z1Str = z1 != null ? `${z1}` : '';
-  const z2Str = z2 != null ? `${z2}` : '';
+  const z1Str = z1 != null ? `${z1}mm` : '';
+  const z2Str = z2 != null ? `${z2}mm` : '';
   // Damage location = (z1 + z2) / 2 (doc §4). Only when both are present.
   const damageLocation =
-    z1 != null && z2 != null ? `${(z1 + z2) / 2}` : '';
+    z1 != null && z2 != null ? `${(z1 + z2) / 2}mm` : '';
 
   // autoTable cell type: [text, fill]. Labels use gray bg + bold black; values
   // use white bg. Fields with no BD data render as '' (empty), never invented.
