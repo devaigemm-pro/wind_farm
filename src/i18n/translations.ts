@@ -1033,6 +1033,7 @@ export const translations: TranslationMap = {
 
   // ─── Assets maintainer ────────────────────────────────────────────────────────
   'assetsAdmin.title': { en: 'Assets Administration', es: 'Administración de Assets' },
+  'assetsAdmin.noCountry': { en: 'No country', es: 'Sin país' },
   'assetsAdmin.newFarm': { en: 'New wind farm', es: 'Nuevo parque' },
   'assetsAdmin.editFarm': { en: 'Edit wind farm', es: 'Editar parque' },
   'assetsAdmin.deleteFarm': { en: 'Delete wind farm', es: 'Eliminar parque' },

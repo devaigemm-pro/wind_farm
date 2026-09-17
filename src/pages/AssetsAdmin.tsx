@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Wind } from 'lucide-react';
 import { Button } from '@/components/atoms';
 import { Skeleton } from '@/components/atoms/Skeleton';
@@ -81,6 +81,28 @@ export const AssetsAdmin = () => {
   };
 
   const closeModal = () => setModal(null);
+
+  // Group farms by country (alphabetical), farms without a country go last
+  // under a "no country" bucket. Farms stay alphabetical within each group.
+  const groupedByCountry = useMemo(() => {
+    const groups = new Map<string, WindFarm[]>();
+    for (const farm of farms ?? []) {
+      const key = farm.country?.trim() || '__none__';
+      const list = groups.get(key) ?? [];
+      list.push(farm);
+      groups.set(key, list);
+    }
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => {
+        if (a === '__none__') return 1;
+        if (b === '__none__') return -1;
+        return a.localeCompare(b);
+      })
+      .map(([country, list]) => ({
+        country,
+        farms: [...list].sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [farms]);
 
   // ─── Save handlers ──────────────────────────────────────────────────────────
 
@@ -216,21 +238,29 @@ export const AssetsAdmin = () => {
           />
         ) : (
           <div style={styles.treeWrapper}>
-            {(farms ?? []).map((farm) => (
-              <FarmNode
-                key={farm.id}
-                farm={farm}
-                expanded={expandedFarms.has(farm.id)}
-                expandedTurbines={expandedTurbines}
-                onToggle={() => toggleFarm(farm.id)}
-                onToggleTurbine={toggleTurbine}
-                onEditFarm={() => setModal({ kind: 'edit-farm', farm })}
-                onDeleteFarm={() => setToDelete({ kind: 'farm', item: farm })}
-                onNewTurbine={() => setModal({ kind: 'create-turbine', windFarmId: farm.id })}
-                onEditTurbine={(turbine) => setModal({ kind: 'edit-turbine', turbine })}
-                onDeleteTurbine={(turbine) => setToDelete({ kind: 'turbine', item: turbine })}
-                onEditBlade={(blade) => setModal({ kind: 'edit-blade', blade })}
-              />
+            {groupedByCountry.map(({ country, farms: countryFarms }) => (
+              <div key={country} style={styles.countryGroup}>
+                <div style={styles.countryHeader}>
+                  {country === '__none__' ? t('assetsAdmin.noCountry') : country}
+                  <span style={styles.countryCount}>{countryFarms.length}</span>
+                </div>
+                {countryFarms.map((farm) => (
+                  <FarmNode
+                    key={farm.id}
+                    farm={farm}
+                    expanded={expandedFarms.has(farm.id)}
+                    expandedTurbines={expandedTurbines}
+                    onToggle={() => toggleFarm(farm.id)}
+                    onToggleTurbine={toggleTurbine}
+                    onEditFarm={() => setModal({ kind: 'edit-farm', farm })}
+                    onDeleteFarm={() => setToDelete({ kind: 'farm', item: farm })}
+                    onNewTurbine={() => setModal({ kind: 'create-turbine', windFarmId: farm.id })}
+                    onEditTurbine={(turbine) => setModal({ kind: 'edit-turbine', turbine })}
+                    onDeleteTurbine={(turbine) => setToDelete({ kind: 'turbine', item: turbine })}
+                    onEditBlade={(blade) => setModal({ kind: 'edit-blade', blade })}
+                  />
+                ))}
+              </div>
             ))}
           </div>
         )}
@@ -500,7 +530,33 @@ const styles: Record<string, React.CSSProperties> = {
   treeWrapper: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 'var(--space-3)',
+    gap: 'var(--space-5)',
+  },
+  countryGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--space-2)',
+  },
+  countryHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    fontSize: 'var(--text-sm)',
+    fontWeight: 700,
+    color: '#111827',
+    borderLeft: '4px solid #5A8F5A',
+    paddingLeft: '10px',
+    marginBottom: 'var(--space-1)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
+  },
+  countryCount: {
+    fontSize: 'var(--text-xs)',
+    fontWeight: 600,
+    color: 'var(--color-neutral-500)',
+    backgroundColor: 'var(--color-neutral-100)',
+    borderRadius: 'var(--radius-full)',
+    padding: '1px 8px',
   },
   farmCard: {
     border: '1px solid var(--color-neutral-200)',
