@@ -233,11 +233,65 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
     const response = await fetch(url);
     if (!response.ok) return null;
     const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
+
+    // Assets estáticos livianos (blade_design.png, logo, svg): devolver dataURL
+    // crudo para preservar el PNG/SVG original. Solo las FOTOS de defectos
+    // (JPEG pesados desde storage) se comprimen.
+    const lower = url.toLowerCase().split('?')[0] ?? '';
+    if (lower.endsWith('.png') || lower.endsWith('.svg')) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // Redimensionar + comprimir vía canvas (igual que inspección) para que el
+    // PDF no exceda el límite de subida de Supabase (evita 413 Payload Too Large).
+    return await new Promise<string | null>((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 8000);
+      const img = new Image();
+      const blobUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        clearTimeout(timeout);
+        try {
+          const MAX_W = 1200,
+            MAX_H = 900;
+          let w = img.naturalWidth,
+            h = img.naturalHeight;
+          if (w > MAX_W) {
+            h = Math.round(h * (MAX_W / w));
+            w = MAX_W;
+          }
+          if (h > MAX_H) {
+            w = Math.round(w * (MAX_H / h));
+            h = MAX_H;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            URL.revokeObjectURL(blobUrl);
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          URL.revokeObjectURL(blobUrl);
+          resolve(dataUrl);
+        } catch {
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        clearTimeout(timeout);
+        URL.revokeObjectURL(blobUrl);
+        resolve(null);
+      };
+      img.src = blobUrl;
     });
   } catch {
     return null;
