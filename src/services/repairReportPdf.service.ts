@@ -1387,7 +1387,12 @@ export async function generateAndDownloadRepairReport(data: RepairReportData): P
   // try/catch interno no propaga errores (la descarga ya ocurrió antes).
   const repairId = data.defectId ?? null;
   if (repairId) {
-    await persistRepairReport(blob, repairId, filename, session.user?.id ?? null);
+    // Persist without letting a hung network call freeze the caller's
+    // spinner. Best-effort with a hard timeout.
+    await Promise.race([
+      persistRepairReport(blob, repairId, filename, session.user?.id ?? null),
+      new Promise<void>((resolve) => setTimeout(resolve, 15000)),
+    ]);
   }
 }
 
@@ -1431,7 +1436,7 @@ async function persistRepairReport(
     let finalStoragePath: string | null = null;
     const { error: uploadError } = await supabase.storage
       .from('reports')
-      .upload(storagePath, blob, { contentType: 'application/pdf', upsert: false });
+      .upload(storagePath, blob, { contentType: 'application/pdf', upsert: true });
     if (uploadError) {
       // Best-effort: the DB row is still inserted (with a pending/ path) so the
       // "Download report" button reappears. Log for diagnosis.
