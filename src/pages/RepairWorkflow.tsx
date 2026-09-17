@@ -118,6 +118,9 @@ export function RepairWorkflow() {
   // the specific defect card whose report is being generated.
   const [downloadingDefectId, setDownloadingDefectId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
+  // Photo ids whose selection mutation is in flight → drives a per-photo spinner.
+  // A Set handles several rapid clicks across different photos concurrently.
+  const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
   // repair_ids that already have a persisted report (type='repair') in the DB.
   // Drives whether each defect shows "Download report" vs "Generate report".
   const [repairsWithReport, setRepairsWithReport] = useState<Set<string>>(new Set());
@@ -143,7 +146,18 @@ export function RepairWorkflow() {
     // client is read-only for selection.
     if (isClient) return;
     if (photo.repairSelected === selected) return;
-    setSelected.mutate({ photoId: photo.id, selected });
+    setPendingPhotoIds((prev) => new Set(prev).add(photo.id));
+    setSelected.mutate(
+      { photoId: photo.id, selected },
+      {
+        onSettled: () =>
+          setPendingPhotoIds((prev) => {
+            const next = new Set(prev);
+            next.delete(photo.id);
+            return next;
+          }),
+      },
+    );
   };
 
   const handlePreview = (photo: RepairPhoto) => {
@@ -247,6 +261,7 @@ export function RepairWorkflow() {
                   locale={locale}
                   t={t}
                   readOnly={isClient}
+                  pendingPhotoIds={pendingPhotoIds}
                   onSelect={handleSelect}
                   onPreview={handlePreview}
                   onGenerateReport={handleGenerateDefectPdf}
@@ -298,6 +313,7 @@ interface DefectSectionProps {
   locale: 'es' | 'en';
   t: (key: string) => string;
   readOnly: boolean;
+  pendingPhotoIds: Set<string>;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
@@ -313,6 +329,7 @@ function DefectSection({
   locale,
   t,
   readOnly,
+  pendingPhotoIds,
   onSelect,
   onPreview,
   onGenerateReport,
@@ -471,6 +488,7 @@ function DefectSection({
               stage={stage}
               t={t}
               readOnly={readOnly}
+              pendingPhotoIds={pendingPhotoIds}
               onSelect={onSelect}
               onPreview={onPreview}
             />
@@ -488,11 +506,12 @@ interface StageRowProps {
   stage: RepairStageNode;
   t: (key: string) => string;
   readOnly: boolean;
+  pendingPhotoIds: Set<string>;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onPreview: (photo: RepairPhoto) => void;
 }
 
-function StageRow({ defectId, stage, t, readOnly, onSelect, onPreview }: StageRowProps) {
+function StageRow({ defectId, stage, t, readOnly, pendingPhotoIds, onSelect, onPreview }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
 
@@ -534,6 +553,7 @@ function StageRow({ defectId, stage, t, readOnly, onSelect, onPreview }: StageRo
                     key={photo.id}
                     photo={photo}
                     dimmed={dragId === photo.id}
+                    pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
                     onDragEnd={() => setDragId(null)}
@@ -586,6 +606,7 @@ function StageRow({ defectId, stage, t, readOnly, onSelect, onPreview }: StageRo
                     key={photo.id}
                     photo={photo}
                     dimmed={dragId === photo.id}
+                    pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
                     onDragEnd={() => setDragId(null)}
@@ -610,6 +631,8 @@ function StageRow({ defectId, stage, t, readOnly, onSelect, onPreview }: StageRo
 interface PhotoCardProps {
   photo: RepairPhoto;
   dimmed: boolean;
+  /** True while this photo's selection mutation is in flight → shows a spinner. */
+  pending?: boolean;
   selected?: boolean;
   readOnly?: boolean;
   action: 'add' | 'remove';
@@ -623,6 +646,7 @@ interface PhotoCardProps {
 function PhotoCard({
   photo,
   dimmed,
+  pending,
   selected,
   readOnly,
   action,
@@ -632,26 +656,28 @@ function PhotoCard({
   onAction,
   onPreview,
 }: PhotoCardProps) {
+  // While pending, block drag + action to avoid a double-fire on the same photo.
+  const interactive = !readOnly && !pending;
   return (
     <div
-      draggable={!readOnly}
+      draggable={interactive}
       onDragStart={
-        readOnly
-          ? undefined
-          : (e) => {
+        interactive
+          ? (e) => {
               e.dataTransfer.setData('text/plain', photo.id);
               e.dataTransfer.effectAllowed = 'move';
               onDragStart();
             }
+          : undefined
       }
-      onDragEnd={readOnly ? undefined : onDragEnd}
+      onDragEnd={interactive ? onDragEnd : undefined}
       onClick={onPreview}
-      onDoubleClick={readOnly ? undefined : onAction}
+      onDoubleClick={interactive ? onAction : undefined}
       style={{
         ...photoCard,
         opacity: dimmed ? 0.5 : 1,
         borderColor: selected ? C.brand : C.border,
-        cursor: readOnly ? 'zoom-in' : 'grab',
+        cursor: readOnly ? 'zoom-in' : pending ? 'progress' : 'grab',
       }}
       title={photo.filename}
     >
@@ -669,9 +695,16 @@ function PhotoCard({
       {/* Selection control (star/remove) is hidden for read-only (client). */}
       {!readOnly && (
         <button
-          style={{ ...photoActionBtn, background: action === 'remove' ? '#EF4444' : C.brand }}
+          style={{
+            ...photoActionBtn,
+            background: action === 'remove' ? '#EF4444' : C.brand,
+            opacity: pending ? 0.5 : 1,
+            cursor: pending ? 'progress' : 'pointer',
+          }}
+          disabled={pending}
           onClick={(e) => {
             e.stopPropagation();
+            if (pending) return;
             onAction();
           }}
           aria-label={actionLabel}
@@ -679,6 +712,12 @@ function PhotoCard({
         >
           {action === 'remove' ? <X size={13} /> : <Star size={13} />}
         </button>
+      )}
+      {/* Processing overlay: shown while the photo's selection is being saved. */}
+      {pending && (
+        <div style={photoPendingOverlay}>
+          <Loader2 size={22} color={C.brand} style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
       )}
     </div>
   );
@@ -776,6 +815,10 @@ const photoBroken: React.CSSProperties = {
 const photoActionBtn: React.CSSProperties = {
   position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none',
   color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+};
+const photoPendingOverlay: React.CSSProperties = {
+  position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2,
 };
 const lightboxOverlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.85)',
