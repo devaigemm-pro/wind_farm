@@ -1263,9 +1263,12 @@ export async function downloadPersistedRepairReport(repairId: string): Promise<b
       (r) => !!r.storage_path && !r.storage_path.startsWith('pending/'),
     );
     if (!latest?.storage_path) return false;
-    const { data: urlData } = supabase.storage.from('reports').getPublicUrl(latest.storage_path);
-    if (urlData?.publicUrl) {
-      window.open(urlData.publicUrl, '_blank');
+    // The `reports` bucket is PRIVATE → use a signed URL instead of a public one.
+    const { data: urlData } = await supabase.storage
+      .from('reports')
+      .createSignedUrl(latest.storage_path, 3600);
+    if (urlData?.signedUrl) {
+      window.open(urlData.signedUrl, '_blank');
       return true;
     }
   } catch {

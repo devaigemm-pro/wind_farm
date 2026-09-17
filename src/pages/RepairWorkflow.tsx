@@ -362,44 +362,81 @@ function DefectSection({
           // A defect with no repair yet has no report → disable the PDF button.
           const hasRepair = node.repairId != null;
           const disabled = downloading || !hasRepair;
-          // When a report was already generated for this repair, the button
-          // becomes a "Download report" action (fetches the persisted PDF);
-          // otherwise it keeps the current "Generate report" behavior.
-          const label = hasReport ? t('repair.downloadReport') : t('repair.generateReport');
-          const trigger = () => {
+          // "Generate report" always keeps its own label/behavior (generate +
+          // persist + download). When a report already exists, an ADDITIONAL
+          // "Download report" button is shown alongside it (fetches the
+          // persisted PDF without regenerating).
+          const generateLabel = t('repair.generateReport');
+          const downloadLabel = t('repair.downloadReport');
+          const triggerGenerate = () => {
             if (disabled || !node.repairId) return;
-            if (hasReport) onDownloadReport(node.repairId);
-            else onGenerateReport(node.repairId);
+            onGenerateReport(node.repairId);
+          };
+          const triggerDownload = () => {
+            if (disabled || !node.repairId) return;
+            onDownloadReport(node.repairId);
           };
           return (
-            <span
-              role="button"
-              tabIndex={disabled ? -1 : 0}
-              aria-disabled={disabled}
-              style={{
-                ...defectPdfBtn,
-                opacity: disabled ? 0.5 : 1,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                trigger();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+            <>
+              <span
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-disabled={disabled}
+                style={{
+                  ...defectPdfBtn,
+                  opacity: disabled ? 0.5 : 1,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                }}
+                onClick={(e) => {
                   e.stopPropagation();
-                  trigger();
-                }
-              }}
-              title={hasRepair ? label : t('repair.notStarted')}
-            >
-              {downloading ? (
-                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <Download size={14} />
+                  triggerGenerate();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    triggerGenerate();
+                  }
+                }}
+                title={hasRepair ? generateLabel : t('repair.notStarted')}
+              >
+                {downloading ? (
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Download size={14} />
+                )}
+                {generateLabel}
+              </span>
+              {hasReport && (
+                <span
+                  role="button"
+                  tabIndex={disabled ? -1 : 0}
+                  aria-disabled={disabled}
+                  style={{
+                    ...defectPdfBtn,
+                    opacity: disabled ? 0.5 : 1,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerDownload();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      triggerDownload();
+                    }
+                  }}
+                  title={downloadLabel}
+                >
+                  {downloading ? (
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  {downloadLabel}
+                </span>
               )}
-              {label}
-            </span>
+            </>
           );
         })()}
         {!readOnly && onDelete && (

@@ -167,8 +167,10 @@ export const reportsService = {
     return data;
   },
 
-  getDownloadUrl(storagePath: string): string {
-    const { data } = supabase.storage.from('reports').getPublicUrl(storagePath);
-    return data.publicUrl;
+  async getDownloadUrl(storagePath: string): Promise<string> {
+    // The `reports` bucket is PRIVATE, so a public URL returns a 404.
+    // Use a short-lived signed URL instead.
+    const { data } = await supabase.storage.from('reports').createSignedUrl(storagePath, 3600);
+    return data?.signedUrl ?? '';
   },
 };
