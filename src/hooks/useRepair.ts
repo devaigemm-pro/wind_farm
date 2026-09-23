@@ -114,6 +114,32 @@ export function useDeleteRepairDefect(campaignId: string | undefined) {
   });
 }
 
+/**
+ * Update a defect's editable fields (type, defect_number, defect_identifier)
+ * with a DIRECT write — no recompute of the numbering, so a manually edited
+ * defect_number stays fixed. Refreshes the tree so the list shows the new
+ * values.
+ */
+export function useUpdateDefectFields(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      defectId,
+      type,
+      defectNumber,
+      defectIdentifier,
+    }: {
+      defectId: string;
+      type?: string;
+      defectNumber?: string | null;
+      defectIdentifier?: string | null;
+    }) => repairService.updateDefectFields(defectId, { type, defectNumber, defectIdentifier }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+    },
+  });
+}
+
 /** Update repair campaign status, then refresh detail + summary. */
 export function useUpdateRepairStatus(campaignId: string | undefined) {
   const queryClient = useQueryClient();

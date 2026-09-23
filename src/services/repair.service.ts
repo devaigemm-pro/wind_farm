@@ -1097,6 +1097,29 @@ export const repairService = {
   },
 
   /**
+   * Update a defect's editable fields (type, defect_number, defect_identifier)
+   * with a DIRECT update on the `defect` table.
+   *
+   * Unlike defectsService.updateDefect, this does NOT run
+   * recomputeDefectNumbersForInspection, so a manually edited defect_number
+   * stays FIXED (it is not recalculated from the annotation numbering). Only the
+   * three columns provided are written; undefined fields are left untouched.
+   */
+  async updateDefectFields(
+    defectId: string,
+    fields: { type?: string; defectNumber?: string | null; defectIdentifier?: string | null },
+  ): Promise<void> {
+    const patch: Record<string, unknown> = {};
+    if (fields.type !== undefined) patch.type = fields.type;
+    if (fields.defectNumber !== undefined) patch.defect_number = fields.defectNumber;
+    if (fields.defectIdentifier !== undefined) patch.defect_identifier = fields.defectIdentifier;
+    if (Object.keys(patch).length === 0) return;
+
+    const { error } = await db.from('defect').update(patch).eq('id', defectId);
+    if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
    * Update the repair campaign workflow status.
    */
   async updateRepairStatus(campaignId: string, status: RepairCampaignStatus): Promise<void> {

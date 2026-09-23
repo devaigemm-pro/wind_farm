@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, Download, Loader2, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import {
   useRepairCampaignDetail,
   useRepairTree,
   useSetPhotoSelected,
   useDeleteRepairDefect,
+  useUpdateDefectFields,
 } from '@/hooks/useRepair';
 import {
   generateAndDownloadRepairReport,
@@ -95,6 +97,10 @@ export function RepairWorkflow() {
   const { data: tree, isLoading: treeLoading } = useRepairTree(campaignId);
   const setSelected = useSetPhotoSelected(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
+  const updateDefectFields = useUpdateDefectFields(campaignId);
+  // Catalog of defect types (annotation_type) for the inline edit <select>,
+  // same source used by DefectEditForm.
+  const { data: annotationTypes = [] } = useAnnotationTypes();
 
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
@@ -247,6 +253,36 @@ export function RepairWorkflow() {
     );
   };
 
+  // Persist the three editable defect fields (type, defect_number,
+  // defect_identifier) with a DIRECT update — the manual number is NOT
+  // recomputed. Returns a promise so the card can await + exit edit mode.
+  const handleSaveDefectFields = (
+    defectId: string,
+    fields: { type: string; defectNumber: string; defectIdentifier: string },
+  ) =>
+    new Promise<void>((resolve, reject) => {
+      updateDefectFields.mutate(
+        {
+          defectId,
+          type: fields.type,
+          defectNumber: fields.defectNumber.trim() || null,
+          defectIdentifier: fields.defectIdentifier.trim() || null,
+        },
+        {
+          onSuccess: () => {
+            toast.success(t('repair.editSuccess'));
+            resolve();
+          },
+          onError: (err) => {
+            toast.error((err as Error)?.message || t('repair.editError'));
+            reject(err);
+          },
+        },
+      );
+    });
+
+  const typeOptions = annotationTypes.map((at) => at.name);
+
   if (campaignLoading) {
     return <div style={page}><p style={{ color: C.muted }}>{t('general.loading')}</p></div>;
   }
@@ -291,6 +327,8 @@ export function RepairWorkflow() {
               repairsWithReport={repairsWithReport}
               onDelete={isClient ? undefined : handleDeleteDefect}
               downloadingDefectId={downloadingDefectId}
+              typeOptions={typeOptions}
+              onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
             />
           ))}
         </div>
@@ -337,6 +375,13 @@ interface BladeGroupSectionProps {
   repairsWithReport: Set<string>;
   onDelete?: (node: RepairDefectNode) => void;
   downloadingDefectId: string | null;
+  /** Defect type catalog (annotation_type names) for the inline edit select. */
+  typeOptions: string[];
+  /** Persist the three editable defect fields (undefined = read-only client). */
+  onSaveDefectFields?: (
+    defectId: string,
+    fields: { type: string; defectNumber: string; defectIdentifier: string },
+  ) => Promise<void>;
 }
 
 /**
@@ -357,6 +402,8 @@ function BladeGroupSection({
   repairsWithReport,
   onDelete,
   downloadingDefectId,
+  typeOptions,
+  onSaveDefectFields,
 }: BladeGroupSectionProps) {
   const [open, setOpen] = useState(false);
   const bladeLabel = group.serial
@@ -390,6 +437,8 @@ function BladeGroupSection({
               hasReport={node.repairId != null && repairsWithReport.has(node.repairId)}
               onDelete={onDelete}
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
+              typeOptions={typeOptions}
+              onSaveDefectFields={onSaveDefectFields}
             />
           ))}
         </div>
@@ -414,6 +463,13 @@ interface DefectSectionProps {
   hasReport: boolean;
   onDelete?: (node: RepairDefectNode) => void;
   downloading: boolean;
+  /** Defect type catalog (annotation_type names) for the inline edit select. */
+  typeOptions: string[];
+  /** Persist the three editable defect fields (undefined = read-only client). */
+  onSaveDefectFields?: (
+    defectId: string,
+    fields: { type: string; defectNumber: string; defectIdentifier: string },
+  ) => Promise<void>;
 }
 
 function DefectSection({
@@ -429,10 +485,52 @@ function DefectSection({
   hasReport,
   onDelete,
   downloading,
+  typeOptions,
+  onSaveDefectFields,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
   const [open, setOpen] = useState(false);
   const { defect } = node;
+
+  // ── Inline edit state for the three editable fields ──────────────────────
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editType, setEditType] = useState(defect.type);
+  const [editNumber, setEditNumber] = useState(defect.defectNumber ?? '');
+  const [editIdentifier, setEditIdentifier] = useState(defect.defectIdentifier ?? '');
+  const canEdit = Boolean(onSaveDefectFields);
+
+  const startEdit = () => {
+    // Seed inputs from the current defect values each time edit opens.
+    setEditType(defect.type);
+    setEditNumber(defect.defectNumber ?? '');
+    setEditIdentifier(defect.defectIdentifier ?? '');
+    setOpen(true);
+    setEditing(true);
+  };
+  const cancelEdit = () => setEditing(false);
+  const saveEdit = async () => {
+    if (!onSaveDefectFields || saving) return;
+    setSaving(true);
+    try {
+      await onSaveDefectFields(defect.id, {
+        type: editType,
+        defectNumber: editNumber,
+        defectIdentifier: editIdentifier,
+      });
+      setEditing(false);
+    } catch {
+      /* toast handled upstream; stay in edit mode so the user can retry */
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Type <select> options: annotation_type names, ensuring the current type is
+  // always present (mirrors DefectEditForm).
+  const typeSelectOptions = typeOptions.includes(editType)
+    ? typeOptions
+    : [editType, ...typeOptions];
 
   const totalPhotos = node.stages.reduce((acc, s) => acc + s.photos.length, 0);
   const selectedPhotos = node.stages.reduce(
@@ -549,6 +647,27 @@ function DefectSection({
             </>
           );
         })()}
+        {canEdit && !editing && (
+          <span
+            role="button"
+            tabIndex={0}
+            style={defectEditBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdit();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                startEdit();
+              }
+            }}
+            title={t('repair.editDefect')}
+          >
+            <Pencil size={14} />
+            {t('repair.editDefect')}
+          </span>
+        )}
         {!readOnly && onDelete && (
           <span
             role="button"
@@ -571,6 +690,63 @@ function DefectSection({
           </span>
         )}
       </button>
+
+      {editing && (
+        <div style={editForm}>
+          <div style={editFieldsRow}>
+            <label style={editField}>
+              <span style={editLabel}>{t('repair.editType')}</span>
+              <select
+                style={editSelect}
+                value={editType}
+                onChange={(e) => setEditType(e.target.value)}
+                disabled={saving}
+              >
+                {typeSelectOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {formatDefectType(opt, locale)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={editField}>
+              <span style={editLabel}>{t('repair.editDefectNumber')}</span>
+              <input
+                type="text"
+                style={editInput}
+                value={editNumber}
+                onChange={(e) => setEditNumber(e.target.value)}
+                disabled={saving}
+                placeholder="C1"
+              />
+            </label>
+            <label style={editField}>
+              <span style={editLabel}>{t('repair.editDefectIdentifier')}</span>
+              <input
+                type="text"
+                style={editInput}
+                value={editIdentifier}
+                onChange={(e) => setEditIdentifier(e.target.value)}
+                disabled={saving}
+                placeholder="Daño1 ..."
+              />
+            </label>
+          </div>
+          <div style={editActions}>
+            <button type="button" style={editCancelBtn} onClick={cancelEdit} disabled={saving}>
+              <X size={14} /> {t('repair.editCancel')}
+            </button>
+            <button type="button" style={editSaveBtn} onClick={saveEdit} disabled={saving}>
+              {saving ? (
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Check size={14} />
+              )}
+              {t('repair.editSave')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div style={stagesWrap}>
@@ -874,6 +1050,36 @@ const defectPdfIconBtn: React.CSSProperties = {
 };
 const defectDeleteBtn: React.CSSProperties = {
   ...defectPdfBtn, background: '#EF4444',
+};
+const defectEditBtn: React.CSSProperties = {
+  ...defectPdfBtn, background: '#6B7280',
+};
+const editForm: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 12, padding: 16,
+  background: '#F7FAF7', borderBottom: `1px solid ${C.border}`,
+};
+const editFieldsRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12,
+};
+const editField: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
+const editLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: C.text };
+const editInput: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 8,
+  fontSize: 13, color: '#1a1a1a', background: '#fff', boxSizing: 'border-box',
+};
+const editSelect: React.CSSProperties = { ...editInput };
+const editActions: React.CSSProperties = {
+  display: 'flex', justifyContent: 'flex-end', gap: 8,
+};
+const editSaveBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
+  border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer',
+};
+const editCancelBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', color: C.text,
+  border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 14px', fontSize: 12,
+  fontWeight: 600, cursor: 'pointer',
 };
 const stagesWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: 16 };
 const stageCard: React.CSSProperties = {
