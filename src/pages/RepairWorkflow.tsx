@@ -296,34 +296,21 @@ export function RepairWorkflow() {
       ) : (
         <div style={defectsWrap}>
           {groupDefectsByBlade(tree).map((group) => (
-            <div key={group.position} style={bladeGroup}>
-              <div style={bladeGroupTitle}>
-                {group.serial
-                  ? `${t('repair.bladeNo')} ${group.serial}`
-                  : `${t('repair.blade')} ${group.label}`}
-              </div>
-              {group.nodes.map((node) => (
-                <DefectSection
-                  key={node.defect.id}
-                  node={node}
-                  locale={locale}
-                  t={t}
-                  readOnly={isClient}
-                  pendingPhotoIds={pendingPhotoIds}
-                  onSelect={handleSelect}
-                  onPreview={handlePreview}
-                  onGenerateReport={handleGenerateDefectPdf}
-                  onDownloadReport={handleDownloadDefectPdf}
-                  hasReport={
-                    node.repairId != null && repairsWithReport.has(node.repairId)
-                  }
-                  onDelete={isClient ? undefined : handleDeleteDefect}
-                  downloading={
-                    node.repairId != null && downloadingDefectId === node.repairId
-                  }
-                />
-              ))}
-            </div>
+            <BladeGroupSection
+              key={group.position}
+              group={group}
+              locale={locale}
+              t={t}
+              readOnly={isClient}
+              pendingPhotoIds={pendingPhotoIds}
+              onSelect={handleSelect}
+              onPreview={handlePreview}
+              onGenerateReport={handleGenerateDefectPdf}
+              onDownloadReport={handleDownloadDefectPdf}
+              repairsWithReport={repairsWithReport}
+              onDelete={isClient ? undefined : handleDeleteDefect}
+              downloadingDefectId={downloadingDefectId}
+            />
           ))}
         </div>
       )}
@@ -348,6 +335,82 @@ export function RepairWorkflow() {
           <div style={lightboxCaption} onClick={(e) => e.stopPropagation()}>
             {lightbox.filename}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Blade group (collapsible) ─────────────────────────────────────────────────
+
+interface BladeGroupSectionProps {
+  group: BladeGroup;
+  locale: 'es' | 'en';
+  t: (key: string) => string;
+  readOnly: boolean;
+  pendingPhotoIds: Set<string>;
+  onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  onPreview: (photo: RepairPhoto) => void;
+  onGenerateReport: (repairId: string) => void;
+  onDownloadReport: (repairId: string) => void;
+  repairsWithReport: Set<string>;
+  onDelete?: (node: RepairDefectNode) => void;
+  downloadingDefectId: string | null;
+}
+
+/**
+ * A collapsible group of defects for a single blade. Blades start COLLAPSED on
+ * page load (only the blade header is visible); selecting a blade header expands
+ * it and reveals its defects, each with its full composed identifier.
+ */
+function BladeGroupSection({
+  group,
+  locale,
+  t,
+  readOnly,
+  pendingPhotoIds,
+  onSelect,
+  onPreview,
+  onGenerateReport,
+  onDownloadReport,
+  repairsWithReport,
+  onDelete,
+  downloadingDefectId,
+}: BladeGroupSectionProps) {
+  const [open, setOpen] = useState(false);
+  const bladeLabel = group.serial
+    ? `${t('repair.bladeNo')} ${group.serial}`
+    : `${t('repair.blade')} ${group.label}`;
+
+  return (
+    <div style={bladeGroup}>
+      <button style={bladeGroupHeader} onClick={() => setOpen((o) => !o)}>
+        {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+        <span style={bladeGroupTitle}>{bladeLabel}</span>
+        <span style={bladeGroupCount}>
+          {group.nodes.length} {t('repair.defects')}
+        </span>
+      </button>
+
+      {open && (
+        <div style={bladeGroupBody}>
+          {group.nodes.map((node) => (
+            <DefectSection
+              key={node.defect.id}
+              node={node}
+              locale={locale}
+              t={t}
+              readOnly={readOnly}
+              pendingPhotoIds={pendingPhotoIds}
+              onSelect={onSelect}
+              onPreview={onPreview}
+              onGenerateReport={onGenerateReport}
+              onDownloadReport={onDownloadReport}
+              hasReport={node.repairId != null && repairsWithReport.has(node.repairId)}
+              onDelete={onDelete}
+              downloading={node.repairId != null && downloadingDefectId === node.repairId}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -784,10 +847,20 @@ const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 20 };
 const defectsWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 24 };
-const bladeGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
+const bladeGroup: React.CSSProperties = {
+  border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', overflow: 'hidden',
+};
+const bladeGroupHeader: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 16px',
+  background: '#EFF5EF', border: 'none', borderLeft: '4px solid #5A8F5A', cursor: 'pointer',
+  color: '#111827',
+};
 const bladeGroupTitle: React.CSSProperties = {
-  fontSize: 16, fontWeight: 700, color: '#111827', margin: 0,
-  borderLeft: '4px solid #5A8F5A', paddingLeft: 10,
+  fontSize: 16, fontWeight: 700, color: '#111827', flex: 1, textAlign: 'left',
+};
+const bladeGroupCount: React.CSSProperties = { fontSize: 12, color: C.muted, flexShrink: 0 };
+const bladeGroupBody: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 12, padding: 16,
 };
 const defectCard: React.CSSProperties = {
   border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', overflow: 'hidden',
