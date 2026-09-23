@@ -554,10 +554,14 @@ function DefectSection({
         <span style={defectIndex}>{defectNumber}</span>
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={defectTitle}>
-            {/* Only the defect TYPE here — the per-blade code (e.g. "C1") is
-                already shown in the green badge on the left, so repeating it in
-                the title would be redundant. */}
-            {formatDefectType(defect.type, locale)}
+            {/* Title = defect TYPE + " - " + defect_identifier (when present).
+                The per-blade code (e.g. "A1") is NOT repeated here because it's
+                already shown in the green badge on the left. The identifier
+                (e.g. "Daño 1") comes from the spreadsheet and is appended after
+                a dash when available. */}
+            {defect.defectIdentifier?.trim()
+              ? `${formatDefectType(defect.type, locale)} - ${defect.defectIdentifier.trim()}`
+              : formatDefectType(defect.type, locale)}
           </div>
           <div style={defectMeta}>
             {t('repair.category')} {defect.severity || '—'}
