@@ -236,10 +236,12 @@ export const repairImportService = {
         const turbina = row.turbina.trim();
         const serialPala = row.serialPala.trim();
         const lado = row.lado.trim().toUpperCase();
+        const defectIdentifier = row.defectIdentifier.trim();
 
         if (!parque) throw new Error('Parque vacío');
         if (!turbina) throw new Error('Turbina vacía');
         if (!serialPala) throw new Error('Serial de pala vacío');
+        if (!defectIdentifier) throw new Error('Identificador de defecto vacío');
 
         // 1. Wind farm (by name) → resolves the exact turbine (park + turbine),
         //    since turbine names can repeat across parks.
@@ -316,7 +318,7 @@ export const repairImportService = {
             distance_from_root: parseUbicacion(row.ubicacionDanio),
             side: lado || null,
             description: null,
-            defect_identifier: row.defectIdentifier || null,
+            defect_identifier: defectIdentifier,
             width_cm: null,
             height_cm: null,
             resolved: false,
