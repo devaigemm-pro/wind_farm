@@ -36,6 +36,38 @@ export interface RepairImportSummary {
   ok: number;
   errores: RepairImportRowError[];
   campanias: RepairImportCampaignInfo[];
+  /** Id of the persisted defect_import batch (null if history persistence failed). */
+  importId?: string | null;
+}
+
+// ─── Import history (persistent) ─────────────────────────────────────────────
+
+/** A persisted defect-import batch, as shown in the Defects tab history list. */
+export interface DefectImport {
+  id: string;
+  uploadedByName: string | null;
+  fileName: string | null;
+  total: number;
+  okCount: number;
+  errorCount: number;
+  createdAt: string;
+}
+
+/** A persisted snapshot row of a defect-import batch. */
+export interface DefectImportRow {
+  id: string;
+  importId: string;
+  fila: number | null;
+  parque: string | null;
+  turbina: string | null;
+  ubicacionDanio: string | null;
+  defectIdentifier: string | null;
+  serialPala: string | null;
+  lado: string | null;
+  tipo: string | null;
+  status: string;
+  motivo: string | null;
+  createdAt: string;
 }
 
 // ─── Defect type mapping (Excel "Tipo" → annotation_type.name) ───────────────
@@ -236,7 +268,10 @@ export const repairImportService = {
    * turbine (created if missing), and linked into the repair tree
    * (quote → quote_item → work_order → repair) so they show up in the workflow.
    */
-  async importFromRows(rows: RepairImportRow[]): Promise<RepairImportSummary> {
+  async importFromRows(
+    rows: RepairImportRow[],
+    fileName?: string,
+  ): Promise<RepairImportSummary> {
     const user = (await db.auth.getUser()).data.user;
     const userId = user?.id ?? null;
 
@@ -247,6 +282,8 @@ export const repairImportService = {
     // Track the display name of the turbine per campaign for the summary.
     const campaignTurbineName = new Map<string, string>();
     const errores: RepairImportRowError[] = [];
+    // Per-row result (ok/error + reason) kept in Excel order for the snapshot.
+    const rowResults: { row: RepairImportRow; status: 'ok' | 'error'; motivo: string | null }[] = [];
     let ok = 0;
 
     for (const row of rows) {
@@ -405,11 +442,11 @@ export const repairImportService = {
         if (repairErr) throw new Error(repairErr.message);
 
         ok += 1;
+        rowResults.push({ row, status: 'ok', motivo: null });
       } catch (err) {
-        errores.push({
-          fila: row.fila,
-          motivo: err instanceof Error ? err.message : String(err),
-        });
+        const motivo = err instanceof Error ? err.message : String(err);
+        errores.push({ fila: row.fila, motivo });
+        rowResults.push({ row, status: 'error', motivo });
       }
     }
 
@@ -421,12 +458,134 @@ export const repairImportService = {
       }),
     );
 
-    return { total: rows.length, ok, errores, campanias };
+    // Persist the import history (batch + per-row snapshot). This is SECONDARY:
+    // a failure here must never abort the import, so we log and continue.
+    const importId = await persistImportHistory(
+      userId,
+      fileName ?? null,
+      rows.length,
+      ok,
+      errores.length,
+      rowResults,
+    );
+
+    return { total: rows.length, ok, errores, campanias, importId };
   },
 
-  /** Convenience wrapper: parse the File then import. */
+  /** Convenience wrapper: parse the File then import (keeps the file name). */
   async importFromFile(file: File): Promise<RepairImportSummary> {
     const rows = await parseRepairRows(file);
-    return this.importFromRows(rows);
+    return this.importFromRows(rows, file.name);
+  },
+
+  /**
+   * List every persisted defect-import batch (all users, newest first). The
+   * uploader name is resolved via the profiles relationship. Not filtered by
+   * user — the Defects tab shows imports from all users.
+   */
+  async getDefectImports(): Promise<DefectImport[]> {
+    const { data, error } = await db
+      .from('defect_import')
+      .select('id, file_name, total, ok_count, error_count, created_at, profiles:uploaded_by(name)')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+
+    return ((data as unknown[]) ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      const profile = r.profiles as { name?: string } | null;
+      return {
+        id: r.id as string,
+        uploadedByName: profile?.name ?? null,
+        fileName: (r.file_name as string) ?? null,
+        total: Number(r.total ?? 0),
+        okCount: Number(r.ok_count ?? 0),
+        errorCount: Number(r.error_count ?? 0),
+        createdAt: r.created_at as string,
+      };
+    });
+  },
+
+  /** Snapshot rows of a defect-import batch, in original Excel order. */
+  async getDefectImportRows(importId: string): Promise<DefectImportRow[]> {
+    const { data, error } = await db
+      .from('defect_import_row')
+      .select(
+        'id, import_id, fila, parque, turbina, ubicacion_danio, defect_identifier, serial_pala, lado, tipo, status, motivo, created_at',
+      )
+      .eq('import_id', importId)
+      .order('fila', { ascending: true });
+    if (error) throw new Error(error.message);
+
+    return ((data as unknown[]) ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: r.id as string,
+        importId: r.import_id as string,
+        fila: r.fila != null ? Number(r.fila) : null,
+        parque: (r.parque as string) ?? null,
+        turbina: (r.turbina as string) ?? null,
+        ubicacionDanio: (r.ubicacion_danio as string) ?? null,
+        defectIdentifier: (r.defect_identifier as string) ?? null,
+        serialPala: (r.serial_pala as string) ?? null,
+        lado: (r.lado as string) ?? null,
+        tipo: (r.tipo as string) ?? null,
+        status: (r.status as string) ?? 'ok',
+        motivo: (r.motivo as string) ?? null,
+        createdAt: r.created_at as string,
+      };
+    });
   },
 };
+
+/**
+ * Persist the import batch (defect_import) and its per-row snapshot
+ * (defect_import_row). Secondary to the import itself: any failure is logged and
+ * swallowed, and the function returns null so the summary still resolves.
+ */
+async function persistImportHistory(
+  userId: string | null,
+  fileName: string | null,
+  total: number,
+  okCount: number,
+  errorCount: number,
+  rowResults: { row: RepairImportRow; status: 'ok' | 'error'; motivo: string | null }[],
+): Promise<string | null> {
+  try {
+    const { data: batch, error: batchErr } = await db
+      .from('defect_import')
+      .insert({
+        uploaded_by: userId,
+        file_name: fileName,
+        total,
+        ok_count: okCount,
+        error_count: errorCount,
+      })
+      .select('id')
+      .single();
+    if (batchErr) throw new Error(batchErr.message);
+    const importId = batch.id as string;
+
+    if (rowResults.length > 0) {
+      const rowsPayload = rowResults.map(({ row, status, motivo }) => ({
+        import_id: importId,
+        fila: row.fila,
+        parque: row.parque,
+        turbina: row.turbina,
+        ubicacion_danio: row.ubicacionDanio,
+        defect_identifier: row.defectIdentifier,
+        serial_pala: row.serialPala,
+        lado: row.lado,
+        tipo: row.tipoEspanol,
+        status,
+        motivo,
+      }));
+      const { error: rowsErr } = await db.from('defect_import_row').insert(rowsPayload);
+      if (rowsErr) throw new Error(rowsErr.message);
+    }
+
+    return importId;
+  } catch (err) {
+    console.error('[repair-import.service] Failed to persist import history:', err);
+    return null;
+  }
+}

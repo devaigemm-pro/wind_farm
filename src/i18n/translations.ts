@@ -637,6 +637,35 @@ export const translations: TranslationMap = {
   },
   'uploads.viewRepair': { en: 'View repair', es: 'Ver reparación' },
 
+  // Defects import history (persistent)
+  'uploads.importHistory': { en: 'Import history', es: 'Historial de cargas' },
+  'uploads.importHistoryEmpty': {
+    en: 'No imports have been recorded yet.',
+    es: 'Aún no se ha registrado ninguna carga.',
+  },
+  'uploads.histFile': { en: 'File', es: 'Archivo' },
+  'uploads.histUploadedBy': { en: 'Uploaded by', es: 'Cargado por' },
+  'uploads.histTotal': { en: 'Total', es: 'Total' },
+  'uploads.histOk': { en: 'OK', es: 'OK' },
+  'uploads.histErrors': { en: 'Errors', es: 'Errores' },
+  'uploads.histDate': { en: 'Date', es: 'Fecha' },
+  'uploads.importDetailTitle': { en: 'Import detail', es: 'Detalle de la carga' },
+  'uploads.backToHistory': { en: 'Back to history', es: 'Volver al historial' },
+  'uploads.rowStatus': { en: 'Status', es: 'Estado' },
+  'uploads.rowReason': { en: 'Reason', es: 'Motivo' },
+  'uploads.rowLocation': { en: 'Location', es: 'Ubicación' },
+  'uploads.rowIdentifier': { en: 'Identifier', es: 'Identificador' },
+  'uploads.rowSerial': { en: 'Blade serial', es: 'Serial pala' },
+  'uploads.rowSide': { en: 'Side', es: 'Lado' },
+  'uploads.rowType': { en: 'Type', es: 'Tipo' },
+  'uploads.rowNumber': { en: 'Row', es: 'Fila' },
+  'uploads.statusOk': { en: 'OK', es: 'OK' },
+  'uploads.statusError': { en: 'Error', es: 'Error' },
+  'uploads.importRowsEmpty': {
+    en: 'This import has no snapshot rows.',
+    es: 'Esta carga no tiene filas guardadas.',
+  },
+
   // ─── Annotate Step (additional) ─────────────────────────────────────────────
   'annotate.blade': { en: 'Blade: ', es: 'Pala: ' },
   'annotate.side': { en: 'Side: ', es: 'Cara: ' },

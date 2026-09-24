@@ -6,7 +6,11 @@ import { Button, Badge, Skeleton } from '@/components/atoms';
 import { EmptyState, TabBar } from '@/components/molecules';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
-import { useImportRepairCampaign } from '@/hooks/useImportRepairCampaign';
+import {
+  useImportRepairCampaign,
+  useDefectImports,
+  useDefectImportRows,
+} from '@/hooks/useImportRepairCampaign';
 import { droneUploadService } from '@/services/drone-upload.service';
 import { BLADE_FACE_LABELS } from '@/types';
 import type { CampaignStatus, UploadRecord, BladeFace } from '@/types';
@@ -597,7 +601,11 @@ function DefectsTab() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [summary, setSummary] = useState<RepairImportSummary | null>(null);
+  const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const importRepair = useImportRepairCampaign();
+
+  const { data: imports, isLoading: isLoadingImports } = useDefectImports();
+  const { data: importRows, isLoading: isLoadingRows } = useDefectImportRows(selectedImportId);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -797,6 +805,188 @@ function DefectsTab() {
             </div>
           )}
         </>
+      )}
+
+      {/* Persistent import history (all users) */}
+      {selectedImportId ? (
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 'var(--space-3)',
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 'var(--text-md)',
+                fontWeight: 600,
+                color: '#111827',
+              }}
+            >
+              {t('uploads.importDetailTitle')}
+            </h2>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={ChevronLeft}
+              onClick={() => setSelectedImportId(null)}
+            >
+              {t('uploads.backToHistory')}
+            </Button>
+          </div>
+
+          {isLoadingRows ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} variant="rect" height="40px" />
+              ))}
+            </div>
+          ) : (importRows ?? []).length === 0 ? (
+            <EmptyState
+              icon={FileSpreadsheet}
+              title={t('uploads.importDetailTitle')}
+              description={t('uploads.importRowsEmpty')}
+            />
+          ) : (
+            <table style={tableStyle} role="grid" aria-label="Import detail rows">
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t('uploads.rowNumber')}</th>
+                  <th style={thStyle}>{t('uploads.turbine')}</th>
+                  <th style={thStyle}>{t('uploads.farm')}</th>
+                  <th style={thStyle}>{t('uploads.rowLocation')}</th>
+                  <th style={thStyle}>{t('uploads.rowIdentifier')}</th>
+                  <th style={thStyle}>{t('uploads.rowSerial')}</th>
+                  <th style={thStyle}>{t('uploads.rowSide')}</th>
+                  <th style={thStyle}>{t('uploads.rowType')}</th>
+                  <th style={thStyle}>{t('uploads.rowStatus')}</th>
+                  <th style={thStyle}>{t('uploads.rowReason')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(importRows ?? []).map((r) => {
+                  const isError = r.status === 'error';
+                  return (
+                    <tr
+                      key={r.id}
+                      style={{
+                        backgroundColor: isError
+                          ? 'var(--color-danger-50, #fef2f2)'
+                          : undefined,
+                      }}
+                    >
+                      <td style={tdStyle}>{r.fila ?? '—'}</td>
+                      <td style={tdStyle}>{r.turbina || '—'}</td>
+                      <td style={tdStyle}>{r.parque || '—'}</td>
+                      <td style={tdStyle}>{r.ubicacionDanio || '—'}</td>
+                      <td style={tdStyle}>{r.defectIdentifier || '—'}</td>
+                      <td style={tdStyle}>{r.serialPala || '—'}</td>
+                      <td style={tdStyle}>{r.lado || '—'}</td>
+                      <td style={tdStyle}>{r.tipo || '—'}</td>
+                      <td style={tdStyle}>
+                        <Badge variant={isError ? 'danger' : 'success'}>
+                          {isError ? t('uploads.statusError') : t('uploads.statusOk')}
+                        </Badge>
+                      </td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          color: isError
+                            ? 'var(--color-danger-500, #ef4444)'
+                            : 'var(--color-neutral-500)',
+                        }}
+                      >
+                        {r.motivo || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : (
+        <div>
+          <h2
+            style={{
+              margin: '0 0 var(--space-3) 0',
+              fontSize: 'var(--text-md)',
+              fontWeight: 600,
+              color: '#111827',
+            }}
+          >
+            {t('uploads.importHistory')}
+          </h2>
+
+          {isLoadingImports ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} variant="rect" height="40px" />
+              ))}
+            </div>
+          ) : (imports ?? []).length === 0 ? (
+            <EmptyState
+              icon={FileSpreadsheet}
+              title={t('uploads.importHistory')}
+              description={t('uploads.importHistoryEmpty')}
+            />
+          ) : (
+            <table style={tableStyle} role="grid" aria-label="Defect import history">
+              <thead>
+                <tr>
+                  <th style={thStyle}>{t('uploads.histFile')}</th>
+                  <th style={thStyle}>{t('uploads.histUploadedBy')}</th>
+                  <th style={thStyle}>{t('uploads.histTotal')}</th>
+                  <th style={thStyle}>{t('uploads.histOk')}</th>
+                  <th style={thStyle}>{t('uploads.histErrors')}</th>
+                  <th style={thStyle}>{t('uploads.histDate')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(imports ?? []).map((imp) => (
+                  <tr
+                    key={imp.id}
+                    style={rowStyle}
+                    onClick={() => setSelectedImportId(imp.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedImportId(imp.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="row"
+                    aria-label={`Import ${imp.fileName ?? imp.id}`}
+                  >
+                    <td style={tdStyle}>{imp.fileName || '—'}</td>
+                    <td style={tdStyle}>{imp.uploadedByName || '—'}</td>
+                    <td style={tdStyle}>{imp.total}</td>
+                    <td style={{ ...tdStyle, color: 'var(--color-success-600, #16a34a)' }}>
+                      {imp.okCount}
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        color:
+                          imp.errorCount > 0
+                            ? 'var(--color-danger-500, #ef4444)'
+                            : 'var(--color-neutral-800)',
+                      }}
+                    >
+                      {imp.errorCount}
+                    </td>
+                    <td style={tdStyle}>
+                      {imp.createdAt ? new Date(imp.createdAt).toLocaleString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );
