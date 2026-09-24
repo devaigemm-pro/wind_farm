@@ -585,6 +585,58 @@ export const translations: TranslationMap = {
   'uploads.importErrors': { en: 'Rows with error', es: 'Filas con error' },
   'uploads.importRow': { en: 'Row', es: 'Fila' },
 
+  // ─── Two-tab layout ─────────────────────────────────────────────────────────
+  'uploads.tabPhotos': { en: 'Inspection photos', es: 'Fotos a inspección' },
+  'uploads.tabDefects': { en: 'Defects (spreadsheet)', es: 'Defectos (planilla)' },
+  'uploads.campaign': { en: 'Campaign', es: 'Campaña' },
+
+  // Photo upload panel
+  'uploads.uploadPhotosTitle': { en: 'Upload photos', es: 'Cargar fotos' },
+  'uploads.selectCampaign': { en: 'Select campaign', es: 'Selecciona campaña' },
+  'uploads.selectBlade': { en: 'Select blade', es: 'Selecciona pala' },
+  'uploads.selectFace': { en: 'Select face', es: 'Selecciona cara' },
+  'uploads.blade': { en: 'Blade', es: 'Pala' },
+  'uploads.face': { en: 'Face', es: 'Cara' },
+  'uploads.bladePosition': { en: 'Blade {n}', es: 'Pala {n}' },
+  'uploads.dragAndDrop': {
+    en: 'Drag & drop photos here, or click to select',
+    es: 'Arrastra y suelta las fotos aquí, o haz clic para seleccionar',
+  },
+  'uploads.dropHere': { en: 'Drop the photos here', es: 'Suelta las fotos aquí' },
+  'uploads.addPhotos': { en: 'Add photos', es: 'Agregar fotos' },
+  'uploads.pickCampaignFirst': {
+    en: 'Select a campaign, blade and face before uploading.',
+    es: 'Selecciona campaña, pala y cara antes de subir.',
+  },
+  'uploads.uploadingPhotos': { en: 'Uploading photos…', es: 'Subiendo fotos…' },
+  'uploads.uploadPhotosSuccess': {
+    en: '{n} photo(s) uploaded',
+    es: '{n} foto(s) cargada(s)',
+  },
+  'uploads.uploadPhotosFailed': {
+    en: 'Some photos could not be uploaded',
+    es: 'No se pudieron subir algunas fotos',
+  },
+  'uploads.noBlades': {
+    en: 'No blades registered for this campaign yet.',
+    es: 'Aún no hay palas registradas para esta campaña.',
+  },
+
+  // Defects import summary
+  'uploads.importSummaryTitle': { en: 'Import summary', es: 'Resumen de importación' },
+  'uploads.summaryTotal': { en: 'Total rows', es: 'Filas totales' },
+  'uploads.summaryOk': { en: 'Rows OK', es: 'Filas OK' },
+  'uploads.summaryErrors': { en: 'Rows with error', es: 'Filas con error' },
+  'uploads.affectedCampaigns': {
+    en: 'Affected repair campaigns',
+    es: 'Campañas de reparación afectadas',
+  },
+  'uploads.noImportYet': {
+    en: 'Upload an .xlsx spreadsheet to import defects and build repair campaigns.',
+    es: 'Sube una planilla .xlsx para importar defectos y armar campañas de reparación.',
+  },
+  'uploads.viewRepair': { en: 'View repair', es: 'Ver reparación' },
+
   // ─── Annotate Step (additional) ─────────────────────────────────────────────
   'annotate.blade': { en: 'Blade: ', es: 'Pala: ' },
   'annotate.side': { en: 'Side: ', es: 'Cara: ' },
