@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Upload, FileSpreadsheet, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Upload, FileSpreadsheet, ExternalLink, Download } from 'lucide-react';
 import { Button, Badge, Skeleton } from '@/components/atoms';
 import { EmptyState, TabBar } from '@/components/molecules';
 import { useLanguage } from '@/components/design-system';
@@ -11,7 +11,10 @@ import {
   useDefectImports,
   useDefectImportRows,
 } from '@/hooks/useImportRepairCampaign';
+import { useWindFarms } from '@/hooks/useWindFarms';
+import { useTurbines } from '@/hooks/useTurbines';
 import { droneUploadService } from '@/services/drone-upload.service';
+import { downloadDefectTemplate } from '@/services/repair-import.service';
 import { BLADE_FACE_LABELS } from '@/types';
 import type { CampaignStatus, UploadRecord, BladeFace } from '@/types';
 import type { BadgeVariant } from '@/components/atoms';
@@ -604,21 +607,47 @@ function DefectsTab() {
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const importRepair = useImportRepairCampaign();
 
+  // Import target: park → turbine (turbine depends on the selected park and
+  // resets whenever the park changes). Both required to enable the import.
+  const [windFarmId, setWindFarmId] = useState('');
+  const [turbineId, setTurbineId] = useState('');
+  const { data: windFarms } = useWindFarms();
+  const { data: turbines } = useTurbines(windFarmId);
+
   const { data: imports, isLoading: isLoadingImports } = useDefectImports();
   const { data: importRows, isLoading: isLoadingRows } = useDefectImportRows(selectedImportId);
 
+  const canImport = !!windFarmId && !!turbineId && !importRepair.isPending;
+
   const handleImportClick = useCallback(() => {
+    if (!windFarmId || !turbineId) {
+      toast.warning(t('uploads.pickFarmTurbineFirst'));
+      return;
+    }
     fileInputRef.current?.click();
-  }, []);
+  }, [windFarmId, turbineId, toast, t]);
 
   const handleFileSelected = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       e.target.value = '';
       if (!file) return;
+      if (!windFarmId || !turbineId) {
+        toast.warning(t('uploads.pickFarmTurbineFirst'));
+        return;
+      }
+
+      const windFarmName = (windFarms ?? []).find((f) => f.id === windFarmId)?.name;
+      const turbineName = (turbines ?? []).find((tb) => tb.id === turbineId)?.name;
 
       try {
-        const result = await importRepair.mutateAsync(file);
+        const result = await importRepair.mutateAsync({
+          file,
+          windFarmId,
+          turbineId,
+          windFarmName,
+          turbineName,
+        });
         setSummary(result);
         if (result.errores.length === 0) {
           toast.success(
@@ -637,7 +666,7 @@ function DefectsTab() {
         toast.error(err instanceof Error ? err.message : t('uploads.importFailed'));
       }
     },
-    [importRepair, toast, t],
+    [importRepair, toast, t, windFarmId, turbineId, windFarms, turbines],
   );
 
   const statCardStyle: React.CSSProperties = {
@@ -665,25 +694,87 @@ function DefectsTab() {
   return (
     <div style={{ ...tableContainerStyle, display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       {/* Import action */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx"
-          onChange={handleFileSelected}
-          style={{ display: 'none' }}
-          aria-hidden="true"
-        />
-        <Button
-          variant="primary"
-          size="sm"
-          icon={FileSpreadsheet}
-          onClick={handleImportClick}
-          loading={importRepair.isPending}
-          title={t('uploads.importRepairHint')}
-        >
-          {importRepair.isPending ? t('uploads.importing') : t('uploads.importRepair')}
-        </Button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 'var(--space-3)' }}>
+          {/* Park select */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>
+              {t('uploads.farm')}
+            </span>
+            <select
+              style={selectStyle}
+              value={windFarmId}
+              onChange={(e) => {
+                setWindFarmId(e.target.value);
+                setTurbineId('');
+              }}
+              aria-label={t('uploads.selectFarm')}
+            >
+              <option value="">{t('uploads.selectFarm')}</option>
+              {(windFarms ?? []).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Turbine select — depends on the selected park */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>
+              {t('uploads.turbineLabel')}
+            </span>
+            <select
+              style={selectStyle}
+              value={turbineId}
+              onChange={(e) => setTurbineId(e.target.value)}
+              disabled={!windFarmId}
+              aria-label={t('uploads.selectTurbine')}
+            >
+              <option value="">{t('uploads.selectTurbine')}</option>
+              {(turbines ?? []).map((tb) => (
+                <option key={tb.id} value={tb.id}>
+                  {tb.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            onChange={handleFileSelected}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            icon={FileSpreadsheet}
+            onClick={handleImportClick}
+            loading={importRepair.isPending}
+            disabled={!canImport}
+            title={t('uploads.importRepairHint')}
+          >
+            {importRepair.isPending ? t('uploads.importing') : t('uploads.importRepair')}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={() => void downloadDefectTemplate()}
+            title={t('uploads.downloadTemplateHint')}
+          >
+            {t('uploads.downloadTemplate')}
+          </Button>
+        </div>
+
+        {(!windFarmId || !turbineId) && (
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
+            {t('uploads.pickFarmTurbineFirst')}
+          </p>
+        )}
       </div>
 
       {!summary && !importRepair.isPending && (

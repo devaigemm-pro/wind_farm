@@ -11,10 +11,24 @@ import {
  * creates/reuses the repair campaign per turbine and links each defect into the
  * repair tree. Invalidates the affected queries on success.
  */
+export interface ImportRepairCampaignVars {
+  file: File;
+  windFarmId: string;
+  turbineId: string;
+  windFarmName?: string;
+  turbineName?: string;
+}
+
 export function useImportRepairCampaign() {
   const queryClient = useQueryClient();
-  return useMutation<RepairImportSummary, Error, File>({
-    mutationFn: (file: File) => repairImportService.importFromFile(file),
+  return useMutation<RepairImportSummary, Error, ImportRepairCampaignVars>({
+    mutationFn: ({ file, windFarmId, turbineId, windFarmName, turbineName }) =>
+      repairImportService.importFromFile(file, {
+        windFarmId,
+        turbineId,
+        windFarmName,
+        turbineName,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upload-records'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });

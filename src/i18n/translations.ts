@@ -584,6 +584,19 @@ export const translations: TranslationMap = {
   },
   'uploads.importErrors': { en: 'Rows with error', es: 'Filas con error' },
   'uploads.importRow': { en: 'Row', es: 'Fila' },
+  // Defect import target (park + turbine combobox)
+  'uploads.turbineLabel': { en: 'Turbine', es: 'Turbina' },
+  'uploads.selectFarm': { en: 'Select wind farm', es: 'Selecciona parque' },
+  'uploads.selectTurbine': { en: 'Select turbine', es: 'Selecciona turbina' },
+  'uploads.pickFarmTurbineFirst': {
+    en: 'Select a wind farm and turbine before importing.',
+    es: 'Selecciona parque y turbina antes de importar.',
+  },
+  'uploads.downloadTemplate': { en: 'Download template', es: 'Descargar plantilla' },
+  'uploads.downloadTemplateHint': {
+    en: 'Download an empty .xlsx template with the expected columns.',
+    es: 'Descarga una plantilla .xlsx vacía con las columnas esperadas.',
+  },
 
   // ─── Two-tab layout ─────────────────────────────────────────────────────────
   'uploads.tabPhotos': { en: 'Inspection photos', es: 'Fotos a inspección' },

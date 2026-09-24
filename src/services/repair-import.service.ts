@@ -8,9 +8,6 @@ const db = supabase as any;
 export interface RepairImportRow {
   /** Excel row number (1-based, header excluded) — for error reporting. */
   fila: number;
-  /** Wind farm name (wind_farm.name) — used with `turbina` to resolve the exact turbine. */
-  parque: string;
-  turbina: string;
   /** Raw "Ubicacion del daño" cell from the Excel (number as string, e.g. "43000"); parsed on insert. */
   ubicacionDanio: string;
   /** External identifier from the Excel (e.g. "DAÑO 1"), stored in defect.defect_identifier. */
@@ -18,6 +15,19 @@ export interface RepairImportRow {
   serialPala: string;
   lado: string;
   tipoEspanol: string;
+}
+
+/**
+ * Selected target for an import run. Parque and turbina are no longer read from
+ * the spreadsheet — the operator picks them in the Defects tab combobox and they
+ * apply to EVERY row of the file. `windFarmName`/`turbineName` are used only for
+ * the history snapshot (so the detail view still shows park/turbine).
+ */
+export interface RepairImportTarget {
+  windFarmId: string;
+  turbineId: string;
+  windFarmName?: string;
+  turbineName?: string;
 }
 
 export interface RepairImportRowError {
@@ -127,8 +137,9 @@ function parseUbicacion(value: string): number | null {
 /**
  * Parse the first worksheet of an .xlsx File into RepairImportRow[].
  * Uses the dynamic-import ExcelJS pattern (same as ExportPanel.tsx).
- * Column order (row 1 = header):
- *   1 Parque | 2 Turbina | 3 Ubicacion del daño (mm) | 4 Identificador Defecto | 5 Pala(serial) | 6 Lado | 7 Tipo
+ * Column order (row 1 = header) — parque/turbina are NOT in the file anymore
+ * (they come from the Defects tab combobox):
+ *   1 Ubicacion del daño (mm) | 2 Identificador Defecto | 3 Pala(serial) | 4 Lado | 5 Tipo
  */
 export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const ExcelJS = (await import('exceljs')).default;
@@ -155,18 +166,46 @@ export async function parseRepairRows(file: File): Promise<RepairImportRow[]> {
   const rows: RepairImportRow[] = [];
   sheet.eachRow((row, n) => {
     if (n === 1) return; // header
-    const parque = cellText(row.getCell(1).value);
-    const turbina = cellText(row.getCell(2).value);
-    const ubicacionDanio = cellText(row.getCell(3).value);
-    const defectIdentifier = cellText(row.getCell(4).value);
-    const serialPala = cellText(row.getCell(5).value);
-    const lado = cellText(row.getCell(6).value);
-    const tipoEspanol = cellText(row.getCell(7).value);
+    const ubicacionDanio = cellText(row.getCell(1).value);
+    const defectIdentifier = cellText(row.getCell(2).value);
+    const serialPala = cellText(row.getCell(3).value);
+    const lado = cellText(row.getCell(4).value);
+    const tipoEspanol = cellText(row.getCell(5).value);
     // Skip fully empty rows.
-    if (!parque && !turbina && !ubicacionDanio && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
-    rows.push({ fila: n, parque, turbina, ubicacionDanio, defectIdentifier, serialPala, lado, tipoEspanol });
+    if (!ubicacionDanio && !defectIdentifier && !serialPala && !lado && !tipoEspanol) return;
+    rows.push({ fila: n, ubicacionDanio, defectIdentifier, serialPala, lado, tipoEspanol });
   });
   return rows;
+}
+
+/**
+ * Build and download an .xlsx template with ONLY the header row of the current
+ * defect-import format. Uses the dynamic-import ExcelJS pattern (same as
+ * parseRepairRows / ExportPanel.tsx) — no external binary.
+ */
+export async function downloadDefectTemplate(): Promise<void> {
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Defectos');
+  sheet.addRow([
+    'Ubicacion del daño (mm)',
+    'Identificador Defecto',
+    'Pala(serial)',
+    'Lado',
+    'Tipo',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+
+  const xlsxBuffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([xlsxBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'plantilla-carga-defectos.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Repair campaign per turbine (cache within a run) ────────────────────────
@@ -270,10 +309,19 @@ export const repairImportService = {
    */
   async importFromRows(
     rows: RepairImportRow[],
-    fileName?: string,
+    fileName: string | undefined,
+    target: RepairImportTarget,
   ): Promise<RepairImportSummary> {
     const user = (await db.auth.getUser()).data.user;
     const userId = user?.id ?? null;
+
+    if (!target?.windFarmId) throw new Error('Parque no seleccionado');
+    if (!target?.turbineId) throw new Error('Turbina no seleccionada');
+    const windFarmId = target.windFarmId;
+    const turbineId = target.turbineId;
+    // Display names for the campaign/summary/history snapshot.
+    const parqueNombre = (target.windFarmName ?? '').trim();
+    const turbinaNombre = (target.turbineName ?? '').trim();
 
     // Load defect types once per run (annotation_type is the source of truth).
     const typeMap = await loadDefectTypeMap();
@@ -288,48 +336,30 @@ export const repairImportService = {
 
     for (const row of rows) {
       try {
-        const parque = row.parque.trim();
-        const turbina = row.turbina.trim();
         const serialPala = row.serialPala.trim();
         const lado = row.lado.trim().toUpperCase();
         const defectIdentifier = row.defectIdentifier.trim();
 
-        if (!parque) throw new Error('Parque vacío');
-        if (!turbina) throw new Error('Turbina vacía');
         if (!serialPala) throw new Error('Serial de pala vacío');
         if (!defectIdentifier) throw new Error('Identificador de defecto vacío');
 
-        // 1. Wind farm (by name) → resolves the exact turbine (park + turbine),
-        //    since turbine names can repeat across parks.
-        const { data: windFarm } = await db
-          .from('wind_farm')
-          .select('id')
-          .eq('name', parque)
-          .maybeSingle();
-        if (!windFarm) throw new Error(`Parque "${parque}" no encontrado`);
-        const windFarmId = windFarm.id as string;
+        // Wind farm + turbine come from the selected combobox (target), shared
+        // by every row of the file — no longer resolved by name per row.
 
-        // 2. Turbine (by name WITHIN the wind farm).
-        const { data: turbine } = await db
-          .from('turbine')
-          .select('id')
-          .eq('name', turbina)
-          .eq('wind_farm_id', windFarmId)
-          .maybeSingle();
-        if (!turbine) throw new Error(`Turbina "${turbina}" no encontrada en "${parque}"`);
-        const turbineId = turbine.id as string;
-
-        // 3. Blade (by serial within the turbine)
+        // 1. Blade (by serial within the selected turbine)
         const { data: blade } = await db
           .from('blade')
           .select('id, position')
           .eq('turbine_id', turbineId)
           .eq('serial_number', serialPala)
           .maybeSingle();
-        if (!blade) throw new Error(`Pala ${serialPala} no encontrada en ${turbina}`);
+        if (!blade)
+          throw new Error(
+            `Pala ${serialPala} no encontrada en ${turbinaNombre || 'la turbina seleccionada'}`,
+          );
         const bladeId = blade.id as string;
 
-        // 4. Inspection of that blade (latest) or create one.
+        // 2. Inspection of that blade (latest) or create one.
         let inspectionId: string;
         const { data: insp } = await db
           .from('inspection')
@@ -359,10 +389,10 @@ export const repairImportService = {
           inspectionId = newInsp.id as string;
         }
 
-        // 5. Defect type mapping (against annotation_type; rejects unknown types)
+        // 3. Defect type mapping (against annotation_type; rejects unknown types)
         const type = mapDefectType(row.tipoEspanol, typeMap);
 
-        // 6. Defect. distance_from_root now comes directly from the Excel
+        // 4. Defect. distance_from_root now comes directly from the Excel
         //    ("Ubicacion del daño" column, in mm) via parseUbicacion. The external
         //    identifier ("DAÑO 1") is stored verbatim in defect_identifier.
         const { data: defect, error: defectErr } = await db
@@ -384,17 +414,17 @@ export const repairImportService = {
         if (defectErr) throw new Error(defectErr.message);
         const defectId = defect.id as string;
 
-        // 7. Repair campaign (one per turbine per run)
+        // 5. Repair campaign (one per turbine per run)
         const campaign = await getOrCreateRepairCampaign(
           campaignCache,
           turbineId,
           windFarmId,
-          turbina,
+          turbinaNombre,
           userId,
         );
-        campaignTurbineName.set(campaign.campaignId, turbina);
+        campaignTurbineName.set(campaign.campaignId, turbinaNombre);
 
-        // 8. Link defect into the repair tree:
+        // 6. Link defect into the repair tree:
         //    quote_item → work_order → repair
         const now = new Date().toISOString();
         const { data: quoteItem, error: qiErr } = await db
@@ -467,15 +497,16 @@ export const repairImportService = {
       ok,
       errores.length,
       rowResults,
+      { parque: parqueNombre, turbina: turbinaNombre },
     );
 
     return { total: rows.length, ok, errores, campanias, importId };
   },
 
   /** Convenience wrapper: parse the File then import (keeps the file name). */
-  async importFromFile(file: File): Promise<RepairImportSummary> {
+  async importFromFile(file: File, target: RepairImportTarget): Promise<RepairImportSummary> {
     const rows = await parseRepairRows(file);
-    return this.importFromRows(rows, file.name);
+    return this.importFromRows(rows, file.name, target);
   },
 
   /**
@@ -549,6 +580,7 @@ async function persistImportHistory(
   okCount: number,
   errorCount: number,
   rowResults: { row: RepairImportRow; status: 'ok' | 'error'; motivo: string | null }[],
+  target: { parque: string; turbina: string },
 ): Promise<string | null> {
   try {
     const { data: batch, error: batchErr } = await db
@@ -569,8 +601,10 @@ async function persistImportHistory(
       const rowsPayload = rowResults.map(({ row, status, motivo }) => ({
         import_id: importId,
         fila: row.fila,
-        parque: row.parque,
-        turbina: row.turbina,
+        // Park/turbine now come from the selected combobox (shared by all rows),
+        // not from the spreadsheet — so the detail view still shows them.
+        parque: target.parque || null,
+        turbina: target.turbina || null,
         ubicacion_danio: row.ubicacionDanio,
         defect_identifier: row.defectIdentifier,
         serial_pala: row.serialPala,
