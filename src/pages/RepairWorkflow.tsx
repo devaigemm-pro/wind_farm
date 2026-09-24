@@ -4,7 +4,6 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil,
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
-import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import {
   useRepairCampaignDetail,
   useRepairTree,
@@ -98,9 +97,6 @@ export function RepairWorkflow() {
   const setSelected = useSetPhotoSelected(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
-  // Catalog of defect types (annotation_type) for the inline edit <select>,
-  // same source used by DefectEditForm.
-  const { data: annotationTypes = [] } = useAnnotationTypes();
 
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
@@ -281,8 +277,6 @@ export function RepairWorkflow() {
       );
     });
 
-  const typeOptions = annotationTypes.map((at) => at.name);
-
   if (campaignLoading) {
     return <div style={page}><p style={{ color: C.muted }}>{t('general.loading')}</p></div>;
   }
@@ -327,7 +321,6 @@ export function RepairWorkflow() {
               repairsWithReport={repairsWithReport}
               onDelete={isClient ? undefined : handleDeleteDefect}
               downloadingDefectId={downloadingDefectId}
-              typeOptions={typeOptions}
               onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
             />
           ))}
@@ -375,8 +368,6 @@ interface BladeGroupSectionProps {
   repairsWithReport: Set<string>;
   onDelete?: (node: RepairDefectNode) => void;
   downloadingDefectId: string | null;
-  /** Defect type catalog (annotation_type names) for the inline edit select. */
-  typeOptions: string[];
   /** Persist the three editable defect fields (undefined = read-only client). */
   onSaveDefectFields?: (
     defectId: string,
@@ -402,7 +393,6 @@ function BladeGroupSection({
   repairsWithReport,
   onDelete,
   downloadingDefectId,
-  typeOptions,
   onSaveDefectFields,
 }: BladeGroupSectionProps) {
   const [open, setOpen] = useState(false);
@@ -437,7 +427,6 @@ function BladeGroupSection({
               hasReport={node.repairId != null && repairsWithReport.has(node.repairId)}
               onDelete={onDelete}
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
-              typeOptions={typeOptions}
               onSaveDefectFields={onSaveDefectFields}
             />
           ))}
@@ -463,8 +452,6 @@ interface DefectSectionProps {
   hasReport: boolean;
   onDelete?: (node: RepairDefectNode) => void;
   downloading: boolean;
-  /** Defect type catalog (annotation_type names) for the inline edit select. */
-  typeOptions: string[];
   /** Persist the three editable defect fields (undefined = read-only client). */
   onSaveDefectFields?: (
     defectId: string,
@@ -485,7 +472,6 @@ function DefectSection({
   hasReport,
   onDelete,
   downloading,
-  typeOptions,
   onSaveDefectFields,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
@@ -526,11 +512,12 @@ function DefectSection({
     }
   };
 
-  // Type <select> options: annotation_type names, ensuring the current type is
-  // always present (mirrors DefectEditForm).
-  const typeSelectOptions = typeOptions.includes(editType)
-    ? typeOptions
-    : [editType, ...typeOptions];
+  // Type <select> options: the valid defect.type enum keys (which satisfy the
+  // defect_type_check constraint). Ensure the current type is always present.
+  const enumTypeKeys = Object.keys(DEFECT_TYPE_LABELS);
+  const typeSelectOptions = enumTypeKeys.includes(editType)
+    ? enumTypeKeys
+    : [editType, ...enumTypeKeys];
 
   const totalPhotos = node.stages.reduce((acc, s) => acc + s.photos.length, 0);
   const selectedPhotos = node.stages.reduce(

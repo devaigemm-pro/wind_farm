@@ -587,7 +587,7 @@ export const translations: TranslationMap = {
 
   // ─── Two-tab layout ─────────────────────────────────────────────────────────
   'uploads.tabPhotos': { en: 'Inspection photos', es: 'Fotos a inspección' },
-  'uploads.tabDefects': { en: 'Defects (spreadsheet)', es: 'Defectos (planilla)' },
+  'uploads.tabDefects': { en: 'Defects upload', es: 'Carga de defectos' },
   'uploads.campaign': { en: 'Campaign', es: 'Campaña' },
 
   // Photo upload panel
