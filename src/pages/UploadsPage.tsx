@@ -1,7 +1,16 @@
 import { useState, useMemo, useCallback, useRef, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Upload, FileSpreadsheet, ExternalLink, Download } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Upload,
+  UploadCloud,
+  FileSpreadsheet,
+  ExternalLink,
+  Download,
+  Loader2,
+} from 'lucide-react';
 import { Button, Badge, Skeleton } from '@/components/atoms';
 import { EmptyState, TabBar } from '@/components/molecules';
 import { useLanguage } from '@/components/design-system';
@@ -617,8 +626,6 @@ function DefectsTab() {
   const { data: imports, isLoading: isLoadingImports } = useDefectImports();
   const { data: importRows, isLoading: isLoadingRows } = useDefectImportRows(selectedImportId);
 
-  const canImport = !!windFarmId && !!turbineId && !importRepair.isPending;
-
   const handleImportClick = useCallback(() => {
     if (!windFarmId || !turbineId) {
       toast.warning(t('uploads.pickFarmTurbineFirst'));
@@ -749,22 +756,12 @@ function DefectsTab() {
             aria-hidden="true"
           />
           <Button
-            variant="primary"
-            size="sm"
-            icon={FileSpreadsheet}
-            onClick={handleImportClick}
-            loading={importRepair.isPending}
-            disabled={!canImport}
-            title={t('uploads.importRepairHint')}
-          >
-            {importRepair.isPending ? t('uploads.importing') : t('uploads.importRepair')}
-          </Button>
-          <Button
             variant="secondary"
             size="sm"
             icon={Download}
             onClick={() => void downloadDefectTemplate()}
             title={t('uploads.downloadTemplateHint')}
+            style={{ backgroundColor: '#5A8F5A', color: '#ffffff', border: 'none' }}
           >
             {t('uploads.downloadTemplate')}
           </Button>
@@ -777,12 +774,81 @@ function DefectsTab() {
         )}
       </div>
 
-      {!summary && !importRepair.isPending && (
-        <EmptyState
-          icon={FileSpreadsheet}
-          title={t('uploads.tabDefects')}
-          description={t('uploads.noImportYet')}
-        />
+      {!summary && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--space-12) var(--space-6)',
+            textAlign: 'center',
+            fontFamily: 'var(--font-family-sans)',
+          }}
+          role="status"
+        >
+          <button
+            type="button"
+            onClick={handleImportClick}
+            disabled={importRepair.isPending}
+            aria-label={t('uploads.importRepair')}
+            title={t('uploads.importRepairHint')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '64px',
+              height: '64px',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'var(--color-neutral-100)',
+              color: 'var(--color-neutral-400)',
+              marginBottom: 'var(--space-4)',
+              border: 'none',
+              padding: 0,
+              cursor: importRepair.isPending ? 'wait' : 'pointer',
+              opacity: importRepair.isPending ? 0.6 : 1,
+              transition: 'all var(--duration-normal) var(--easing-default)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+            }}
+          >
+            {importRepair.isPending ? (
+              <Loader2
+                size={28}
+                style={{ animation: 'spin 1s linear infinite' }}
+                aria-hidden="true"
+              />
+            ) : (
+              <UploadCloud size={28} aria-hidden="true" />
+            )}
+          </button>
+          <h3
+            style={{
+              fontSize: 'var(--text-lg)',
+              fontWeight: 600,
+              color: 'var(--color-neutral-900)',
+              margin: 0,
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            {t('uploads.tabDefects')}
+          </h3>
+          <p
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-neutral-500)',
+              margin: 0,
+              maxWidth: '320px',
+              lineHeight: 1.5,
+            }}
+          >
+            {t('uploads.noImportYet')}
+          </p>
+        </div>
       )}
 
       {summary && (
