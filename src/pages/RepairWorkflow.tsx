@@ -930,9 +930,13 @@ function PhotoCard({
   onAction,
   onPreview,
 }: PhotoCardProps) {
+  const { t } = useLanguage();
   // While pending, block drag + action to avoid a double-fire on the same photo.
   const interactive = !readOnly && !pending;
+  const uploaderName = photo.uploadedBy ?? '—';
+  const uploaderLabel = `${t('uploads.uploadedBy')}: ${uploaderName}`;
   return (
+    <div style={photoCardWrap}>
     <div
       draggable={interactive}
       onDragStart={
@@ -993,6 +997,9 @@ function PhotoCard({
           <Loader2 size={22} color={C.brand} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
       )}
+    </div>
+      {/* Uploader label: who uploaded this photo (sits below the image). */}
+      <span style={photoUploader} title={uploaderLabel}>{uploaderLabel}</span>
     </div>
   );
 }
@@ -1118,9 +1125,16 @@ const colEmpty: React.CSSProperties = { fontSize: 12, color: C.muted, gridColumn
 const dropPlaceholder: React.CSSProperties = {
   fontSize: 12, color: C.muted, textAlign: 'center', padding: '16px 0', gridColumn: '1 / -1',
 };
+const photoCardWrap: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0,
+};
 const photoCard: React.CSSProperties = {
   position: 'relative', border: `2px solid ${C.border}`, borderRadius: 8, overflow: 'hidden',
   cursor: 'grab', aspectRatio: '4 / 3', background: '#f3f4f6',
+};
+const photoUploader: React.CSSProperties = {
+  fontSize: 11, color: C.muted, lineHeight: 1.3,
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 };
 const photoImg: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'cover', display: 'block' };
 const photoBroken: React.CSSProperties = {

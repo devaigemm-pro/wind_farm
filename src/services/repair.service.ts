@@ -85,6 +85,8 @@ export interface RepairPhoto {
   url: string;
   /** Resolved public URL of the thumbnail (thumbnail_path) for the grid; falls back to url. */
   thumbnailUrl: string;
+  /** Readable name of the technician who uploaded the photo (repair_photos_detailed.technician_name), or null. */
+  uploadedBy: string | null;
 }
 
 /** One repair stage (of the 11) with its photos, scoped to a single repair. */
@@ -483,6 +485,33 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
   return selected;
 }
 
+/**
+ * Resolve the uploader's readable name per photo id. The read-only RPC
+ * get_repair_photos_by_stage doesn't expose the uploader, and repair_photo has
+ * no uploader column, so we source the already-resolved `technician_name` from
+ * the official `repair_photos_detailed` view (keyed by photo_id). One batched
+ * query for all photos.
+ */
+async function fetchUploaderByPhotoId(photoIds: string[]): Promise<Map<string, string>> {
+  const byId = new Map<string, string>();
+  const unique = [...new Set(photoIds.filter(Boolean))];
+  if (unique.length === 0) return byId;
+
+  const { data, error } = await db
+    .from('repair_photos_detailed')
+    .select('photo_id, technician_name')
+    .in('photo_id', unique);
+  if (error) throw new RepairServiceError(error.message, error.code);
+
+  for (const row of (data as unknown[]) ?? []) {
+    const r = row as Record<string, unknown>;
+    const id = r.photo_id as string;
+    const name = (r.technician_name as string) ?? '';
+    if (id && name) byId.set(id, name);
+  }
+  return byId;
+}
+
 /** Map a raw photo object (from the RPC photos[] array) to a RepairPhoto. */
 function mapPhoto(
   raw: Record<string, unknown>,
@@ -490,6 +519,7 @@ function mapPhoto(
   repairStageId: string | null,
   stageCode: string,
   selectedIds: Set<string>,
+  uploaderById: Map<string, string>,
 ): RepairPhoto {
   const id = (raw.photo_id as string) ?? '';
   const storagePath = (raw.storage_path as string) ?? '';
@@ -509,6 +539,7 @@ function mapPhoto(
     repairSelected: selectedIds.has(id),
     url,
     thumbnailUrl,
+    uploadedBy: uploaderById.get(id) ?? null,
   };
 }
 
@@ -546,13 +577,14 @@ function mapStages(
   repairId: string,
   stageRows: RepairStageRow[],
   selectedIds: Set<string>,
+  uploaderById: Map<string, string>,
   stageFlags?: Map<string, RepairStageFlags>,
 ): RepairStageNode[] {
   const nodes = stageRows.map((stage) => {
     const stageId = stage.repair_stage_id ?? null;
     const stageCode = stage.stage_code ?? '';
     const photos = parsePhotosArray(stage.photos)
-      .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds))
+      .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds, uploaderById))
       .sort((a, b) => a.captureOrder - b.captureOrder);
     // Optional/enabled/z1/z2 come from repair_stage (the RPC does NOT return
     // them). When a stage_code isn't present in repair_stage, default to a
@@ -859,6 +891,10 @@ export const repairService = {
     }
     const selectedIds = await fetchSelectedPhotoIds(allPhotoIds);
 
+    // 8b. Resolve the uploader's readable name for every photo id in one query
+    //     (from repair_photos_detailed.technician_name, keyed by photo_id).
+    const uploaderByPhotoId = await fetchUploaderByPhotoId(allPhotoIds);
+
     // 9. Build one node per work_order (i.e. per defect of the campaign),
     //    keeping the defect's created_at alongside for the final ordering.
     const built = workOrders.map((wo) => {
@@ -873,6 +909,7 @@ export const repairService = {
             repairId,
             stagesByRepair.get(repairId) ?? [],
             selectedIds,
+            uploaderByPhotoId,
             stageFlagsByRepair.get(repairId),
           )
         : catalogStages();
