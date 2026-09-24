@@ -4,6 +4,7 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil,
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import {
   useRepairCampaignDetail,
   useRepairTree,
@@ -94,6 +95,10 @@ export function RepairWorkflow() {
 
   const { data: campaign, isLoading: campaignLoading } = useRepairCampaignDetail(campaignId);
   const { data: tree, isLoading: treeLoading } = useRepairTree(campaignId);
+  // Full list of annotation type names (~20) — matches the Excel importer and
+  // the annotations. The defect_type_check constraint now accepts all of them.
+  const { data: annotationTypes = [] } = useAnnotationTypes();
+  const typeOptions = annotationTypes.map((at) => at.name);
   const setSelected = useSetPhotoSelected(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
@@ -322,6 +327,7 @@ export function RepairWorkflow() {
               onDelete={isClient ? undefined : handleDeleteDefect}
               downloadingDefectId={downloadingDefectId}
               onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
+              typeOptions={typeOptions}
             />
           ))}
         </div>
@@ -373,6 +379,8 @@ interface BladeGroupSectionProps {
     defectId: string,
     fields: { type: string; defectNumber: string; defectIdentifier: string },
   ) => Promise<void>;
+  /** Full list of annotation type names offered by the inline type <select>. */
+  typeOptions: string[];
 }
 
 /**
@@ -394,6 +402,7 @@ function BladeGroupSection({
   onDelete,
   downloadingDefectId,
   onSaveDefectFields,
+  typeOptions,
 }: BladeGroupSectionProps) {
   const [open, setOpen] = useState(false);
   const bladeLabel = group.serial
@@ -428,6 +437,7 @@ function BladeGroupSection({
               onDelete={onDelete}
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
               onSaveDefectFields={onSaveDefectFields}
+              typeOptions={typeOptions}
             />
           ))}
         </div>
@@ -457,6 +467,8 @@ interface DefectSectionProps {
     defectId: string,
     fields: { type: string; defectNumber: string; defectIdentifier: string },
   ) => Promise<void>;
+  /** Full list of annotation type names offered by the inline type <select>. */
+  typeOptions: string[];
 }
 
 function DefectSection({
@@ -473,6 +485,7 @@ function DefectSection({
   onDelete,
   downloading,
   onSaveDefectFields,
+  typeOptions,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
   const [open, setOpen] = useState(false);
@@ -512,12 +525,13 @@ function DefectSection({
     }
   };
 
-  // Type <select> options: the valid defect.type enum keys (which satisfy the
-  // defect_type_check constraint). Ensure the current type is always present.
-  const enumTypeKeys = Object.keys(DEFECT_TYPE_LABELS);
-  const typeSelectOptions = enumTypeKeys.includes(editType)
-    ? enumTypeKeys
-    : [editType, ...enumTypeKeys];
+  // Type <select> options: the full list of annotation type names (coherent
+  // with the Excel importer and the annotations). The defect_type_check
+  // constraint now accepts all of them. Ensure the current type is always
+  // present so the current value is never lost even if it's not in the list.
+  const typeSelectOptions = typeOptions.includes(editType)
+    ? typeOptions
+    : [editType, ...typeOptions];
 
   const totalPhotos = node.stages.reduce((acc, s) => acc + s.photos.length, 0);
   const selectedPhotos = node.stages.reduce(
