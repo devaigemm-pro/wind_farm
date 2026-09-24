@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 281
+- **Sesiones analizadas**: 284
 - **Última actualización**: 2026-09-24
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1799,3 +1799,32 @@
   - El desarrollador (sub-agente) NO tiene execute_bash ni MCP → NO puede aplicar migraciones, buildear ni verificar en BD. El compañero (yo) debo hacer siempre: aplicar migración (Management API con SUPABASE_ACCESS_TOKEN), build (pnpm run build), y verificación en BD. Delegar solo el código.
   - La migración se aplica de inmediato a la BD compartida (no hay entorno separado de BD); solo falta desplegar el frontend. Avisé y quedé esperando aprobación de deploy.
 - **Patrones confirmados**: español, ultra-directo (respuestas numeradas), modo compañero, rigor sobre origen del dato, verificar con datos reales antes de reportar, aplicar migración a prod cuando el usuario eligió explícitamente, pedir aprobación antes de deploy de frontend.
+
+### Sesión 282 - 2026-09-24
+- **Tarea principal**: "a prod" — desplegar a producción el cambio del label de uploader real por foto en Repairs.
+- **Observaciones nuevas**:
+  - "a prod" (2 palabras) = aprobación explícita de deploy. Ejecutar el flujo completo sin más preguntas: commit en session branch/main → fetch+sync origin/main → push → vercel --prod --yes → verificar bundle.
+  - Flujo de deploy confirmado (3+ sesiones = alta confianza): el push a main NO dispara Vercel; deploy manual con `vercel --prod --yes`. Alias prod: wind-farm-eight.vercel.app.
+  - Verificación post-deploy sin login: grep de la cadena nueva del feature (get_repair_photo_uploaders) en el chunk index-*.js servido en prod. Confirmé que el bundle nuevo (index-Di5aD8hO.js) invoca la RPC.
+  - Estaba en branch main (no session branch) al iniciar; los cambios de código+migración estaban sin commitear. Commiteé código+migración por separado de logs/perfil.
+- **Patrones confirmados**: español, ultra-directo, modo compañero, aprobación de deploy en 1-2 palabras, deploy manual vercel --prod, verificación por hash/grep de bundle, honestidad sobre limitación de verificación visual (sin credenciales de la app).
+
+### Sesión 283 - 2026-09-24
+- **Tarea principal**: En /inspections/upload (carga de defectos), las cargas de planillas no quedan registradas. Debe aparecer el historial de TODOS los usuarios que cargan, y al hacer click en un registro ver los datos cargados.
+- **Observaciones nuevas**:
+  - DIAGNÓSTICO (context-gatherer): la importación de planilla (tab Defects de UploadsPage) escribe directo a tablas de negocio (defect, campaign, quote, work_order, repair) pero NO persiste ningún registro de "carga/import batch". El resumen (RepairImportSummary) solo vive en estado React → se pierde al recargar. Por eso "no quedan registradas".
+  - Falta construir de cero: (1) tabla de import records con uploaded_by + snapshot de filas + resultado, (2) insert en repairImportService.importFromRows, (3) listado sin filtro por usuario en el tab Defects, (4) vista de detalle al click.
+  - El listado del tab Photos SÍ existe (RPC get_upload_records, no filtra por usuario en el body pero es SECURITY INVOKER → RLS aplica). Ojo: las RPCs SQL de este proyecto viven en scripts/ Y en supabase/migrations/.
+  - Antes de delegar, hice UNA pregunta de producto (qué mostrar en el detalle: filas crudas de la planilla vs defectos creados) porque afecta el diseño de la tabla. Coherente con el perfil: preguntar cuando hay decisión de producto real, no técnica.
+  - Archivos clave: src/pages/UploadsPage.tsx (DefectsTab ~546+), src/services/repair-import.service.ts, src/hooks/useImportRepairCampaign.ts, scripts/upload-records-rpc.sql.
+- **Patrones confirmados**: español, directo, modo compañero, URL exacta + descripción del problema en una frase, describe desde lo visual/UX (no técnico), confía en que el agente diagnostique, alta autonomía. Pregunta de producto pendiente antes de implementar.
+
+### Sesión 284 - 2026-09-24
+- **Tarea principal**: "A" — construir el historial persistente de cargas de planillas de defectos (opción A: snapshot de filas crudas + resultado por fila).
+- **Observaciones nuevas**:
+  - Respuesta de 1 letra ("A") = elección entre opciones que le presenté. Ejecutar de inmediato con esa decisión.
+  - Feature construido de cero: 2 tablas nuevas (defect_import batch + defect_import_row snapshot) con RLS que permite leer TODAS las cargas (USING true, sin filtro por auth.uid()), persistencia secundaria en importFromRows (si falla no aborta el import), servicio+hooks de lectura, y UI en DefectsTab (historial clickable + detalle de filas con estado ok/error resaltado).
+  - Patrón "doble path" de este proyecto: preferí insertar historial en el mismo repairImportService trackeando resultado por fila (ok/error) en orden del Excel.
+  - Repetido: el sub-agente desarrollador NO tiene execute_bash ni POST a Management API (solo GET) ni MCP Supabase conectado → NO puede aplicar migración ni buildear. Yo (compañero) aplico migración (Management API POST /database/query con SUPABASE_ACCESS_TOKEN), verifico tablas+policies, y hago pnpm run build. Delegar solo el código. CONFIRMADO 2+ sesiones seguidas.
+  - Esta vez levanté PREVIEW local (puerto 4174) en vez de ir directo a prod, y pregunté si revisar preview o deployar. Feature grande (tablas nuevas) justifica revisión previa.
+- **Patrones confirmados**: español, ultra-directo (respuesta "A"), modo compañero, alta autonomía, verificar migración+build antes de reportar, aplicar migración a BD compartida cuando el usuario eligió, pedir aprobación antes de deploy de frontend.
