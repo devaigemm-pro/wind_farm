@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 277
-- **Última actualización**: 2026-09-23
+- **Sesiones analizadas**: 281
+- **Última actualización**: 2026-09-24
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -96,6 +96,8 @@
 ---
 
 - **"un ejemplo concreto = especificación exacta"** — cuando el usuario da un ejemplo de datos (ej. códigos "A1, A34, B4, B6" no consecutivos), ese ejemplo DEFINE el comportamiento esperado al detalle. Los números no consecutivos indicaban que el código debía ser el ORIGINAL de la pantalla de referencia (ANALYZE), no un correlativo nuevo. No interpretar de forma laxa: reproducir el patrón exacto que el ejemplo implica. Correlaciona con "usar el mismo método que X" y "diagnosticar más profundo".
+- **"aplicar en prod" = deploy manual con Vercel CLI** — en este proyecto el push a `main` NO dispara deploy automático de Vercel. Cuando el usuario aprueba deploy ("aplicar en prod", "mergea", "libera"): rebase sobre origin/main → merge a main → push origin main → `vercel --prod --yes` (CLI ya autenticado, proyecto dev-ai2/wind-farm, alias `wind-farm-eight.vercel.app`). Verificar comparando el hash del chunk `index-*.js` servido en prod y grep de la cadena nueva del feature. NO asumir que el push solo basta.
+
 ## 8. Historial de Observaciones por Sesión
 
 ### Sesión 1 - 2026-07-21 (madrugada)
@@ -1757,3 +1759,43 @@
   - CADENA DE FIXES COHERENTE: s274 importador usa annotation_type → s276 detecté que violaba constraint → s277 amplié constraint (opción A del usuario) → ahora importador Y edición funcionan con los 20 tipos. La opción A alineó todo el sistema.
   - Cambio de esquema en PROD: lo hice porque el usuario eligió A explícitamente. La BD es compartida (no hay deploy separado de BD); el cambio aplica de inmediato. Avisé que era cambio de esquema.
 - **Patrones confirmados**: español, ultra-directo (respuesta "A"), modo compañero, "diagnosticar más profundo" (raíz: constraint + desajuste de mayúsculas), verificar con test real+rollback antes de confiar, guardar migración en repo para trazabilidad, deploy vercel --prod + verificación por hash
+
+### Sesión 278 - 2026-09-24
+- **Tarea principal**: (modo compañero) En la pantalla de Repairs (`/repairs/:campaignId`), agregar bajo cada fotografía un label con el usuario que la subió. Luego "aplicar en prod".
+- **Observaciones nuevas**:
+  - Confirmó el flujo compañero → desarrollador → revisión: activó "compañero" + URL exacta + descripción en una frase. Cambio simple/visual.
+  - El dato del uploader NO existía en `repair_photo`; salía de la vista oficial `repair_photos_detailed.technician_name` por `photo_id` (mismo patrón que ya usa el service). Replicar la fuente existente > inventar columna.
+  - **DESCUBRIMIENTO DE INFRA CLAVE**: en este proyecto el push a `main` NO dispara deploy automático de Vercel. Los deploys a prod son MANUALES vía `vercel --prod --yes` (CLI ya autenticado como dev-ai2/wind-farm, usuario devaigemm-1057). El alias de prod es `wind-farm-eight.vercel.app`. Para "aplicar en prod" hay que: rebase sobre origin/main → merge a main → push → `vercel --prod`.
+  - Verificación sin login: comparar el hash del chunk `index-*.js` servido en prod y hacer grep de la cadena nueva (`photo_id,technician_name`) para confirmar que el bundle desplegado contiene el código. La pantalla requiere login y NO tengo credenciales de esta app (las de Skyvisor son de otro sistema).
+- **Patrones confirmados**: español, directo, modo compañero, URL exacta como referencia, "replicar lo que ya funciona", alta autonomía, aprueba deploy explícitamente ("aplicar en prod") antes de tocar main.
+
+### Sesión 279 - 2026-09-24
+- **Tarea principal**: Confirmar si el nombre mostrado en el label de fotos de Repairs (technician_name) corresponde a quien inició sesión en la app móvil y subió las fotos.
+- **Observaciones nuevas**:
+  - El usuario cuestiona la CORRECTITUD SEMÁNTICA del dato, no solo que "aparezca algo". Piensa en la fuente real del dato, no en lo visual. Verificar el ORIGEN antes de dar por bueno un campo.
+  - HALLAZGO: `repair_photos_detailed.technician_name` = `profiles.name` JOIN por `repair.technician_id` → es el TÉCNICO ASIGNADO A LA REPARACIÓN, no el uploader por foto. `repair_photo` NO tiene columna uploaded_by/user_id (solo uploaded_at, captured_at, metadata jsonb).
+  - Le respondí con honestidad sobre la limitación (patrón que valora): el dato exacto "quién subió cada foto" NO existe en el esquema; el técnico asignado es una aproximación válida solo si la app móvil usa 1 técnico por reparación.
+  - Propuse revisar `repair_photo.metadata` (jsonb) por si la app móvil guarda ahí el uploader real por foto. Quedé esperando su confirmación antes de tocar nada.
+  - Consulté la definición de la vista vía Management API (`/database/query` con SUPABASE_ACCESS_TOKEN) — método confiable para inspeccionar esquema/vistas cuando no hay RPC exec_sql.
+- **Patrones confirmados**: español, directo, modo compañero, exige rigor y honestidad sobre limitaciones, piensa a nivel de modelo de datos, prefiere que pregunte antes de implementar si hay ambigüedad real.
+
+### Sesión 280 - 2026-09-24
+- **Tarea principal**: "revisa" — verificar en la BD si el uploader real por foto existe, tras cuestionar que technician_name no era quien subió las fotos.
+- **Observaciones nuevas**:
+  - HALLAZGO CLAVE: el uploader REAL por foto SÍ existe → `storage.objects.owner_id` (usuario autenticado que subió el objeto al bucket inspection-photos, prefijo repairs/). Se resuelve a nombre vía `profiles`. owner_id es TEXT → castear a uuid para joins.
+  - PRUEBA DURA: technician_id (lo que muestra el label actual) ≠ owner_id real en 212 de 228 fotos (~93%). Ej: reparación asignada a "Andres" con fotos subidas por "Victor Hugo"/"Ian"/"Jhonatan". El label en prod está mostrando a la persona EQUIVOCADA en la mayoría.
+  - Matiz: ~73 fotos tienen owner_id NULL en storage (subidas por service role o migradas) → necesitan fallback ("—" o técnico asignado).
+  - El "revisa" de una palabra = ejecutar la investigación completa (revisar metadata + storage.objects + comparar fuentes) sin pedir más contexto. Confirmado patrón s6.
+  - Dejé 2 decisiones al usuario antes de implementar: (1) confirmar cambio de fuente a owner_id, (2) qué hacer con las fotos sin owner. NO implementé aún — hay decisión de producto pendiente.
+- **Patrones confirmados**: español, directo, "revisa" = trabajo completo autónomo, rigor sobre origen del dato, honestidad sobre limitaciones/errores (el label desplegado estaba mal), pregunta antes de implementar cuando hay decisión de producto real.
+
+### Sesión 281 - 2026-09-24
+- **Tarea principal**: Cambiar la fuente del label "Cargado por" en Repairs al uploader REAL por foto (storage.objects.owner_id), con fallback al técnico asignado.
+- **Observaciones nuevas**:
+  - Decisiones del usuario en formato ultra-conciso numerado: "1.- cambia a storage.objects.owner_id; 2.- al tecnico asignado". Responde exactamente a las 2 preguntas que le hice, en orden.
+  - RESTRICCIÓN TÉCNICA CLAVE: el schema `storage` NO está expuesto a PostgREST (solo public + graphql_public). Para que el frontend lea storage.objects hay que crear una RPC `SECURITY DEFINER` en public. Patrón del proyecto: migración SQL en supabase/migrations/ + `grant execute ... to anon, authenticated`.
+  - Implementé RPC `get_repair_photo_uploaders(photo_ids uuid[])` → coalesce(owner_name, tecnico_name). owner_id es TEXT → cast a uuid.
+  - Verifiqué con fotos reales de la campaña: muestra Andres/Ian/Victor Hugo (uploaders reales) y cae a Gerard (técnico) solo cuando owner_real es null. Correcto.
+  - El desarrollador (sub-agente) NO tiene execute_bash ni MCP → NO puede aplicar migraciones, buildear ni verificar en BD. El compañero (yo) debo hacer siempre: aplicar migración (Management API con SUPABASE_ACCESS_TOKEN), build (pnpm run build), y verificación en BD. Delegar solo el código.
+  - La migración se aplica de inmediato a la BD compartida (no hay entorno separado de BD); solo falta desplegar el frontend. Avisé y quedé esperando aprobación de deploy.
+- **Patrones confirmados**: español, ultra-directo (respuestas numeradas), modo compañero, rigor sobre origen del dato, verificar con datos reales antes de reportar, aplicar migración a prod cuando el usuario eligió explícitamente, pedir aprobación antes de deploy de frontend.
