@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 286
+- **Sesiones analizadas**: 288
 - **Última actualización**: 2026-09-24
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1847,3 +1847,20 @@
   - Esta vez NO hubo migración (solo frontend), así que build + preview local, sin Management API.
   - Levanté preview 4174 y ofrecí 3 opciones (revisar / ajustar orden columnas / prod) en vez de ir directo a prod. Feature con cambio de formato justifica confirmación.
 - **Patrones confirmados**: español, directo, modo compañero, describe desde lo visual/UX, alta autonomía, reutilizar lo existente, adjunto como spec, verificar build antes de reportar, pedir aprobación antes de deploy.
+
+### Sesión 287 - 2026-09-24
+- **Tarea principal**: "aplicar en prod" — desplegar los combobox parque/turbina + plantilla descargable + planilla de 5 columnas en carga de defectos.
+- **Observaciones nuevas**:
+  - Deploy sin fricción (patrón consolidado): stop preview → commit código separado de logs → fetch/sync origin/main (0 detrás) → push → vercel --prod --yes → verificar chunk.
+  - Verificación post-deploy: el feature vive en chunk lazy `UploadsPage-*.js`. Grep de marcadores (plantilla-carga-defectos, downloadTemplate, selectTurbine, pickFarmTurbineFirst) en ESE chunk confirmó el deploy. Solo frontend, sin migración.
+  - Quedó pendiente confirmar con el usuario el orden real de columnas de la planilla (el adjunto no llegó legible); se lo recordé.
+- **Patrones confirmados**: español, ultra-directo, modo compañero, "aplicar en prod" = aprobación explícita, deploy manual vercel --prod, verificación por grep del chunk correcto, honestidad sobre límite de verificación visual (sin credenciales) y sobre el adjunto ilegible.
+
+### Sesión 288 - 2026-09-24
+- **Tarea principal**: Ajustes UI en tab Defects: hacer el ícono grande del EmptyState clickable para subir la planilla (cambiar a ícono de upload), eliminar el botón "Cargar campaña de reparación", y poner verde el botón "Descargar plantilla".
+- **Observaciones nuevas**:
+  - Adjuntó screenshot del EmptyState (ícono + "Carga de defectos" + descripción) para señalar EXACTAMENTE qué elemento cambiar. Imagen como referencia visual precisa del elemento a modificar.
+  - Interpretación: "el icono que está arriba" = el ícono del EmptyState, no un botón de toolbar. Reemplacé EmptyState por bloque inline con el círculo como <button> (EmptyState no soporta ícono clickable).
+  - Ícono UploadCloud + Loader2 durante isPending. Botón verde = #5A8F5A (marca del proyecto, ya usada en header/RepairWorkflow). El style del Button se mergea sobre la variante.
+  - Cambio 100% UI/cosmético, sin tocar lógica de import/parseo/combobox/historial. Mínimo cambio.
+- **Patrones confirmados**: español, directo, modo compañero, screenshot/imagen como spec visual precisa, describe desde lo visual, alta autonomía, verificar build antes de reportar, preview local antes de prod.
