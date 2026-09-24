@@ -85,7 +85,9 @@ export interface RepairPhoto {
   url: string;
   /** Resolved public URL of the thumbnail (thumbnail_path) for the grid; falls back to url. */
   thumbnailUrl: string;
-  /** Readable name of the technician who uploaded the photo (repair_photos_detailed.technician_name), or null. */
+  /** Readable name of the REAL user who uploaded the photo (storage.objects.owner_id
+   *  via get_repair_photo_uploaders), falling back to the assigned technician; null
+   *  when neither can be resolved. */
   uploadedBy: string | null;
 }
 
@@ -486,27 +488,29 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
 }
 
 /**
- * Resolve the uploader's readable name per photo id. The read-only RPC
+ * Resolve the REAL uploader's readable name per photo id. The read-only RPC
  * get_repair_photos_by_stage doesn't expose the uploader, and repair_photo has
- * no uploader column, so we source the already-resolved `technician_name` from
- * the official `repair_photos_detailed` view (keyed by photo_id). One batched
- * query for all photos.
+ * no uploader column. The actual user who uploaded a photo from the mobile app
+ * is storage.objects.owner_id (matched by name = storage_path), which the
+ * frontend can't read directly because the `storage` schema isn't exposed to
+ * PostgREST. So we call the SECURITY DEFINER RPC get_repair_photo_uploaders,
+ * which resolves owner_id → profiles.name and falls back to the assigned
+ * technician when no owner exists. One batched call for all photos.
  */
 async function fetchUploaderByPhotoId(photoIds: string[]): Promise<Map<string, string>> {
   const byId = new Map<string, string>();
   const unique = [...new Set(photoIds.filter(Boolean))];
   if (unique.length === 0) return byId;
 
-  const { data, error } = await db
-    .from('repair_photos_detailed')
-    .select('photo_id, technician_name')
-    .in('photo_id', unique);
+  const { data, error } = await db.rpc('get_repair_photo_uploaders', {
+    photo_ids: unique,
+  });
   if (error) throw new RepairServiceError(error.message, error.code);
 
   for (const row of (data as unknown[]) ?? []) {
     const r = row as Record<string, unknown>;
     const id = r.photo_id as string;
-    const name = (r.technician_name as string) ?? '';
+    const name = (r.uploader_name as string) ?? '';
     if (id && name) byId.set(id, name);
   }
   return byId;
