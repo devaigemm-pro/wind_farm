@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, Download, Loader2, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import {
   useRepairCampaignDetail,
   useRepairTree,
   useSetPhotoSelected,
   useDeleteRepairDefect,
+  useUpdateDefectFields,
 } from '@/hooks/useRepair';
 import {
   generateAndDownloadRepairReport,
@@ -41,25 +43,6 @@ function formatDefectType(type: string, locale: 'es' | 'en'): string {
   const label = DEFECT_TYPE_LABELS[type];
   if (label) return locale === 'es' ? label.es : label.en;
   return type.replace(/_/g, ' ');
-}
-
-/**
- * Compose the defect display name exactly like the technician app (doc §6):
- *   type + " " + defect_number + "-" + defect_identifier
- * The type is separated by a space; number and identifier are joined with a
- * dash; empty parts are omitted (e.g. "Grieta A27-XYZ" or "Grieta A27").
- */
-function composeDefectName(
-  type: string,
-  defectNumber: string | null,
-  defectIdentifier: string | null,
-  locale: 'es' | 'en',
-): string {
-  const typeLabel = formatDefectType(type, locale);
-  const num = defectNumber?.trim() || '';
-  const ident = defectIdentifier?.trim() || '';
-  const numberPart = [num, ident].filter(Boolean).join('-');
-  return [typeLabel, numberPart].filter(Boolean).join(' ');
 }
 
 interface BladeGroup {
@@ -112,8 +95,13 @@ export function RepairWorkflow() {
 
   const { data: campaign, isLoading: campaignLoading } = useRepairCampaignDetail(campaignId);
   const { data: tree, isLoading: treeLoading } = useRepairTree(campaignId);
+  // Full list of annotation type names (~20) — matches the Excel importer and
+  // the annotations. The defect_type_check constraint now accepts all of them.
+  const { data: annotationTypes = [] } = useAnnotationTypes();
+  const typeOptions = annotationTypes.map((at) => at.name);
   const setSelected = useSetPhotoSelected(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
+  const updateDefectFields = useUpdateDefectFields(campaignId);
 
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
@@ -266,6 +254,34 @@ export function RepairWorkflow() {
     );
   };
 
+  // Persist the three editable defect fields (type, defect_number,
+  // defect_identifier) with a DIRECT update — the manual number is NOT
+  // recomputed. Returns a promise so the card can await + exit edit mode.
+  const handleSaveDefectFields = (
+    defectId: string,
+    fields: { type: string; defectNumber: string; defectIdentifier: string },
+  ) =>
+    new Promise<void>((resolve, reject) => {
+      updateDefectFields.mutate(
+        {
+          defectId,
+          type: fields.type,
+          defectNumber: fields.defectNumber.trim() || null,
+          defectIdentifier: fields.defectIdentifier.trim() || null,
+        },
+        {
+          onSuccess: () => {
+            toast.success(t('repair.editSuccess'));
+            resolve();
+          },
+          onError: (err) => {
+            toast.error((err as Error)?.message || t('repair.editError'));
+            reject(err);
+          },
+        },
+      );
+    });
+
   if (campaignLoading) {
     return <div style={page}><p style={{ color: C.muted }}>{t('general.loading')}</p></div>;
   }
@@ -310,6 +326,8 @@ export function RepairWorkflow() {
               repairsWithReport={repairsWithReport}
               onDelete={isClient ? undefined : handleDeleteDefect}
               downloadingDefectId={downloadingDefectId}
+              onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
+              typeOptions={typeOptions}
             />
           ))}
         </div>
@@ -356,6 +374,13 @@ interface BladeGroupSectionProps {
   repairsWithReport: Set<string>;
   onDelete?: (node: RepairDefectNode) => void;
   downloadingDefectId: string | null;
+  /** Persist the three editable defect fields (undefined = read-only client). */
+  onSaveDefectFields?: (
+    defectId: string,
+    fields: { type: string; defectNumber: string; defectIdentifier: string },
+  ) => Promise<void>;
+  /** Full list of annotation type names offered by the inline type <select>. */
+  typeOptions: string[];
 }
 
 /**
@@ -376,6 +401,8 @@ function BladeGroupSection({
   repairsWithReport,
   onDelete,
   downloadingDefectId,
+  onSaveDefectFields,
+  typeOptions,
 }: BladeGroupSectionProps) {
   const [open, setOpen] = useState(false);
   const bladeLabel = group.serial
@@ -409,6 +436,8 @@ function BladeGroupSection({
               hasReport={node.repairId != null && repairsWithReport.has(node.repairId)}
               onDelete={onDelete}
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
+              onSaveDefectFields={onSaveDefectFields}
+              typeOptions={typeOptions}
             />
           ))}
         </div>
@@ -433,6 +462,13 @@ interface DefectSectionProps {
   hasReport: boolean;
   onDelete?: (node: RepairDefectNode) => void;
   downloading: boolean;
+  /** Persist the three editable defect fields (undefined = read-only client). */
+  onSaveDefectFields?: (
+    defectId: string,
+    fields: { type: string; defectNumber: string; defectIdentifier: string },
+  ) => Promise<void>;
+  /** Full list of annotation type names offered by the inline type <select>. */
+  typeOptions: string[];
 }
 
 function DefectSection({
@@ -448,10 +484,54 @@ function DefectSection({
   hasReport,
   onDelete,
   downloading,
+  onSaveDefectFields,
+  typeOptions,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
   const [open, setOpen] = useState(false);
   const { defect } = node;
+
+  // ── Inline edit state for the three editable fields ──────────────────────
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editType, setEditType] = useState(defect.type);
+  const [editNumber, setEditNumber] = useState(defect.defectNumber ?? '');
+  const [editIdentifier, setEditIdentifier] = useState(defect.defectIdentifier ?? '');
+  const canEdit = Boolean(onSaveDefectFields);
+
+  const startEdit = () => {
+    // Seed inputs from the current defect values each time edit opens.
+    setEditType(defect.type);
+    setEditNumber(defect.defectNumber ?? '');
+    setEditIdentifier(defect.defectIdentifier ?? '');
+    setOpen(true);
+    setEditing(true);
+  };
+  const cancelEdit = () => setEditing(false);
+  const saveEdit = async () => {
+    if (!onSaveDefectFields || saving) return;
+    setSaving(true);
+    try {
+      await onSaveDefectFields(defect.id, {
+        type: editType,
+        defectNumber: editNumber,
+        defectIdentifier: editIdentifier,
+      });
+      setEditing(false);
+    } catch {
+      /* toast handled upstream; stay in edit mode so the user can retry */
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Type <select> options: the full list of annotation type names (coherent
+  // with the Excel importer and the annotations). The defect_type_check
+  // constraint now accepts all of them. Ensure the current type is always
+  // present so the current value is never lost even if it's not in the list.
+  const typeSelectOptions = typeOptions.includes(editType)
+    ? typeOptions
+    : [editType, ...typeOptions];
 
   const totalPhotos = node.stages.reduce((acc, s) => acc + s.photos.length, 0);
   const selectedPhotos = node.stages.reduce(
@@ -475,7 +555,14 @@ function DefectSection({
         <span style={defectIndex}>{defectNumber}</span>
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={defectTitle}>
-            {composeDefectName(defect.type, defect.defectNumber, defect.defectIdentifier, locale)}
+            {/* Title = defect TYPE + " - " + defect_identifier (when present).
+                The per-blade code (e.g. "A1") is NOT repeated here because it's
+                already shown in the green badge on the left. The identifier
+                (e.g. "Daño 1") comes from the spreadsheet and is appended after
+                a dash when available. */}
+            {defect.defectIdentifier?.trim()
+              ? `${formatDefectType(defect.type, locale)} - ${defect.defectIdentifier.trim()}`
+              : formatDefectType(defect.type, locale)}
           </div>
           <div style={defectMeta}>
             {t('repair.category')} {defect.severity || '—'}
@@ -565,6 +652,27 @@ function DefectSection({
             </>
           );
         })()}
+        {canEdit && !editing && (
+          <span
+            role="button"
+            tabIndex={0}
+            style={defectEditBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdit();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                startEdit();
+              }
+            }}
+            title={t('repair.editDefect')}
+          >
+            <Pencil size={14} />
+            {t('repair.editDefect')}
+          </span>
+        )}
         {!readOnly && onDelete && (
           <span
             role="button"
@@ -587,6 +695,63 @@ function DefectSection({
           </span>
         )}
       </button>
+
+      {editing && (
+        <div style={editForm}>
+          <div style={editFieldsRow}>
+            <label style={editField}>
+              <span style={editLabel}>{t('repair.editType')}</span>
+              <select
+                style={editSelect}
+                value={editType}
+                onChange={(e) => setEditType(e.target.value)}
+                disabled={saving}
+              >
+                {typeSelectOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {formatDefectType(opt, locale)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={editField}>
+              <span style={editLabel}>{t('repair.editDefectNumber')}</span>
+              <input
+                type="text"
+                style={editInput}
+                value={editNumber}
+                onChange={(e) => setEditNumber(e.target.value)}
+                disabled={saving}
+                placeholder="C1"
+              />
+            </label>
+            <label style={editField}>
+              <span style={editLabel}>{t('repair.editDefectIdentifier')}</span>
+              <input
+                type="text"
+                style={editInput}
+                value={editIdentifier}
+                onChange={(e) => setEditIdentifier(e.target.value)}
+                disabled={saving}
+                placeholder="Daño1 ..."
+              />
+            </label>
+          </div>
+          <div style={editActions}>
+            <button type="button" style={editCancelBtn} onClick={cancelEdit} disabled={saving}>
+              <X size={14} /> {t('repair.editCancel')}
+            </button>
+            <button type="button" style={editSaveBtn} onClick={saveEdit} disabled={saving}>
+              {saving ? (
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Check size={14} />
+              )}
+              {t('repair.editSave')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div style={stagesWrap}>
@@ -765,9 +930,13 @@ function PhotoCard({
   onAction,
   onPreview,
 }: PhotoCardProps) {
+  const { t } = useLanguage();
   // While pending, block drag + action to avoid a double-fire on the same photo.
   const interactive = !readOnly && !pending;
+  const uploaderName = photo.uploadedBy ?? '—';
+  const uploaderLabel = `${t('uploads.uploadedBy')}: ${uploaderName}`;
   return (
+    <div style={photoCardWrap}>
     <div
       draggable={interactive}
       onDragStart={
@@ -828,6 +997,9 @@ function PhotoCard({
           <Loader2 size={22} color={C.brand} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
       )}
+    </div>
+      {/* Uploader label: who uploaded this photo (sits below the image). */}
+      <span style={photoUploader} title={uploaderLabel}>{uploaderLabel}</span>
     </div>
   );
 }
@@ -891,6 +1063,36 @@ const defectPdfIconBtn: React.CSSProperties = {
 const defectDeleteBtn: React.CSSProperties = {
   ...defectPdfBtn, background: '#EF4444',
 };
+const defectEditBtn: React.CSSProperties = {
+  ...defectPdfBtn, background: '#6B7280',
+};
+const editForm: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 12, padding: 16,
+  background: '#F7FAF7', borderBottom: `1px solid ${C.border}`,
+};
+const editFieldsRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12,
+};
+const editField: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
+const editLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: C.text };
+const editInput: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 8,
+  fontSize: 13, color: '#1a1a1a', background: '#fff', boxSizing: 'border-box',
+};
+const editSelect: React.CSSProperties = { ...editInput };
+const editActions: React.CSSProperties = {
+  display: 'flex', justifyContent: 'flex-end', gap: 8,
+};
+const editSaveBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
+  border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer',
+};
+const editCancelBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', color: C.text,
+  border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 14px', fontSize: 12,
+  fontWeight: 600, cursor: 'pointer',
+};
 const stagesWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: 16 };
 const stageCard: React.CSSProperties = {
   border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, background: '#fff',
@@ -923,9 +1125,16 @@ const colEmpty: React.CSSProperties = { fontSize: 12, color: C.muted, gridColumn
 const dropPlaceholder: React.CSSProperties = {
   fontSize: 12, color: C.muted, textAlign: 'center', padding: '16px 0', gridColumn: '1 / -1',
 };
+const photoCardWrap: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0,
+};
 const photoCard: React.CSSProperties = {
   position: 'relative', border: `2px solid ${C.border}`, borderRadius: 8, overflow: 'hidden',
   cursor: 'grab', aspectRatio: '4 / 3', background: '#f3f4f6',
+};
+const photoUploader: React.CSSProperties = {
+  fontSize: 11, color: C.muted, lineHeight: 1.3,
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 };
 const photoImg: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'cover', display: 'block' };
 const photoBroken: React.CSSProperties = {
