@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 284
+- **Sesiones analizadas**: 286
 - **Última actualización**: 2026-09-24
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1828,3 +1828,22 @@
   - Repetido: el sub-agente desarrollador NO tiene execute_bash ni POST a Management API (solo GET) ni MCP Supabase conectado → NO puede aplicar migración ni buildear. Yo (compañero) aplico migración (Management API POST /database/query con SUPABASE_ACCESS_TOKEN), verifico tablas+policies, y hago pnpm run build. Delegar solo el código. CONFIRMADO 2+ sesiones seguidas.
   - Esta vez levanté PREVIEW local (puerto 4174) en vez de ir directo a prod, y pregunté si revisar preview o deployar. Feature grande (tablas nuevas) justifica revisión previa.
 - **Patrones confirmados**: español, ultra-directo (respuesta "A"), modo compañero, alta autonomía, verificar migración+build antes de reportar, aplicar migración a BD compartida cuando el usuario eligió, pedir aprobación antes de deploy de frontend.
+
+### Sesión 285 - 2026-09-24
+- **Tarea principal**: "aplicar en prod" — desplegar el historial persistente de cargas de planillas de defectos.
+- **Observaciones nuevas**:
+  - Flujo de deploy ejecutado sin fricción (ya patrón de alta confianza): stop preview → commit código+migración por separado de logs → fetch+sync origin/main (0 detrás) → push → vercel --prod --yes → verificar bundle.
+  - Verificación post-deploy: el código de UploadsPage vive en chunk lazy `UploadsPage-*.js` (no en index). Grep de defect_import/defect_import_row/importHistory en ESE chunk confirmó el deploy. Recordar: buscar la feature en su chunk correcto, no solo en index.
+  - La migración de las tablas ya estaba aplicada en sesión anterior (BD compartida), así que el deploy fue solo frontend.
+- **Patrones confirmados**: español, ultra-directo, modo compañero, "aplicar en prod" = aprobación explícita de deploy, deploy manual vercel --prod, verificación por grep del chunk correcto en prod, honestidad sobre límite de verificación visual (sin credenciales de la app).
+
+### Sesión 286 - 2026-09-24
+- **Tarea principal**: En el tab Defects de /inspections/upload: agregar 2 combobox (Parque + Turbina dependiente), eliminar columnas Parque/Turbina de la planilla, y ofrecer descarga de plantilla con el nuevo formato. Adjuntó un .xlsx de referencia.
+- **Observaciones nuevas**:
+  - Adjuntó una planilla .xlsx como spec de formato, PERO el binario se corrompió en el traspaso (no legible como archivo). No pude leer sus headers exactos. Decidí asumir el formato = actual menos Parque/Turbina (Ubicación|Identificador|Pala|Lado|Tipo) y avisé explícitamente que si el orden real difiere, me diga. Patrón: cuando un adjunto binario no es legible, proceder con la interpretación más razonable + avisar, no bloquear.
+  - Combobox dependientes: reutilicé hooks existentes useWindFarms + useTurbines(windFarmId). Siempre buscar el hook/servicio que ya existe antes de crear uno.
+  - Plantilla descargable generada con ExcelJS por dynamic import (patrón del proyecto), sin binario externo ni dependencia nueva.
+  - Cambio de contrato: parseRepairRows pasó de 7 a 5 columnas; parque/turbina ahora vienen de la UI y aplican a toda la carga. El historial (defect_import_row) guarda parque/turbina desde lo seleccionado.
+  - Esta vez NO hubo migración (solo frontend), así que build + preview local, sin Management API.
+  - Levanté preview 4174 y ofrecí 3 opciones (revisar / ajustar orden columnas / prod) en vez de ir directo a prod. Feature con cambio de formato justifica confirmación.
+- **Patrones confirmados**: español, directo, modo compañero, describe desde lo visual/UX, alta autonomía, reutilizar lo existente, adjunto como spec, verificar build antes de reportar, pedir aprobación antes de deploy.
