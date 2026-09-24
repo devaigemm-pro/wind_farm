@@ -800,8 +800,8 @@ function DefectsTab() {
               width: '64px',
               height: '64px',
               borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--color-neutral-100)',
-              color: 'var(--color-neutral-400)',
+              backgroundColor: '#5A8F5A',
+              color: '#ffffff',
               marginBottom: 'var(--space-4)',
               border: 'none',
               padding: 0,
@@ -810,10 +810,10 @@ function DefectsTab() {
               transition: 'all var(--duration-normal) var(--easing-default)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
+              e.currentTarget.style.backgroundColor = '#4A7A4A';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+              e.currentTarget.style.backgroundColor = '#5A8F5A';
             }}
           >
             {importRepair.isPending ? (
