@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 288
+- **Sesiones analizadas**: 289
 - **Última actualización**: 2026-09-24
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1864,3 +1864,10 @@
   - Ícono UploadCloud + Loader2 durante isPending. Botón verde = #5A8F5A (marca del proyecto, ya usada en header/RepairWorkflow). El style del Button se mergea sobre la variante.
   - Cambio 100% UI/cosmético, sin tocar lógica de import/parseo/combobox/historial. Mínimo cambio.
 - **Patrones confirmados**: español, directo, modo compañero, screenshot/imagen como spec visual precisa, describe desde lo visual, alta autonomía, verificar build antes de reportar, preview local antes de prod.
+
+### Sesión 289 - 2026-09-24
+- **Tarea principal**: "aplicar en prod" — desplegar los ajustes UI del tab Defects (ícono clickable de subida, quitar botón importar, plantilla verde).
+- **Observaciones nuevas**:
+  - Deploy sin fricción (patrón consolidado, alta confianza): commit código separado de logs → fetch/sync origin/main (0 detrás) → push → vercel --prod --yes → verificar chunk UploadsPage-*.js.
+  - Verificación por grep del chunk: confirmé 5A8F5A (verde de marca) + downloadTemplate + plantilla-carga-defectos en el bundle nuevo. Solo frontend, sin migración.
+- **Patrones confirmados**: español, ultra-directo, modo compañero, "aplicar en prod" = aprobación explícita de deploy, deploy manual vercel --prod, verificación por grep del chunk lazy correcto, honestidad sobre límite de verificación visual (sin credenciales de la app).
