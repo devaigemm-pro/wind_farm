@@ -38,19 +38,11 @@ export interface RepairImportSummary {
   campanias: RepairImportCampaignInfo[];
 }
 
-// ─── Defect type mapping (ES → enum) ─────────────────────────────────────────
-// Mirrors DEFECT_TYPE_LABELS in RepairWorkflow.tsx. Keys are normalized
-// (lowercase, no accents) so both "delaminación" and "delaminacion" match.
-
-const DEFECT_TYPE_ES_MAP: Record<string, string> = {
-  delaminacion: 'delamination',
-  grieta: 'crack',
-  'erosion le': 'le_erosion',
-  'danos de pintura': 'paint_defect',
-  'dano por rayo': 'lightning_damage',
-  vortex: 'vortex',
-  otros: 'other',
-};
+// ─── Defect type mapping (Excel "Tipo" → annotation_type.name) ───────────────
+// The source of truth for defect types is the `annotation_type` table (names in
+// UPPERCASE ENGLISH, e.g. "CRACK", "LE EROSION", "SHELL DELAMINATION"). The Excel
+// "Tipo" column already comes in English with those same names. We resolve each
+// row's type against a normalized map built once per import run.
 
 /** Lowercase + strip diacritics, collapse whitespace. */
 function normalize(value: string): string {
@@ -62,8 +54,32 @@ function normalize(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
-function mapDefectType(tipoEspanol: string): string {
-  return DEFECT_TYPE_ES_MAP[normalize(tipoEspanol)] ?? 'other';
+/**
+ * Load all active annotation types and build a map from the NORMALIZED name to
+ * the original `annotation_type.name` (stored verbatim in defect.type). Loaded
+ * once per import run — never per row.
+ */
+async function loadDefectTypeMap(): Promise<Map<string, string>> {
+  const { data, error } = await db
+    .from('annotation_type')
+    .select('name')
+    .eq('is_active', true);
+  if (error) throw new Error(error.message);
+  const map = new Map<string, string>();
+  for (const row of (data ?? []) as { name: string }[]) {
+    if (row?.name) map.set(normalize(row.name), row.name);
+  }
+  return map;
+}
+
+/**
+ * Resolve the Excel "Tipo" value to an annotation_type.name using the prebuilt
+ * map. Throws (strict validation) when the type is not recognized.
+ */
+function mapDefectType(tipoEspanol: string, typeMap: Map<string, string>): string {
+  const match = typeMap.get(normalize(tipoEspanol));
+  if (!match) throw new Error(`Tipo de daño no reconocido: "${tipoEspanol}"`);
+  return match;
 }
 
 /** Parse the "Ubicacion del daño" Excel cell to a number (mm). Null when empty/invalid. */
@@ -224,6 +240,9 @@ export const repairImportService = {
     const user = (await db.auth.getUser()).data.user;
     const userId = user?.id ?? null;
 
+    // Load defect types once per run (annotation_type is the source of truth).
+    const typeMap = await loadDefectTypeMap();
+
     const campaignCache = new Map<string, CampaignRef>();
     // Track the display name of the turbine per campaign for the summary.
     const campaignTurbineName = new Map<string, string>();
@@ -303,8 +322,8 @@ export const repairImportService = {
           inspectionId = newInsp.id as string;
         }
 
-        // 5. Defect type mapping
-        const type = mapDefectType(row.tipoEspanol);
+        // 5. Defect type mapping (against annotation_type; rejects unknown types)
+        const type = mapDefectType(row.tipoEspanol, typeMap);
 
         // 6. Defect. distance_from_root now comes directly from the Excel
         //    ("Ubicacion del daño" column, in mm) via parseUbicacion. The external
