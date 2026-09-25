@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 289
+- **Sesiones analizadas**: 291
 - **Última actualización**: 2026-09-24
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1871,3 +1871,19 @@
   - Deploy sin fricción (patrón consolidado, alta confianza): commit código separado de logs → fetch/sync origin/main (0 detrás) → push → vercel --prod --yes → verificar chunk UploadsPage-*.js.
   - Verificación por grep del chunk: confirmé 5A8F5A (verde de marca) + downloadTemplate + plantilla-carga-defectos en el bundle nuevo. Solo frontend, sin migración.
 - **Patrones confirmados**: español, ultra-directo, modo compañero, "aplicar en prod" = aprobación explícita de deploy, deploy manual vercel --prod, verificación por grep del chunk lazy correcto, honestidad sobre límite de verificación visual (sin credenciales de la app).
+
+### Sesión 290 - 2026-09-24
+- **Tarea principal**: El botón (ícono) de cargar planilla en el tab Defects debe ser verde. Luego "prod".
+- **Observaciones nuevas**:
+  - Cambio cosmético trivial (color del botón de subida): lo hice yo directo con str_replace en UploadsPage.tsx (fondo #5A8F5A, ícono blanco, hover #4A7A4A) SIN delegar al desarrollador. Para cambios de 1 línea/color, ejecutar directo es más eficiente que delegar.
+  - Iteración de refinamiento visual: sesión anterior puse verde el botón "Descargar plantilla"; ahora el usuario pide el mismo verde para el botón de cargar. Consistencia cromática de acciones = verde de marca #5A8F5A.
+  - Aprobó deploy con "si" y luego "prod" (ultra-mínimo). Ejecuté flujo completo. Verifiqué en el chunk: 5A8F5A x4 + hover 4A7A4A.
+- **Patrones confirmados**: español, ultra-directo (1 palabra = aprobación deploy), modo compañero, refinamiento visual incremental, verde de marca #5A8F5A consistente, deploy manual vercel --prod, verificación por grep del chunk, cambios triviales hechos directo sin delegar.
+
+### Sesión 291 - 2026-09-24
+- **Tarea principal**: El label "Cargado por" bajo las fotos de Repairs se corta (evidencia: "Cargado por: Vict..."). Abreviar a "CP: nombre" (es) / "CB: nombre" (en).
+- **Observaciones nuevas**:
+  - Screenshot como evidencia del bug visual + propuso él mismo la solución exacta (abreviatura CP/CB). Cuando el usuario da la solución concreta, aplicarla tal cual.
+  - Cambio trivial hecho directo (sin delegar): clave i18n nueva `repair.uploadedByShort` = {en:'CB', es:'CP'} + usarla en el label del PhotoCard. El title (tooltip) mantiene el nombre completo.
+  - Refinamiento de un feature de sesiones previas (label de uploader s278/281). Iteración incremental sobre lo ya construido.
+- **Patrones confirmados**: español, directo, modo compañero, screenshot como evidencia, propone solución concreta que hay que respetar, cambios triviales hechos directo sin delegar, build antes de reportar, pide aprobación antes de deploy.
