@@ -934,7 +934,8 @@ function PhotoCard({
   // While pending, block drag + action to avoid a double-fire on the same photo.
   const interactive = !readOnly && !pending;
   const uploaderName = photo.uploadedBy ?? '—';
-  const uploaderLabel = `${t('uploads.uploadedBy')}: ${uploaderName}`;
+  // Short prefix (CP/CB) so the label fits under the thumbnail without truncating.
+  const uploaderLabel = `${t('repair.uploadedByShort')}: ${uploaderName}`;
   return (
     <div style={photoCardWrap}>
     <div

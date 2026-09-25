@@ -303,6 +303,7 @@ export const translations: TranslationMap = {
   'repair.photos': { en: 'photos', es: 'fotos' },
   'repair.selected': { en: 'selected', es: 'seleccionadas' },
   'repair.allPhotos': { en: 'All photos', es: 'Todas las fotos' },
+  'repair.uploadedByShort': { en: 'CB', es: 'CP' },
   'repair.selectedForReport': { en: 'Selected for the report', es: 'Seleccionadas para el informe' },
   'repair.noPhotosStage': { en: 'No photos uploaded for this stage yet.', es: 'Aún no hay fotos subidas para esta etapa.' },
   'repair.allSelectedStage': { en: 'All photos selected.', es: 'Todas las fotos seleccionadas.' },
