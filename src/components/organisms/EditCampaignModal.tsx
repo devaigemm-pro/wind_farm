@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Badge } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import {
   useWindFarmInspections,

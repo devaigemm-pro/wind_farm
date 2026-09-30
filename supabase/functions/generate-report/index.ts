@@ -198,7 +198,7 @@ serve(withCors(async (req) => {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (err) {
+  } catch {
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

@@ -143,15 +143,6 @@ export function Sidebar({
     justifyContent: isCollapsed ? 'center' : 'flex-start',
   };
 
-  const logoTextStyle: React.CSSProperties = {
-    fontSize: 'var(--text-lg)',
-    fontWeight: 700,
-    fontFamily: 'var(--font-family-sans)',
-    color: '#ffffff',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-  };
-
   const navStyle: React.CSSProperties = {
     flex: 1,
     overflowY: 'auto',

@@ -258,7 +258,7 @@ serve(withCors(async (req) => {
     }
 
     return json({ error: `Unknown action: ${action}` }, 400)
-  } catch (_err) {
+  } catch {
     return json({ error: 'Internal server error' }, 500)
   }
 }))

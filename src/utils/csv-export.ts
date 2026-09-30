@@ -59,8 +59,6 @@ export async function generateDefectsXLSX(data: DefectDashboardRow[]): Promise<B
   const sheet = workbook.addWorksheet('Defects');
   sheet.views = [{ showGridLines: false }];
 
-  const origin = window.location.origin;
-
   // Logo area
   sheet.mergeCells('A1:L2');
   const logoBuffer = await renderLogoPng();

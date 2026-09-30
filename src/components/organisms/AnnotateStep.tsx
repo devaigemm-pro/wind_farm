@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Camera } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/components/design-system';
@@ -11,7 +10,6 @@ import { useRotatePhoto } from '@/hooks/useRotatePhoto';
 import { useAnnotationTypes } from '@/hooks/useAnnotationTypes';
 import { supabase } from '@/lib/supabase';
 import type { Inspection } from '@/types';
-import { BLADE_POSITION_LABELS } from '@/types';
 
 export interface AnnotateStepProps {
   inspectionId: string;
@@ -217,7 +215,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   const [showEditPopover, setShowEditPopover] = useState(false);
   const [showAnnotationPopover, setShowAnnotationPopover] = useState(false);
-  const [annotationClickPos, setAnnotationClickPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [annotationType, setAnnotationType] = useState('LE EROSION');
   const [annotationCategory, setAnnotationCategory] = useState(2);
   const [annotationNote, setAnnotationNote] = useState('');
@@ -412,16 +409,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   }, [groupedThumbnails]);
 
   const currentThumbIndex = flatFilteredThumbs.findIndex(t => t.id === selectedThumbnail);
-
-  const groupBoundaries = useMemo(() => {
-    const boundaries: number[] = [];
-    let offset = 0;
-    for (const thumbs of Object.values(groupedThumbnails)) {
-      boundaries.push(offset);
-      offset += thumbs.length;
-    }
-    return boundaries;
-  }, [groupedThumbnails]);
 
   // Preload next/prev viewer images when current changes
   useEffect(() => {
@@ -1117,7 +1104,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
               }
             }
           }}
-          onMouseUp={(e) => {
+          onMouseUp={(_e) => {
             isMouseDownRef.current = false;
             if (isPanning) {
               setIsPanning(false);
@@ -1439,9 +1426,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const p3y = endY - ny * halfH;
             const p4x = startX - nx * halfH;
             const p4y = startY - ny * halfH;
-            const minX = Math.min(p1x, p2x, p3x, p4x);
             const minY = Math.min(p1y, p2y, p3y, p4y);
-            const maxY = Math.max(p1y, p2y, p3y, p4y);
 
             return (
             <div key={idx} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
@@ -1498,9 +1483,6 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
             const dy = drawEnd.y - drawStart.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < 1) return null;
-            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-            const cx = (drawStart.x + drawEnd.x) / 2;
-            const cy = (drawStart.y + drawEnd.y) / 2;
             const w = dist;
             const h = drawWidth;
             const isLine = drawPhase === 'drawing-line';
@@ -2169,13 +2151,6 @@ const rightPanelInner: React.CSSProperties = {
   flex: 1,
 };
 
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 11,
-  fontWeight: 500,
-  color: C.muted,
-  marginBottom: 4,
-};
 const selectStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
@@ -2187,46 +2162,6 @@ const selectStyle: React.CSSProperties = {
   cursor: 'pointer',
   outline: 'none',
   boxSizing: 'border-box',
-};
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 10px',
-  border: `1px solid ${C.borderLight}`,
-  borderRadius: 4,
-  fontSize: 13,
-  color: C.text,
-  background: C.bg,
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const catBtn: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  border: `1px solid ${C.borderLight}`,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  background: C.bg,
-  color: C.text,
-  outline: 'none',
-};
-const catBtnActive: React.CSSProperties = {
-  background: C.primary,
-  color: C.bg,
-  borderColor: C.primary,
-};
-
-const saveBtnStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 20px',
-  background: C.primaryDisabled,
-  color: C.bg,
-  border: 'none',
-  borderRadius: 4,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'not-allowed',
 };
 
 const hubDiagramContainer: React.CSSProperties = {

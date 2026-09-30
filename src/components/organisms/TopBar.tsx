@@ -15,7 +15,7 @@ export function TopBar({
   onMenuToggle,
   user,
   onLogout,
-  onSearch,
+  onSearch: _onSearch,
 }: TopBarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const { locale, setLocale, t } = useLanguage();

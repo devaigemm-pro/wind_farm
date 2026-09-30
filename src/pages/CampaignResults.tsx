@@ -494,17 +494,6 @@ const subtitleStyle: React.CSSProperties = {
 
 const toolbarRight: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'center' };
 
-const outlinedBtn: React.CSSProperties = {
-  border: '1px solid #5A8F5A',
-  borderRadius: 'var(--radius-sm)',
-  background: 'transparent',
-  padding: '6px 10px',
-  cursor: 'pointer',
-  color: '#5A8F5A',
-  display: 'flex',
-  alignItems: 'center',
-};
-
 const primaryBtn: React.CSSProperties = {
   border: 'none',
   borderRadius: 'var(--radius-sm)',

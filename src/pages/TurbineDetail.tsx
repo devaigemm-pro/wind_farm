@@ -51,10 +51,6 @@ function deriveBladeFace(thumbnailId: string): { blade: string; face: string } {
   return { blade: '?', face: '?' };
 }
 
-function imageForType(_type: string): string {
-  return '';
-}
-
 export interface TurbineDetailProps {
   shared?: boolean;
   embedded?: boolean;
@@ -1397,8 +1393,6 @@ const col2: React.CSSProperties = { width: 220, flexShrink: 0, background: 'var(
 const col3: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, justifyContent: 'space-between' };
 const card: React.CSSProperties = { background: 'var(--color-neutral-0)', border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 };
 const cardTitle: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: C.text, margin: '0 0 14px' };
-const counters: React.CSSProperties = { display: 'flex', gap: 20, padding: '12px 0', borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` };
-const counterItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text };
 const conclText: React.CSSProperties = { fontSize: 12.5, color: '#555', margin: '0 0 8px', lineHeight: 1.45 };
 const planBtn: React.CSSProperties = { width: '100%', padding: '12px', background: '#5A8F5A', color: 'var(--color-neutral-0)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 500, textAlign: 'center', cursor: 'pointer', fontFamily: 'var(--font-family-sans)' };
 const requestQuoteBtn: React.CSSProperties = { width: '100%', padding: '12px', marginTop: 8, background: 'var(--color-neutral-0)', color: '#5A8F5A', border: '1px solid #5A8F5A', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 600, textAlign: 'center', cursor: 'pointer', fontFamily: 'var(--font-family-sans)' };
@@ -1407,7 +1401,6 @@ const counterCardText: React.CSSProperties = { margin: 0, fontSize: 14, fontFami
 const conclusionCard: React.CSSProperties = { padding: 12, borderRadius: 8, background: 'var(--color-neutral-0)', boxShadow: '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)' };
 
 const filterSelect: React.CSSProperties = { padding: '4px 8px', fontSize: 11, border: `1px solid ${C.border}`, borderRadius: 4, fontFamily: 'inherit', backgroundColor: 'var(--color-neutral-0)', color: C.text, cursor: 'pointer' };
-const donutCenter: React.CSSProperties = { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2, pointerEvents: 'none' };
 const catRow: React.CSSProperties = { display: 'flex', gap: 12, justifyContent: 'space-between' };
 const catCell: React.CSSProperties = { flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' };
 const table: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 11.5 };

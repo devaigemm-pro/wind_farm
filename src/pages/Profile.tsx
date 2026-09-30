@@ -407,21 +407,6 @@ const outlinedBtnStyle: React.CSSProperties = {
   transition: 'border-color 200ms ease, background 200ms ease',
 };
 
-const primaryBtnStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '8px 20px',
-  background: 'var(--color-primary-500, #1B4B7A)',
-  border: 'none',
-  borderRadius: 'var(--radius-md, 8px)',
-  color: '#ffffff',
-  fontSize: 'var(--text-sm, 0.875rem)',
-  fontWeight: 500,
-  cursor: 'pointer',
-  transition: 'background 200ms ease',
-};
-
 const assetCardStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',

@@ -983,7 +983,7 @@ export async function generateAndDownloadReport(data: ReportPdfData): Promise<vo
       (status === 400 && /refresh_token|auth|token/i.test(message)) ||
       /expired|invalid.*token|refresh_token/i.test(message)
     ) {
-      throw new Error('Sesión expirada. Por favor inicie sesión nuevamente.');
+      throw new Error('Sesión expirada. Por favor inicie sesión nuevamente.', { cause: err });
     }
     throw err;
   }
