@@ -74,9 +74,23 @@ export function useDefectHistory(
         const { data: annotations } = await supabase.from('annotation').select('id, thumbnail_id').in('id', annotationIds);
         if (annotations && annotations.length > 0) {
           const thumbnailIds = [...new Set(annotations.map((a) => a.thumbnail_id).filter(Boolean))];
-          const { data: photos } = await (supabase as any).from('inspection_photo').select('id, storage_path').in('id', thumbnailIds);
-          if (photos && photos.length > 0) {
-            const storagePaths = photos.filter((p: any) => p.storage_path).map((p: any) => p.storage_path);
+          // `inspection_photo` is not in the generated Supabase types, so we
+          // cast the client to call it, then type the returned rows.
+          type PhotoRow = { id: string; storage_path: string | null };
+          const photoDb = supabase as unknown as {
+            from: (t: string) => {
+              select: (c: string) => {
+                in: (col: string, vals: readonly string[]) => Promise<{ data: PhotoRow[] | null }>;
+              };
+            };
+          };
+          const { data: photoData } = await photoDb
+            .from('inspection_photo')
+            .select('id, storage_path')
+            .in('id', thumbnailIds as string[]);
+          const photos = photoData ?? [];
+          if (photos.length > 0) {
+            const storagePaths = photos.filter((p) => p.storage_path).map((p) => p.storage_path as string);
             const { data: signedResult } = await supabase.storage.from('asset-documents').createSignedUrls(storagePaths, 3600);
             const pathToUrl: Record<string, string> = {};
             if (signedResult) {

@@ -5,6 +5,9 @@ import { fullName } from '@/utils/fullName';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** jsPDF instance augmented by jspdf-autotable with the last-table position. */
+type JsPDFWithAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
+
 export interface ReportPdfData {
   inspectionId: string;
   inspectionDate?: string;
@@ -138,20 +141,20 @@ async function fetchReportData(inspectionId: string) {
 
   if (inspErr || !inspection) throw inspErr || new Error('Inspection not found');
 
-  const blade = inspection.blade as any;
-  const turbine = blade?.turbine;
-  const windFarm = turbine?.wind_farm;
+  const blade = inspection.blade as Record<string, unknown> | null | undefined;
+  const turbine = blade?.turbine as Record<string, unknown> | null | undefined;
+  const windFarm = turbine?.wind_farm as Record<string, unknown> | null | undefined;
 
   const turbineInfo: TurbineInfo = {
-    id: turbine?.id || '',
-    name: turbine?.name || 'N/D',
-    model: turbine?.model || null,
+    id: (turbine?.id as string) || '',
+    name: (turbine?.name as string) || 'N/D',
+    model: (turbine?.model as string | null) || null,
     windFarm: {
-      id: windFarm?.id || '',
-      name: windFarm?.name || 'N/D',
-      location: windFarm?.location || 'N/D',
-      latitude: windFarm?.latitude || null,
-      longitude: windFarm?.longitude || null,
+      id: (windFarm?.id as string) || '',
+      name: (windFarm?.name as string) || 'N/D',
+      location: (windFarm?.location as string) || 'N/D',
+      latitude: (windFarm?.latitude as number | null) || null,
+      longitude: (windFarm?.longitude as number | null) || null,
     },
   };
 
@@ -456,7 +459,7 @@ function renderDefectSummary(
   });
 
   // Conclusions per blade
-  const afterTable = (doc as any).lastAutoTable?.finalY ?? y + 40;
+  const afterTable = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 40;
   let cy = afterTable + 10;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
@@ -683,7 +686,7 @@ function renderInspectionDetails(
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } },
   });
 
-  const afterOp = (doc as any).lastAutoTable?.finalY ?? y + 40;
+  const afterOp = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 40;
   let y2 = afterOp + 10;
 
   y2 = addSubSectionTitle(doc, '3.2 Detalles del informe', y2);
@@ -711,7 +714,7 @@ function renderTurbineInfo(
   doc: jsPDF,
   turbineInfo: TurbineInfo,
   bladesData: BladeData[],
-  allInspections: any[],
+  allInspections: Array<{ completed_at?: string | null; scheduled_date?: string | null }>,
   windFarmName: string,
   turbineName: string,
   date: string,
@@ -743,7 +746,7 @@ function renderTurbineInfo(
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
   });
 
-  const after41 = (doc as any).lastAutoTable?.finalY ?? y + 40;
+  const after41 = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 40;
   let y2 = after41 + 8;
 
   // 4.2 Ubicación
@@ -788,7 +791,7 @@ function renderTurbineInfo(
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  const after43 = (doc as any).lastAutoTable?.finalY ?? y2 + 30;
+  const after43 = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y2 + 30;
   let y3 = after43 + 8;
 
   // 4.4 Historial de inspecciones
@@ -797,7 +800,7 @@ function renderTurbineInfo(
 
   const histHeaders = ['Fecha', 'Método', 'Total defectos'];
   const histBody = allInspections.map((insp) => {
-    const inspDate = insp.completed_at || insp.scheduled_date;
+    const inspDate = insp.completed_at || insp.scheduled_date || '';
     return [
       formatDateES(inspDate),
       'Dron (CORE Insight)',
@@ -920,7 +923,7 @@ async function renderBladeResults(
       });
 
       // Images
-      const afterDefectTable = (doc as any).lastAutoTable?.finalY ?? dy + 60;
+      const afterDefectTable = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? dy + 60;
       let imgY = afterDefectTable + 8;
 
       if (defect.imageUrls.length > 0) {
@@ -973,10 +976,11 @@ export async function generateAndDownloadReport(data: ReportPdfData): Promise<vo
   let reportData;
   try {
     reportData = await fetchReportData(data.inspectionId);
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Detect auth-related errors (401, 400 on auth endpoints)
-    const message = err?.message || '';
-    const status = err?.status || err?.code || 0;
+    const e = err as { message?: string; status?: number; code?: number } | null;
+    const message = e?.message || '';
+    const status = e?.status || e?.code || 0;
     if (
       status === 401 ||
       status === 403 ||

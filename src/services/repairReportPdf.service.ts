@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type CellHookData } from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
 import { getStageCatalogLabel } from '@/constants/repair-stages';
 import { fullName } from '@/utils/fullName';
@@ -8,6 +8,9 @@ import { fullName } from '@/utils/fullName';
 const db = supabase as any;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+/** jsPDF instance augmented by jspdf-autotable with the last-table position. */
+type JsPDFWithAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
 export interface RepairReportData {
   campaignId: string;
@@ -904,7 +907,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  y = (doc as any).lastAutoTable?.finalY ?? y + 60;
+  y = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 60;
   y += 8;
 
   // Blade data
@@ -927,7 +930,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  y = (doc as any).lastAutoTable?.finalY ?? y + 40;
+  y = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 40;
   y += 8;
 
   // Findings
@@ -969,9 +972,10 @@ function renderDamageCategorizationPage(doc: jsPDF) {
     headStyles: { fillColor: [160, 160, 160], textColor: 255, fontStyle: 'bold' },
     bodyStyles: { textColor: [0, 0, 0] },
     margin: { left: MARGIN, right: MARGIN },
-    didParseCell: (data: any) => {
+    didParseCell: (data: CellHookData) => {
       if (data.section === 'body') {
-        const catNum = parseInt(data.row.raw[0] as string, 10);
+        const rawRow = data.row.raw as unknown as unknown[];
+        const catNum = parseInt(rawRow[0] as string, 10);
         // Row colors from reference image: teal 1-2, amber 3, orange 4, red 5
         const rowColors: Record<number, RGB> = {
           1: [0, 139, 148],   // teal/cyan

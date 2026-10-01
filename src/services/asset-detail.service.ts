@@ -310,7 +310,7 @@ export const assetDetailService = {
       const turbineName = (bladeTurbine?.name ?? directTurbine?.name) as string | null;
       const defects = (r.defects as unknown[]) ?? [];
       const inspId = r.id as string;
-      const realPhotosCount = photosCountMap[inspId] ?? Number(r.photos_count) ?? 0;
+      const realPhotosCount = photosCountMap[inspId] ?? (Number(r.photos_count) || 0);
       return {
         id: inspId,
         inspectionDate: r.created_at as string,
@@ -458,7 +458,7 @@ export const assetDetailService = {
         const turbineName = (bladeTurbine?.name ?? directTurbine?.name) as string | null;
         const defects = (r.defects as unknown[]) ?? [];
         const inspId = r.id as string;
-        const realPhotosCount = campaignPhotosMap[inspId] ?? Number(r.photos_count) ?? 0;
+        const realPhotosCount = campaignPhotosMap[inspId] ?? (Number(r.photos_count) || 0);
         return {
           id: inspId,
           inspectionDate: r.created_at as string,

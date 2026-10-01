@@ -5,6 +5,10 @@ import { supabase } from '@/lib/supabase';
 import { savePdfBlob, getPdfBlob } from '@/utils/pdfStorage';
 import { fullName } from '@/utils/fullName';
 import type { ResultsDefect } from '@/types';
+import type { jsPDF as JsPDF } from 'jspdf';
+
+/** jsPDF instance augmented by jspdf-autotable with the last-table position. */
+type JsPDFWithAutoTable = JsPDF & { lastAutoTable?: { finalY: number } };
 
 export interface ExportPanelProps {
   inspectionId: string;
@@ -70,7 +74,7 @@ interface BladeDefectMarker {
 // Draws a blade diagram with 4 vertical sections (PS, LE, SS, TE),
 // a meter scale on the left, and defect markers as colored circles.
 function drawBladeDiagram(
-  doc: any,
+  doc: JsPDF,
   x: number,
   y: number,
   width: number,
@@ -145,7 +149,7 @@ function drawBladeDiagram(
 // ─── drawDonutChart ──────────────────────────────────────────────────────────
 // Draws a donut chart using arcs approximated with line segments.
 function drawDonutChart(
-  doc: any,
+  doc: JsPDF,
   centerX: number,
   centerY: number,
   outerRadius: number,
@@ -171,7 +175,7 @@ function drawDonutChart(
 }
 
 function drawArc(
-  doc: any,
+  doc: JsPDF,
   cx: number,
   cy: number,
   outerR: number,
@@ -224,7 +228,7 @@ function drawArc(
 // ─── drawMapPlaceholder ──────────────────────────────────────────────────────
 // Draws a placeholder map rectangle with location marker and coordinates
 function drawMapPlaceholder(
-  doc: any,
+  doc: JsPDF,
   x: number,
   y: number,
   width: number,
@@ -716,14 +720,14 @@ export function ExportPanel({
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await (supabase as any)
+        const { data } = await supabase
           .from('report')
           .select('storage_path, generated_at')
           .eq('reference_id', inspectionId)
           .eq('type', 'inspection')
           .order('generated_at', { ascending: false });
         if (cancelled || !data) return;
-        const latest = (data as { storage_path: string | null; generated_at: string | null }[])
+        const latest = data
           .find((r) => !!r.storage_path && !r.storage_path.startsWith('pending/'));
         if (latest?.storage_path) {
           setPreviousReportPath(latest.storage_path);
@@ -789,7 +793,7 @@ export function ExportPanel({
       // Idempotent & self-correcting: always advance stage to 'report' explicitly.
       // Don't rely solely on the DB trigger — the guard (.neq) prevents redundant
       // writes and recovers any inspection left behind on an earlier stage.
-      await (supabase as any).from('inspection')
+      await supabase.from('inspection')
         .update({ stage: 'report' })
         .eq('id', inspectionId)
         .neq('stage', 'report');
@@ -840,6 +844,9 @@ export function ExportPanel({
       // Fetch inspection metadata (inspected_by) from DB
       let inspectedByName = 'Inspector';
       try {
+        // `inspected_by` is not part of the generated `inspection` type, so this
+        // query must bypass the typed client.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = supabase as any;
         const { data: inspRow } = await db.from('inspection').select('inspected_by').eq('id', inspectionId).single();
         if (inspRow?.inspected_by) inspectedByName = inspRow.inspected_by;
@@ -1100,7 +1107,7 @@ export function ExportPanel({
       });
 
       // Blade diagrams (3 small blades side by side using bladePng)
-      const tableEndY = (doc as any).lastAutoTable?.finalY || y + 40;
+      const tableEndY = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY || y + 40;
       const diagramStartY = tableEndY + 10;
       const diagramH = 90;
       const diagramW = (contentW - 16) / 3; // 3 columns with 8mm gap between
@@ -1278,7 +1285,10 @@ export function ExportPanel({
         margin: { left: margin, right: margin },
         tableWidth: contentW * 0.7,
       });
-      y = (doc as any).lastAutoTable?.finalY + 8 || y + 50;
+      {
+        const fy = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY;
+        y = fy ? fy + 8 : y + 50;
+      }
 
       // 2.5 Categorization table
       if (y > pageH - 80) { newPage(); y = 28; }
@@ -1306,9 +1316,9 @@ export function ExportPanel({
         styles: { fontSize: 8, cellPadding: 2.5 },
         headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
         bodyStyles: { textColor: [0, 0, 0] },
-        didParseCell: (data: any) => {
+        didParseCell: (data) => {
           if (data.section === 'body') {
-            const catNum = parseInt(data.row.raw[0] as string, 10);
+            const catNum = parseInt((data.row.raw as string[])[0] as string, 10);
             // Row colors from reference image: teal 1-2, amber 3, orange 4, red 5
             const rowColors: Record<number, [number, number, number]> = {
               1: [0, 139, 148],    // teal/cyan
@@ -1361,7 +1371,10 @@ export function ExportPanel({
         tableWidth: contentW * 0.7,
         theme: 'grid',
       });
-      y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
+      {
+        const fy = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY;
+        y = fy ? fy + 12 : y + 40;
+      }
 
       // 3.2 Report Details
       // Get current user's full name — prefer the profile (name + last_name),
@@ -1425,7 +1438,7 @@ export function ExportPanel({
       let turbineCommission = 'N/A';
       if (turbineId) {
         try {
-          const { data: tData } = await (supabase as any)
+          const { data: tData } = await supabase
             .from('turbine')
             .select('model, power_kw, powering_date')
             .eq('id', turbineId)
@@ -1455,7 +1468,10 @@ export function ExportPanel({
         tableWidth: contentW * 0.7,
         theme: 'grid',
       });
-      y = (doc as any).lastAutoTable?.finalY + 12 || y + 50;
+      {
+        const fy = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY;
+        y = fy ? fy + 12 : y + 50;
+      }
 
       // 4.2 Location (terrain map with turbine icon + Google Maps link)
       const locationTitle = language === 'es' ? '4.2 Ubicación' : '4.2 Location';
@@ -1575,7 +1591,10 @@ export function ExportPanel({
         tableWidth: contentW * 0.7,
         theme: 'grid',
       });
-      y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
+      {
+        const fy = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY;
+        y = fy ? fy + 12 : y + 40;
+      }
 
       // 4.4 Inspection History
       y = subTitle(t.inspHistory, y);
@@ -1678,7 +1697,7 @@ export function ExportPanel({
             styles: { fontSize: 8, cellPadding: 2.5 },
             headStyles: { fillColor: PDF_COLORS.tableHeaderGray, textColor: 255, fontStyle: 'bold' },
             columnStyles: { 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } },
-            didParseCell: (data: any) => {
+            didParseCell: (data) => {
               if (data.section === 'body' && data.column.index === 3) {
                 const catNum = parseInt(data.cell.raw as string, 10);
                 if (catNum >= 1 && catNum <= 5) {
@@ -1690,7 +1709,7 @@ export function ExportPanel({
             },
             margin: { left: margin + bladeW + 8, right: margin },
           });
-          const tableBottom = (doc as any).lastAutoTable?.finalY || y + 30;
+          const tableBottom = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY || y + 30;
           y = Math.max(tableBottom, y + diagramH) + 8;
         }
         bladeIdx++;
@@ -1715,7 +1734,10 @@ export function ExportPanel({
             if (annots && annots.length > 0) {
               const thumbIds = annots.map(a => a.thumbnail_id).filter(Boolean) as string[];
               if (thumbIds.length > 0) {
-                // Step 2: Get storage paths for all photos
+                // Step 2: Get storage paths for all photos.
+                // `inspection_photo` is not in the generated Supabase types,
+                // so this table access must bypass the typed client.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const { data: photos } = await (supabase as any)
                   .from('inspection_photo')
                   .select('id, storage_path, metadata')
@@ -1724,9 +1746,14 @@ export function ExportPanel({
                 if (photos && photos.length > 0) {
                   const photoMap: Record<string, string> = {};
                   const rotationMap: Record<string, number> = {};
-                  for (const p of photos) {
+                  const photoRows = photos as Array<{
+                    id: string;
+                    storage_path: string | null;
+                    metadata: { rotation?: number } | null;
+                  }>;
+                  for (const p of photoRows) {
                     if (p.storage_path) photoMap[p.id] = p.storage_path;
-                    rotationMap[p.id] = (p.metadata as any)?.rotation || 0;
+                    rotationMap[p.id] = p.metadata?.rotation || 0;
                   }
 
                   // Step 3: Generate signed URLs in batch
@@ -1738,8 +1765,8 @@ export function ExportPanel({
                     assetPaths.length > 0 ? supabase.storage.from('asset-documents').createSignedUrls(assetPaths, 600) : { data: null },
                     inspPaths.length > 0 ? supabase.storage.from('inspection-photos').createSignedUrls(inspPaths, 600) : { data: null },
                   ]);
-                  if (aRes.data) aRes.data.forEach((item: any, i: number) => { if (item?.signedUrl && !item.error) signedMap[assetPaths[i]!] = item.signedUrl; });
-                  if (iRes.data) iRes.data.forEach((item: any, i: number) => { if (item?.signedUrl && !item.error) signedMap[inspPaths[i]!] = item.signedUrl; });
+                  if (aRes.data) aRes.data.forEach((item, i) => { if (item?.signedUrl && !item.error) signedMap[assetPaths[i]!] = item.signedUrl; });
+                  if (iRes.data) iRes.data.forEach((item, i) => { if (item?.signedUrl && !item.error) signedMap[inspPaths[i]!] = item.signedUrl; });
 
                   // Step 4: Map annotation_id → signed URL
                   const annotUrlMap: Record<string, string> = {};
@@ -1837,7 +1864,7 @@ export function ExportPanel({
             margin: { left: tableLeftMargin, right: margin },
             tableWidth: contentW - (tableLeftMargin - margin),
             theme: 'grid',
-            didParseCell: (data: any) => {
+            didParseCell: (data) => {
               // Color the category value cell
               if (data.section === 'body' && data.row.index === 0 && data.column.index === 1) {
                 const catNum = parseInt(data.cell.raw as string, 10);
@@ -1849,7 +1876,7 @@ export function ExportPanel({
               }
             },
           });
-          const detailTableEnd = (doc as any).lastAutoTable?.finalY || y + 40;
+          const detailTableEnd = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY || y + 40;
           y = Math.max(detailTableEnd, y + profileH + 5) + 5;
 
           // Clickable link per defect
@@ -2046,7 +2073,7 @@ export function ExportPanel({
       (async () => {
         try { await savePdfBlob(inspectionId, blob); } catch { /* ignore */ }
         try {
-          await (supabase as any).from('inspection')
+          await supabase.from('inspection')
             .update({ stage: 'report' })
             .eq('id', inspectionId)
             .neq('stage', 'report');
@@ -2057,20 +2084,20 @@ export function ExportPanel({
             // Remove any previous report(s) for this inspection so only the
             // most recent one remains (both storage PDFs and DB records).
             try {
-              const { data: prevReports } = await (supabase as any)
+              const { data: prevReports } = await supabase
                 .from('report')
                 .select('storage_path')
                 .eq('reference_id', inspectionId);
 
               const pathsToRemove = (prevReports || [])
-                .map((r: { storage_path: string | null }) => r.storage_path)
-                .filter((p: string | null): p is string => !!p && !p.startsWith('pending/'));
+                .map((r) => r.storage_path)
+                .filter((p): p is string => !!p && !p.startsWith('pending/'));
 
               if (pathsToRemove.length > 0) {
                 await supabase.storage.from('reports').remove(pathsToRemove);
               }
 
-              await (supabase as any)
+              await supabase
                 .from('report')
                 .delete()
                 .eq('reference_id', inspectionId);
@@ -2090,7 +2117,7 @@ export function ExportPanel({
               setPreviousReportPath(storagePath);
             }
 
-            await (supabase as any).from('report').insert({
+            await supabase.from('report').insert({
               reference_id: inspectionId,
               type: 'inspection',
               generated_by: userId,

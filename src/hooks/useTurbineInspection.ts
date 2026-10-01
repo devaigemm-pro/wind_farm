@@ -117,7 +117,7 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
       inspectionIds.push(insp.id);
     }
 
-    const wf = turbine.wind_farm as any;
+    const wf = turbine.wind_farm as Record<string, unknown> | null;
     const maxBladeLength = blades.reduce((max, b) => Math.max(max, b.length_meters || 43), 0);
 
     return {
@@ -125,8 +125,8 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
       inspectionIds,
       inspectionToBladePosition,
       inspectionDate: new Date().toISOString(),
-      windFarmName: wf?.name || 'Unknown',
-      windFarmId: wf?.id || '',
+      windFarmName: (wf?.name as string) || 'Unknown',
+      windFarmId: (wf?.id as string) || '',
       turbineName: turbine.name,
       turbineId: turbine.id,
       blades: blades.map((b) => ({
@@ -136,7 +136,10 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
       })),
       defects: [],
       bladeLength: maxBladeLength,
-      windFarmCoords: wf?.latitude && wf?.longitude ? { lat: wf.latitude, lon: wf.longitude } : null,
+      windFarmCoords:
+        wf?.latitude && wf?.longitude
+          ? { lat: Number(wf.latitude), lon: Number(wf.longitude) }
+          : null,
     };
   }
 
@@ -250,7 +253,7 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
     };
   });
 
-  const wf = turbine.wind_farm as any;
+  const wf = turbine.wind_farm as Record<string, unknown> | null;
   // Build inspectionId → blade position letter mapping
   const inspectionToBladePosition: Record<string, string> = {};
   for (const insp of allInspections) {
@@ -264,8 +267,8 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
     inspectionIds: inspectionIds,
     inspectionToBladePosition,
     inspectionDate: inspection.completed_at || inspection.scheduled_date,
-    windFarmName: wf?.name || 'Unknown',
-    windFarmId: wf?.id || '',
+    windFarmName: (wf?.name as string) || 'Unknown',
+    windFarmId: (wf?.id as string) || '',
     turbineName: turbine.name,
     turbineId: turbine.id,
     blades: blades.map((b) => ({
@@ -275,7 +278,10 @@ async function fetchTurbineInspection(turbineId: string): Promise<TurbineInspect
     })),
     defects: mappedDefects,
     bladeLength: maxBladeLength,
-    windFarmCoords: wf?.latitude && wf?.longitude ? { lat: wf.latitude, lon: wf.longitude } : null,
+    windFarmCoords:
+      wf?.latitude && wf?.longitude
+        ? { lat: Number(wf.latitude), lon: Number(wf.longitude) }
+        : null,
   };
 }
 

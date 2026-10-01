@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Inspection, InspectionStatus, InspectionStage } from '@/types';
+import type { TablesUpdate } from '@/types/supabase';
 
 // ─── Custom Error ───────────────────────────────────────────────────────────
 
@@ -192,10 +193,12 @@ export const inspectionsService = {
     id: string,
     verticalBlade: string,
   ): Promise<void> {
-    const { error } = await supabase
-      .from('inspection')
-      .update({ vertical_blade: verticalBlade } as any)
-      .eq('id', id);
+    // `vertical_blade` is a runtime column not present in the generated
+    // Supabase table types; the generated Update type rejects excess
+    // properties, so we cast through `unknown` to the Update type (instead of
+    // `any`) to allow the extra column while keeping the call typed.
+    const payload = { vertical_blade: verticalBlade } as unknown as TablesUpdate<'inspection'>;
+    const { error } = await supabase.from('inspection').update(payload).eq('id', id);
 
     if (error) throw new InspectionServiceError(error.message, error.code);
   },

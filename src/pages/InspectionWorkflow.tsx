@@ -84,7 +84,7 @@ export function InspectionWorkflow() {
 
   // Derive title from inspection (support both blade-based and turbine-based inspections)
   const turbine = inspection?.blade?.turbine ?? inspection?.turbine;
-  const turbineId = turbine?.id ?? (inspection as any)?.turbine_id ?? '';
+  const turbineId = turbine?.id ?? inspection?.turbine_id ?? '';
   const windFarm = turbine?.wind_farm ?? inspection?.turbine?.wind_farm;
   const turbineName = turbine?.name ?? '—';
   const farmName = windFarm?.name ?? '—';
