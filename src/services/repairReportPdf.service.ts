@@ -48,7 +48,9 @@ interface RepairPhotoForPdf {
   bladeSide: string | null;
   /** turbine name (view.turbine_name). */
   turbineName: string | null;
-  /** public URL resolved from storage_path. */
+  /** raw storage_path (used to batch-resolve signed URLs for imported photos). */
+  storagePath: string;
+  /** public URL (native) or signed URL (imported) resolved from storage_path. */
   url: string;
   /** whether metadata.selected_for_report is true. */
   selected: boolean;
@@ -301,11 +303,47 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
   }
 }
 
+// Imported photos live under `inspection-imports/...` in the PRIVATE
+// 'asset-documents' bucket and need a SIGNED url; native repair photos live
+// under repairs/... in the PUBLIC 'inspection-photos' bucket (public url).
+// Same bucket split as repair.service.ts / drone-upload.service.ts.
+const PDF_IMPORT_PATH_PREFIX = 'inspection-imports/';
+const PDF_IMPORT_BUCKET = 'asset-documents';
+
+function isImportedPhotoPath(storagePath: string): boolean {
+  return !!storagePath && storagePath.startsWith(PDF_IMPORT_PATH_PREFIX);
+}
+
 function resolvePhotoUrl(storagePath: string): string {
-  // Repair photos live under repairs/{repair_id}/... in the PUBLIC
-  // 'inspection-photos' bucket → public URL (no signing).
+  // Imported photos can't be resolved synchronously (private bucket, signed
+  // url). Return '' here; they're patched in batch after the fetch loop. Native
+  // repair photos resolve to a public URL from 'inspection-photos'.
+  if (isImportedPhotoPath(storagePath)) return '';
   const { data } = supabase.storage.from('inspection-photos').getPublicUrl(storagePath);
   return data?.publicUrl ?? '';
+}
+
+/**
+ * Batch-resolve SIGNED urls for imported photo paths (private 'asset-documents'
+ * bucket), keyed by storage path. One call for all paths.
+ */
+async function resolveImportedPhotoSignedUrls(
+  paths: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = [...new Set(paths.filter(isImportedPhotoPath))];
+  if (unique.length === 0) return map;
+
+  const { data } = await supabase.storage
+    .from(PDF_IMPORT_BUCKET)
+    .createSignedUrls(unique, 3600);
+
+  for (const item of data ?? []) {
+    if (item.signedUrl && !item.error && item.path) {
+      map.set(item.path, item.signedUrl);
+    }
+  }
+  return map;
 }
 
 // ─── Data Fetching ────────────────────────────────────────────────────────────
@@ -446,9 +484,22 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
         repairCompletedAt: (r.repair_completed_at as string) ?? null,
         bladeSide: (r.blade_side as string) ?? null,
         turbineName: (r.turbine_name as string) ?? null,
+        storagePath,
         url: resolvePhotoUrl(storagePath),
         selected: isSelectedForReport(r.metadata),
       });
+    }
+
+    // Imported photos (private 'asset-documents' bucket) need SIGNED urls, which
+    // can't be resolved synchronously inside the loop above. Resolve them all in
+    // ONE batched call and patch the photos; native photos keep their public URL.
+    const importedSignedByPath = await resolveImportedPhotoSignedUrls(
+      photos.map((p) => p.storagePath),
+    );
+    for (const p of photos) {
+      if (isImportedPhotoPath(p.storagePath)) {
+        p.url = importedSignedByPath.get(p.storagePath) ?? '';
+      }
     }
   }
 
