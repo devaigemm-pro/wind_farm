@@ -187,12 +187,12 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
   const [showBladeConfirm, setShowBladeConfirm] = useState(false);
   const storageKey = `vertical-blade-${inspectionId}`;
   const [verticalBlade, setVerticalBlade] = useState<string>(() => {
-    const dbVal = (inspection as any)?.vertical_blade;
+    const dbVal = (inspection as { vertical_blade?: string | null } | undefined)?.vertical_blade;
     if (dbVal && ['A','B','C'].includes(dbVal)) return dbVal;
     return localStorage.getItem(storageKey) || 'A';
   });
   const [pendingVerticalBlade, setPendingVerticalBlade] = useState<string>(() => {
-    const dbVal = (inspection as any)?.vertical_blade;
+    const dbVal = (inspection as { vertical_blade?: string | null } | undefined)?.vertical_blade;
     if (dbVal && ['A','B','C'].includes(dbVal)) return dbVal;
     return localStorage.getItem(storageKey) || 'A';
   });
@@ -200,7 +200,7 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // Sync verticalBlade from inspection data or localStorage when it loads
   useEffect(() => {
-    const dbBlade = (inspection as any)?.vertical_blade;
+    const dbBlade = (inspection as { vertical_blade?: string | null } | undefined)?.vertical_blade;
     if (dbBlade && ['A','B','C'].includes(dbBlade)) {
       setVerticalBlade(dbBlade);
       setPendingVerticalBlade(dbBlade);
@@ -453,11 +453,11 @@ export function AnnotateStep({ inspectionId, inspection, campaignId: propCampaig
 
   // ─── Turbine info derived from inspection ─────────────────────────────────
   const turbine = inspection?.blade?.turbine ?? inspection?.turbine;
-  const turbineId = turbine?.id ?? (inspection as any)?.turbine_id ?? null;
-  const turbineModel = (turbine as any)?.model ?? '—';
-  const turbinePower = (turbine as any)?.power_kw ? `${(turbine as any).power_kw} kW` : '—';
-  const turbineCommissioning = (turbine as any)?.powering_date
-    ? new Date((turbine as any).powering_date).toLocaleDateString()
+  const turbineId = turbine?.id ?? inspection?.turbine_id ?? null;
+  const turbineModel = turbine?.model ?? '—';
+  const turbinePower = turbine?.power_kw ? `${turbine.power_kw} kW` : '—';
+  const turbineCommissioning = turbine?.powering_date
+    ? new Date(turbine.powering_date).toLocaleDateString()
     : '—';
 
   // ─── Comparison: other inspections of the same turbine ─────────────────────

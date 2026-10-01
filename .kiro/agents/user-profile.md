@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 293
+- **Sesiones analizadas**: 294
 - **Última actualización**: 2026-09-30
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -1946,3 +1946,35 @@
 - **Recomendación dada**: SÍ, deployar ahora. Razones: (1) la limpieza V2 es bajo riesgo/no cambia comportamiento (prod ya corría legacy, que es lo que queda); (2) todo verificado (build/tsc/tests + usuario en dev); (3) separar este deploy del refactor riesgoso de any/react-hooks da un punto de rollback limpio y aísla el riesgo. Mezclar limpieza + refactor en un mismo deploy complica el diagnóstico si algo rompe.
 - **Esperando aprobación explícita** para ejecutar flujo de prod (rebase origin/main → merge main → push → vercel --prod). NO ejecutado aún.
 - **Patrón confirmado**: pensamiento de release/riesgo — separar cambios seguros de riesgosos en deploys distintos; respetar límite de aprobación de deploy.
+
+### Sesión 293 (deploy) - 2026-09-30 — liberado a prod
+- **Aprobación**: usuario dijo "libera". Ejecuté flujo completo de deploy.
+- **Flujo**: rebase origin/main (up to date) → checkout main → pull → merge session branch --no-ff → build en main ✅ → push origin main (7b5c511..edb40f5) → `vercel --prod --yes`.
+- **Deploy OK**: Production https://wind-farm-qquczfdjx-dev-ai2.vercel.app, aliased a https://wind-farm-eight.vercel.app. Verificado en navegador headless: redirige a /login, LoginV2 renderiza, 0 errores de consola. Bundle en prod = index-JG8Az6A3.js (coincide con el build del deploy). Volví a la branch de sesión.
+- **Confirmado el patrón del perfil**: "aplicar en prod" = rebase+merge main+push+`vercel --prod` (el push solo NO deploya, deploymentEnabled main:false en vercel.json). Verificar prod con hash de bundle + carga real.
+
+### Sesión 293 (warnings) - 2026-09-30 — reducción ESLint por fases
+- **Tarea**: "sigue con los 133" — reducir los 133 warnings de ESLint restantes tras la limpieza V2.
+- **Ejecutado por fases con verificación tras cada una**: Fase 1 servicios (133→117, +2 bugs CBE reales), Fase 2 hooks (117→107), Fase 3 componentes/páginas (107→48). TODOS los `any` eliminados (85) salvo disables legítimos documentados. tsc/build/tests verdes en cada fase.
+- **Bug real encontrado y corregido**: `Number(r.photos_count) ?? 0` en asset-detail.service devolvía NaN en vez de 0 (Number() nunca es nullish) → `Number(x) || 0`.
+- **Patrón de delegación afinado**: el desarrollador (sin terminal) introduce errores TS al tipar (por noUncheckedIndexedAccess + tablas no tipadas en el schema Supabase). El compañero debe verificar SIEMPRE y corregir los errores en cadena (hice correcciones en inspections.service, reportPdf, useAnnotations, useTurbineInspection, ExportPanel). Tabla `inspection_photo` y varias columnas NO están en los tipos generados → `any` con disable es legítimo ahí.
+- **Decisión frenada antes de Fase 4**: los 48 restantes son react-hooks/* (set-state-in-effect 28, exhaustive-deps 16, refs/purity/memo 4). A diferencia de los any, cambiar estos PUEDE alterar comportamiento runtime. Recomendé parar (opción A: dejar y deployar) por la regla "no romper lo que funciona". Esperando decisión A/B/C del usuario.
+- **Patrones confirmados**: ejecución incremental con verificación rigurosa, pensamiento de riesgo/release, parar y consultar cuando el riesgo cambia de naturaleza en vez de seguir por inercia.
+
+### Sesión 294 - 2026-09-30
+- **Tarea principal**: modo compañero — revisar por qué las imágenes del paso "Análisis de daño" se visualizaban rotas en el workflow de reparación (adjuntó screenshot)
+- **Observaciones nuevas**: el usuario reporta bugs visuales con un screenshot y 1 frase conceptual, sin indicar causa ni archivos; espera que el agente diagnostique la causa raíz y la corrija. Confía en que el compañero delegue al desarrollador y cierre el ciclo (build + preview). Usa escritura con typos ("poruqe", "imagnes") sin problema.
+- **Patrones confirmados**: descripción conceptual breve + alta autonomía; iteración base→validación; stack Supabase (storage buckets, signed vs public URL), React/Vite; respeta flujo "build + preview local, NO deploy sin aprobación"; prefiere reporte final conciso con causa raíz + archivos tocados + URL
+
+### Sesión 293 (release warnings) - 2026-09-30 — hallazgo pre-deploy
+- **Usuario eligió A**: dejar los 48 react-hooks sin tocar y deployar la reducción de warnings. Verificación final verde (tsc/build/tests 3/3, 0 errores, 48 warnings).
+- **Hallazgo crítico antes de deployar**: la branch de sesión incluye un cambio funcional NO acordado — `src/services/repair.service.ts` +94 líneas (lógica nueva de signed URLs para fotos importadas, bucket privado asset-documents). Las fases 1-3 NO tocaron ese archivo; lo recogió el auto-commit del hook pero viene de trabajo previo que nunca llegó a main.
+- **Acción**: frené el deploy y pregunté al usuario (A: deployar todo incluyendo el cambio de repair si lo reconoce / B: aislar solo los warnings en otra branch). NO deployé un cambio funcional no revisado sin aprobación.
+- **Aprendizaje clave**: SIEMPRE revisar el diff completo vs origin/main ANTES de deployar, no asumir que la branch solo contiene lo trabajado en la sesión. El auto-commit del hook puede arrastrar cambios previos no mergeados. Verificar scope del release.
+- **Patrón confirmado**: pensamiento de release/riesgo, no meter cambios no acordados a prod sin confirmar, revisar diff antes de liberar.
+
+### Sesión 293 (repair.service) - 2026-09-30 — explicación del cambio
+- **Pregunta del usuario**: "a que se refiere repair.service.ts?" — pidió entender el cambio antes de decidir el deploy.
+- **Qué es**: servicio del workflow de reparaciones (/repairs/:campaignId). El cambio (+94 líneas, commit cc4e935 auto-commit) es un FIX real: las fotos importadas (bucket privado asset-documents, path inspection-imports/) necesitan signed URL, pero el código les daba URL pública → 404, no se veían. El fix detecta importadas y resuelve signed URLs en batch (mismo patrón que defects.service/drone-upload).
+- **No es basura**: es un bugfix legítimo de trabajo previo no mergeado. Recomendé A (incluirlo, porque arregla algo roto hoy en prod) pero dejé la decisión al usuario por no haberlo probado juntos.
+- **Patrón confirmado**: el usuario pregunta antes de aprobar cuando no reconoce un cambio — valora entender qué se libera. Explicar en simple (qué es el archivo, qué bug arregla, por qué apareció) antes de pedir decisión. Esperando A/B.

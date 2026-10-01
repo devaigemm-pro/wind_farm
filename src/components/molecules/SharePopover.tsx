@@ -24,13 +24,14 @@ export function SharePopover({ anchorEl, open, onClose, shareKey, windFarmId, tu
     if (!open) return;
     (async () => {
       // Find latest share token for this shareKey
-      const tokens = await restSelect('report',
+      const tokens = await restSelect<{ storage_path: string; generated_at: string }>('report',
         `select=storage_path,generated_at&filename=eq.share:${encodeURIComponent(shareKey)}&type=eq.consolidated&order=generated_at.desc&limit=1`
       );
 
-      if (tokens.length > 0) {
-        const latestToken = tokens[0].storage_path;
-        const tokenTime = tokens[0].generated_at;
+      const firstToken = tokens[0];
+      if (firstToken) {
+        const latestToken = firstToken.storage_path;
+        const tokenTime = firstToken.generated_at;
 
         // Check if revoked (revocation created AFTER this token)
         const revokes = await restSelect('report',
@@ -65,7 +66,7 @@ export function SharePopover({ anchorEl, open, onClose, shareKey, windFarmId, tu
     // Create token if needed
     if (!currentToken) {
       const token = crypto.randomUUID();
-      const inspections = await restSelect('inspection', 'select=id&limit=1');
+      const inspections = await restSelect<{ id: string }>('inspection', 'select=id&limit=1');
       const refId = inspections[0]?.id || '00000000-0000-4000-8000-000000000001';
 
       const result = await restInsert('report', {
@@ -92,7 +93,7 @@ export function SharePopover({ anchorEl, open, onClose, shareKey, windFarmId, tu
 
     // If no emails left, revoke
     if (updated.length === 0) {
-      const inspections = await restSelect('inspection', 'select=id&limit=1');
+      const inspections = await restSelect<{ id: string }>('inspection', 'select=id&limit=1');
       const refId = inspections[0]?.id || '00000000-0000-4000-8000-000000000001';
 
       const result = await restInsert('report', {

@@ -188,11 +188,74 @@ function numOrNull(v: unknown): number | null {
   return isNaN(n) ? null : n;
 }
 
+// Imported photos (from spreadsheet/drone imports) live under
+// `inspection-imports/...` in the PRIVATE 'asset-documents' bucket and require a
+// SIGNED url. Native repair photos live under repairs/... in the PUBLIC
+// 'inspection-photos' bucket and resolve to a public url. See the same bucket
+// split in drone-upload.service.ts (getPhotoUrl) and useInspectionPhotos.ts.
+const IMPORT_PATH_PREFIX = 'inspection-imports/';
+const IMPORT_BUCKET = 'asset-documents';
+const SIGNED_URL_TTL_SECONDS = 3600;
+
+/** Whether a storage path belongs to the private imports bucket (needs signing). */
+function isImportedPath(storagePath: string | null): boolean {
+  return !!storagePath && storagePath.startsWith(IMPORT_PATH_PREFIX);
+}
+
 /** Resolve a public URL for a storage path in the public inspection-photos bucket. */
 function publicUrl(storagePath: string | null): string {
   if (!storagePath) return '';
   const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(storagePath);
   return data?.publicUrl ?? '';
+}
+
+/**
+ * Batch-resolve SIGNED urls for imported photos living in the private
+ * 'asset-documents' bucket, keyed by storage path. One call for all paths
+ * (same pattern as defects.service.ts createSignedUrls). Paths that aren't
+ * imported are ignored by the caller (they use the public URL instead).
+ */
+async function resolveImportedSignedUrls(
+  paths: (string | null)[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = [...new Set(paths.filter(isImportedPath))] as string[];
+  if (unique.length === 0) return map;
+
+  const { data } = await supabase.storage
+    .from(IMPORT_BUCKET)
+    .createSignedUrls(unique, SIGNED_URL_TTL_SECONDS);
+
+  for (const item of data ?? []) {
+    if (item.signedUrl && !item.error && item.path) {
+      map.set(item.path, item.signedUrl);
+    }
+  }
+  return map;
+}
+
+/**
+ * Patch the url/thumbnailUrl of imported photos in a stage tree using a
+ * previously-resolved storagePath → signed URL map. Native (non-imported)
+ * photos keep the public URL already set by mapPhoto.
+ */
+function applySignedUrlsToStages(
+  stages: RepairStageNode[],
+  signedByPath: Map<string, string>,
+): void {
+  for (const stage of stages) {
+    for (const photo of stage.photos) {
+      if (isImportedPath(photo.storagePath)) {
+        photo.url = signedByPath.get(photo.storagePath) ?? '';
+      }
+      if (isImportedPath(photo.thumbnailPath)) {
+        photo.thumbnailUrl = signedByPath.get(photo.thumbnailPath!) ?? photo.url;
+      } else if (!photo.thumbnailPath && isImportedPath(photo.storagePath)) {
+        // Imported photo with no separate thumbnail → fall back to the signed full URL.
+        photo.thumbnailUrl = photo.url;
+      }
+    }
+  }
 }
 
 /** Whether a repair_photo.metadata marks the photo as selected for the report. */
@@ -428,8 +491,17 @@ function mapPhoto(
   const id = (raw.photo_id as string) ?? '';
   const storagePath = (raw.storage_path as string) ?? '';
   const thumbnailPath = (raw.thumbnail_path as string) ?? null;
-  const url = publicUrl(storagePath);
-  const thumbnailUrl = thumbnailPath ? publicUrl(thumbnailPath) : url;
+  // Native photos (public 'inspection-photos') resolve to a public URL here.
+  // Imported photos (private 'asset-documents', path starts with
+  // 'inspection-imports/') need a SIGNED URL, resolved in batch later via
+  // applySignedUrlsToStages — leave empty for now so we never hand back a
+  // 404-ing public URL for the wrong bucket.
+  const url = isImportedPath(storagePath) ? '' : publicUrl(storagePath);
+  const thumbnailUrl = isImportedPath(thumbnailPath)
+    ? ''
+    : thumbnailPath
+      ? publicUrl(thumbnailPath)
+      : url;
   return {
     id,
     repairId,
@@ -823,6 +895,24 @@ export const repairService = {
       };
       return { node, createdAt: (defectRow?.created_at as string) ?? '' };
     });
+
+    // 9b. Imported photos live in the PRIVATE 'asset-documents' bucket (path
+    //     starts with 'inspection-imports/') and need a SIGNED url, unlike the
+    //     native repair photos in the PUBLIC 'inspection-photos' bucket. Collect
+    //     every imported storage/thumbnail path across all stages and resolve
+    //     their signed URLs in ONE batched call, then patch the photos in place.
+    const importedPaths: (string | null)[] = [];
+    for (const { node } of built) {
+      for (const stage of node.stages) {
+        for (const photo of stage.photos) {
+          importedPaths.push(photo.storagePath, photo.thumbnailPath);
+        }
+      }
+    }
+    const signedByPath = await resolveImportedSignedUrls(importedPaths);
+    for (const { node } of built) {
+      applySignedUrlsToStages(node.stages, signedByPath);
+    }
 
     // 10. Order by (bladePosition, defect.created_at) for correlative consistency.
     built.sort((a, b) => {

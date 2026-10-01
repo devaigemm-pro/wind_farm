@@ -66,6 +66,9 @@ export function DefectCompareViewer({
   useEffect(() => {
     if (!bladeId) return;
     (async () => {
+      // `inspection_photo` is not in the generated Supabase types, so this
+      // table access must bypass the typed client.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
 
       // Find all photos for this blade (regardless of campaign)
@@ -76,12 +79,15 @@ export function DefectCompareViewer({
         .order('radial_position', { ascending: true });
 
       if (photos && photos.length > 0) {
-        setBladePhotos(photos.map((p: any) => ({
-          id: p.id,
-          face: FACE_DB_TO_SHORT[p.face] || p.face,
-          storagePath: p.storage_path,
-          radialPosition: Number(p.radial_position),
-        })));
+        setBladePhotos((photos as Record<string, unknown>[]).map((p) => {
+          const face = p.face as string;
+          return {
+            id: p.id as string,
+            face: FACE_DB_TO_SHORT[face] || face,
+            storagePath: p.storage_path as string,
+            radialPosition: Number(p.radial_position),
+          };
+        }));
       }
     })();
   }, [bladeId]);
@@ -90,6 +96,9 @@ export function DefectCompareViewer({
   useEffect(() => {
     if (!inspectionId) return;
     (async () => {
+      // `inspection_photo` (queried below) is not in the generated Supabase
+      // types, so this table access must bypass the typed client.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
       // Find defects for this inspection
       const { data: defectRows } = await db
@@ -101,7 +110,9 @@ export function DefectCompareViewer({
 
       if (!defectRows || defectRows.length === 0) return;
 
-      const annotIds = defectRows.map((d: any) => d.description).filter(Boolean);
+      const annotIds = (defectRows as Record<string, unknown>[])
+        .map((d) => d.description)
+        .filter(Boolean);
       if (annotIds.length === 0) return;
 
       const { data: annotations } = await db
@@ -124,7 +135,7 @@ export function DefectCompareViewer({
           .limit(1);
 
         if (photos && photos.length > 0) {
-          const { data: signedData } = await (supabase as any).storage
+          const { data: signedData } = await supabase.storage
             .from('inspection-imports')
             .createSignedUrl(photos[0].storage_path, 3600);
 
@@ -137,7 +148,7 @@ export function DefectCompareViewer({
   }, [inspectionId, currentImage]);
 
   const getSignedUrl = useCallback(async (storagePath: string): Promise<string | null> => {
-    const { data } = await (supabase as any).storage
+    const { data } = await supabase.storage
       .from('inspection-imports')
       .createSignedUrl(storagePath, 3600);
     return data?.signedUrl ?? null;

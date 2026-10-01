@@ -228,14 +228,16 @@ export function useAnnotationThumbnailUrls(thumbnailIds: string[], campaignId: s
       if (error || !data) return {};
 
       // Generate signed URLs for thumbnails only
-      const importedRows = data.filter((r: any) => r.storage_path?.startsWith('inspection-imports/'));
+      const rows = data as Array<{ id: string; storage_path: string | null }>;
+      const importedRows = rows.filter((r) => r.storage_path?.startsWith('inspection-imports/'));
       const urlMap: Record<string, string> = {};
 
       if (importedRows.length > 0) {
-        const thumbPaths = importedRows.map((r: any) => {
-          const lastSlash = r.storage_path.lastIndexOf('/');
-          const dir = r.storage_path.substring(0, lastSlash);
-          const filename = r.storage_path.substring(lastSlash + 1);
+        const thumbPaths = importedRows.map((r) => {
+          const sp = r.storage_path as string;
+          const lastSlash = sp.lastIndexOf('/');
+          const dir = sp.substring(0, lastSlash);
+          const filename = sp.substring(lastSlash + 1);
           return `${dir}/thumb_${filename}`;
         });
 
@@ -246,8 +248,9 @@ export function useAnnotationThumbnailUrls(thumbnailIds: string[], campaignId: s
           if (signedData) {
             for (let j = 0; j < signedData.length; j++) {
               const item = signedData[j];
-              if (item?.signedUrl && !item.error) {
-                urlMap[importedRows[j].id] = item.signedUrl;
+              const row = importedRows[j];
+              if (row && item?.signedUrl && !item.error) {
+                urlMap[row.id] = item.signedUrl;
               }
             }
           }
@@ -290,11 +293,12 @@ export function useAnnotationViewerUrls(thumbnailIds: string[], campaignId: stri
       const urlMap: Record<string, string> = {};
 
       // For imported photos that need signed URLs (private bucket)
-      const importedRows = data.filter((r: any) => r.storage_path?.startsWith('inspection-imports/'));
+      const rows = data as Array<{ id: string; storage_path: string | null }>;
+      const importedRows = rows.filter((r) => r.storage_path?.startsWith('inspection-imports/'));
 
       if (importedRows.length > 0) {
         // Generate signed URLs for the ORIGINAL files (not thumb_ prefixed)
-        const originalPaths = importedRows.map((r: any) => r.storage_path);
+        const originalPaths = importedRows.map((r) => r.storage_path as string);
         const BATCH_SIZE = 50;
 
         for (let i = 0; i < originalPaths.length; i += BATCH_SIZE) {
@@ -308,24 +312,27 @@ export function useAnnotationViewerUrls(thumbnailIds: string[], campaignId: stri
             if (signedData) {
               for (let j = 0; j < signedData.length; j++) {
                 const item = signedData[j];
-                if (item?.signedUrl && !item.error) {
+                const batchRow = batchRows[j];
+                if (batchRow && item?.signedUrl && !item.error) {
                   // Same approach as getPhotoPublicUrl: append width/quality params to signed URL
                   const separator = item.signedUrl.includes('?') ? '&' : '?';
-                  urlMap[batchRows[j].id] = `${item.signedUrl}${separator}width=1400&quality=82`;
+                  urlMap[batchRow.id] = `${item.signedUrl}${separator}width=1400&quality=82`;
                 }
               }
             }
           } catch {
             // Fallback: use getPhotoPublicUrl for each
             for (const row of batchRows) {
-              urlMap[row.id] = getPhotoPublicUrl(row.storage_path, 'viewer');
+              if (row.storage_path) {
+                urlMap[row.id] = getPhotoPublicUrl(row.storage_path, 'viewer');
+              }
             }
           }
         }
       }
 
       // For non-imported photos, use getPhotoPublicUrl with 'viewer' size
-      const otherRows = data.filter((r: any) => !r.storage_path?.startsWith('inspection-imports/'));
+      const otherRows = rows.filter((r) => !r.storage_path?.startsWith('inspection-imports/'));
       for (const row of otherRows) {
         if (row.storage_path) {
           urlMap[row.id] = getPhotoPublicUrl(row.storage_path, 'viewer');

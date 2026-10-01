@@ -123,7 +123,7 @@ export function Reports() {
     try {
       // 1. Fetch the report rows linked to this inspection so we can clean up
       //    their PDFs from storage before deleting the DB records.
-      const { data: reports } = await (supabase as any)
+      const { data: reports } = await supabase
         .from('report')
         .select('storage_path')
         .eq('reference_id', row.id);
@@ -131,18 +131,18 @@ export function Reports() {
       // 2. Remove associated PDFs from the 'reports' bucket. Skip placeholder
       //    paths ('pending/...') since no real file was uploaded for those.
       const paths: string[] = (reports || [])
-        .map((r: { storage_path: string | null }) => r.storage_path)
-        .filter((p: string | null): p is string => !!p && !p.startsWith('pending/'));
+        .map((r) => r.storage_path)
+        .filter((p): p is string => !!p && !p.startsWith('pending/'));
       if (paths.length > 0) {
         await supabase.storage.from('reports').remove(paths);
       }
 
       // 3. Delete the report records so no orphans remain.
-      await (supabase as any).from('report').delete().eq('reference_id', row.id);
+      await supabase.from('report').delete().eq('reference_id', row.id);
 
       // 4. Send the inspection back to the 'analyze' stage so it no longer
       //    matches stage='report' in the finalized-inspections listing.
-      await (supabase as any).from('inspection')
+      await supabase.from('inspection')
         .update({ stage: 'analyze', completed_at: null })
         .eq('id', row.id);
 

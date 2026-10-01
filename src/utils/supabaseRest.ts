@@ -38,7 +38,10 @@ function headers(): Record<string, string> {
   };
 }
 
-export async function restSelect(table: string, params: string): Promise<any[]> {
+export async function restSelect<T = Record<string, unknown>>(
+  table: string,
+  params: string,
+): Promise<T[]> {
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { headers: headers() });
   if (!resp.ok) return [];
   return resp.json();

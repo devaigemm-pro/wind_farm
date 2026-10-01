@@ -102,20 +102,21 @@ export const reportsService = {
 
     // Build result rows
     return inspections.map((insp) => {
-      const blade = insp.blade as any;
+      const blade = insp.blade as Record<string, unknown> | null | undefined;
       // Prefer the turbine linked directly to the inspection (turbine_id).
       // Fall back to the turbine reached through the blade relation for
       // inspections created per-blade (blade_id set).
-      const turbine = (insp as any).turbine ?? blade?.turbine;
-      const windFarm = turbine?.wind_farm;
+      const turbine = ((insp as Record<string, unknown>).turbine ??
+        blade?.turbine) as Record<string, unknown> | null | undefined;
+      const windFarm = turbine?.wind_farm as Record<string, unknown> | null | undefined;
 
       return {
         id: insp.id,
         inspectionDate: insp.completed_at || insp.scheduled_date,
-        asset: windFarm?.name || 'Unknown',
-        assetId: windFarm?.id || '',
-        subAsset: turbine?.name || 'Unknown',
-        subAssetId: turbine?.id || '',
+        asset: (windFarm?.name as string) || 'Unknown',
+        assetId: (windFarm?.id as string) || '',
+        subAsset: (turbine?.name as string) || 'Unknown',
+        subAssetId: (turbine?.id as string) || '',
         type: 'Blades',
         defectsCount: defectCounts[insp.id] || 0,
         note: null, // No note field in current schema

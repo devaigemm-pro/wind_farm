@@ -175,7 +175,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
     }
     // Also include annotations flagged as is_defect (in case defect insert failed due to RLS)
     for (const a of (dbAnnotations ?? [])) {
-      if ((a as any).isDefect) ids.add(a.id);
+      if (a.isDefect) ids.add(a.id);
     }
     return ids;
   }, [savedDefects, dbAnnotations]);
@@ -302,7 +302,10 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
         } catch {
           // RLS may block insert — fall through, is_defect flag on annotation is the backup
         }
-        // Also mark annotation as confirmed defect (always succeeds, no RLS issue)
+        // Also mark annotation as confirmed defect (always succeeds, no RLS issue).
+        // `is_defect` is not present in the generated `annotation` type, so this
+        // update must bypass the typed client.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = supabase as any;
         await db.from('annotation').update({ is_defect: true }).eq('id', selectedDefectId);
       }
@@ -667,8 +670,7 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
                     // Delete annotation from DB
                     await deleteAnnotation.mutateAsync(selectedDefectId);
                     // Also delete associated defect record if exists
-                    const db = supabase as any;
-                    await db.from('defect').delete().eq('description', selectedDefectId);
+                    await supabase.from('defect').delete().eq('description', selectedDefectId);
                     await queryClient.invalidateQueries({ queryKey: ['annotations-multi'] });
                     handleClear();
                   } catch (err) {

@@ -197,8 +197,9 @@ export function CampaignAccordion({
                                 asset: campaign.name,
                                 subAsset: insp.subassetName,
                               });
-                            } catch (err: any) {
-                              alert(err?.message || 'Error generating PDF.');
+                            } catch (err: unknown) {
+                              const e = err as { message?: string };
+                              alert(e?.message || 'Error generating PDF.');
                             } finally {
                               setDownloadingId(null);
                             }

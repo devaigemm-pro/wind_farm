@@ -258,7 +258,7 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
     }
     // Also include annotations flagged as is_defect
     for (const a of dbAnnotations) {
-      if ((a as any).isDefect) ids.add(a.id);
+      if (a.isDefect) ids.add(a.id);
     }
     return ids;
   }, [confirmedDefectRecords, dbAnnotations]);
@@ -289,15 +289,15 @@ export function TurbineDetail({ shared = false, embedded = false, embeddedTurbin
           type: d.type?.toUpperCase().replace(/_/g, ' ') ?? 'UNKNOWN',
           cat: d.severity ?? 3,
           blade: bladeLetter,
-          side: (d as any).side ?? 'LE',
+          side: d.side ?? 'LE',
           root: d.distance_from_root ?? 0,
           size: `${d.width_cm ?? 0} x ${d.height_cm ?? 0}`,
           description: d.description ?? '',
-          resolved: (d as any).resolved ?? false,
+          resolved: d.resolved ?? false,
           images: [],
           notes: d.description ?? '',
-          rootCause: (d as any).root_cause ?? null,
-          nextStep: (d as any).next_step ?? null,
+          rootCause: d.root_cause ?? null,
+          nextStep: d.next_step ?? null,
           comments: [],
         };
       });

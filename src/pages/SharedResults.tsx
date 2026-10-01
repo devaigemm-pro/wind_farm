@@ -27,7 +27,7 @@ export function SharedResults() {
       }
 
       // Step 1: Find the token in report where storage_path = token, type = consolidated, filename starts with "share:"
-      const { data: tokenData } = await (supabase as any)
+      const { data: tokenData } = await supabase
         .from('report')
         .select('id, filename, generated_at')
         .eq('storage_path', token)
@@ -41,11 +41,15 @@ export function SharedResults() {
       }
 
       const tokenRecord = tokenData[0];
-      const shareKey = (tokenRecord.filename as string).replace('share:', '');
+      if (!tokenRecord) {
+        setState('expired');
+        return;
+      }
+      const shareKey = tokenRecord.filename.replace('share:', '');
       const tokenCreatedAt = tokenRecord.generated_at;
 
       // Step 2: Check if there's a "revoked-all:{shareKey}" record with generated_at AFTER the token's generated_at
-      const { data: revokeData } = await (supabase as any)
+      const { data: revokeData } = await supabase
         .from('report')
         .select('id, generated_at')
         .eq('filename', `revoked-all:${shareKey}`)

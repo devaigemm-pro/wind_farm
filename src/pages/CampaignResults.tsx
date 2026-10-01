@@ -324,6 +324,9 @@ export function CampaignResults() {
                     }}
                     onDownloadPdf={async (turbineId) => {
                       try {
+                        // `turbine_id` is not part of the generated `inspection`
+                        // type, so this query must bypass the typed client.
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const { data: inspections } = await (supabase as any)
                           .from('inspection')
                           .select('id, scheduled_date')
@@ -343,8 +346,9 @@ export function CampaignResults() {
                         } else {
                           alert('No inspection found for this turbine.');
                         }
-                      } catch (err: any) {
-                        alert(err?.message || 'Error generating PDF.');
+                      } catch (err: unknown) {
+                        const e = err as { message?: string };
+                        alert(e?.message || 'Error generating PDF.');
                       }
                     }}
                     onDownloadCsv={async (turbineId) => {
