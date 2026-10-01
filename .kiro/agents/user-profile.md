@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 291
-- **Última actualización**: 2026-09-24
+- **Sesiones analizadas**: 293
+- **Última actualización**: 2026-09-30
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -1887,3 +1887,62 @@
   - Cambio trivial hecho directo (sin delegar): clave i18n nueva `repair.uploadedByShort` = {en:'CB', es:'CP'} + usarla en el label del PhotoCard. El title (tooltip) mantiene el nombre completo.
   - Refinamiento de un feature de sesiones previas (label de uploader s278/281). Iteración incremental sobre lo ya construido.
 - **Patrones confirmados**: español, directo, modo compañero, screenshot como evidencia, propone solución concreta que hay que respetar, cambios triviales hechos directo sin delegar, build antes de reportar, pide aprobación antes de deploy.
+
+### Sesión 292 - 2026-09-24
+- **Tarea principal**: "prod" — desplegar la abreviatura CP/CB del label uploader en Repairs.
+- **Observaciones nuevas**:
+  - Deploy sin fricción (patrón consolidado): commit código separado de logs → sync origin/main → push → vercel --prod --yes → verificar chunk.
+  - Verificación post-deploy: las claves i18n compilan en el chunk `design-system-*.js` (no en index ni en el chunk de la página). Confirmé el valor {en:'CB',es:'CP'} ahí + el uso en RepairWorkflow-*.js. APRENDIZAJE: al verificar strings i18n en prod, buscar en el chunk design-system, no solo en index/página.
+- **Patrones confirmados**: español, ultra-directo ("prod" = aprobación deploy), modo compañero, deploy manual vercel --prod, verificación por grep del chunk (i18n vive en design-system chunk), honestidad sobre límite de verificación visual.
+
+### Sesión 293 - 2026-09-30
+- **Tarea principal**: Auditoría exhaustiva full-stack del sistema wind_farm — homologar, organizar archivos, eliminar basura de código/archivos, dejar la app con estándares de alta calidad de desarrollo (modo compañero)
+- **Observaciones nuevas**:
+  - Pide auditoría amplia y abierta ("desde el backend hasta el front", "todo lo que vayas entendiendo que se debe modificar") — confía en que el agente decida el scope, pero espera que sea minucioso, exhaustivo y profesional
+  - Cuando la tarea es enorme y abierta, el approach correcto NO es delegar a ciegas: primero mapear el estado real (build, tsc, lint, estructura, duplicación) para diagnosticar antes de tocar
+  - El sistema tiene deuda técnica grande: 12 pares de páginas duplicadas legacy/V2 controladas por feature flag `VITE_FF_NEW_LAYOUT`. Prod corre legacy (flag ausente en Vercel), dev corre V2. Login siempre V2.
+  - Descubrimiento clave: eliminar un árbol de UI completo es decisión de producto/arquitectura → superar el límite del modo compañero ("no cambia arquitectura general sin aprobación") → PREGUNTAR antes de ejecutar (opciones A/B/C)
+  - Baseline: tsc limpio, build ok, 2 errores eslint (ambos en archivos V2), 283 warnings, 158 `any`, 1 console.log, 3 TODO, sin backups
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, tarea conceptual amplia (1-2 frases, confía en el agente), exige calidad profesional/estándares altos, pensamiento sistémico/arquitectural
+
+### Sesión 293 (continuación) - 2026-09-30 — ejecución
+- **Decisión del usuario**: "de la V2 solo uso login... el resto eliminalo" → opción B. Confirma patrón: da la decisión en una frase mínima y espera ejecución completa.
+- **Resultado**: eliminada dualidad legacy/V2. 22 archivos borrados (11 páginas V2, 3 organisms V2, subárbol newLayout completo: app-layout/navigation, feature-flags.ts) + 2 carpetas vacías. App.tsx simplificado a legacy directo + LoginV2. Limpieza lint: warnings 283→133, errores 2→0 (5 prefer-const, 47 unused-vars, 1 preserve-caught-error). Fix tsconfig ES2020→ES2022 para Error{cause}. tests 3/3, build/tsc/eslint verdes, preview local 200.
+- **Observaciones nuevas**:
+  - El sub-agente "desarrollador" NO tiene herramienta de terminal — no puede correr pnpm/tsc/eslint/build. El compañero debe: (a) generar las listas de warnings/errores con execute_bash y pasárselas con archivo:línea exactos, y (b) hacer TODA la verificación (build/tsc/eslint/tests) él mismo tras cada delegación. Delegar "arregla los warnings" sin la lista concreta falla.
+  - Config eslint del proyecto NO tiene caughtErrorsIgnorePattern → en catch sin uso hay que eliminar el binding (`} catch {`), no renombrar a `_err`.
+  - Restan 133 warnings (85 no-explicit-any + 48 react-hooks/*) deliberadamente sin tocar: react-hooks puede cambiar comportamiento y el perfil manda "no romper lo que funciona". Cobertura de tests muy baja (3 tests) — deuda pendiente.
+- **Patrones confirmados**: decisión en una frase, alta autonomía, exige calidad profesional, "no romper lo que funciona", modo compañero con verificación rigurosa antes de reportar éxito.
+
+### Sesión 293 (nota) - 2026-09-30 — preview local
+- **Incidente**: el usuario reportó "localhost refused to connect" al revisar el preview. Diagnóstico raíz: los procesos en background (control_bash_process) NO sobreviven al cierre de cada turno — el server arranca y responde 200 en el mismo turno, pero muere después (exit 143/SIGTERM). Relevantarlo repite el fallo.
+- **Aprendizaje operativo**: NO prometer una URL localhost persistente como entrega final. El preview local solo sirve para verificar dentro del mismo turno. Para que el usuario revise de forma estable: (a) que levante `pnpm run preview`/`pnpm run dev` en SU terminal, o (b) deploy a preview de Vercel (requiere aprobación explícita). Aplicar patrón "diagnosticar más profundo": tras 2 fallos iguales, cambiar de enfoque en vez de reintentar.
+
+### Sesión 293 (nota 2) - 2026-09-30 — preview bloqueado
+- **Estado**: usuario reitera "sigue sin cargar". Confirmado que no hay proceso escuchando en :4173 (muere entre turnos). Intento de levantar server con nohup fue bloqueado por el guard de comandos-servidor del entorno. No se puede sostener un server vivo entre turnos desde el agente.
+- **Acción**: en vez de reintentar por 3ª vez (patrón "diagnosticar más profundo"), pedí al usuario distinguir su caso: (A) abre localhost:4173 que ya murió → solución: correr `pnpm run dev` en SU terminal; (B) ya lo levantó él y no carga → pedir error de consola del navegador + terminal para diagnóstico real. Esperando respuesta A/B.
+- **Aprendizaje**: el entorno bloquea comandos que arrancan servers vía execute_bash; solo control_bash_process (que no persiste entre turnos). Conclusión firme: la verificación visual persistente debe hacerla el usuario en su terminal o vía deploy a Vercel (con aprobación).
+
+### Sesión 293 (nota 3) - 2026-09-30 — verificación en navegador
+- **Diagnóstico definitivo**: ante "sigue sin cargar" (3ª vez), levanté preview con control_bash_process y cargué la app en navegador headless (agent-browser). Resultado: la app CARGA BIEN — redirige a /login, renderiza LoginV2 completo (campos, botón Continue), #root con 2640 chars, CERO errores de consola. index.html y bundle JS entregan 200. La limpieza V2 NO rompió nada.
+- **Causa real del "no carga"**: el usuario abre localhost:4173 en SU navegador pero el server solo vive dentro de la sesión del agente, no en su máquina. Solución entregada: correr `pnpm run dev` en su terminal (localhost:5173).
+- **Aprendizaje clave**: cuando el usuario reporta "no carga/no funciona" y sospecho que es infra (server) y no código, VERIFICAR de verdad cargando en navegador headless con agent-browser antes de seguir asumiendo. Distingue "server muerto" de "bug de app" con evidencia (screenshot + consola), en vez de solo pedirle al usuario que elija A/B.
+- **Patrones confirmados**: "se riguroso" / "diagnosticar más profundo" — verificar con evidencia real (navegador) antes de reportar; no reintentar lo mismo 3 veces.
+
+### Sesión 293 (nota 4) - 2026-09-30 — opción preview estable
+- **Estado**: "sigue sin abrir". Confirmado que localhost no persiste en la máquina del usuario y la app funciona (verificada en headless). Propuse 2 vías estables: (A) deploy PREVIEW a Vercel (`vercel deploy` sin --prod, NO prod, NO merge, URL *.vercel.app descartable) — pedí aprobación explícita porque toda operación de Vercel CLI la requiere según reglas; (B) que el usuario corra `pnpm run dev` en su terminal (localhost:5173).
+- **Vercel**: CLI instalado y autenticado (devaigemm-1057), proyecto linkeado (wind-farm, team dev-ai2, framework vite, build `pnpm run build`, output dist).
+- **Esperando**: respuesta del usuario para elegir A o B. NO ejecuté deploy sin aprobación.
+- **Patrón confirmado**: respetar límite de deploy — pedir aprobación explícita antes de cualquier comando Vercel, incluso un preview.
+
+### Sesión 293 (cierre) - 2026-09-30 — verificado por el usuario
+- **Resolución**: el usuario corrió `pnpm run dev` en su terminal y verificó la app OK. Confirma el diagnóstico: nunca fue un bug de código, era el server de preview que no persistía en su máquina. La solución correcta fue que lo levantara él (opción B).
+- **Aprendizaje operativo consolidado**: para que el usuario revise visualmente, la vía confiable es que corra `pnpm run dev` en SU terminal (localhost:5173). El preview que levanta el agente solo sirve para verificación interna del mismo turno. Evitar prometer URLs localhost persistentes.
+- **Auditoría cerrada con éxito**: dualidad V2 eliminada, lint 0 errores (283→133 warnings), build/tsc/tests verdes, app verificada por el usuario. Pendiente futuro: 85 any + 48 react-hooks + cobertura de tests. Sin merge ni deploy (branch de sesión).
+- **Patrones confirmados**: alta autonomía, exige rigor/verificación real, "no romper lo que funciona", modo compañero efectivo end-to-end.
+
+### Sesión 293 (nota 5) - 2026-09-30 — recomendación de deploy
+- **Pregunta del usuario**: ¿recomiendo pasar los cambios a prod antes de atacar los any por módulo?
+- **Recomendación dada**: SÍ, deployar ahora. Razones: (1) la limpieza V2 es bajo riesgo/no cambia comportamiento (prod ya corría legacy, que es lo que queda); (2) todo verificado (build/tsc/tests + usuario en dev); (3) separar este deploy del refactor riesgoso de any/react-hooks da un punto de rollback limpio y aísla el riesgo. Mezclar limpieza + refactor en un mismo deploy complica el diagnóstico si algo rompe.
+- **Esperando aprobación explícita** para ejecutar flujo de prod (rebase origin/main → merge main → push → vercel --prod). NO ejecutado aún.
+- **Patrón confirmado**: pensamiento de release/riesgo — separar cambios seguros de riesgosos en deploys distintos; respetar límite de aprobación de deploy.
