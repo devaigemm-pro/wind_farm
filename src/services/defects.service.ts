@@ -872,29 +872,3 @@ export const defectsService = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function mapToDefectDashboardRow(row: Record<string, unknown>, imageUrl: string | null): DefectDashboardRow {
-  const bladePos = Number(row.blade_position) || 1;
-  return {
-    id: row.id as string,
-    assetName: (row.asset_name as string) ?? '',
-    turbineName: (row.turbine_name as string) ?? '',
-    turbineModel: (row.turbine_model as string) ?? '',
-    type: DEFECT_TYPE_DISPLAY_LABELS[(row.defect_type as string) ?? ''] ?? (row.defect_type as string) ?? '',
-    defectWidth: Number(row.width_cm) || 0,
-    defectHeight: Number(row.height_cm) || 0,
-    category: Number(row.category) || 3,
-    actionText: (row.action_text as string) ?? '',
-    actionUrgency: (row.action_urgency as 'high' | 'medium' | 'low') ?? 'medium',
-    nextStep: (row.next_step as string) ?? '',
-    bladePosition: BLADE_POSITION_LABELS[bladePos] ?? String(bladePos),
-    side: (row.side as string) ?? 'LE',
-    rootDistance: Number(row.root_distance) || 0,
-    rootCause: (row.root_cause as string) ?? null,
-    notes: (row.notes as string) ?? null,
-    imageUrl: imageUrl ?? null,
-    resolved: Boolean(row.resolved),
-    inspectionId: (row.inspection_id as string) ?? '',
-    bladeId: (row.blade_id as string) ?? '',
-  };
-}

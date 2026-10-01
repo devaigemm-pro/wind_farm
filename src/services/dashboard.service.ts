@@ -62,7 +62,7 @@ async function getFilteredBladeIds(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  let query = db.from('blade').select('id, turbine:turbine_id(id, model, wind_farm_id)');
+  const query = db.from('blade').select('id, turbine:turbine_id(id, model, wind_farm_id)');
 
   const { data: blades } = await query;
   if (!blades || blades.length === 0) return [];
@@ -271,7 +271,7 @@ export const dashboardService = {
     const db = supabase as any;
 
     // Get all blades, optionally filtered
-    let bladeQuery = db.from('blade').select('id, turbine:turbine_id(id, model, wind_farm_id)');
+    const bladeQuery = db.from('blade').select('id, turbine:turbine_id(id, model, wind_farm_id)');
     const { data: allBlades } = await bladeQuery;
 
     let blades = (allBlades ?? []) as Array<{

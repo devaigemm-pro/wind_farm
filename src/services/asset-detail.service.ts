@@ -242,7 +242,7 @@ export const assetDetailService = {
 
     // Fetch reports for these inspections
     const inspIds = inspections.map((row: unknown) => (row as Record<string, unknown>).id as string);
-    let reportMap: Record<string, string> = {};
+    const reportMap: Record<string, string> = {};
     if (inspIds.length > 0) {
       const { data: reports } = await db
         .from('report')

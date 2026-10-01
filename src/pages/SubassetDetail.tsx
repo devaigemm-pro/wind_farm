@@ -5,7 +5,6 @@ import { TabBar } from '@/components/molecules/TabBar';
 import { TablePagination } from '@/components/molecules/TablePagination';
 import { DocumentDropbox } from '@/components/organisms/DocumentDropbox';
 import { DefectsWindFarmTab } from '@/components/organisms/DefectsWindFarmTab';
-import { Badge } from '@/components/atoms';
 import { Skeleton } from '@/components/atoms';
 import { Button } from '@/components/atoms';
 import { useTurbineDetail, useTurbineInspections, useTurbineDefects, useDefectImages } from '@/hooks/useWindFarmDetail';

@@ -221,56 +221,6 @@ function drawArc(
   doc.lines(moves, startPoint[0], startPoint[1], [1, 1], 'F', true);
 }
 
-// ─── drawTurbineIcon ─────────────────────────────────────────────────────────
-// Draws a stylized turbine icon (hub + 3 blades + tower)
-function drawTurbineIcon(
-  doc: any,
-  x: number,
-  y: number,
-  size: number,
-  color: [number, number, number],
-  opacity: number,
-) {
-  // Set color with opacity approximation (jsPDF doesn't support true opacity on shapes,
-  // so we'll blend the color with white based on opacity)
-  const blended: [number, number, number] = [
-    Math.round(color[0] * opacity + 255 * (1 - opacity)),
-    Math.round(color[1] * opacity + 255 * (1 - opacity)),
-    Math.round(color[2] * opacity + 255 * (1 - opacity)),
-  ];
-  doc.setFillColor(...blended);
-  doc.setDrawColor(...blended);
-
-  // Tower (thin trapezoid)
-  const towerW = size * 0.06;
-  const towerH = size * 0.4;
-  const towerX = x - towerW / 2;
-  const towerY = y;
-  doc.rect(towerX, towerY, towerW, towerH, 'F');
-
-  // Hub (circle at top of tower)
-  const hubR = size * 0.04;
-  doc.circle(x, y, hubR, 'F');
-
-  // Blades (3 elongated ellipses radiating from hub)
-  const bladeLen = size * 0.45;
-  const bladeW = size * 0.04;
-  const angles = [90, 210, 330]; // degrees from center
-  for (const angleDeg of angles) {
-    const angleRad = (angleDeg * Math.PI) / 180;
-    // Draw blade as a series of small rectangles along the angle
-    const segments = 12;
-    for (let i = 0; i < segments; i++) {
-      const dist = (i / segments) * bladeLen;
-      const w = bladeW * (1 - i / segments * 0.7); // taper
-      const bx = x + dist * Math.cos(angleRad);
-      const by = y - dist * Math.sin(angleRad);
-      // Rotated rectangle approximation with a small circle
-      doc.circle(bx, by, w / 2, 'F');
-    }
-  }
-}
-
 // ─── drawMapPlaceholder ──────────────────────────────────────────────────────
 // Draws a placeholder map rectangle with location marker and coordinates
 function drawMapPlaceholder(
@@ -341,55 +291,6 @@ function drawMapPlaceholder(
     const googleMapsUrl = `https://www.google.com/maps?q=${coords.lat},${coords.lon}`;
     doc.link(x, y, width, height, { url: googleMapsUrl });
   }
-}
-
-// ─── drawBladeProfile ────────────────────────────────────────────────────────
-// Draws a lateral blade profile (tapered vertical shape) with a defect marker
-function drawBladeProfile(
-  doc: any,
-  x: number,
-  y: number,
-  height: number,
-  bladeLength: number,
-  defect: BladeDefectMarker,
-) {
-  const topW = 4; // width at root (bottom visually = 0m)
-  const tipW = 1; // width at tip (top visually)
-  // Blade as vertical trapezoid (0m at top, bladeLength at bottom)
-  // We draw 0m at top, so root is top and tip is bottom
-  doc.setFillColor(210, 220, 230);
-  doc.setDrawColor(180, 190, 200);
-
-  // Trapezoid points: top-left, top-right, bottom-right, bottom-left
-  const tl: [number, number] = [x - topW / 2, y];
-  const tr: [number, number] = [x + topW / 2, y];
-  const br: [number, number] = [x + tipW / 2, y + height];
-  const bl: [number, number] = [x - tipW / 2, y + height];
-
-  const moves: [number, number][] = [
-    [tr[0] - tl[0], tr[1] - tl[1]],
-    [br[0] - tr[0], br[1] - tr[1]],
-    [bl[0] - br[0], bl[1] - br[1]],
-    [tl[0] - bl[0], tl[1] - bl[1]],
-  ];
-  doc.lines(moves, tl[0], tl[1], [1, 1], 'FD', true);
-
-  // Defect marker
-  const defectY = y + (defect.distanceFromRoot / bladeLength) * height;
-  const widthAtDist = topW - (topW - tipW) * (defect.distanceFromRoot / bladeLength);
-  doc.setFillColor(...catColor(defect.cat));
-  doc.circle(x, defectY, Math.max(widthAtDist * 0.4, 1.2), 'F');
-
-  // Side label at top
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...PDF_COLORS.darkText);
-  doc.text(defect.side, x, y - 2, { align: 'center' });
-
-  // Airfoil cross-section at bottom (small ellipse)
-  doc.setFillColor(210, 220, 230);
-  doc.setDrawColor(180, 190, 200);
-  doc.ellipse(x, y + height + 5, 3, 1.2, 'FD');
 }
 
 // ─── i18n texts ──────────────────────────────────────────────────────────────
@@ -533,27 +434,6 @@ async function svgToBase64Png(svgText: string, width: number, height: number): P
   }
 }
 
-function generateCSV(defects: ResultsDefect[], windFarmName: string, turbineName: string, photoUrls: Map<string, string>) {
-  const header =
-    'ID,Type,Category,Blade,Side,Distance from Root (m),Width (cm),Height (cm),Resolved,Description,Photo URL\n';
-  const rows = defects
-    .map(
-      (d) => {
-        const photoUrl = photoUrls.get(d.id) || '';
-        return `${d.displayId},${d.type},${d.severity},${d.blade},${d.side},${d.distanceFromRoot},${d.widthCm || ''},${d.heightCm || ''},${d.resolved},"${(d.description || '').replace(/"/g, '""')}","${photoUrl}"`;
-      },
-    )
-    .join('\n');
-  const csv = header + rows;
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Defects_${windFarmName}_${turbineName}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 // (Defect images now come from the real evidence in the database)
 
 /** Fetch an image URL and convert to base64 ArrayBuffer for ExcelJS */
@@ -612,8 +492,6 @@ async function generateXLSX(defects: ResultsDefect[], windFarmName: string, turb
 
   // Remove default grid lines
   sheet.views = [{ showGridLines: false }];
-
-  const origin = window.location.origin;
 
   // Merge cells for logo area so image doesn't split across column borders
   sheet.mergeCells(includePhotos ? 'A1:K2' : 'A1:J2');
@@ -803,7 +681,7 @@ export function ExportPanel({
   windFarmCoords,
   windFarmId,
   turbineId,
-  campaignId,
+  campaignId: _campaignId,
 }: ExportPanelProps) {
   const [language, setLanguage] = useState<'en' | 'es'>('es');
   const [includeDetails, setIncludeDetails] = useState(true);
@@ -1111,7 +989,6 @@ export function ExportPanel({
 
       // Professional TOC with dot leaders and section numbers
       // We'll track actual page numbers and fill them in after generation
-      const tocPageRef: Record<string, number> = {};
       const tocSections = [
         { level: 0, num: '1', text: language === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary' },
         { level: 1, num: '1.1', text: language === 'es' ? 'Resumen de defectos' : 'Defect Summary' },
@@ -2475,14 +2352,6 @@ export function ExportPanel({
 }
 
 /* ---------- Styles ---------- */
-
-const overlayStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'transparent',
-  zIndex: 999,
-  pointerEvents: 'none',
-};
 
 const panelStyle: CSSProperties = {
   position: 'fixed',

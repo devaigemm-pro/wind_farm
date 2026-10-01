@@ -72,7 +72,7 @@ export const reportsService = {
 
     // Get annotation counts per inspection (annotations are the source of truth for defects)
     const inspectionIds = inspections.map((i) => i.id);
-    let defectCounts: Record<string, number> = {};
+    const defectCounts: Record<string, number> = {};
     if (inspectionIds.length > 0) {
       const { data: annotations, error: annError } = await supabase
         .from('annotation')

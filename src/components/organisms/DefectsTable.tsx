@@ -95,7 +95,7 @@ export function DefectsTable({
   onSort,
   selectedId,
   onSelect,
-  onToggleResolved,
+  onToggleResolved: _onToggleResolved,
   skeletonRows = 10,
 }: DefectsTableProps) {
   const { t } = useLanguage();

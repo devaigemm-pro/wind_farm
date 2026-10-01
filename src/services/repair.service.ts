@@ -222,106 +222,6 @@ interface RepairBladeInfo {
 const BLADE_LETTERS: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C' };
 
 /**
- * Resolve the real blade position and the per-blade correlative (matching the
- * Analyze step's A1/A2/B1 numbering) for every repair of a quote.
- *
- * Chain (same as repairReportPdf.service.ts):
- *   repair_photos_detailed.repair_id → defect_id → defect.inspection_id
- *   → inspection.blade_id → blade.position (1/2/3 = A/B/C)
- *
- * The correlative is a per-blade sequential index. To match Analyze (which
- * counts annotations in order), we order defects within a blade by the
- * defect's creation time, then assign A1, A2, B1, ...
- */
-async function resolveBladeInfoByRepair(
-  quoteId: string | null,
-): Promise<Map<string, RepairBladeInfo>> {
-  const result = new Map<string, RepairBladeInfo>();
-  if (!quoteId) return result;
-
-  // 1. Map repair_id → defect_id from the view (one defect per repair node).
-  const { data: viewRows } = await db
-    .from('repair_photos_detailed')
-    .select('repair_id, defect_id')
-    .eq('quote_id', quoteId);
-
-  const defectIdByRepair = new Map<string, string>();
-  const defectIds = new Set<string>();
-  for (const vr of (viewRows as unknown[]) ?? []) {
-    const r = vr as Record<string, unknown>;
-    const repairId = r.repair_id as string;
-    const defectId = r.defect_id as string;
-    if (repairId && defectId && !defectIdByRepair.has(repairId)) {
-      defectIdByRepair.set(repairId, defectId);
-    }
-    if (defectId) defectIds.add(defectId);
-  }
-  if (defectIds.size === 0) return result;
-
-  // 2. Load the defects (with inspection + creation order).
-  const { data: defectRows } = await db
-    .from('defect')
-    .select('id, inspection_id, created_at')
-    .in('id', [...defectIds]);
-
-  const inspectionByDefect = new Map<string, string>();
-  const createdAtByDefect = new Map<string, string>();
-  const inspectionIds = new Set<string>();
-  for (const dr of (defectRows as unknown[]) ?? []) {
-    const r = dr as Record<string, unknown>;
-    const id = r.id as string;
-    const inspId = (r.inspection_id as string) ?? '';
-    inspectionByDefect.set(id, inspId);
-    createdAtByDefect.set(id, (r.created_at as string) ?? '');
-    if (inspId) inspectionIds.add(inspId);
-  }
-
-  // 3. Resolve blade position + serial per inspection.
-  const positionByInspection = new Map<string, number>();
-  const serialByInspection = new Map<string, string | null>();
-  if (inspectionIds.size > 0) {
-    const { data: inspRows } = await db
-      .from('inspection')
-      .select('id, blade:blade_id ( position, serial_number )')
-      .in('id', [...inspectionIds]);
-    for (const ir of (inspRows as unknown[]) ?? []) {
-      const r = ir as Record<string, unknown>;
-      const blade = (r.blade as Record<string, unknown>) ?? {};
-      positionByInspection.set(r.id as string, Number(blade.position) || 0);
-      serialByInspection.set(r.id as string, (blade.serial_number as string) ?? null);
-    }
-  }
-
-  // 4. Build per-blade correlatives (A1, A2, B1, ...). Order defects within a
-  //    blade by creation time to match the Analyze step's annotation order.
-  const defectsWithBlade = [...defectIdByRepair.entries()].map(([repairId, defectId]) => {
-    const inspId = inspectionByDefect.get(defectId) ?? '';
-    return {
-      repairId,
-      defectId,
-      position: positionByInspection.get(inspId) ?? 0,
-      serial: serialByInspection.get(inspId) ?? null,
-      createdAt: createdAtByDefect.get(defectId) ?? '',
-    };
-  });
-  defectsWithBlade.sort(
-    (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt),
-  );
-
-  const counters: Record<number, number> = {};
-  for (const d of defectsWithBlade) {
-    counters[d.position] = (counters[d.position] || 0) + 1;
-    const letter = BLADE_LETTERS[d.position] ?? String(d.position);
-    result.set(d.repairId, {
-      bladePosition: d.position,
-      defectNumber: d.position > 0 ? `${letter}${counters[d.position]}` : null,
-      bladeSerial: d.serial,
-    });
-  }
-  return result;
-}
-
-/**
  * Resolve the real blade position and the per-blade correlative (A1/A2/B1)
  * directly for a set of defect ids, matching the Analyze step's numbering.
  *
@@ -639,27 +539,6 @@ function catalogStages(): RepairStageNode[] {
     z2: null,
     photos: [],
   }));
-}
-
-/** Map a get_repairs_for_quote row to a RepairDefect. Blade position and the
- *  per-blade correlative come from `bladeInfo` (resolved via the view/defect
- *  join), since the RPC itself carries no blade data. */
-function mapDefect(row: RepairForQuoteRow, bladeInfo?: RepairBladeInfo): RepairDefect {
-  return {
-    id: row.repair_id,
-    type: (row.defect_type as string) ?? 'other',
-    severity: Number(row.defect_severity) || 0,
-    side: null,
-    distanceFromRoot: 0,
-    widthCm: null,
-    heightCm: null,
-    description: null,
-    bladePosition: bladeInfo?.bladePosition ?? 0,
-    bladeSerial: bladeInfo?.bladeSerial ?? null,
-    defectNumber: bladeInfo?.defectNumber ?? null,
-    defectIdentifier: null,
-    turbineName: (row.turbine_name as string) ?? null,
-  };
 }
 
 // ─── Service ────────────────────────────────────────────────────────────────

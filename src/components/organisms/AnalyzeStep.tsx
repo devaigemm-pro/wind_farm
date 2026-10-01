@@ -263,7 +263,6 @@ export function AnalyzeStep({ inspectionId, inspection, campaignId: propCampaign
       // Update the annotation fields (preserve original x/y position — never overwrite drawing coords)
       // Preserve [oval]/[pencil] prefix from original note (shape marker used by step 2 renderer)
       const originalAnn = (dbAnnotations ?? []).find(a => a.id === selectedDefectId);
-      const originalPrefix = originalAnn?.note?.match(/^\[oval\]|\^\[pencil\].*?\|\|\|/)?.[0] || '';
       const preservedNote = originalAnn?.note?.startsWith('[oval]') ? '[oval]' + note :
                             originalAnn?.note?.startsWith('[pencil]') ? originalAnn.note.split('|||')[0] + '|||' + note : note;
       await updateAnnotation.mutateAsync({

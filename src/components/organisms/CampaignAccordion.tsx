@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, MoreHorizontal, Download, Loader2 } from 'lucide-react';
-import { Button, Badge } from '@/components/atoms';
+import { Button } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { useRepairSummary } from '@/hooks/useRepair';
@@ -21,7 +21,7 @@ export interface CampaignAccordionProps {
 export function CampaignAccordion({
   campaign,
   onViewResults,
-  onSubassetClick,
+  onSubassetClick: _onSubassetClick,
   onInspectionClick,
   onEdit,
   onDelete,
