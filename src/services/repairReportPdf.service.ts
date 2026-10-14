@@ -1712,16 +1712,14 @@ export async function generateAndDownloadRepairReport(
   const { startDate } = deriveStageDates(ctx.photos);
   ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
 
-  // "Color" (Datos del Aspa) = dominant color of the SECOND stage's photo.
-  // Stage 1 is the "Etiqueta"; stage 2 is "Análisis de daño" (the one that
-  // actually shows the blade). We take the distinct stageOrders of photos with
-  // a url, sort ascending, pick the 2nd (index 1); within it the lowest
-  // captureOrder. Falls back to the first stage when there is no second one.
+  // "Color" (Datos del Aspa) = dominant color of IMAGE 1 of the FIRST stage.
+  // The first stage is the lowest stageOrder; "image 1" within it is the lowest
+  // captureOrder. The dominant color is detected by mode (not average).
   const colorPhotos = ctx.photos.filter((p) => !!p.url);
   const distinctStageOrders = Array.from(new Set(colorPhotos.map((p) => p.stageOrder))).sort(
     (a, b) => a - b,
   );
-  const targetStageOrder = distinctStageOrders[1] ?? distinctStageOrders[0];
+  const targetStageOrder = distinctStageOrders[0];
   const colorPhoto =
     targetStageOrder == null
       ? undefined
