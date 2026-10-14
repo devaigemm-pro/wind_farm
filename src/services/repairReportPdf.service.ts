@@ -445,10 +445,36 @@ async function sampleDominantColor(url: string): Promise<string | null> {
             resolve(null);
             return;
           }
-          // Pick the most frequent bucket (the mode).
+          // Pick the STRONGEST color, not merely the most frequent one. A big
+          // pale/beige area (low saturation) would win a pure count vote even
+          // when a smaller vivid area (e.g. the orange blade) is clearly the
+          // dominant color a human would name. So we score each bucket by
+          // count × saturation²: vivid colors are strongly favored over washed
+          // out light/gray tones, while still requiring meaningful area.
+          const saturationOf = (r: number, g: number, b: number): number => {
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            return max === 0 ? 0 : (max - min) / max; // HSV saturation, 0..1
+          };
           let winner: { count: number; rSum: number; gSum: number; bSum: number } | null = null;
+          let bestScore = -1;
           for (const bucket of buckets.values()) {
-            if (!winner || bucket.count > winner.count) winner = bucket;
+            const ar = bucket.rSum / bucket.count;
+            const ag = bucket.gSum / bucket.count;
+            const ab = bucket.bSum / bucket.count;
+            const sat = saturationOf(ar, ag, ab);
+            const score = bucket.count * (sat * sat);
+            if (score > bestScore) {
+              bestScore = score;
+              winner = bucket;
+            }
+          }
+          // Fallback: if every bucket is essentially gray (score 0 → no vivid
+          // color at all), use the plain most-frequent bucket.
+          if (!winner || bestScore <= 0) {
+            for (const bucket of buckets.values()) {
+              if (!winner || bucket.count > winner.count) winner = bucket;
+            }
           }
           // Represent the bucket by the average of its own pixels for a
           // truer hex than the bucket center.
