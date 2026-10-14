@@ -1115,7 +1115,10 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
       ['Estado turbina después de la reparación', ctx.defects.length > 0 ? 'Defecto reparado' : NA],
       ['Pala(s) en reparación', bladesInRepair],
       ['Fecha inicio', ctx.repairStartedAt ? formatDateES(ctx.repairStartedAt) : NA],
-      ['Fecha fin', ctx.repairCompletedAt ? formatDateES(ctx.repairCompletedAt) : NA],
+      // Fecha fin = repair.completed_at (set by the technician app on "Finalizar
+      // reparación"). When the repair isn't finished yet (null), show an explicit
+      // "Reparación sin finalizar" instead of N/A.
+      ['Fecha fin', ctx.repairCompletedAt ? formatDateES(ctx.repairCompletedAt) : 'Reparación sin finalizar'],
       ['Daños reparados (cantidad)', String(ctx.defects.length)],
       ['Informe realizado por', ctx.reportedBy],
       ['Técnico(s) a cargo', ctx.techniciansInCharge || NA],
