@@ -174,6 +174,23 @@ export function useUpdateRepairProgress(campaignId: string | undefined) {
   });
 }
 
+/**
+ * Persist the coating-method text on repair.blade_color (DIRECT write), then
+ * refresh the tree so the report reads the cached value. Fired ONCE per repair
+ * from the background OCR on the repair screen; same invalidation pattern as
+ * useUpdateRepairProgress.
+ */
+export function useUpdateBladeColor(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ repairId, color }: { repairId: string; color: string | null }) =>
+      repairService.updateBladeColor(repairId, color),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+    },
+  });
+}
+
 /** List technicians (profiles with role='technician') for the assignment combobox. */
 export function useTechnicians() {
   return useQuery<Technician[]>({

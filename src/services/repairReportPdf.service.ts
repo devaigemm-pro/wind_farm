@@ -116,9 +116,11 @@ interface RepairPdfContext {
   /** Z1/Z2 of the `analisis_falla` stage, keyed by repair_id. Damage location
    *  is computed as (z1 + z2) / 2. Null components when not yet entered. */
   failureZByRepair: Record<string, { z1: number | null; z2: number | null }>;
-  /** Coating method text (e.g. "RAL 7035-2009") read via OCR from the label in
-   *  IMAGE 1 of the FIRST stage (lowest stageOrder) photo. Null when it can't
-   *  be resolved. */
+  /** Coating method text (e.g. "RAL 7035-2009") read from `repair.blade_color`
+   *  in the DB. The value is produced ONCE in the background on the repair
+   *  screen (RepairWorkflow) via in-browser OCR and cached in the column; the
+   *  report NEVER runs OCR — it only reads this cached value. Null when it
+   *  hasn't been resolved yet. */
   bladeColor: string | null;
   /** repair.start_category (1-5) of the repair in scope. Null when absent. */
   startCategory: number | null;
@@ -138,6 +140,7 @@ interface RepairPdfContext {
       finalCategory: number | null;
       progressPercent: number | null;
       assignedTechnicianName: string | null;
+      bladeColor: string | null;
     }
   >;
 }
@@ -322,32 +325,6 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
       };
       img.src = blobUrl;
     });
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Reads the "Coating Method" value off the inspection label via OCR. The label
- * on the FIRST stage's IMAGE 1 contains a line like "Coating Method: RAL
- * 7035-2009"; the server returns everything after the colon ("RAL 7035-2009").
- *
- * The OCR runs SERVER-SIDE in the `ocr-coating-method` Supabase Edge Function
- * (Deno + tesseract.js), not in the browser — the in-browser OCR was unreliable
- * and competed with the main thread. Here we just invoke the function and read
- * `data.coatingMethod`. The whole thing is wrapped in try/catch and NEVER
- * throws: if the call fails or the label isn't found, it returns null so the
- * PDF keeps rendering (just without a Color).
- */
-async function extractCoatingMethod(url: string): Promise<string | null> {
-  if (!url) return null;
-  try {
-    const { data, error } = await supabase.functions.invoke('ocr-coating-method', {
-      body: { imageUrl: url },
-    });
-    if (error) return null;
-    const coatingMethod = (data as { coatingMethod?: string | null } | null)?.coatingMethod;
-    return coatingMethod ?? null;
   } catch {
     return null;
   }
@@ -747,7 +724,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
   if (repairIdsForProgress.length > 0) {
     const { data: repairRows } = await db
       .from('repair')
-      .select('id, start_category, final_category, assigned_technician_id, progress_percent')
+      .select('id, start_category, final_category, assigned_technician_id, progress_percent, blade_color')
       .in('id', repairIdsForProgress);
 
     // Resolve assigned technician names in one batch (id → fullName).
@@ -781,6 +758,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
         finalCategory: numOrNull(r.final_category),
         progressPercent: numOrNull(r.progress_percent),
         assignedTechnicianName: assignedId ? techNameById[assignedId] || null : null,
+        bladeColor: (r.blade_color as string) || null,
       };
     }
   }
@@ -1580,6 +1558,11 @@ export async function generateAndDownloadRepairReport(
     if (ctx.assignedTechnicianName == null && prog.assignedTechnicianName != null) {
       ctx.assignedTechnicianName = prog.assignedTechnicianName;
     }
+    // "Color" (Datos del Aspa) = repair.blade_color, cached in the DB. It is
+    // produced ONCE in the background on the repair screen (RepairWorkflow) via
+    // in-browser OCR of the coating-method label; the report NEVER runs OCR, it
+    // only reads this value. Use the first repair in scope that has it.
+    if (ctx.bladeColor == null && prog.bladeColor != null) ctx.bladeColor = prog.bladeColor;
   }
 
   // "Fecha inicio" is derived from the photo of the 2nd distinct stage (by
@@ -1590,24 +1573,9 @@ export async function generateAndDownloadRepairReport(
   const { startDate } = deriveStageDates(ctx.photos);
   ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
 
-  // "Color" (Datos del Aspa) = the "Coating Method" text read via OCR off the
-  // label in IMAGE 1 of the FIRST stage. The first stage is the lowest
-  // stageOrder; "image 1" within it is the lowest captureOrder.
-  const colorPhotos = ctx.photos.filter((p) => !!p.url);
-  const distinctStageOrders = Array.from(new Set(colorPhotos.map((p) => p.stageOrder))).sort(
-    (a, b) => a - b,
-  );
-  const targetStageOrder = distinctStageOrders[0];
-  const colorPhoto =
-    targetStageOrder == null
-      ? undefined
-      : colorPhotos
-          .filter((p) => p.stageOrder === targetStageOrder)
-          .slice()
-          .sort((a, b) => a.captureOrder - b.captureOrder)[0];
-  if (colorPhoto) {
-    ctx.bladeColor = await extractCoatingMethod(colorPhoto.url);
-  }
+  // "Color" (Datos del Aspa) is already resolved above from repair.blade_color
+  // (cached in the DB by the background OCR on the repair screen). The report
+  // NEVER runs OCR — it only reads the cached value.
 
   const doc = new jsPDF('p', 'mm', 'a4');
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
@@ -12,8 +12,10 @@ import {
   useDeleteRepairDefect,
   useUpdateDefectFields,
   useUpdateRepairProgress,
+  useUpdateBladeColor,
   useTechnicians,
 } from '@/hooks/useRepair';
+import { parseCoatingMethod } from '@/utils/coatingMethod';
 import {
   generateAndDownloadRepairReport,
   getRepairsWithReport,
@@ -105,6 +107,7 @@ export function RepairWorkflow() {
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
   const updateRepairProgress = useUpdateRepairProgress(campaignId);
+  const updateBladeColor = useUpdateBladeColor(campaignId);
   const { data: technicians = [] } = useTechnicians();
 
   // defectId currently being generated (null = none). Scopes the spinner to
@@ -134,6 +137,82 @@ export function RepairWorkflow() {
     })();
     return () => { cancelled = true; };
   }, [tree]);
+
+  // ── Coating method ("Color") — background OCR, ONCE per repair ──────────────
+  // When the tree is loaded, resolve repair.blade_color for every repair that
+  // doesn't have it yet, by running tesseract.js IN THE BROWSER (it has Web
+  // Workers) against the FIRST-stage / FIRST-image photo. The result is cached
+  // in the DB (repair.blade_color); the PDF report only READS it, never runs
+  // OCR. This is fully decoupled from report generation and non-blocking:
+  //   - runs in a background async loop (sequential, one repair at a time)
+  //   - a ref-backed Set prevents re-dispatching the same repair in this mount
+  //   - tesseract.js is imported DYNAMICALLY so it stays out of the initial bundle
+  //   - wrapped in try/catch: a failure leaves blade_color null (retried later)
+  //   - skipped entirely for client users (read-only; RLS would block the write)
+  const ocrProcessedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isClient || !tree || tree.length === 0) return;
+
+    // Candidate repairs: have a repairId, no blade_color yet, and a resolvable
+    // first-stage/first-image photo URL.
+    const pickFirstPhotoUrl = (node: RepairDefectNode): string | null => {
+      const stagesWithPhotos = node.stages.filter((s) => s.photos.some((p) => !!p.url));
+      if (stagesWithPhotos.length === 0) return null;
+      // First stage = lowest sortOrder; image 1 = lowest captureOrder.
+      const firstStage = stagesWithPhotos
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)[0]!;
+      const firstPhoto = firstStage.photos
+        .filter((p) => !!p.url)
+        .slice()
+        .sort((a, b) => a.captureOrder - b.captureOrder)[0];
+      return firstPhoto?.url ?? null;
+    };
+
+    const candidates = tree
+      .map((node) => {
+        const repairId = node.repairId;
+        if (!repairId) return null;
+        if (node.bladeColor && node.bladeColor.trim()) return null; // already resolved
+        if (ocrProcessedRef.current.has(repairId)) return null; // already attempted this mount
+        const url = pickFirstPhotoUrl(node);
+        if (!url) return null;
+        return { repairId, url };
+      })
+      .filter((c): c is { repairId: string; url: string } => c != null);
+
+    if (candidates.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      // Dynamic import so tesseract.js never inflates the initial bundle.
+      // tesseract.js uses `export = Tesseract` (CJS), so under bundler module
+      // resolution the namespace is surfaced on `.default` with a plain
+      // namespace fallback.
+      const mod = await import('tesseract.js');
+      const Tesseract = (mod as unknown as { default?: typeof import('tesseract.js') }).default ?? mod;
+      for (const { repairId, url } of candidates) {
+        if (cancelled) return;
+        // Mark as attempted up-front so a refetch mid-loop doesn't re-dispatch it.
+        ocrProcessedRef.current.add(repairId);
+        try {
+          const result = await Tesseract.recognize(url, 'eng');
+          const value = parseCoatingMethod(result?.data?.text ?? '');
+          if (value && !cancelled) {
+            // Persist + invalidate the tree so the report reads the cached value.
+            await updateBladeColor.mutateAsync({ repairId, color: value });
+          }
+        } catch {
+          // Leave blade_color null; a later visit (fresh mount) will retry.
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Re-run when the tree changes (e.g. after invalidation): the ref prevents
+    // reprocessing repairs already attempted, and resolved ones are filtered out.
+  }, [tree, isClient, updateBladeColor]);
 
   const handleSelect = (photo: RepairPhoto, selected: boolean) => {
     // client is read-only for selection.

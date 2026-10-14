@@ -131,6 +131,9 @@ export interface RepairDefectNode {
   finalCategory: number | null;
   assignedTechnicianId: string | null;
   progressPercent: number | null;
+  /** Coating method text (e.g. "RAL 7035-2009") cached on repair.blade_color.
+   *  Null/empty until the background OCR on the repair screen resolves it. */
+  bladeColor: string | null;
   stages: RepairStageNode[];
 }
 
@@ -721,7 +724,7 @@ export const repairService = {
       const { data: repairRows, error: repErr } = await db
         .from('repair')
         .select(
-          'id, work_order_id, defect_id, status, technician_id, start_category, final_category, assigned_technician_id, progress_percent',
+          'id, work_order_id, defect_id, status, technician_id, start_category, final_category, assigned_technician_id, progress_percent, blade_color',
         )
         .in('work_order_id', workOrderIds);
       if (repErr) throw new RepairServiceError(repErr.message, repErr.code);
@@ -909,6 +912,7 @@ export const repairService = {
         finalCategory: repairRow ? numOrNull(repairRow.final_category) : null,
         assignedTechnicianId: repairRow ? ((repairRow.assigned_technician_id as string) ?? null) : null,
         progressPercent: repairRow ? numOrNull(repairRow.progress_percent) : null,
+        bladeColor: repairRow ? ((repairRow.blade_color as string) || null) : null,
         stages: stages.length > 0 ? stages : catalogStages(),
       };
       return { node, createdAt: (defectRow?.created_at as string) ?? '' };
@@ -1171,6 +1175,20 @@ export const repairService = {
     if (Object.keys(patch).length === 0) return;
 
     const { error } = await db.from('repair').update(patch).eq('id', repairId);
+    if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
+   * Persist the coating-method text on repair.blade_color with a DIRECT update
+   * (same pattern as updateRepairProgress). The value is produced ONCE in the
+   * background on the repair screen (RepairWorkflow) via in-browser OCR; the
+   * report then reads it from the DB and NEVER runs OCR itself.
+   */
+  async updateBladeColor(repairId: string, color: string | null): Promise<void> {
+    const { error } = await db
+      .from('repair')
+      .update({ blade_color: color })
+      .eq('id', repairId);
     if (error) throw new RepairServiceError(error.message, error.code);
   },
 
