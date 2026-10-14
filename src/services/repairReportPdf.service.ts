@@ -116,6 +116,9 @@ interface RepairPdfContext {
   /** Z1/Z2 of the `analisis_falla` stage, keyed by repair_id. Damage location
    *  is computed as (z1 + z2) / 2. Null components when not yet entered. */
   failureZByRepair: Record<string, { z1: number | null; z2: number | null }>;
+  /** Dominant/average color (#RRGGBB) sampled from the image of the FIRST stage
+   *  (lowest stageOrder) photo. Null when it can't be resolved. */
+  bladeColor: string | null;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -286,6 +289,90 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           URL.revokeObjectURL(blobUrl);
           resolve(dataUrl);
+        } catch {
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        clearTimeout(timeout);
+        URL.revokeObjectURL(blobUrl);
+        resolve(null);
+      };
+      img.src = blobUrl;
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Samples the DOMINANT/average color of an image via canvas, mirroring the
+ * loadImageAsBase64 pattern (fetch → blob → <img> on a canvas, crossOrigin,
+ * blobUrl, timeout, revokeObjectURL, Promise). The image is drawn into a small
+ * ~50x50 canvas for speed; R/G/B are averaged over all NON fully-transparent
+ * pixels. Returns an uppercase '#RRGGBB' hex, or null when the load/draw fails.
+ */
+async function sampleDominantColor(url: string): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+
+    return await new Promise<string | null>((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 8000);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const blobUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        clearTimeout(timeout);
+        try {
+          // Small canvas (~50x50) for a fast average sample.
+          const SAMPLE = 50;
+          const w = img.naturalWidth || SAMPLE;
+          const h = img.naturalHeight || SAMPLE;
+          let cw = SAMPLE,
+            ch = SAMPLE;
+          const ratio = w / h;
+          if (ratio >= 1) ch = Math.max(1, Math.round(SAMPLE / ratio));
+          else cw = Math.max(1, Math.round(SAMPLE * ratio));
+
+          const canvas = document.createElement('canvas');
+          canvas.width = cw;
+          canvas.height = ch;
+          const cctx = canvas.getContext('2d');
+          if (!cctx) {
+            URL.revokeObjectURL(blobUrl);
+            resolve(null);
+            return;
+          }
+          cctx.drawImage(img, 0, 0, cw, ch);
+          const { data } = cctx.getImageData(0, 0, cw, ch);
+
+          let rSum = 0,
+            gSum = 0,
+            bSum = 0,
+            count = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            const alpha = data[i + 3] ?? 0;
+            if (alpha === 0) continue; // ignore fully transparent pixels
+            rSum += data[i] ?? 0;
+            gSum += data[i + 1] ?? 0;
+            bSum += data[i + 2] ?? 0;
+            count++;
+          }
+          URL.revokeObjectURL(blobUrl);
+          if (count === 0) {
+            resolve(null);
+            return;
+          }
+          const toHex = (n: number) =>
+            Math.round(n / count)
+              .toString(16)
+              .padStart(2, '0')
+              .toUpperCase();
+          resolve(`#${toHex(rSum)}${toHex(gSum)}${toHex(bSum)}`);
         } catch {
           URL.revokeObjectURL(blobUrl);
           resolve(null);
@@ -709,6 +796,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     defects,
     photos,
     failureZByRepair,
+    bladeColor: null,
   };
 }
 
@@ -1009,7 +1097,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     head: [['Campo', 'Valor']],
     body: [
       ['Largo', ctx.blades[0]?.lengthMeters != null ? `${ctx.blades[0]!.lengthMeters} m` : NA],
-      ['Color', NA],
+      ['Color', ctx.bladeColor || NA],
       ['Serie Pala A', ctx.blades.find((b) => b.position === 1)?.serialNumber || NA],
       ['Serie Pala B', ctx.blades.find((b) => b.position === 2)?.serialNumber || NA],
       ['Serie Pala C', ctx.blades.find((b) => b.position === 3)?.serialNumber || NA],
@@ -1173,7 +1261,7 @@ function renderBlockTable(
   autoTable(doc, {
     startY,
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2, lineColor: [180, 180, 180], lineWidth: 0.2, halign: 'left', valign: 'middle' },
+    styles: { fontSize: 8, cellPadding: 2, lineColor: [180, 180, 180], lineWidth: 0.2, halign: 'center', valign: 'middle' },
     columnStyles: {
       0: { cellWidth: colW },
       1: { cellWidth: colW },
@@ -1241,15 +1329,20 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
       doc.addPage();
 
       // 1. Bicolor header row: left gray "Pala X ~ Daño #n", right orange category.
+      //    The LEFT cell (long damage name) gets 65% of the width; the RIGHT cell
+      //    (short "Categoría del daño: N") gets 35% so the name doesn't collide
+      //    with the orange cell.
       const headerY = 20;
       const headerH = 9;
-      const halfW = (PAGE_WIDTH - 2 * MARGIN) / 2;
+      const totalHeaderW = PAGE_WIDTH - 2 * MARGIN;
+      const leftW = totalHeaderW * 0.65;
+      const rightW = totalHeaderW * 0.35;
+      const HEADER_PAD = 3;
 
       // Left cell — gray bg, black bold.
       doc.setFillColor(...COLOR_BLOCK_LABEL_BG);
-      doc.rect(MARGIN, headerY, halfW, headerH, 'F');
+      doc.rect(MARGIN, headerY, leftW, headerH, 'F');
       doc.setTextColor(0, 0, 0);
-      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       // Compose the defect name (type + number-identifier, doc §6),
       // e.g. "Pala A · Grieta A27-XYZ".
@@ -1257,14 +1350,22 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
       const headerLeft = defectName
         ? `Pala ${label} · ${defectName}`
         : `Pala ${label}`;
-      doc.text(headerLeft, MARGIN + 3, headerY + headerH / 2 + 1.5);
+      // Dynamically shrink the left font (11 → min 7) until it fits in leftW.
+      let leftFontSize = 11;
+      doc.setFontSize(leftFontSize);
+      while (leftFontSize > 7 && doc.getTextWidth(headerLeft) > leftW - HEADER_PAD * 2) {
+        leftFontSize -= 0.5;
+        doc.setFontSize(leftFontSize);
+      }
+      doc.text(headerLeft, MARGIN + HEADER_PAD, headerY + headerH / 2 + 1.5);
 
-      // Right cell — orange bg, white bold.
+      // Right cell — orange bg, white bold. Fixed at fontSize 11.
       doc.setFillColor(...COLOR_BLOCK_ORANGE);
-      doc.rect(MARGIN + halfW, headerY, halfW, headerH, 'F');
+      doc.rect(MARGIN + leftW, headerY, rightW, headerH, 'F');
       doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
       const categoria = defect.severity != null ? String(defect.severity) : '';
-      doc.text(`Categoría del daño: ${categoria}`, MARGIN + halfW + 3, headerY + headerH / 2 + 1.5);
+      doc.text(`Categoría del daño: ${categoria}`, MARGIN + leftW + HEADER_PAD, headerY + headerH / 2 + 1.5);
       doc.setTextColor(0, 0, 0);
 
       // 2. Detail table (4-column label/value grid). Z1/Z2 come from the photo's
@@ -1480,6 +1581,16 @@ export async function generateAndDownloadRepairReport(
   const { startDate, endDate } = deriveStageDates(ctx.photos);
   ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
   ctx.repairCompletedAt = endDate ?? ctx.repairCompletedAt;
+
+  // "Color" (Datos del Aspa) = dominant color of the FIRST stage's photo. The
+  // first stage is the lowest stageOrder; within it, the lowest captureOrder.
+  const firstStagePhoto = ctx.photos
+    .filter((p) => !!p.url)
+    .slice()
+    .sort((a, b) => a.stageOrder - b.stageOrder || a.captureOrder - b.captureOrder)[0];
+  if (firstStagePhoto) {
+    ctx.bladeColor = await sampleDominantColor(firstStagePhoto.url);
+  }
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
