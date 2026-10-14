@@ -1111,7 +1111,9 @@ async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(255, 255, 255);
   doc.text('Generado por', margin + 10, footerStartY);
-  doc.text(ctx.windFarmName, margin + 10, footerStartY + 5);
+  // Same value as the "Informe realizado por" field (the authenticated user who
+  // generates the PDF), not the wind farm name.
+  doc.text(ctx.reportedBy, margin + 10, footerStartY + 5);
   doc.text('Con tecnología', pageW - margin - 10, footerStartY, { align: 'right' });
   doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
 
