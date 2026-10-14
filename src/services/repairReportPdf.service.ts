@@ -119,6 +119,26 @@ interface RepairPdfContext {
   /** Dominant/average color (#RRGGBB) sampled from the image of the FIRST stage
    *  (lowest stageOrder) photo. Null when it can't be resolved. */
   bladeColor: string | null;
+  /** repair.start_category (1-5) of the repair in scope. Null when absent. */
+  startCategory: number | null;
+  /** repair.final_category (1-5) of the repair in scope. Null when absent. */
+  finalCategory: number | null;
+  /** repair.progress_percent (0-100) of the repair in scope. Null when absent. */
+  progressPercent: number | null;
+  /** Name of repair.assigned_technician_id (→ profiles) of the repair in scope.
+   *  Null when no assigned technician. */
+  assignedTechnicianName: string | null;
+  /** Per-repair progress/category/assigned-technician values, keyed by repair_id.
+   *  Used to resolve the 4 fields above AFTER the per-defect scope is applied. */
+  repairProgressByRepairId: Record<
+    string,
+    {
+      startCategory: number | null;
+      finalCategory: number | null;
+      progressPercent: number | null;
+      assignedTechnicianName: string | null;
+    }
+  >;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -816,6 +836,57 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     }
   }
 
+  // 9. Per-repair category/progress/assigned-technician — read the 4 columns that
+  //    already exist on the `repair` table, keyed by repair_id (the repair ids in
+  //    scope come from the photos). The assigned technician name is resolved via
+  //    profiles (id → name/last_name). This map is resolved AFTER the per-defect
+  //    scope is applied (in generateAndDownloadRepairReport) so the report shows
+  //    the values of the repair actually in scope.
+  const repairProgressByRepairId: RepairPdfContext['repairProgressByRepairId'] = {};
+  const repairIdsForProgress = [
+    ...new Set(photos.map((p) => p.repairId).filter((id): id is string => Boolean(id))),
+  ];
+  if (repairIdsForProgress.length > 0) {
+    const { data: repairRows } = await db
+      .from('repair')
+      .select('id, start_category, final_category, assigned_technician_id, progress_percent')
+      .in('id', repairIdsForProgress);
+
+    // Resolve assigned technician names in one batch (id → fullName).
+    const assignedTechIds = [
+      ...new Set(
+        ((repairRows as unknown[]) ?? [])
+          .map((r) => (r as Record<string, unknown>).assigned_technician_id as string)
+          .filter(Boolean),
+      ),
+    ];
+    const techNameById: Record<string, string> = {};
+    if (assignedTechIds.length > 0) {
+      const { data: techProfiles } = await db
+        .from('profiles')
+        .select('id, name, last_name')
+        .in('id', assignedTechIds);
+      for (const tp of (techProfiles as unknown[]) ?? []) {
+        const r = tp as Record<string, unknown>;
+        const name = fullName({ name: r.name as string, last_name: r.last_name as string | null });
+        if (r.id) techNameById[r.id as string] = name;
+      }
+    }
+
+    for (const rr of (repairRows as unknown[]) ?? []) {
+      const r = rr as Record<string, unknown>;
+      const id = r.id as string;
+      if (!id) continue;
+      const assignedId = (r.assigned_technician_id as string) ?? null;
+      repairProgressByRepairId[id] = {
+        startCategory: numOrNull(r.start_category),
+        finalCategory: numOrNull(r.final_category),
+        progressPercent: numOrNull(r.progress_percent),
+        assignedTechnicianName: assignedId ? techNameById[assignedId] || null : null,
+      };
+    }
+  }
+
   return {
     campaignName: (campaign.name as string) ?? NA,
     status: (campaign.status as string) ?? NA,
@@ -842,39 +913,12 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     photos,
     failureZByRepair,
     bladeColor: null,
+    startCategory: null,
+    finalCategory: null,
+    progressPercent: null,
+    assignedTechnicianName: null,
+    repairProgressByRepairId,
   };
-}
-
-/**
- * Resolves the DISTINCT names of the users who UPLOADED the given repair photos,
- * replicating `fetchUploaderByPhotoId` from repair.service.ts. The real uploader
- * is storage.objects.owner_id (not readable from PostgREST), so we call the
- * SECURITY DEFINER RPC `get_repair_photo_uploaders` with the photo ids in scope;
- * it resolves owner_id → profiles.name with a fallback to the assigned
- * technician. This mirrors the "CP: <nombre>" the workflow screen shows.
- *
- * Returns the distinct non-empty uploader names joined with ", " (same shape the
- * "Técnico(s) a cargo" row expects); '' when none can be resolved so the render
- * still falls back to NA.
- */
-async function resolveUploadersByPhotoIds(photoIds: string[]): Promise<string> {
-  const unique = [...new Set(photoIds.filter(Boolean))];
-  if (unique.length === 0) return '';
-
-  const { data, error } = await db.rpc('get_repair_photo_uploaders', {
-    photo_ids: unique,
-  });
-  if (error) return '';
-
-  const names = [
-    ...new Set(
-      ((data as unknown[]) ?? [])
-        .map((row) => ((row as Record<string, unknown>).uploader_name as string) ?? '')
-        .map((n) => n.trim())
-        .filter(Boolean),
-    ),
-  ];
-  return names.join(', ');
 }
 
 /**
@@ -1120,8 +1164,11 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
       // "Reparación sin finalizar" instead of N/A.
       ['Fecha fin', ctx.repairCompletedAt ? formatDateES(ctx.repairCompletedAt) : 'Reparación sin finalizar'],
       ['Daños reparados (cantidad)', String(ctx.defects.length)],
+      ['Categoría de inicio', ctx.startCategory != null ? `Cat ${ctx.startCategory}` : NA],
+      ['Categoría final', ctx.finalCategory != null ? `Cat ${ctx.finalCategory}` : NA],
+      ['Porcentaje de avance', ctx.progressPercent != null ? `${ctx.progressPercent}%` : NA],
       ['Informe realizado por', ctx.reportedBy],
-      ['Técnico(s) a cargo', ctx.techniciansInCharge || NA],
+      ['Técnico(s) a cargo', ctx.assignedTechnicianName || NA],
     ],
     theme: 'grid',
     headStyles: { fillColor: COLOR_HEADER_TABLE, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
@@ -1609,15 +1656,30 @@ export async function generateAndDownloadRepairReport(
     };
   }
 
-  // Recalculate "Técnico(s) a cargo" OVER THE FINAL SCOPED CONTEXT (robust for
-  // both the full and per-defect PDF). This must be the user(s) who UPLOADED the
-  // report's photos — the same "CP: <nombre>" the workflow screen shows — NOT the
-  // assigned technician. We resolve it via the SECURITY DEFINER RPC
-  // get_repair_photo_uploaders over the photo ids actually in scope (already
-  // filtered: selected_for_report + disabled optional groups dropped), replicating
-  // fetchUploaderByPhotoId from repair.service.ts.
-  const scopedPhotoIds = ctx.photos.map((p) => p.photoId).filter(Boolean);
-  ctx.techniciansInCharge = await resolveUploadersByPhotoIds(scopedPhotoIds);
+  // Resolve "Categoría de inicio/final", "Porcentaje de avance" and "Técnico(s) a
+  // cargo" OVER THE FINAL SCOPED CONTEXT. These come from the `repair` row in
+  // scope (repair.start_category / final_category / progress_percent /
+  // assigned_technician_id). The scoped repair_id is data.defectId (which is a
+  // repair_id) or, as a fallback, the first repairId present in the scoped photos.
+  // When several repairs are in scope (full-campaign report), use the first repair
+  // that has a non-null value for each field.
+  const scopedRepairIds = [
+    ...new Set(
+      [data.defectId, ...ctx.photos.map((p) => p.repairId)].filter(
+        (id): id is string => Boolean(id),
+      ),
+    ),
+  ];
+  for (const rid of scopedRepairIds) {
+    const prog = ctx.repairProgressByRepairId[rid];
+    if (!prog) continue;
+    if (ctx.startCategory == null && prog.startCategory != null) ctx.startCategory = prog.startCategory;
+    if (ctx.finalCategory == null && prog.finalCategory != null) ctx.finalCategory = prog.finalCategory;
+    if (ctx.progressPercent == null && prog.progressPercent != null) ctx.progressPercent = prog.progressPercent;
+    if (ctx.assignedTechnicianName == null && prog.assignedTechnicianName != null) {
+      ctx.assignedTechnicianName = prog.assignedTechnicianName;
+    }
+  }
 
   // "Fecha inicio" is derived from the photo of the 2nd distinct stage (by
   // stageOrder), falling back to the view's repair_started_at. "Fecha fin"
