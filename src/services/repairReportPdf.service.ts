@@ -713,51 +713,92 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
 }
 
 /**
- * Resolves the "Técnico(s) a cargo" string over an EXPLICIT scope.
+ * Resolves the DISTINCT names of the users who UPLOADED the given repair photos,
+ * replicating `fetchUploaderByPhotoId` from repair.service.ts. The real uploader
+ * is storage.objects.owner_id (not readable from PostgREST), so we call the
+ * SECURITY DEFINER RPC `get_repair_photo_uploaders` with the photo ids in scope;
+ * it resolves owner_id → profiles.name with a fallback to the assigned
+ * technician. This mirrors the "CP: <nombre>" the workflow screen shows.
  *
- * Precedence:
- *   1. When `repairIds` is provided (and non-empty), query `repair` by
- *      `id IN (repairIds)` — this is the most precise, since the report scope
- *      is defined by repair_id (photos[].repairId).
- *   2. Otherwise fall back to `defectIds` → `repair.defect_id IN (defectIds)`.
- *
- * From the matched repairs, take the DISTINCT non-null `technician_id`, resolve
- * `profiles (name, last_name)` and join their `fullName()` with ", ".
- * Returns '' when there are no technicians (the render already falls back to NA).
+ * Returns the distinct non-empty uploader names joined with ", " (same shape the
+ * "Técnico(s) a cargo" row expects); '' when none can be resolved so the render
+ * still falls back to NA.
  */
-async function resolveTechnicians(repairIds?: string[], defectIds?: string[]): Promise<string> {
-  const ids = (repairIds ?? []).filter(Boolean);
-  const defIds = (defectIds ?? []).filter(Boolean);
+async function resolveUploadersByPhotoIds(photoIds: string[]): Promise<string> {
+  const unique = [...new Set(photoIds.filter(Boolean))];
+  if (unique.length === 0) return '';
 
-  let repairRows: unknown[] | null = null;
-  if (ids.length > 0) {
-    const { data } = await db.from('repair').select('technician_id').in('id', ids);
-    repairRows = (data as unknown[]) ?? [];
-  } else if (defIds.length > 0) {
-    const { data } = await db.from('repair').select('technician_id').in('defect_id', defIds);
-    repairRows = (data as unknown[]) ?? [];
-  }
+  const { data, error } = await db.rpc('get_repair_photo_uploaders', {
+    photo_ids: unique,
+  });
+  if (error) return '';
 
-  const techIds = [
+  const names = [
     ...new Set(
-      (repairRows ?? [])
-        .map((r) => (r as Record<string, unknown>).technician_id as string)
+      ((data as unknown[]) ?? [])
+        .map((row) => ((row as Record<string, unknown>).uploader_name as string) ?? '')
+        .map((n) => n.trim())
         .filter(Boolean),
     ),
   ];
-  if (techIds.length === 0) return '';
-
-  const { data: techProfiles } = await db
-    .from('profiles')
-    .select('name, last_name')
-    .in('id', techIds);
-  const names = ((techProfiles as unknown[]) ?? [])
-    .map((p) => {
-      const r = p as Record<string, unknown>;
-      return fullName({ name: r.name as string, last_name: r.last_name as string | null });
-    })
-    .filter(Boolean);
   return names.join(', ');
+}
+
+/**
+ * Derives "Fecha inicio" / "Fecha fin" from the photos actually in scope:
+ *   - startDate = captured_at of the photo of the SECOND distinct stage
+ *     (stages ordered by stageOrder asc; index 1). First stage is "Etiqueta".
+ *   - endDate   = captured_at of the photo of the LAST distinct stage
+ *     (highest stageOrder present).
+ * Within a stage, the chosen photo is the one with the lowest captureOrder
+ * (tie-broken by the oldest capturedAt). Returns null when a date can't be
+ * resolved so the caller can fall back to the view's repair dates / NA.
+ */
+function deriveStageDates(photos: RepairPhotoForPdf[]): {
+  startDate: string | null;
+  endDate: string | null;
+} {
+  const withDate = photos.filter((p) => p.capturedAt);
+  if (withDate.length === 0) return { startDate: null, endDate: null };
+
+  // Distinct stageOrders present, ascending.
+  const stageOrders = [...new Set(withDate.map((p) => p.stageOrder))].sort((a, b) => a - b);
+
+  // Pick the "representative" photo of a given stageOrder: lowest captureOrder,
+  // tie-broken by oldest capturedAt.
+  const pickPhoto = (order: number): RepairPhotoForPdf | null => {
+    const inStage = withDate.filter((p) => p.stageOrder === order);
+    if (inStage.length === 0) return null;
+    return inStage.reduce((best, p) => {
+      if (p.captureOrder !== best.captureOrder) {
+        return p.captureOrder < best.captureOrder ? p : best;
+      }
+      const pt = new Date(p.capturedAt as string).getTime();
+      const bt = new Date(best.capturedAt as string).getTime();
+      return pt < bt ? p : best;
+    });
+  };
+
+  const secondStageOrder = stageOrders.length >= 2 ? stageOrders[1] : undefined;
+  const lastStageOrder = stageOrders[stageOrders.length - 1];
+
+  const startPhoto = secondStageOrder != null ? pickPhoto(secondStageOrder) : null;
+
+  // End = most recent photo of the last stage (captured_at desc).
+  const lastStagePhotos = withDate.filter((p) => p.stageOrder === lastStageOrder);
+  const endPhoto =
+    lastStagePhotos.length > 0
+      ? lastStagePhotos.reduce((latest, p) => {
+          const pt = new Date(p.capturedAt as string).getTime();
+          const lt = new Date(latest.capturedAt as string).getTime();
+          return pt > lt ? p : latest;
+        })
+      : null;
+
+  return {
+    startDate: startPhoto?.capturedAt ?? null,
+    endDate: endPhoto?.capturedAt ?? null,
+  };
 }
 
 // ─── PDF Renderers ──────────────────────────────────────────────────────────
@@ -1424,19 +1465,21 @@ export async function generateAndDownloadRepairReport(
   }
 
   // Recalculate "Técnico(s) a cargo" OVER THE FINAL SCOPED CONTEXT (robust for
-  // both the full and per-defect PDF). The report scope is defined by repair_id
-  // (photos[].repairId), so we resolve technicians by repair.id whenever we have
-  // repair ids in scope. For the per-defect case, `data.defectId` IS a repair_id.
-  const scopedRepairIds = [
-    ...new Set(
-      [
-        ...(data.defectId ? [data.defectId] : []),
-        ...ctx.photos.map((p) => p.repairId).filter((id): id is string => id != null),
-      ].filter(Boolean),
-    ),
-  ];
-  const scopedDefectIdList = ctx.defects.map((d) => d.id).filter(Boolean);
-  ctx.techniciansInCharge = await resolveTechnicians(scopedRepairIds, scopedDefectIdList);
+  // both the full and per-defect PDF). This must be the user(s) who UPLOADED the
+  // report's photos — the same "CP: <nombre>" the workflow screen shows — NOT the
+  // assigned technician. We resolve it via the SECURITY DEFINER RPC
+  // get_repair_photo_uploaders over the photo ids actually in scope (already
+  // filtered: selected_for_report + disabled optional groups dropped), replicating
+  // fetchUploaderByPhotoId from repair.service.ts.
+  const scopedPhotoIds = ctx.photos.map((p) => p.photoId).filter(Boolean);
+  ctx.techniciansInCharge = await resolveUploadersByPhotoIds(scopedPhotoIds);
+
+  // "Fecha inicio" / "Fecha fin" are derived from the photos in scope: the 2nd
+  // distinct stage (by stageOrder) for the start, and the last stage for the end.
+  // Fall back to the view's repair dates when a stage date can't be resolved.
+  const { startDate, endDate } = deriveStageDates(ctx.photos);
+  ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
+  ctx.repairCompletedAt = endDate ?? ctx.repairCompletedAt;
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
