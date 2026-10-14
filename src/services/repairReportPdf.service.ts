@@ -1115,11 +1115,10 @@ function renderBlockTable(
   const z2 = failureZ?.z2 ?? null;
   const z1Str = z1 != null ? `${z1}mm` : '';
   const z2Str = z2 != null ? `${z2}mm` : '';
-  // Largo = (z1 + z2) / 2. Only when both Z values are present.
-  const largo = z1 != null && z2 != null ? `${(z1 + z2) / 2}mm` : '';
-  // Ubicación del daño = defect.distance_from_root (mm, from Excel).
-  const ubicacionDanio =
-    defect?.distanceFromRoot != null ? `${defect.distanceFromRoot}mm` : '';
+  // Largo = |z1 - z2| (the span between both Z marks). Only when both present.
+  const largo = z1 != null && z2 != null ? `${Math.abs(z1 - z2)}mm` : '';
+  // Ubicación del daño = (z1 + z2) / 2 (midpoint between both Z marks).
+  const ubicacionDanio = z1 != null && z2 != null ? `${(z1 + z2) / 2}mm` : '';
 
   // autoTable cell type: [text, fill]. Labels use gray bg + bold black; values
   // use white bg. Fields with no BD data render as '' (empty), never invented.
