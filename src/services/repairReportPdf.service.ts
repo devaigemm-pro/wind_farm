@@ -328,43 +328,26 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 /**
- * Reads the "Coating Method" value off the inspection label via OCR
- * (Tesseract.js). The label on the FIRST stage's IMAGE 1 contains a line like
- * "Coating Method: RAL 7035-2009"; we return everything after the colon
- * ("RAL 7035-2009"). English is used for the OCR language ('eng') because the
- * label text and RAL codes are English/alphanumeric.
+ * Reads the "Coating Method" value off the inspection label via OCR. The label
+ * on the FIRST stage's IMAGE 1 contains a line like "Coating Method: RAL
+ * 7035-2009"; the server returns everything after the colon ("RAL 7035-2009").
  *
- * Tesseract.js is imported DYNAMICALLY so it never inflates the main bundle —
- * it's only pulled in when a repair PDF is actually generated. The whole thing
- * is wrapped in try/catch and NEVER throws: if the OCR fails or the label isn't
- * found, it returns null so the PDF keeps rendering (just without a Color).
+ * The OCR runs SERVER-SIDE in the `ocr-coating-method` Supabase Edge Function
+ * (Deno + tesseract.js), not in the browser — the in-browser OCR was unreliable
+ * and competed with the main thread. Here we just invoke the function and read
+ * `data.coatingMethod`. The whole thing is wrapped in try/catch and NEVER
+ * throws: if the call fails or the label isn't found, it returns null so the
+ * PDF keeps rendering (just without a Color).
  */
 async function extractCoatingMethod(url: string): Promise<string | null> {
   if (!url) return null;
   try {
-    // Dynamic import keeps tesseract.js out of the initial bundle. v7 exposes
-    // `recognize` both as a named export and on the default export; the module
-    // namespace object carries it directly.
-    const Tesseract = await import('tesseract.js');
-    const { data } = await Tesseract.recognize(url, 'eng');
-    const text = data?.text ?? '';
-    if (!text) return null;
-
-    // Find the line that mentions "Coating Method" (tolerant to case and to
-    // OCR spacing variants), then take whatever follows the first colon.
-    const lines = text.split(/\r?\n/);
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) continue;
-      if (!/coating\s*method/i.test(line)) continue;
-
-      // Prefer text after the first ":" on the matched line.
-      const colonIdx = line.indexOf(':');
-      let value = colonIdx >= 0 ? line.slice(colonIdx + 1) : line.replace(/coating\s*method/i, '');
-      value = value.replace(/\s+/g, ' ').trim();
-      if (value) return value;
-    }
-    return null;
+    const { data, error } = await supabase.functions.invoke('ocr-coating-method', {
+      body: { imageUrl: url },
+    });
+    if (error) return null;
+    const coatingMethod = (data as { coatingMethod?: string | null } | null)?.coatingMethod;
+    return coatingMethod ?? null;
   } catch {
     return null;
   }
