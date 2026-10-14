@@ -204,48 +204,56 @@ function hexToRgb(hex: string): RGB {
 }
 
 /**
- * Maps a '#RRGGBB' hex to the nearest basic color NAME in Spanish, using
- * Euclidean distance to a small reference palette. Low-saturation colors
- * (R≈G≈B) resolve to Blanco/Gris/Negro by brightness so photos of light/dark
- * blades don't get a spurious hue. Returns a single word (e.g. "Blanco").
+ * Maps a '#RRGGBB' hex to a basic color NAME in Spanish using HSV, NOT raw RGB
+ * distance. RGB distance confuses hues that differ mainly in brightness (e.g.
+ * "Naranjo" vs "Café", which share the same hue — brown is just a dark/dull
+ * orange). We classify by HUE so an orange blade is named "Naranjo" regardless
+ * of how dark it is. Low-saturation colors resolve to Blanco/Gris/Negro by
+ * value; very dark orange/yellow hues map to "Café/Marrón" only when both
+ * saturation and brightness are low enough to actually read as brown.
  */
-const COLOR_NAME_PALETTE: Record<string, RGB> = {
-  Rojo: [220, 20, 60],
-  Naranjo: [255, 140, 0],
-  Amarillo: [240, 220, 40],
-  Verde: [40, 160, 60],
-  Celeste: [120, 200, 240],
-  Azul: [30, 70, 200],
-  Morado: [130, 60, 180],
-  Rosado: [240, 130, 170],
-  'Café/Marrón': [120, 70, 40],
-};
-
 function rgbToColorName(hex: string): string {
   if (!hex || hex.length < 7) return NA;
   const [r, g, b] = hexToRgb(hex);
 
-  // Grayscale check: when R, G and B are close, it's white/gray/black by brightness.
-  const maxC = Math.max(r, g, b);
-  const minC = Math.min(r, g, b);
-  if (maxC - minC <= 28) {
-    const lum = (r + g + b) / 3;
-    if (lum >= 190) return 'Blanco';
-    if (lum <= 65) return 'Negro';
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const value = max / 255; // brightness 0..1
+  const sat = max === 0 ? 0 : delta / max; // saturation 0..1
+
+  // Achromatic (gray scale): low saturation → white/gray/black by brightness.
+  if (sat <= 0.15 || delta <= 18) {
+    if (value >= 0.75) return 'Blanco';
+    if (value <= 0.25) return 'Negro';
     return 'Gris';
   }
 
-  // Chromatic: nearest reference color by Euclidean distance.
-  let bestName = NA;
-  let bestDist = Infinity;
-  for (const [name, [pr, pg, pb]] of Object.entries(COLOR_NAME_PALETTE)) {
-    const dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestName = name;
-    }
+  // Hue in degrees (0..360).
+  let hue = 0;
+  if (max === r) hue = 60 * (((g - b) / delta) % 6);
+  else if (max === g) hue = 60 * ((b - r) / delta + 2);
+  else hue = 60 * ((r - g) / delta + 4);
+  if (hue < 0) hue += 360;
+
+  // Orange/yellow hues (~15–50°) read as "Café/Marrón" ONLY when the color is
+  // both dark and dull (low value AND low saturation). A vivid or bright orange
+  // stays "Naranjo" even if somewhat dark (e.g. the orange blade coating).
+  const isBrown = hue >= 15 && hue < 50 && value < 0.45 && sat < 0.6;
+  if (isBrown) return 'Café/Marrón';
+
+  if (hue < 15 || hue >= 345) return 'Rojo';
+  if (hue < 45) return 'Naranjo';
+  if (hue < 70) return 'Amarillo';
+  if (hue < 170) return 'Verde';
+  if (hue < 200) return 'Celeste';
+  if (hue < 255) return 'Azul';
+  if (hue < 290) return 'Morado';
+  if (hue < 330) {
+    // Pink vs red/magenta: pale, light tones read as "Rosado".
+    return value >= 0.6 && sat < 0.6 ? 'Rosado' : 'Morado';
   }
-  return bestName;
+  return 'Rosado';
 }
 
 function formatDateES(dateStr: string | null | undefined): string {
