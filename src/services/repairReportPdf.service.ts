@@ -415,29 +415,49 @@ async function sampleDominantColor(url: string): Promise<string | null> {
           cctx.drawImage(img, 0, 0, cw, ch);
           const { data } = cctx.getImageData(0, 0, cw, ch);
 
-          let rSum = 0,
-            gSum = 0,
-            bSum = 0,
-            count = 0;
+          // Dominant color (mode): quantize each pixel into coarse buckets
+          // (channels >> 5 => 32-level buckets) and pick the most frequent
+          // bucket. This lets the predominant color win over background noise
+          // instead of averaging everything into a muddy brown.
+          const buckets = new Map<
+            number,
+            { count: number; rSum: number; gSum: number; bSum: number }
+          >();
           for (let i = 0; i < data.length; i += 4) {
             const alpha = data[i + 3] ?? 0;
             if (alpha === 0) continue; // ignore fully transparent pixels
-            rSum += data[i] ?? 0;
-            gSum += data[i + 1] ?? 0;
-            bSum += data[i + 2] ?? 0;
-            count++;
+            const r = data[i] ?? 0;
+            const g = data[i + 1] ?? 0;
+            const b = data[i + 2] ?? 0;
+            const key = ((r >> 5) << 10) | ((g >> 5) << 5) | (b >> 5);
+            const bucket = buckets.get(key);
+            if (bucket) {
+              bucket.count++;
+              bucket.rSum += r;
+              bucket.gSum += g;
+              bucket.bSum += b;
+            } else {
+              buckets.set(key, { count: 1, rSum: r, gSum: g, bSum: b });
+            }
           }
           URL.revokeObjectURL(blobUrl);
-          if (count === 0) {
+          if (buckets.size === 0) {
             resolve(null);
             return;
           }
-          const toHex = (n: number) =>
-            Math.round(n / count)
+          // Pick the most frequent bucket (the mode).
+          let winner: { count: number; rSum: number; gSum: number; bSum: number } | null = null;
+          for (const bucket of buckets.values()) {
+            if (!winner || bucket.count > winner.count) winner = bucket;
+          }
+          // Represent the bucket by the average of its own pixels for a
+          // truer hex than the bucket center.
+          const toHex = (sum: number) =>
+            Math.round(sum / winner!.count)
               .toString(16)
               .padStart(2, '0')
               .toUpperCase();
-          resolve(`#${toHex(rSum)}${toHex(gSum)}${toHex(bSum)}`);
+          resolve(`#${toHex(winner!.rSum)}${toHex(winner!.gSum)}${toHex(winner!.bSum)}`);
         } catch {
           URL.revokeObjectURL(blobUrl);
           resolve(null);
@@ -1202,9 +1222,10 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
   });
 
   y = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 40;
-  y += 8;
 
-  // Findings
+  // Findings — on its own page (page 3), starting clean at the top.
+  doc.addPage();
+  y = 28;
   y = addSectionTitle(doc, 'Hallazgos', y);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -1689,14 +1710,25 @@ export async function generateAndDownloadRepairReport(
   const { startDate } = deriveStageDates(ctx.photos);
   ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
 
-  // "Color" (Datos del Aspa) = dominant color of the FIRST stage's photo. The
-  // first stage is the lowest stageOrder; within it, the lowest captureOrder.
-  const firstStagePhoto = ctx.photos
-    .filter((p) => !!p.url)
-    .slice()
-    .sort((a, b) => a.stageOrder - b.stageOrder || a.captureOrder - b.captureOrder)[0];
-  if (firstStagePhoto) {
-    ctx.bladeColor = await sampleDominantColor(firstStagePhoto.url);
+  // "Color" (Datos del Aspa) = dominant color of the SECOND stage's photo.
+  // Stage 1 is the "Etiqueta"; stage 2 is "Análisis de daño" (the one that
+  // actually shows the blade). We take the distinct stageOrders of photos with
+  // a url, sort ascending, pick the 2nd (index 1); within it the lowest
+  // captureOrder. Falls back to the first stage when there is no second one.
+  const colorPhotos = ctx.photos.filter((p) => !!p.url);
+  const distinctStageOrders = Array.from(new Set(colorPhotos.map((p) => p.stageOrder))).sort(
+    (a, b) => a - b,
+  );
+  const targetStageOrder = distinctStageOrders[1] ?? distinctStageOrders[0];
+  const colorPhoto =
+    targetStageOrder == null
+      ? undefined
+      : colorPhotos
+          .filter((p) => p.stageOrder === targetStageOrder)
+          .slice()
+          .sort((a, b) => a.captureOrder - b.captureOrder)[0];
+  if (colorPhoto) {
+    ctx.bladeColor = await sampleDominantColor(colorPhoto.url);
   }
 
   const doc = new jsPDF('p', 'mm', 'a4');
