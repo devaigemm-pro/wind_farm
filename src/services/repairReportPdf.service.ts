@@ -116,8 +116,9 @@ interface RepairPdfContext {
   /** Z1/Z2 of the `analisis_falla` stage, keyed by repair_id. Damage location
    *  is computed as (z1 + z2) / 2. Null components when not yet entered. */
   failureZByRepair: Record<string, { z1: number | null; z2: number | null }>;
-  /** Dominant/average color (#RRGGBB) sampled from the image of the FIRST stage
-   *  (lowest stageOrder) photo. Null when it can't be resolved. */
+  /** Coating method text (e.g. "RAL 7035-2009") read via OCR from the label in
+   *  IMAGE 1 of the FIRST stage (lowest stageOrder) photo. Null when it can't
+   *  be resolved. */
   bladeColor: string | null;
   /** repair.start_category (1-5) of the repair in scope. Null when absent. */
   startCategory: number | null;
@@ -201,59 +202,6 @@ function hexToRgb(hex: string): RGB {
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
   ];
-}
-
-/**
- * Maps a '#RRGGBB' hex to a basic color NAME in Spanish using HSV, NOT raw RGB
- * distance. RGB distance confuses hues that differ mainly in brightness (e.g.
- * "Naranjo" vs "Café", which share the same hue — brown is just a dark/dull
- * orange). We classify by HUE so an orange blade is named "Naranjo" regardless
- * of how dark it is. Low-saturation colors resolve to Blanco/Gris/Negro by
- * value; very dark orange/yellow hues map to "Café/Marrón" only when both
- * saturation and brightness are low enough to actually read as brown.
- */
-function rgbToColorName(hex: string): string {
-  if (!hex || hex.length < 7) return NA;
-  const [r, g, b] = hexToRgb(hex);
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  const value = max / 255; // brightness 0..1
-  const sat = max === 0 ? 0 : delta / max; // saturation 0..1
-
-  // Achromatic (gray scale): low saturation → white/gray/black by brightness.
-  if (sat <= 0.15 || delta <= 18) {
-    if (value >= 0.75) return 'Blanco';
-    if (value <= 0.25) return 'Negro';
-    return 'Gris';
-  }
-
-  // Hue in degrees (0..360).
-  let hue = 0;
-  if (max === r) hue = 60 * (((g - b) / delta) % 6);
-  else if (max === g) hue = 60 * ((b - r) / delta + 2);
-  else hue = 60 * ((r - g) / delta + 4);
-  if (hue < 0) hue += 360;
-
-  // Orange/yellow hues (~15–50°) read as "Café/Marrón" ONLY when the color is
-  // both dark and dull (low value AND low saturation). A vivid or bright orange
-  // stays "Naranjo" even if somewhat dark (e.g. the orange blade coating).
-  const isBrown = hue >= 15 && hue < 50 && value < 0.45 && sat < 0.6;
-  if (isBrown) return 'Café/Marrón';
-
-  if (hue < 15 || hue >= 345) return 'Rojo';
-  if (hue < 45) return 'Naranjo';
-  if (hue < 70) return 'Amarillo';
-  if (hue < 170) return 'Verde';
-  if (hue < 200) return 'Celeste';
-  if (hue < 255) return 'Azul';
-  if (hue < 290) return 'Morado';
-  if (hue < 330) {
-    // Pink vs red/magenta: pale, light tones read as "Rosado".
-    return value >= 0.6 && sat < 0.6 ? 'Rosado' : 'Morado';
-  }
-  return 'Rosado';
 }
 
 function formatDateES(dateStr: string | null | undefined): string {
@@ -380,130 +328,43 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 /**
- * Samples the DOMINANT/average color of an image via canvas, mirroring the
- * loadImageAsBase64 pattern (fetch → blob → <img> on a canvas, crossOrigin,
- * blobUrl, timeout, revokeObjectURL, Promise). The image is drawn into a small
- * ~50x50 canvas for speed; R/G/B are averaged over all NON fully-transparent
- * pixels. Returns an uppercase '#RRGGBB' hex, or null when the load/draw fails.
+ * Reads the "Coating Method" value off the inspection label via OCR
+ * (Tesseract.js). The label on the FIRST stage's IMAGE 1 contains a line like
+ * "Coating Method: RAL 7035-2009"; we return everything after the colon
+ * ("RAL 7035-2009"). English is used for the OCR language ('eng') because the
+ * label text and RAL codes are English/alphanumeric.
+ *
+ * Tesseract.js is imported DYNAMICALLY so it never inflates the main bundle —
+ * it's only pulled in when a repair PDF is actually generated. The whole thing
+ * is wrapped in try/catch and NEVER throws: if the OCR fails or the label isn't
+ * found, it returns null so the PDF keeps rendering (just without a Color).
  */
-async function sampleDominantColor(url: string): Promise<string | null> {
+async function extractCoatingMethod(url: string): Promise<string | null> {
   if (!url) return null;
   try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const blob = await response.blob();
+    // Dynamic import keeps tesseract.js out of the initial bundle. v7 exposes
+    // `recognize` both as a named export and on the default export; the module
+    // namespace object carries it directly.
+    const Tesseract = await import('tesseract.js');
+    const { data } = await Tesseract.recognize(url, 'eng');
+    const text = data?.text ?? '';
+    if (!text) return null;
 
-    return await new Promise<string | null>((resolve) => {
-      const timeout = setTimeout(() => resolve(null), 8000);
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      const blobUrl = URL.createObjectURL(blob);
-      img.onload = () => {
-        clearTimeout(timeout);
-        try {
-          // Small canvas (~50x50) for a fast average sample.
-          const SAMPLE = 50;
-          const w = img.naturalWidth || SAMPLE;
-          const h = img.naturalHeight || SAMPLE;
-          let cw = SAMPLE,
-            ch = SAMPLE;
-          const ratio = w / h;
-          if (ratio >= 1) ch = Math.max(1, Math.round(SAMPLE / ratio));
-          else cw = Math.max(1, Math.round(SAMPLE * ratio));
+    // Find the line that mentions "Coating Method" (tolerant to case and to
+    // OCR spacing variants), then take whatever follows the first colon.
+    const lines = text.split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      if (!/coating\s*method/i.test(line)) continue;
 
-          const canvas = document.createElement('canvas');
-          canvas.width = cw;
-          canvas.height = ch;
-          const cctx = canvas.getContext('2d');
-          if (!cctx) {
-            URL.revokeObjectURL(blobUrl);
-            resolve(null);
-            return;
-          }
-          cctx.drawImage(img, 0, 0, cw, ch);
-          const { data } = cctx.getImageData(0, 0, cw, ch);
-
-          // Dominant color (mode): quantize each pixel into coarse buckets
-          // (channels >> 5 => 32-level buckets) and pick the most frequent
-          // bucket. This lets the predominant color win over background noise
-          // instead of averaging everything into a muddy brown.
-          const buckets = new Map<
-            number,
-            { count: number; rSum: number; gSum: number; bSum: number }
-          >();
-          for (let i = 0; i < data.length; i += 4) {
-            const alpha = data[i + 3] ?? 0;
-            if (alpha === 0) continue; // ignore fully transparent pixels
-            const r = data[i] ?? 0;
-            const g = data[i + 1] ?? 0;
-            const b = data[i + 2] ?? 0;
-            const key = ((r >> 5) << 10) | ((g >> 5) << 5) | (b >> 5);
-            const bucket = buckets.get(key);
-            if (bucket) {
-              bucket.count++;
-              bucket.rSum += r;
-              bucket.gSum += g;
-              bucket.bSum += b;
-            } else {
-              buckets.set(key, { count: 1, rSum: r, gSum: g, bSum: b });
-            }
-          }
-          URL.revokeObjectURL(blobUrl);
-          if (buckets.size === 0) {
-            resolve(null);
-            return;
-          }
-          // Pick the STRONGEST color, not merely the most frequent one. A big
-          // pale/beige area (low saturation) would win a pure count vote even
-          // when a smaller vivid area (e.g. the orange blade) is clearly the
-          // dominant color a human would name. So we score each bucket by
-          // count × saturation²: vivid colors are strongly favored over washed
-          // out light/gray tones, while still requiring meaningful area.
-          const saturationOf = (r: number, g: number, b: number): number => {
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            return max === 0 ? 0 : (max - min) / max; // HSV saturation, 0..1
-          };
-          let winner: { count: number; rSum: number; gSum: number; bSum: number } | null = null;
-          let bestScore = -1;
-          for (const bucket of buckets.values()) {
-            const ar = bucket.rSum / bucket.count;
-            const ag = bucket.gSum / bucket.count;
-            const ab = bucket.bSum / bucket.count;
-            const sat = saturationOf(ar, ag, ab);
-            const score = bucket.count * (sat * sat);
-            if (score > bestScore) {
-              bestScore = score;
-              winner = bucket;
-            }
-          }
-          // Fallback: if every bucket is essentially gray (score 0 → no vivid
-          // color at all), use the plain most-frequent bucket.
-          if (!winner || bestScore <= 0) {
-            for (const bucket of buckets.values()) {
-              if (!winner || bucket.count > winner.count) winner = bucket;
-            }
-          }
-          // Represent the bucket by the average of its own pixels for a
-          // truer hex than the bucket center.
-          const toHex = (sum: number) =>
-            Math.round(sum / winner!.count)
-              .toString(16)
-              .padStart(2, '0')
-              .toUpperCase();
-          resolve(`#${toHex(winner!.rSum)}${toHex(winner!.gSum)}${toHex(winner!.bSum)}`);
-        } catch {
-          URL.revokeObjectURL(blobUrl);
-          resolve(null);
-        }
-      };
-      img.onerror = () => {
-        clearTimeout(timeout);
-        URL.revokeObjectURL(blobUrl);
-        resolve(null);
-      };
-      img.src = blobUrl;
-    });
+      // Prefer text after the first ":" on the matched line.
+      const colonIdx = line.indexOf(':');
+      let value = colonIdx >= 0 ? line.slice(colonIdx + 1) : line.replace(/coating\s*method/i, '');
+      value = value.replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -1244,7 +1105,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     head: [['Campo', 'Valor']],
     body: [
       ['Largo', ctx.blades[0]?.lengthMeters != null ? `${ctx.blades[0]!.lengthMeters} m` : NA],
-      ['Color', ctx.bladeColor ? rgbToColorName(ctx.bladeColor) : NA],
+      ['Color', ctx.bladeColor || NA],
       ['Serie Pala A', ctx.blades.find((b) => b.position === 1)?.serialNumber || NA],
       ['Serie Pala B', ctx.blades.find((b) => b.position === 2)?.serialNumber || NA],
       ['Serie Pala C', ctx.blades.find((b) => b.position === 3)?.serialNumber || NA],
@@ -1746,9 +1607,9 @@ export async function generateAndDownloadRepairReport(
   const { startDate } = deriveStageDates(ctx.photos);
   ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
 
-  // "Color" (Datos del Aspa) = dominant color of IMAGE 1 of the FIRST stage.
-  // The first stage is the lowest stageOrder; "image 1" within it is the lowest
-  // captureOrder. The dominant color is detected by mode (not average).
+  // "Color" (Datos del Aspa) = the "Coating Method" text read via OCR off the
+  // label in IMAGE 1 of the FIRST stage. The first stage is the lowest
+  // stageOrder; "image 1" within it is the lowest captureOrder.
   const colorPhotos = ctx.photos.filter((p) => !!p.url);
   const distinctStageOrders = Array.from(new Set(colorPhotos.map((p) => p.stageOrder))).sort(
     (a, b) => a - b,
@@ -1762,7 +1623,7 @@ export async function generateAndDownloadRepairReport(
           .slice()
           .sort((a, b) => a.captureOrder - b.captureOrder)[0];
   if (colorPhoto) {
-    ctx.bladeColor = await sampleDominantColor(colorPhoto.url);
+    ctx.bladeColor = await extractCoatingMethod(colorPhoto.url);
   }
 
   const doc = new jsPDF('p', 'mm', 'a4');
