@@ -976,7 +976,7 @@ async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
   doc.setTextColor(0, 0, 0);
 }
 
-function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
+function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext): number {
   // General data starts on its own page (page 2), after the cover.
   doc.addPage();
 
@@ -1090,10 +1090,15 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
   const findings = ctx.defects.length > 0
     ? `Se identificaron ${ctx.defects.length} daño(s) a reparar en la turbina ${ctx.turbineName}.`
     : 'Sin hallazgos registrados.';
-  doc.text(doc.splitTextToSize(findings, PAGE_WIDTH - 2 * MARGIN), MARGIN, y);
-  // NOTE: "Diseño de la pala" now lives on its own dedicated page
-  // (renderBladeDesignPage) and "Categorización de Daños" follows it
-  // (renderDamageCategorizationPage), both called after renderGeneralData.
+  const findingsLines = doc.splitTextToSize(findings, PAGE_WIDTH - 2 * MARGIN);
+  doc.text(findingsLines, MARGIN, y);
+  // Advance y past the findings text so "Diseño de la pala" can be drawn
+  // right below it on the SAME page.
+  y += Array.isArray(findingsLines) ? findingsLines.length * 5 : 5;
+  // NOTE: "Diseño de la pala" now renders on this same page (page 3), below
+  // the findings text (renderBladeDesignPage receives this y). "Categorización
+  // de Daños" still follows on its own page (renderDamageCategorizationPage).
+  return y;
 }
 
 /**
@@ -1155,19 +1160,20 @@ function renderDamageCategorizationPage(doc: jsPDF) {
 }
 
 /**
- * "Diseño de la pala" — a FULL DEDICATED PAGE showing the blade definitions
- * diagram from the static asset public/blade_design.png, fit full-page (centered,
- * aspect ratio preserved). Fallback: leaves a blank page if the image fails.
+ * "Diseño de la pala" — the blade definitions diagram from the static asset
+ * public/blade_design.png, drawn BELOW `startY` on the current page (same page
+ * as "Hallazgos"). Centered horizontally and within the remaining vertical
+ * space, aspect ratio preserved. Fallback: no-op if the image fails to load.
  */
-async function renderBladeDesignPage(doc: jsPDF) {
-  doc.addPage();
+async function renderBladeDesignPage(doc: jsPDF, startY: number) {
+  const titleY = addSectionTitle(doc, 'Diseño de la pala', startY);
   const base64 = await loadImageAsBase64(`${window.location.origin}/blade_design.png`);
   if (!base64) return;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const anyDoc = doc as any;
     const availW = PAGE_WIDTH - 2 * MARGIN;
-    const availH = PAGE_HEIGHT - 2 * MARGIN;
+    const availH = PAGE_HEIGHT - titleY - MARGIN;
     let drawW = availW;
     let drawH = availH;
     const props = anyDoc.getImageProperties ? anyDoc.getImageProperties(base64) : null;
@@ -1180,10 +1186,12 @@ async function renderBladeDesignPage(doc: jsPDF) {
       }
     }
     const x = (PAGE_WIDTH - drawW) / 2;
-    const y = (PAGE_HEIGHT - drawH) / 2;
+    // Place the image RIGHT BELOW the title (small gap), not vertically centered
+    // in the remaining space — centering left a big empty gap under the title.
+    const y = titleY + 4;
     doc.addImage(base64, 'PNG', x, y, drawW, drawH);
   } catch {
-    // leave the page blank if the image can't be drawn
+    // leave the space blank if the image can't be drawn
   }
 }
 
@@ -1583,12 +1591,13 @@ export async function generateAndDownloadRepairReport(
   await renderCoverPage(doc, ctx);
 
   // 1b. General data + blade data + findings (page 2 onwards).
-  renderGeneralData(doc, ctx);
+  const afterFindingsY = renderGeneralData(doc, ctx);
 
-  // 1c. "Diseño de la pala" — dedicated full page with the vector definitions
-  //     diagram, then the "Categorización de Daños" table right after it.
-  //     Order: datos generales -> Diseño de la pala -> Categorización de Daños.
-  await renderBladeDesignPage(doc);
+  // 1c. "Diseño de la pala" — drawn on the SAME page as "Hallazgos", below the
+  //     findings text (small gap), then the "Categorización de Daños" table on
+  //     its own page right after.
+  //     Order: datos generales -> Hallazgos + Diseño de la pala -> Categorización de Daños.
+  await renderBladeDesignPage(doc, afterFindingsY + 6);
   renderDamageCategorizationPage(doc);
 
   // 2. Per-blade sections. One block page per SELECTED photo, grouped by blade.
