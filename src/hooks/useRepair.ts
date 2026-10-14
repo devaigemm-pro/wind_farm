@@ -4,6 +4,7 @@ import type {
   RepairCampaignDetail,
   RepairTree,
   RepairSummary,
+  Technician,
 } from '@/services/repair.service';
 import type { RepairCampaignStatus } from '@/types';
 
@@ -137,6 +138,49 @@ export function useUpdateDefectFields(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
     },
+  });
+}
+
+/**
+ * Update a repair's progress fields (start/final category, assigned technician,
+ * progress %) with a DIRECT write on the `repair` row. Refreshes the tree so the
+ * controls reflect the saved values. Same pattern as useUpdateDefectFields.
+ */
+export function useUpdateRepairProgress(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      repairId,
+      startCategory,
+      finalCategory,
+      assignedTechnicianId,
+      progressPercent,
+    }: {
+      repairId: string;
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    }) =>
+      repairService.updateRepairProgress(repairId, {
+        startCategory,
+        finalCategory,
+        assignedTechnicianId,
+        progressPercent,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+    },
+  });
+}
+
+/** List technicians (profiles with role='technician') for the assignment combobox. */
+export function useTechnicians() {
+  return useQuery<Technician[]>({
+    queryKey: ['technicians'],
+    queryFn: () => repairService.listTechnicians(),
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }
 

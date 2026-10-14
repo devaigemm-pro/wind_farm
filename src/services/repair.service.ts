@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { REPAIR_STAGE_CATALOG } from '@/constants/repair-stages';
+import { fullName } from '@/utils/fullName';
 import type { RepairCampaignStatus } from '@/types';
 import { buildCampaignAnnotationCodeMap, isUuid, BLADE_LETTERS as ANNOTATION_BLADE_LETTERS } from './defectNumbering';
 
@@ -125,11 +126,22 @@ export interface RepairDefectNode {
   workOrderId: string | null;
   repairStatus: string | null;
   technicianName: string | null;
+  /** Repair progress fields persisted on the `repair` row. Null when unset. */
+  startCategory: number | null;
+  finalCategory: number | null;
+  assignedTechnicianId: string | null;
+  progressPercent: number | null;
   stages: RepairStageNode[];
 }
 
 /** Full repair tree: defects[] → stages[] (the 11, ordered) → photos[]. */
 export type RepairTree = RepairDefectNode[];
+
+/** A technician option (profiles with role='technician') for the assignment combobox. */
+export interface Technician {
+  id: string;
+  name: string;
+}
 
 /** Summary data for the repair row in the campaigns panel. */
 export interface RepairSummary {
@@ -708,7 +720,9 @@ export const repairService = {
     if (workOrderIds.length > 0) {
       const { data: repairRows, error: repErr } = await db
         .from('repair')
-        .select('id, work_order_id, defect_id, status, technician_id')
+        .select(
+          'id, work_order_id, defect_id, status, technician_id, start_category, final_category, assigned_technician_id, progress_percent',
+        )
         .in('work_order_id', workOrderIds);
       if (repErr) throw new RepairServiceError(repErr.message, repErr.code);
       for (const rr of (repairRows as unknown[]) ?? []) {
@@ -891,6 +905,10 @@ export const repairService = {
         workOrderId: wo.id,
         repairStatus,
         technicianName: null,
+        startCategory: repairRow ? numOrNull(repairRow.start_category) : null,
+        finalCategory: repairRow ? numOrNull(repairRow.final_category) : null,
+        assignedTechnicianId: repairRow ? ((repairRow.assigned_technician_id as string) ?? null) : null,
+        progressPercent: repairRow ? numOrNull(repairRow.progress_percent) : null,
         stages: stages.length > 0 ? stages : catalogStages(),
       };
       return { node, createdAt: (defectRow?.created_at as string) ?? '' };
@@ -1127,6 +1145,54 @@ export const repairService = {
 
     const { error } = await db.from('defect').update(patch).eq('id', defectId);
     if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
+   * Update a repair's progress fields (start/final category, assigned
+   * technician, progress %) with a DIRECT update on the `repair` row (same
+   * pattern as updateDefectFields — no recompute). Only the fields explicitly
+   * provided (not undefined) are written; undefined fields are left untouched.
+   */
+  async updateRepairProgress(
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ): Promise<void> {
+    const patch: Record<string, unknown> = {};
+    if (fields.startCategory !== undefined) patch.start_category = fields.startCategory;
+    if (fields.finalCategory !== undefined) patch.final_category = fields.finalCategory;
+    if (fields.assignedTechnicianId !== undefined)
+      patch.assigned_technician_id = fields.assignedTechnicianId;
+    if (fields.progressPercent !== undefined) patch.progress_percent = fields.progressPercent;
+    if (Object.keys(patch).length === 0) return;
+
+    const { error } = await db.from('repair').update(patch).eq('id', repairId);
+    if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
+   * List the technicians (profiles with role='technician') available for the
+   * "Técnico a cargo" combobox, ordered by name. The visible label is the full
+   * name (name + last_name); the value is the profile id.
+   */
+  async listTechnicians(): Promise<Technician[]> {
+    const { data, error } = await db
+      .from('profiles')
+      .select('id, name, last_name')
+      .eq('role', 'technician')
+      .order('name');
+    if (error) throw new RepairServiceError(error.message, error.code);
+    return ((data as unknown[]) ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: r.id as string,
+        name: fullName({ name: r.name as string | null, last_name: r.last_name as string | null }),
+      };
+    });
   },
 
   /**

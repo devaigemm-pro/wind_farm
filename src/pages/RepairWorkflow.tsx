@@ -11,6 +11,8 @@ import {
   useSetPhotoSelected,
   useDeleteRepairDefect,
   useUpdateDefectFields,
+  useUpdateRepairProgress,
+  useTechnicians,
 } from '@/hooks/useRepair';
 import {
   generateAndDownloadRepairReport,
@@ -18,7 +20,7 @@ import {
   downloadPersistedRepairReport,
   persistRepairReport,
 } from '@/services/repairReportPdf.service';
-import type { RepairDefectNode, RepairPhoto, RepairStageNode } from '@/services/repair.service';
+import type { RepairDefectNode, RepairPhoto, RepairStageNode, Technician } from '@/services/repair.service';
 
 const C = {
   brand: '#5A8F5A',
@@ -102,6 +104,8 @@ export function RepairWorkflow() {
   const setSelected = useSetPhotoSelected(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
+  const updateRepairProgress = useUpdateRepairProgress(campaignId);
+  const { data: technicians = [] } = useTechnicians();
 
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
@@ -282,6 +286,34 @@ export function RepairWorkflow() {
       );
     });
 
+  // Persist a single repair progress field (start/final category, assigned
+  // technician, or progress %) with a DIRECT update on the repair row. Fired
+  // immediately on change (combobox) or on blur/debounce (progress %).
+  const handleSaveProgress = (
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ) =>
+    new Promise<void>((resolve, reject) => {
+      updateRepairProgress.mutate(
+        { repairId, ...fields },
+        {
+          onSuccess: () => {
+            toast.success(t('repair.editSuccess'));
+            resolve();
+          },
+          onError: (err) => {
+            toast.error((err as Error)?.message || t('repair.editError'));
+            reject(err);
+          },
+        },
+      );
+    });
+
   if (campaignLoading) {
     return <div style={page}><p style={{ color: C.muted }}>{t('general.loading')}</p></div>;
   }
@@ -328,6 +360,8 @@ export function RepairWorkflow() {
               downloadingDefectId={downloadingDefectId}
               onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
               typeOptions={typeOptions}
+              technicians={technicians}
+              onSaveProgress={isClient ? undefined : handleSaveProgress}
             />
           ))}
         </div>
@@ -381,6 +415,18 @@ interface BladeGroupSectionProps {
   ) => Promise<void>;
   /** Full list of annotation type names offered by the inline type <select>. */
   typeOptions: string[];
+  /** Technicians (role='technician') for the "Técnico a cargo" combobox. */
+  technicians: Technician[];
+  /** Persist a repair progress field (undefined = read-only client). */
+  onSaveProgress?: (
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ) => Promise<void>;
 }
 
 /**
@@ -403,6 +449,8 @@ function BladeGroupSection({
   downloadingDefectId,
   onSaveDefectFields,
   typeOptions,
+  technicians,
+  onSaveProgress,
 }: BladeGroupSectionProps) {
   const [open, setOpen] = useState(false);
   const bladeLabel = group.serial
@@ -438,6 +486,8 @@ function BladeGroupSection({
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
               onSaveDefectFields={onSaveDefectFields}
               typeOptions={typeOptions}
+              technicians={technicians}
+              onSaveProgress={onSaveProgress}
             />
           ))}
         </div>
@@ -469,6 +519,18 @@ interface DefectSectionProps {
   ) => Promise<void>;
   /** Full list of annotation type names offered by the inline type <select>. */
   typeOptions: string[];
+  /** Technicians (role='technician') for the "Técnico a cargo" combobox. */
+  technicians: Technician[];
+  /** Persist a repair progress field (undefined = read-only client). */
+  onSaveProgress?: (
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ) => Promise<void>;
 }
 
 function DefectSection({
@@ -486,10 +548,76 @@ function DefectSection({
   downloading,
   onSaveDefectFields,
   typeOptions,
+  technicians,
+  onSaveProgress,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
   const [open, setOpen] = useState(false);
   const { defect } = node;
+
+  // ── Per-defect repair progress state (start/final category, technician, %) ─
+  // Always-visible controls (not gated by the pencil edit mode). Each combobox
+  // persists immediately on change; the % input persists on blur to avoid a
+  // write per keystroke. Seeded from the node's saved values.
+  const canEditProgress = Boolean(onSaveProgress) && node.repairId != null;
+  const [startCat, setStartCat] = useState<string>(
+    node.startCategory != null ? String(node.startCategory) : '',
+  );
+  const [finalCat, setFinalCat] = useState<string>(
+    node.finalCategory != null ? String(node.finalCategory) : '',
+  );
+  const [assignedTech, setAssignedTech] = useState<string>(node.assignedTechnicianId ?? '');
+  const [progress, setProgress] = useState<string>(
+    node.progressPercent != null ? String(node.progressPercent) : '',
+  );
+
+  // Re-seed when the node's saved values change (e.g. after a tree refetch).
+  useEffect(() => {
+    setStartCat(node.startCategory != null ? String(node.startCategory) : '');
+    setFinalCat(node.finalCategory != null ? String(node.finalCategory) : '');
+    setAssignedTech(node.assignedTechnicianId ?? '');
+    setProgress(node.progressPercent != null ? String(node.progressPercent) : '');
+  }, [node.startCategory, node.finalCategory, node.assignedTechnicianId, node.progressPercent]);
+
+  const commitProgressField = (fields: {
+    startCategory?: number | null;
+    finalCategory?: number | null;
+    assignedTechnicianId?: string | null;
+    progressPercent?: number | null;
+  }) => {
+    if (!onSaveProgress || node.repairId == null) return;
+    void onSaveProgress(node.repairId, fields).catch(() => {
+      /* toast handled upstream */
+    });
+  };
+
+  const handleStartCatChange = (value: string) => {
+    setStartCat(value);
+    commitProgressField({ startCategory: value === '' ? null : Number(value) });
+  };
+  const handleFinalCatChange = (value: string) => {
+    setFinalCat(value);
+    commitProgressField({ finalCategory: value === '' ? null : Number(value) });
+  };
+  const handleAssignedTechChange = (value: string) => {
+    setAssignedTech(value);
+    commitProgressField({ assignedTechnicianId: value === '' ? null : value });
+  };
+  // Persist % on blur: clamp to 0-100, treat blank as null.
+  const commitProgress = () => {
+    const trimmed = progress.trim();
+    if (trimmed === '') {
+      if (node.progressPercent != null) commitProgressField({ progressPercent: null });
+      return;
+    }
+    let n = Number(trimmed);
+    if (isNaN(n)) return;
+    n = Math.max(0, Math.min(100, Math.round(n)));
+    if (String(n) !== String(node.progressPercent ?? '')) {
+      setProgress(String(n));
+      commitProgressField({ progressPercent: n });
+    }
+  };
 
   // ── Inline edit state for the three editable fields ──────────────────────
   const [editing, setEditing] = useState(false);
@@ -695,6 +823,74 @@ function DefectSection({
           </span>
         )}
       </button>
+
+      {/* Always-visible per-defect repair progress controls (start/final
+          category, assigned technician, progress %). Shown right below the
+          defect header and BEFORE the stages. Read-only for the client. */}
+      <div style={progressBlock}>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.startCategory')}</span>
+          <select
+            style={editSelect}
+            value={startCat}
+            onChange={(e) => handleStartCatChange(e.target.value)}
+            disabled={!canEditProgress}
+          >
+            <option value="">—</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                Cat {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.finalCategory')}</span>
+          <select
+            style={editSelect}
+            value={finalCat}
+            onChange={(e) => handleFinalCatChange(e.target.value)}
+            disabled={!canEditProgress}
+          >
+            <option value="">—</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                Cat {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.assignedTechnician')}</span>
+          <select
+            style={editSelect}
+            value={assignedTech}
+            onChange={(e) => handleAssignedTechChange(e.target.value)}
+            disabled={!canEditProgress}
+          >
+            <option value="">—</option>
+            {technicians.map((tech) => (
+              <option key={tech.id} value={tech.id}>
+                {tech.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.progressPercent')}</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            style={editInput}
+            value={progress}
+            onChange={(e) => setProgress(e.target.value)}
+            onBlur={commitProgress}
+            disabled={!canEditProgress}
+            placeholder="0-100"
+          />
+        </label>
+      </div>
 
       {editing && (
         <div style={editForm}>
@@ -1083,6 +1279,13 @@ const editInput: React.CSSProperties = {
 const editSelect: React.CSSProperties = { ...editInput };
 const editActions: React.CSSProperties = {
   display: 'flex', justifyContent: 'flex-end', gap: 8,
+};
+// Always-visible per-defect progress controls (start/final category, assigned
+// technician, progress %), shown just below the defect header and before the
+// stages. Mirrors the edit form look but is NOT gated by the pencil edit mode.
+const progressBlock: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12,
+  padding: 16, background: '#F7FAF7', borderBottom: `1px solid ${C.border}`,
 };
 const editSaveBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
