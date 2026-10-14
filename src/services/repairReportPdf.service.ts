@@ -183,6 +183,51 @@ function hexToRgb(hex: string): RGB {
   ];
 }
 
+/**
+ * Maps a '#RRGGBB' hex to the nearest basic color NAME in Spanish, using
+ * Euclidean distance to a small reference palette. Low-saturation colors
+ * (R≈G≈B) resolve to Blanco/Gris/Negro by brightness so photos of light/dark
+ * blades don't get a spurious hue. Returns a single word (e.g. "Blanco").
+ */
+const COLOR_NAME_PALETTE: Record<string, RGB> = {
+  Rojo: [220, 20, 60],
+  Naranjo: [255, 140, 0],
+  Amarillo: [240, 220, 40],
+  Verde: [40, 160, 60],
+  Celeste: [120, 200, 240],
+  Azul: [30, 70, 200],
+  Morado: [130, 60, 180],
+  Rosado: [240, 130, 170],
+  'Café/Marrón': [120, 70, 40],
+};
+
+function rgbToColorName(hex: string): string {
+  if (!hex || hex.length < 7) return NA;
+  const [r, g, b] = hexToRgb(hex);
+
+  // Grayscale check: when R, G and B are close, it's white/gray/black by brightness.
+  const maxC = Math.max(r, g, b);
+  const minC = Math.min(r, g, b);
+  if (maxC - minC <= 28) {
+    const lum = (r + g + b) / 3;
+    if (lum >= 190) return 'Blanco';
+    if (lum <= 65) return 'Negro';
+    return 'Gris';
+  }
+
+  // Chromatic: nearest reference color by Euclidean distance.
+  let bestName = NA;
+  let bestDist = Infinity;
+  for (const [name, [pr, pg, pb]] of Object.entries(COLOR_NAME_PALETTE)) {
+    const dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestName = name;
+    }
+  }
+  return bestName;
+}
+
 function formatDateES(dateStr: string | null | undefined): string {
   if (!dateStr) return NA;
   const d = new Date(dateStr);
@@ -1055,9 +1100,6 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
         .join(', ')
     : NA;
 
-  // Horas de producción — totalHH from quote items.
-  const productionHours = ctx.totalHH != null ? `${ctx.totalHH} HH` : NA;
-
   autoTable(doc, {
     startY: y,
     head: [['Datos generales', '']],
@@ -1069,7 +1111,6 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
       ['Fabricante', ctx.manufacturer || NA],
       ['Tipo de turbina', ctx.turbineModel],
       ['N° de turbina', ctx.turbineName],
-      ['Horas de producción', productionHours],
       ['Estado turbina antes de la reparación', stateBefore],
       ['Estado turbina después de la reparación', ctx.defects.length > 0 ? 'Defecto reparado' : NA],
       ['Pala(s) en reparación', bladesInRepair],
@@ -1097,7 +1138,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext) {
     head: [['Campo', 'Valor']],
     body: [
       ['Largo', ctx.blades[0]?.lengthMeters != null ? `${ctx.blades[0]!.lengthMeters} m` : NA],
-      ['Color', ctx.bladeColor || NA],
+      ['Color', ctx.bladeColor ? rgbToColorName(ctx.bladeColor) : NA],
       ['Serie Pala A', ctx.blades.find((b) => b.position === 1)?.serialNumber || NA],
       ['Serie Pala B', ctx.blades.find((b) => b.position === 2)?.serialNumber || NA],
       ['Serie Pala C', ctx.blades.find((b) => b.position === 3)?.serialNumber || NA],
@@ -1575,12 +1616,13 @@ export async function generateAndDownloadRepairReport(
   const scopedPhotoIds = ctx.photos.map((p) => p.photoId).filter(Boolean);
   ctx.techniciansInCharge = await resolveUploadersByPhotoIds(scopedPhotoIds);
 
-  // "Fecha inicio" / "Fecha fin" are derived from the photos in scope: the 2nd
-  // distinct stage (by stageOrder) for the start, and the last stage for the end.
-  // Fall back to the view's repair dates when a stage date can't be resolved.
-  const { startDate, endDate } = deriveStageDates(ctx.photos);
+  // "Fecha inicio" is derived from the photo of the 2nd distinct stage (by
+  // stageOrder), falling back to the view's repair_started_at. "Fecha fin"
+  // is NOT derived from photos: it must be repair.completed_at (set by the
+  // technician app on "Finalizar reparación"), already in ctx.repairCompletedAt
+  // from the view. When the repair isn't finished yet it stays null → N/A.
+  const { startDate } = deriveStageDates(ctx.photos);
   ctx.repairStartedAt = startDate ?? ctx.repairStartedAt;
-  ctx.repairCompletedAt = endDate ?? ctx.repairCompletedAt;
 
   // "Color" (Datos del Aspa) = dominant color of the FIRST stage's photo. The
   // first stage is the lowest stageOrder; within it, the lowest captureOrder.
