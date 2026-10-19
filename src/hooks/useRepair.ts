@@ -92,6 +92,83 @@ export function useSetPhotoSelected(campaignId: string | undefined) {
 }
 
 /**
+ * Move a photo to a DIFFERENT stage of the same defect (fixing a photo uploaded
+ * under the wrong stage). Optimistically moves the photo from its origin stage's
+ * photos[] to the target stage's photos[] in the cached tree so it jumps columns
+ * instantly, with rollback on error. Mirrors useSetPhotoSelected: summary
+ * refetch + tree marked stale (no immediate refetch) to avoid a reorder flicker.
+ */
+export function useMovePhotoToStage(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      photoId,
+      targetStageId,
+      targetStageCode,
+    }: {
+      photoId: string;
+      targetStageId: string;
+      targetStageCode: string;
+    }) => repairService.movePhotoToStage(photoId, targetStageId, targetStageCode),
+    onMutate: async ({ photoId, targetStageId, targetStageCode }) => {
+      const treeKey = ['repair-tree', campaignId];
+      await queryClient.cancelQueries({ queryKey: treeKey });
+      const prev = queryClient.getQueryData<RepairTree>(treeKey);
+      if (prev) {
+        const next: RepairTree = prev.map((node) => {
+          // Find the moving photo inside THIS node's stages (if present).
+          let moving: RepairTree[number]['stages'][number]['photos'][number] | undefined;
+          for (const stage of node.stages) {
+            const found = stage.photos.find((p) => p.id === photoId);
+            if (found) {
+              moving = found;
+              break;
+            }
+          }
+          if (!moving) return node;
+          const movedPhoto = {
+            ...moving,
+            repairStageId: targetStageId,
+            stageCode: targetStageCode,
+          };
+          return {
+            ...node,
+            stages: node.stages.map((stage) => {
+              // Remove from the origin stage.
+              if (stage.photos.some((p) => p.id === photoId)) {
+                return { ...stage, photos: stage.photos.filter((p) => p.id !== photoId) };
+              }
+              // Add to the target stage (append, then keep captureOrder order).
+              if (stage.stageId === targetStageId) {
+                const photos = [...stage.photos, movedPhoto].sort(
+                  (a, b) => a.captureOrder - b.captureOrder,
+                );
+                return { ...stage, photos };
+              }
+              return stage;
+            }),
+          };
+        });
+        queryClient.setQueryData(treeKey, next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['repair-tree', campaignId], context.prev);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+      queryClient.invalidateQueries({
+        queryKey: ['repair-tree', campaignId],
+        refetchType: 'none',
+      });
+    },
+  });
+}
+
+/**
  * Permanently delete a defect from the repair campaign (whole chain:
  * repair_photo → repair_stage → repair → work_order → quote_item → defect),
  * then refresh tree + summary via react-query invalidation.

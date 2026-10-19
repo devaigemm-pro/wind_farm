@@ -975,6 +975,30 @@ export const repairService = {
   },
 
   /**
+   * Move a photo to a DIFFERENT repair stage (within the same defect/repair),
+   * to fix a photo uploaded under the wrong stage. Only the row's
+   * repair_stage_id + stage_code are updated so the tree (built by
+   * get_repair_photos_by_stage, which groups by repair_stage_id) regroups it
+   * under the target stage.
+   *
+   * The file is NOT moved in storage: photo URLs are resolved purely from
+   * `storage_path` (see mapPhoto/publicUrl), which is independent of the stage,
+   * so the public/signed URL keeps resolving after the move even though the
+   * original path still carries the old stage_code segment.
+   */
+  async movePhotoToStage(
+    photoId: string,
+    targetStageId: string,
+    targetStageCode: string,
+  ): Promise<void> {
+    const { error } = await db
+      .from('repair_photo')
+      .update({ repair_stage_id: targetStageId, stage_code: targetStageCode })
+      .eq('id', photoId);
+    if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
    * Permanently delete a defect from a repair campaign. The tree is driven by
    * work_order, not defect, so we delete the whole chain children→parents:
    *   repair_photo → repair_stage → repair → work_order → quote_item → defect.
