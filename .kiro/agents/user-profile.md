@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 322
+- **Sesiones analizadas**: 323
 - **Última actualización**: 2026-10-19
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -2257,3 +2257,19 @@
   - La pista estaba desde el primer mensaje ("seleccion de fotos pueda ser cruzada", "mover fotos de una etapa a otra") — "selección cruzada" aludía al mismo drag&drop de la selección existente. El agente debió inferirlo o preguntar el mecanismo.
   - El usuario tolera el error pero lo corrige directo y sin rodeos; espera que se acate de inmediato.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, corrección directa sin drama, "replicar mecanismo existente" (confianza alta — repetido en múltiples sesiones), describe interacción por analogía con lo que ya ve en pantalla.
+
+### Sesión 322 (cont.) - 2026-10-19 — Deploy de la corrección a prod
+- **Tarea principal**: "aplicar en prod" — desplegar el drag&drop entre etapas corregido.
+- **Observaciones nuevas**:
+  - Tras corregir el mecanismo (menú → drag&drop), "aplicar en prod" con 3 palabras = aprobación directa del deploy. Mismo flujo: rebase → merge --no-ff → push → `vercel --prod --yes`.
+  - Verificación en prod por bundle: confirmar que el chunk sirve el mecanismo NUEVO (grep `application/x-stage-id` presente) y que el VIEJO desapareció (grep `moveToStage` = 0). Útil validar ambos lados (lo nuevo entró, lo viejo salió).
+  - El deploy de Vercel tardó ~5min esta vez (vs 43s antes); no afecta, solo esperar.
+- **Patrones confirmados**: "aplicar en prod" = deploy manual Vercel CLI, verificación por hash de chunk + grep de cadena (nueva presente / vieja ausente), alta autonomía, comunicación ultra-mínima.
+
+### Sesión 323 - 2026-10-19 — Fix borde residual drag&drop
+- **Tarea principal**: Al mover una foto entre etapas, el borde de la etapa (origen y destino) quedaba marcado; quitar ese resaltado residual.
+- **Observaciones nuevas**:
+  - Reporta bug visual observado tras usar la feature en prod: describe el síntoma exacto ("el borde... quedando marcado, tanto la que recibe como la de procedencia") y la acción ("quitar ese comportamiento"). Estructura típica: síntoma preciso + qué quiere.
+  - Micro-iteración de pulido tras el deploy: usa la feature real, detecta detalle visual, pide el ajuste. Patrón de refinamiento incremental post-deploy.
+  - Causa raíz: con drag&drop + optimistic update, onDragLeave no dispara de forma fiable → highlight pegado. Solución robusta: listener global dragend/drop en vez de parche sobre onDragLeave.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, comunicación ultra-mínima, describe bug desde lo visual/UX, iteración incremental de pulido tras validar en prod.
