@@ -1120,6 +1120,30 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
   // dragged over this stage card (reuses the colDropActive look on stageCard).
   const [stageDropActive, setStageDropActive] = useState(false);
 
+  // Global drag-end safety net: when ANY HTML5 drag finishes (drop OR cancel),
+  // force every stage's highlights off. onDragLeave is unreliable here because
+  // onDrop fires an optimistic update that reorders/remounts the photos, so the
+  // leave event of the origin (and sometimes the target) stage never arrives,
+  // leaving the green border stuck. A document-level `dragend` listener always
+  // fires exactly once per drag regardless of where the pointer is, so it's the
+  // reliable place to clear the residual highlight without touching the
+  // in-drag feedback (which still works via onDragOver/onDragLeave).
+  useEffect(() => {
+    const clearHighlights = () => {
+      setStageDropActive(false);
+      setDropActive(false);
+    };
+    document.addEventListener('dragend', clearHighlights);
+    // `drop` also clears as a belt-and-suspenders fallback: in some browsers a
+    // successful drop may not be followed by a dragend on the original source
+    // if its DOM node was removed by the optimistic re-render.
+    document.addEventListener('drop', clearHighlights);
+    return () => {
+      document.removeEventListener('dragend', clearHighlights);
+      document.removeEventListener('drop', clearHighlights);
+    };
+  }, []);
+
   const photos = stage.photos;
   const available = photos.filter((p) => !p.repairSelected);
   const selected = photos.filter((p) => p.repairSelected);
