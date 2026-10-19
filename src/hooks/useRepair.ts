@@ -4,6 +4,7 @@ import type {
   RepairCampaignDetail,
   RepairTree,
   RepairSummary,
+  Technician,
 } from '@/services/repair.service';
 import type { RepairCampaignStatus } from '@/types';
 
@@ -91,6 +92,83 @@ export function useSetPhotoSelected(campaignId: string | undefined) {
 }
 
 /**
+ * Move a photo to a DIFFERENT stage of the same defect (fixing a photo uploaded
+ * under the wrong stage). Optimistically moves the photo from its origin stage's
+ * photos[] to the target stage's photos[] in the cached tree so it jumps columns
+ * instantly, with rollback on error. Mirrors useSetPhotoSelected: summary
+ * refetch + tree marked stale (no immediate refetch) to avoid a reorder flicker.
+ */
+export function useMovePhotoToStage(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      photoId,
+      targetStageId,
+      targetStageCode,
+    }: {
+      photoId: string;
+      targetStageId: string;
+      targetStageCode: string;
+    }) => repairService.movePhotoToStage(photoId, targetStageId, targetStageCode),
+    onMutate: async ({ photoId, targetStageId, targetStageCode }) => {
+      const treeKey = ['repair-tree', campaignId];
+      await queryClient.cancelQueries({ queryKey: treeKey });
+      const prev = queryClient.getQueryData<RepairTree>(treeKey);
+      if (prev) {
+        const next: RepairTree = prev.map((node) => {
+          // Find the moving photo inside THIS node's stages (if present).
+          let moving: RepairTree[number]['stages'][number]['photos'][number] | undefined;
+          for (const stage of node.stages) {
+            const found = stage.photos.find((p) => p.id === photoId);
+            if (found) {
+              moving = found;
+              break;
+            }
+          }
+          if (!moving) return node;
+          const movedPhoto = {
+            ...moving,
+            repairStageId: targetStageId,
+            stageCode: targetStageCode,
+          };
+          return {
+            ...node,
+            stages: node.stages.map((stage) => {
+              // Remove from the origin stage.
+              if (stage.photos.some((p) => p.id === photoId)) {
+                return { ...stage, photos: stage.photos.filter((p) => p.id !== photoId) };
+              }
+              // Add to the target stage (append, then keep captureOrder order).
+              if (stage.stageId === targetStageId) {
+                const photos = [...stage.photos, movedPhoto].sort(
+                  (a, b) => a.captureOrder - b.captureOrder,
+                );
+                return { ...stage, photos };
+              }
+              return stage;
+            }),
+          };
+        });
+        queryClient.setQueryData(treeKey, next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['repair-tree', campaignId], context.prev);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+      queryClient.invalidateQueries({
+        queryKey: ['repair-tree', campaignId],
+        refetchType: 'none',
+      });
+    },
+  });
+}
+
+/**
  * Permanently delete a defect from the repair campaign (whole chain:
  * repair_photo → repair_stage → repair → work_order → quote_item → defect),
  * then refresh tree + summary via react-query invalidation.
@@ -137,6 +215,66 @@ export function useUpdateDefectFields(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
     },
+  });
+}
+
+/**
+ * Update a repair's progress fields (start/final category, assigned technician,
+ * progress %) with a DIRECT write on the `repair` row. Refreshes the tree so the
+ * controls reflect the saved values. Same pattern as useUpdateDefectFields.
+ */
+export function useUpdateRepairProgress(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      repairId,
+      startCategory,
+      finalCategory,
+      assignedTechnicianId,
+      progressPercent,
+    }: {
+      repairId: string;
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    }) =>
+      repairService.updateRepairProgress(repairId, {
+        startCategory,
+        finalCategory,
+        assignedTechnicianId,
+        progressPercent,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+    },
+  });
+}
+
+/**
+ * Persist the coating-method text on repair.blade_color (DIRECT write), then
+ * refresh the tree so the report reads the cached value. Fired ONCE per repair
+ * from the background OCR on the repair screen; same invalidation pattern as
+ * useUpdateRepairProgress.
+ */
+export function useUpdateBladeColor(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ repairId, color }: { repairId: string; color: string | null }) =>
+      repairService.updateBladeColor(repairId, color),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+    },
+  });
+}
+
+/** List technicians (profiles with role='technician') for the assignment combobox. */
+export function useTechnicians() {
+  return useQuery<Technician[]>({
+    queryKey: ['technicians'],
+    queryFn: () => repairService.listTechnicians(),
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }
 

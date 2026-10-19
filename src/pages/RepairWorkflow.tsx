@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, FolderInput, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,16 +9,21 @@ import {
   useRepairCampaignDetail,
   useRepairTree,
   useSetPhotoSelected,
+  useMovePhotoToStage,
   useDeleteRepairDefect,
   useUpdateDefectFields,
+  useUpdateRepairProgress,
+  useUpdateBladeColor,
+  useTechnicians,
 } from '@/hooks/useRepair';
+import { parseCoatingMethod } from '@/utils/coatingMethod';
 import {
   generateAndDownloadRepairReport,
   getRepairsWithReport,
   downloadPersistedRepairReport,
   persistRepairReport,
 } from '@/services/repairReportPdf.service';
-import type { RepairDefectNode, RepairPhoto, RepairStageNode } from '@/services/repair.service';
+import type { RepairDefectNode, RepairPhoto, RepairStageNode, Technician } from '@/services/repair.service';
 
 const C = {
   brand: '#5A8F5A',
@@ -100,8 +105,12 @@ export function RepairWorkflow() {
   const { data: annotationTypes = [] } = useAnnotationTypes();
   const typeOptions = annotationTypes.map((at) => at.name);
   const setSelected = useSetPhotoSelected(campaignId);
+  const movePhoto = useMovePhotoToStage(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
+  const updateRepairProgress = useUpdateRepairProgress(campaignId);
+  const updateBladeColor = useUpdateBladeColor(campaignId);
+  const { data: technicians = [] } = useTechnicians();
 
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
@@ -131,6 +140,82 @@ export function RepairWorkflow() {
     return () => { cancelled = true; };
   }, [tree]);
 
+  // ── Coating method ("Color") — background OCR, ONCE per repair ──────────────
+  // When the tree is loaded, resolve repair.blade_color for every repair that
+  // doesn't have it yet, by running tesseract.js IN THE BROWSER (it has Web
+  // Workers) against the FIRST-stage / FIRST-image photo. The result is cached
+  // in the DB (repair.blade_color); the PDF report only READS it, never runs
+  // OCR. This is fully decoupled from report generation and non-blocking:
+  //   - runs in a background async loop (sequential, one repair at a time)
+  //   - a ref-backed Set prevents re-dispatching the same repair in this mount
+  //   - tesseract.js is imported DYNAMICALLY so it stays out of the initial bundle
+  //   - wrapped in try/catch: a failure leaves blade_color null (retried later)
+  //   - skipped entirely for client users (read-only; RLS would block the write)
+  const ocrProcessedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isClient || !tree || tree.length === 0) return;
+
+    // Candidate repairs: have a repairId, no blade_color yet, and a resolvable
+    // first-stage/first-image photo URL.
+    const pickFirstPhotoUrl = (node: RepairDefectNode): string | null => {
+      const stagesWithPhotos = node.stages.filter((s) => s.photos.some((p) => !!p.url));
+      if (stagesWithPhotos.length === 0) return null;
+      // First stage = lowest sortOrder; image 1 = lowest captureOrder.
+      const firstStage = stagesWithPhotos
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)[0]!;
+      const firstPhoto = firstStage.photos
+        .filter((p) => !!p.url)
+        .slice()
+        .sort((a, b) => a.captureOrder - b.captureOrder)[0];
+      return firstPhoto?.url ?? null;
+    };
+
+    const candidates = tree
+      .map((node) => {
+        const repairId = node.repairId;
+        if (!repairId) return null;
+        if (node.bladeColor && node.bladeColor.trim()) return null; // already resolved
+        if (ocrProcessedRef.current.has(repairId)) return null; // already attempted this mount
+        const url = pickFirstPhotoUrl(node);
+        if (!url) return null;
+        return { repairId, url };
+      })
+      .filter((c): c is { repairId: string; url: string } => c != null);
+
+    if (candidates.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      // Dynamic import so tesseract.js never inflates the initial bundle.
+      // tesseract.js uses `export = Tesseract` (CJS), so under bundler module
+      // resolution the namespace is surfaced on `.default` with a plain
+      // namespace fallback.
+      const mod = await import('tesseract.js');
+      const Tesseract = (mod as unknown as { default?: typeof import('tesseract.js') }).default ?? mod;
+      for (const { repairId, url } of candidates) {
+        if (cancelled) return;
+        // Mark as attempted up-front so a refetch mid-loop doesn't re-dispatch it.
+        ocrProcessedRef.current.add(repairId);
+        try {
+          const result = await Tesseract.recognize(url, 'eng');
+          const value = parseCoatingMethod(result?.data?.text ?? '');
+          if (value && !cancelled) {
+            // Persist + invalidate the tree so the report reads the cached value.
+            await updateBladeColor.mutateAsync({ repairId, color: value });
+          }
+        } catch {
+          // Leave blade_color null; a later visit (fresh mount) will retry.
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Re-run when the tree changes (e.g. after invalidation): the ref prevents
+    // reprocessing repairs already attempted, and resolved ones are filtered out.
+  }, [tree, isClient, updateBladeColor]);
+
   const handleSelect = (photo: RepairPhoto, selected: boolean) => {
     // client is read-only for selection.
     if (isClient) return;
@@ -139,6 +224,28 @@ export function RepairWorkflow() {
     setSelected.mutate(
       { photoId: photo.id, selected },
       {
+        onSettled: () =>
+          setPendingPhotoIds((prev) => {
+            const next = new Set(prev);
+            next.delete(photo.id);
+            return next;
+          }),
+      },
+    );
+  };
+
+  // Move a photo to another stage of the same defect (fixing a wrong-stage
+  // upload). Read-only for client (RLS also blocks the write). Reuses the
+  // per-photo pending spinner so the card shows progress while the move saves.
+  const handleMovePhoto = (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => {
+    if (isClient) return;
+    if (!targetStageId || photo.repairStageId === targetStageId) return;
+    setPendingPhotoIds((prev) => new Set(prev).add(photo.id));
+    movePhoto.mutate(
+      { photoId: photo.id, targetStageId, targetStageCode },
+      {
+        onSuccess: () => toast.success(t('repair.movePhotoSuccess')),
+        onError: (err) => toast.error((err as Error)?.message || t('repair.movePhotoError')),
         onSettled: () =>
           setPendingPhotoIds((prev) => {
             const next = new Set(prev);
@@ -282,6 +389,34 @@ export function RepairWorkflow() {
       );
     });
 
+  // Persist a single repair progress field (start/final category, assigned
+  // technician, or progress %) with a DIRECT update on the repair row. Fired
+  // immediately on change (combobox) or on blur/debounce (progress %).
+  const handleSaveProgress = (
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ) =>
+    new Promise<void>((resolve, reject) => {
+      updateRepairProgress.mutate(
+        { repairId, ...fields },
+        {
+          onSuccess: () => {
+            toast.success(t('repair.editSuccess'));
+            resolve();
+          },
+          onError: (err) => {
+            toast.error((err as Error)?.message || t('repair.editError'));
+            reject(err);
+          },
+        },
+      );
+    });
+
   if (campaignLoading) {
     return <div style={page}><p style={{ color: C.muted }}>{t('general.loading')}</p></div>;
   }
@@ -320,6 +455,7 @@ export function RepairWorkflow() {
               readOnly={isClient}
               pendingPhotoIds={pendingPhotoIds}
               onSelect={handleSelect}
+              onMovePhoto={isClient ? undefined : handleMovePhoto}
               onPreview={handlePreview}
               onGenerateReport={handleGenerateDefectPdf}
               onDownloadReport={handleDownloadDefectPdf}
@@ -328,6 +464,8 @@ export function RepairWorkflow() {
               downloadingDefectId={downloadingDefectId}
               onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
               typeOptions={typeOptions}
+              technicians={technicians}
+              onSaveProgress={isClient ? undefined : handleSaveProgress}
             />
           ))}
         </div>
@@ -368,6 +506,8 @@ interface BladeGroupSectionProps {
   readOnly: boolean;
   pendingPhotoIds: Set<string>;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  /** Move a photo to another stage of the same defect (undefined = read-only client). */
+  onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
@@ -381,6 +521,18 @@ interface BladeGroupSectionProps {
   ) => Promise<void>;
   /** Full list of annotation type names offered by the inline type <select>. */
   typeOptions: string[];
+  /** Technicians (role='technician') for the "Técnico a cargo" combobox. */
+  technicians: Technician[];
+  /** Persist a repair progress field (undefined = read-only client). */
+  onSaveProgress?: (
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ) => Promise<void>;
 }
 
 /**
@@ -395,6 +547,7 @@ function BladeGroupSection({
   readOnly,
   pendingPhotoIds,
   onSelect,
+  onMovePhoto,
   onPreview,
   onGenerateReport,
   onDownloadReport,
@@ -403,6 +556,8 @@ function BladeGroupSection({
   downloadingDefectId,
   onSaveDefectFields,
   typeOptions,
+  technicians,
+  onSaveProgress,
 }: BladeGroupSectionProps) {
   const [open, setOpen] = useState(false);
   const bladeLabel = group.serial
@@ -430,6 +585,7 @@ function BladeGroupSection({
               readOnly={readOnly}
               pendingPhotoIds={pendingPhotoIds}
               onSelect={onSelect}
+              onMovePhoto={onMovePhoto}
               onPreview={onPreview}
               onGenerateReport={onGenerateReport}
               onDownloadReport={onDownloadReport}
@@ -438,6 +594,8 @@ function BladeGroupSection({
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
               onSaveDefectFields={onSaveDefectFields}
               typeOptions={typeOptions}
+              technicians={technicians}
+              onSaveProgress={onSaveProgress}
             />
           ))}
         </div>
@@ -455,6 +613,8 @@ interface DefectSectionProps {
   readOnly: boolean;
   pendingPhotoIds: Set<string>;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  /** Move a photo to another stage of the same defect (undefined = read-only client). */
+  onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
@@ -469,6 +629,18 @@ interface DefectSectionProps {
   ) => Promise<void>;
   /** Full list of annotation type names offered by the inline type <select>. */
   typeOptions: string[];
+  /** Technicians (role='technician') for the "Técnico a cargo" combobox. */
+  technicians: Technician[];
+  /** Persist a repair progress field (undefined = read-only client). */
+  onSaveProgress?: (
+    repairId: string,
+    fields: {
+      startCategory?: number | null;
+      finalCategory?: number | null;
+      assignedTechnicianId?: string | null;
+      progressPercent?: number | null;
+    },
+  ) => Promise<void>;
 }
 
 function DefectSection({
@@ -478,6 +650,7 @@ function DefectSection({
   readOnly,
   pendingPhotoIds,
   onSelect,
+  onMovePhoto,
   onPreview,
   onGenerateReport,
   onDownloadReport,
@@ -486,10 +659,76 @@ function DefectSection({
   downloading,
   onSaveDefectFields,
   typeOptions,
+  technicians,
+  onSaveProgress,
 }: DefectSectionProps) {
   // Defects start COLLAPSED on page load; the user expands the ones they want.
   const [open, setOpen] = useState(false);
   const { defect } = node;
+
+  // ── Per-defect repair progress state (start/final category, technician, %) ─
+  // Always-visible controls (not gated by the pencil edit mode). Each combobox
+  // persists immediately on change; the % input persists on blur to avoid a
+  // write per keystroke. Seeded from the node's saved values.
+  const canEditProgress = Boolean(onSaveProgress) && node.repairId != null;
+  const [startCat, setStartCat] = useState<string>(
+    node.startCategory != null ? String(node.startCategory) : '',
+  );
+  const [finalCat, setFinalCat] = useState<string>(
+    node.finalCategory != null ? String(node.finalCategory) : '',
+  );
+  const [assignedTech, setAssignedTech] = useState<string>(node.assignedTechnicianId ?? '');
+  const [progress, setProgress] = useState<string>(
+    node.progressPercent != null ? String(node.progressPercent) : '',
+  );
+
+  // Re-seed when the node's saved values change (e.g. after a tree refetch).
+  useEffect(() => {
+    setStartCat(node.startCategory != null ? String(node.startCategory) : '');
+    setFinalCat(node.finalCategory != null ? String(node.finalCategory) : '');
+    setAssignedTech(node.assignedTechnicianId ?? '');
+    setProgress(node.progressPercent != null ? String(node.progressPercent) : '');
+  }, [node.startCategory, node.finalCategory, node.assignedTechnicianId, node.progressPercent]);
+
+  const commitProgressField = (fields: {
+    startCategory?: number | null;
+    finalCategory?: number | null;
+    assignedTechnicianId?: string | null;
+    progressPercent?: number | null;
+  }) => {
+    if (!onSaveProgress || node.repairId == null) return;
+    void onSaveProgress(node.repairId, fields).catch(() => {
+      /* toast handled upstream */
+    });
+  };
+
+  const handleStartCatChange = (value: string) => {
+    setStartCat(value);
+    commitProgressField({ startCategory: value === '' ? null : Number(value) });
+  };
+  const handleFinalCatChange = (value: string) => {
+    setFinalCat(value);
+    commitProgressField({ finalCategory: value === '' ? null : Number(value) });
+  };
+  const handleAssignedTechChange = (value: string) => {
+    setAssignedTech(value);
+    commitProgressField({ assignedTechnicianId: value === '' ? null : value });
+  };
+  // Persist % on blur: clamp to 0-100, treat blank as null.
+  const commitProgress = () => {
+    const trimmed = progress.trim();
+    if (trimmed === '') {
+      if (node.progressPercent != null) commitProgressField({ progressPercent: null });
+      return;
+    }
+    let n = Number(trimmed);
+    if (isNaN(n)) return;
+    n = Math.max(0, Math.min(100, Math.round(n)));
+    if (String(n) !== String(node.progressPercent ?? '')) {
+      setProgress(String(n));
+      commitProgressField({ progressPercent: n });
+    }
+  };
 
   // ── Inline edit state for the three editable fields ──────────────────────
   const [editing, setEditing] = useState(false);
@@ -696,6 +935,74 @@ function DefectSection({
         )}
       </button>
 
+      {/* Always-visible per-defect repair progress controls (start/final
+          category, assigned technician, progress %). Shown right below the
+          defect header and BEFORE the stages. Read-only for the client. */}
+      <div style={progressBlock}>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.startCategory')}</span>
+          <select
+            style={editSelect}
+            value={startCat}
+            onChange={(e) => handleStartCatChange(e.target.value)}
+            disabled={!canEditProgress}
+          >
+            <option value="">—</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                Cat {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.finalCategory')}</span>
+          <select
+            style={editSelect}
+            value={finalCat}
+            onChange={(e) => handleFinalCatChange(e.target.value)}
+            disabled={!canEditProgress}
+          >
+            <option value="">—</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                Cat {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.assignedTechnician')}</span>
+          <select
+            style={editSelect}
+            value={assignedTech}
+            onChange={(e) => handleAssignedTechChange(e.target.value)}
+            disabled={!canEditProgress}
+          >
+            <option value="">—</option>
+            {technicians.map((tech) => (
+              <option key={tech.id} value={tech.id}>
+                {tech.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.progressPercent')}</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            style={editInput}
+            value={progress}
+            onChange={(e) => setProgress(e.target.value)}
+            onBlur={commitProgress}
+            disabled={!canEditProgress}
+            placeholder="0-100"
+          />
+        </label>
+      </div>
+
       {editing && (
         <div style={editForm}>
           <div style={editFieldsRow}>
@@ -760,10 +1067,12 @@ function DefectSection({
               key={stage.stageId ?? stage.stageCode}
               defectId={defect.id}
               stage={stage}
+              defectStages={node.stages}
               t={t}
               readOnly={readOnly}
               pendingPhotoIds={pendingPhotoIds}
               onSelect={onSelect}
+              onMovePhoto={onMovePhoto}
               onPreview={onPreview}
             />
           ))}
@@ -778,16 +1087,27 @@ function DefectSection({
 interface StageRowProps {
   defectId: string;
   stage: RepairStageNode;
+  /** All stages of the defect — used to build the "move to stage" target list. */
+  defectStages: RepairStageNode[];
   t: (key: string) => string;
   readOnly: boolean;
   pendingPhotoIds: Set<string>;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  /** Move a photo to another stage of the same defect (undefined = read-only client). */
+  onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
   onPreview: (photo: RepairPhoto) => void;
 }
 
-function StageRow({ defectId, stage, t, readOnly, pendingPhotoIds, onSelect, onPreview }: StageRowProps) {
+function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds, onSelect, onMovePhoto, onPreview }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
+
+  // Valid move targets: the OTHER stages of this defect that are real (have a
+  // repair_stage_id — catalog fallback stages have stageId null and can't be a
+  // target). Ordered by sortOrder for a readable menu.
+  const moveTargets = defectStages
+    .filter((s) => s.stageId != null && s.stageId !== stage.stageId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const photos = stage.photos;
   const available = photos.filter((p) => !p.repairSelected);
@@ -835,6 +1155,13 @@ function StageRow({ defectId, stage, t, readOnly, pendingPhotoIds, onSelect, onP
                     actionLabel={t('repair.select')}
                     onAction={() => onSelect(photo, true)}
                     onPreview={() => onPreview(photo)}
+                    moveTargets={moveTargets}
+                    onMove={
+                      onMovePhoto
+                        ? (targetStageId, targetStageCode) =>
+                            onMovePhoto(photo, targetStageId, targetStageCode)
+                        : undefined
+                    }
                   />
                 ))
               )}
@@ -888,6 +1215,13 @@ function StageRow({ defectId, stage, t, readOnly, pendingPhotoIds, onSelect, onP
                     actionLabel={t('repair.remove')}
                     onAction={() => onSelect(photo, false)}
                     onPreview={() => onPreview(photo)}
+                    moveTargets={moveTargets}
+                    onMove={
+                      onMovePhoto
+                        ? (targetStageId, targetStageCode) =>
+                            onMovePhoto(photo, targetStageId, targetStageCode)
+                        : undefined
+                    }
                     selected
                   />
                 ))
@@ -915,6 +1249,10 @@ interface PhotoCardProps {
   onDragEnd: () => void;
   onAction: () => void;
   onPreview: () => void;
+  /** Other stages of the defect the photo can be moved to (real stageId only). */
+  moveTargets?: RepairStageNode[];
+  /** Move this photo to another stage (undefined = read-only client / no targets). */
+  onMove?: (targetStageId: string, targetStageCode: string) => void;
 }
 
 function PhotoCard({
@@ -929,6 +1267,8 @@ function PhotoCard({
   onDragEnd,
   onAction,
   onPreview,
+  moveTargets,
+  onMove,
 }: PhotoCardProps) {
   const { t } = useLanguage();
   // While pending, block drag + action to avoid a double-fire on the same photo.
@@ -936,6 +1276,19 @@ function PhotoCard({
   const uploaderName = photo.uploadedBy ?? '—';
   // Short prefix (CP/CB) so the label fits under the thumbnail without truncating.
   const uploaderLabel = `${t('repair.uploadedByShort')}: ${uploaderName}`;
+  // "Move to stage" menu: shown only when writable and there are real target
+  // stages. Toggled by the move icon; closes on outside click.
+  const [moveOpen, setMoveOpen] = useState(false);
+  const moveRef = useRef<HTMLDivElement | null>(null);
+  const canMove = !readOnly && !pending && !!onMove && !!moveTargets && moveTargets.length > 0;
+  useEffect(() => {
+    if (!moveOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (moveRef.current && !moveRef.current.contains(e.target as Node)) setMoveOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [moveOpen]);
   return (
     <div style={photoCardWrap}>
     <div
@@ -991,6 +1344,47 @@ function PhotoCard({
         >
           {action === 'remove' ? <X size={13} /> : <Star size={13} />}
         </button>
+      )}
+      {/* Move-to-stage control (top-left): opens a menu with the other stages
+          of the defect. Distinct from the drag&drop selection (top-right star),
+          which only toggles selected_for_report within the same stage. */}
+      {canMove && (
+        <div ref={moveRef} style={photoMoveWrap} onClick={(e) => e.stopPropagation()}>
+          <button
+            style={photoMoveBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMoveOpen((o) => !o);
+            }}
+            aria-label={t('repair.movePhoto')}
+            aria-haspopup="menu"
+            aria-expanded={moveOpen}
+            title={t('repair.movePhoto')}
+          >
+            <FolderInput size={13} />
+          </button>
+          {moveOpen && (
+            <div style={photoMoveMenu} role="menu">
+              <div style={photoMoveMenuTitle}>{t('repair.moveToStage')}</div>
+              {moveTargets!.map((target) => (
+                <button
+                  key={target.stageId}
+                  style={photoMoveMenuItem}
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMoveOpen(false);
+                    onMove!(target.stageId!, target.stageCode);
+                  }}
+                  title={`${target.sortOrder}. ${target.stageLabel}`}
+                >
+                  <span style={photoMoveMenuOrder}>{target.sortOrder}</span>
+                  <span style={photoMoveMenuLabel}>{target.stageLabel}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       {/* Processing overlay: shown while the photo's selection is being saved. */}
       {pending && (
@@ -1084,6 +1478,13 @@ const editSelect: React.CSSProperties = { ...editInput };
 const editActions: React.CSSProperties = {
   display: 'flex', justifyContent: 'flex-end', gap: 8,
 };
+// Always-visible per-defect progress controls (start/final category, assigned
+// technician, progress %), shown just below the defect header and before the
+// stages. Mirrors the edit form look but is NOT gated by the pencil edit mode.
+const progressBlock: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12,
+  padding: 16, background: '#F7FAF7', borderBottom: `1px solid ${C.border}`,
+};
 const editSaveBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
   border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600,
@@ -1144,6 +1545,32 @@ const photoBroken: React.CSSProperties = {
 const photoActionBtn: React.CSSProperties = {
   position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none',
   color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+};
+const photoMoveWrap: React.CSSProperties = { position: 'absolute', top: 4, left: 4, zIndex: 3 };
+const photoMoveBtn: React.CSSProperties = {
+  width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'rgba(17,24,39,0.6)',
+  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+};
+const photoMoveMenu: React.CSSProperties = {
+  position: 'absolute', top: 26, left: 0, minWidth: 180, maxHeight: 220, overflowY: 'auto',
+  background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8,
+  boxShadow: '0 6px 24px rgba(0,0,0,0.18)', padding: 4, zIndex: 10,
+};
+const photoMoveMenuTitle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, color: C.muted, padding: '4px 8px 6px', textTransform: 'uppercase',
+  letterSpacing: 0.3,
+};
+const photoMoveMenuItem: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 8px', border: 'none',
+  background: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left', color: C.text, fontSize: 12,
+};
+const photoMoveMenuOrder: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18,
+  borderRadius: '50%', background: 'rgba(90,143,90,0.15)', color: C.brand, fontSize: 10, fontWeight: 700,
+  flexShrink: 0,
+};
+const photoMoveMenuLabel: React.CSSProperties = {
+  flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 };
 const photoPendingOverlay: React.CSSProperties = {
   position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)',
