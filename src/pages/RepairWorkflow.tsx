@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, FolderInput, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -1087,7 +1087,8 @@ function DefectSection({
 interface StageRowProps {
   defectId: string;
   stage: RepairStageNode;
-  /** All stages of the defect — used to build the "move to stage" target list. */
+  /** All stages of the defect — used to resolve a photo dragged in from
+      another stage (it isn't in this stage's own photos list). */
   defectStages: RepairStageNode[];
   t: (key: string) => string;
   readOnly: boolean;
@@ -1098,16 +1099,26 @@ interface StageRowProps {
   onPreview: (photo: RepairPhoto) => void;
 }
 
+// Custom dataTransfer MIME carrying the ORIGIN stage id of the dragged photo.
+// Lets a drop target tell "move to another stage" (origin != this stage) apart
+// from "select within the same stage" (origin == this stage). Catalog fallback
+// stages have stageId null → serialized as an empty string.
+const STAGE_MIME = 'application/x-stage-id';
+
+// Origin stage id of the drag currently in flight. dataTransfer.getData() is
+// NOT readable during `dragover` in most browsers (only on `drop`), so the
+// drop zones can't use it to decide, mid-drag, whether to highlight. This
+// module-level value is set on dragStart and read synchronously during
+// dragover to distinguish a cross-stage move from a same-stage selection. It's
+// safe as a singleton because only one HTML5 drag can be in flight at a time.
+let activeDragOriginStageId: string | null = null;
+
 function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds, onSelect, onMovePhoto, onPreview }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
-
-  // Valid move targets: the OTHER stages of this defect that are real (have a
-  // repair_stage_id — catalog fallback stages have stageId null and can't be a
-  // target). Ordered by sortOrder for a readable menu.
-  const moveTargets = defectStages
-    .filter((s) => s.stageId != null && s.stageId !== stage.stageId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  // Stage-level drop highlight: active while a photo from ANOTHER stage is
+  // dragged over this stage card (reuses the colDropActive look on stageCard).
+  const [stageDropActive, setStageDropActive] = useState(false);
 
   const photos = stage.photos;
   const available = photos.filter((p) => !p.repairSelected);
@@ -1115,8 +1126,66 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
   // Scope drop zone to this defect+stage to avoid cross-stage drops.
   const dropKey = `${defectId}::${stage.stageCode}`;
 
+  // This stage can RECEIVE a moved photo only when writable and it's a real
+  // stage (has a repair_stage_id — catalog fallback stages have stageId null).
+  const canReceiveMove = !readOnly && !!onMovePhoto && stage.stageId != null;
+
+  // True when the in-flight drag started in a DIFFERENT stage than this one.
+  // Reads the module-level origin tracker (dataTransfer.getData is unreadable
+  // during dragover). On a real `drop` the dataTransfer value is authoritative
+  // and used as a fallback when the tracker was already cleared.
+  const isForeignDrag = (e: React.DragEvent) => {
+    const origin = activeDragOriginStageId ?? e.dataTransfer.getData(STAGE_MIME);
+    return origin !== (stage.stageId ?? '');
+  };
+
   return (
-    <div style={stageCard}>
+    <div
+      style={{ ...stageCard, ...(stageDropActive ? stageDropActiveStyle : {}) }}
+      onDragOver={
+        canReceiveMove
+          ? (e) => {
+              // Only react to cross-stage moves here; same-stage selection is
+              // handled by the "selected" column drop zone below.
+              if (!isForeignDrag(e)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setStageDropActive(true);
+            }
+          : undefined
+      }
+      onDragLeave={
+        canReceiveMove
+          ? (e) => {
+              // Ignore leave events bubbling from children still inside the card.
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setStageDropActive(false);
+            }
+          : undefined
+      }
+      onDrop={
+        canReceiveMove
+          ? (e) => {
+              const origin =
+                e.dataTransfer.getData(STAGE_MIME) || (activeDragOriginStageId ?? '');
+              // Same-stage drop → let the inner "selected" column handle it.
+              if (origin === (stage.stageId ?? '')) return;
+              e.preventDefault();
+              setStageDropActive(false);
+              const id = e.dataTransfer.getData('text/plain');
+              const photo = photos.find((p) => p.id === id);
+              // The dragged photo belongs to another stage, so it won't be in
+              // this stage's photos; find it from the full defect tree instead.
+              const moved =
+                photo ??
+                defectStages.flatMap((s) => s.photos).find((p) => p.id === id);
+              if (moved && onMovePhoto) {
+                onMovePhoto(moved, stage.stageId!, stage.stageCode);
+              }
+            }
+          : undefined
+      }
+    >
       <div style={stageHeader}>
         <span style={stageOrder}>{stage.sortOrder}</span>
         <h3 style={stageTitle}>{stage.stageLabel}</h3>
@@ -1146,6 +1215,7 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
                   <PhotoCard
                     key={photo.id}
                     photo={photo}
+                    originStageId={stage.stageId}
                     dimmed={dragId === photo.id}
                     pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
@@ -1155,20 +1225,17 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
                     actionLabel={t('repair.select')}
                     onAction={() => onSelect(photo, true)}
                     onPreview={() => onPreview(photo)}
-                    moveTargets={moveTargets}
-                    onMove={
-                      onMovePhoto
-                        ? (targetStageId, targetStageCode) =>
-                            onMovePhoto(photo, targetStageId, targetStageCode)
-                        : undefined
-                    }
                   />
                 ))
               )}
             </div>
           </div>
 
-          {/* Right: selected photos (drop zone) */}
+          {/* Right: selected photos (drop zone). Handles ONLY same-stage
+              selection (toggle selected_for_report). A photo dragged from
+              ANOTHER stage is ignored here and handled by the stage-level drop
+              zone (move to stage); its onDragOver/onDrop don't preventDefault
+              so the event bubbles up to the stage card. */}
           <div
             style={{ ...col, ...(dropActive ? colDropActive : {}) }}
             data-drop={dropKey}
@@ -1176,9 +1243,13 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
               readOnly
                 ? undefined
                 : (e) => {
+                    // Foreign drag → let it bubble to the stage-level move zone.
+                    if (isForeignDrag(e)) return;
                     e.preventDefault();
+                    e.stopPropagation();
                     e.dataTransfer.dropEffect = 'move';
                     setDropActive(true);
+                    setStageDropActive(false);
                   }
             }
             onDragLeave={readOnly ? undefined : () => setDropActive(false)}
@@ -1186,7 +1257,9 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
               readOnly
                 ? undefined
                 : (e) => {
+                    if (isForeignDrag(e)) return; // handled by stage-level drop
                     e.preventDefault();
+                    e.stopPropagation();
                     setDropActive(false);
                     const id = e.dataTransfer.getData('text/plain') || dragId;
                     const photo = photos.find((p) => p.id === id);
@@ -1206,6 +1279,7 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
                   <PhotoCard
                     key={photo.id}
                     photo={photo}
+                    originStageId={stage.stageId}
                     dimmed={dragId === photo.id}
                     pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
@@ -1215,13 +1289,6 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
                     actionLabel={t('repair.remove')}
                     onAction={() => onSelect(photo, false)}
                     onPreview={() => onPreview(photo)}
-                    moveTargets={moveTargets}
-                    onMove={
-                      onMovePhoto
-                        ? (targetStageId, targetStageCode) =>
-                            onMovePhoto(photo, targetStageId, targetStageCode)
-                        : undefined
-                    }
                     selected
                   />
                 ))
@@ -1238,6 +1305,10 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
 
 interface PhotoCardProps {
   photo: RepairPhoto;
+  /** Origin stage id of this photo (null for catalog fallback stages). Written
+      to the drag payload so a drop target can tell move-across-stage apart from
+      select-within-stage. */
+  originStageId: string | null;
   dimmed: boolean;
   /** True while this photo's selection mutation is in flight → shows a spinner. */
   pending?: boolean;
@@ -1249,14 +1320,11 @@ interface PhotoCardProps {
   onDragEnd: () => void;
   onAction: () => void;
   onPreview: () => void;
-  /** Other stages of the defect the photo can be moved to (real stageId only). */
-  moveTargets?: RepairStageNode[];
-  /** Move this photo to another stage (undefined = read-only client / no targets). */
-  onMove?: (targetStageId: string, targetStageCode: string) => void;
 }
 
 function PhotoCard({
   photo,
+  originStageId,
   dimmed,
   pending,
   selected,
@@ -1267,8 +1335,6 @@ function PhotoCard({
   onDragEnd,
   onAction,
   onPreview,
-  moveTargets,
-  onMove,
 }: PhotoCardProps) {
   const { t } = useLanguage();
   // While pending, block drag + action to avoid a double-fire on the same photo.
@@ -1276,19 +1342,6 @@ function PhotoCard({
   const uploaderName = photo.uploadedBy ?? '—';
   // Short prefix (CP/CB) so the label fits under the thumbnail without truncating.
   const uploaderLabel = `${t('repair.uploadedByShort')}: ${uploaderName}`;
-  // "Move to stage" menu: shown only when writable and there are real target
-  // stages. Toggled by the move icon; closes on outside click.
-  const [moveOpen, setMoveOpen] = useState(false);
-  const moveRef = useRef<HTMLDivElement | null>(null);
-  const canMove = !readOnly && !pending && !!onMove && !!moveTargets && moveTargets.length > 0;
-  useEffect(() => {
-    if (!moveOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (moveRef.current && !moveRef.current.contains(e.target as Node)) setMoveOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [moveOpen]);
   return (
     <div style={photoCardWrap}>
     <div
@@ -1297,12 +1350,24 @@ function PhotoCard({
         interactive
           ? (e) => {
               e.dataTransfer.setData('text/plain', photo.id);
+              // Origin stage id → lets drop targets distinguish a cross-stage
+              // move from a same-stage selection. Mirrored into the module-level
+              // tracker because getData() is unreadable during dragover.
+              e.dataTransfer.setData(STAGE_MIME, originStageId ?? '');
+              activeDragOriginStageId = originStageId ?? '';
               e.dataTransfer.effectAllowed = 'move';
               onDragStart();
             }
           : undefined
       }
-      onDragEnd={interactive ? onDragEnd : undefined}
+      onDragEnd={
+        interactive
+          ? () => {
+              activeDragOriginStageId = null;
+              onDragEnd();
+            }
+          : undefined
+      }
       onClick={onPreview}
       onDoubleClick={interactive ? onAction : undefined}
       style={{
@@ -1344,47 +1409,6 @@ function PhotoCard({
         >
           {action === 'remove' ? <X size={13} /> : <Star size={13} />}
         </button>
-      )}
-      {/* Move-to-stage control (top-left): opens a menu with the other stages
-          of the defect. Distinct from the drag&drop selection (top-right star),
-          which only toggles selected_for_report within the same stage. */}
-      {canMove && (
-        <div ref={moveRef} style={photoMoveWrap} onClick={(e) => e.stopPropagation()}>
-          <button
-            style={photoMoveBtn}
-            onClick={(e) => {
-              e.stopPropagation();
-              setMoveOpen((o) => !o);
-            }}
-            aria-label={t('repair.movePhoto')}
-            aria-haspopup="menu"
-            aria-expanded={moveOpen}
-            title={t('repair.movePhoto')}
-          >
-            <FolderInput size={13} />
-          </button>
-          {moveOpen && (
-            <div style={photoMoveMenu} role="menu">
-              <div style={photoMoveMenuTitle}>{t('repair.moveToStage')}</div>
-              {moveTargets!.map((target) => (
-                <button
-                  key={target.stageId}
-                  style={photoMoveMenuItem}
-                  role="menuitem"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMoveOpen(false);
-                    onMove!(target.stageId!, target.stageCode);
-                  }}
-                  title={`${target.sortOrder}. ${target.stageLabel}`}
-                >
-                  <span style={photoMoveMenuOrder}>{target.sortOrder}</span>
-                  <span style={photoMoveMenuLabel}>{target.stageLabel}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       )}
       {/* Processing overlay: shown while the photo's selection is being saved. */}
       {pending && (
@@ -1498,6 +1522,12 @@ const editCancelBtn: React.CSSProperties = {
 const stagesWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: 16 };
 const stageCard: React.CSSProperties = {
   border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, background: '#fff',
+  transition: 'border-color 0.15s, background 0.15s',
+};
+// Stage-level drop highlight when a photo from ANOTHER stage is dragged over
+// this stage card (mirrors colDropActive used by the intra-stage selection).
+const stageDropActiveStyle: React.CSSProperties = {
+  borderColor: C.brand, background: 'rgba(90,143,90,0.06)', boxShadow: `0 0 0 2px ${C.brand} inset`,
 };
 const stageHeader: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 };
 const stageOrder: React.CSSProperties = {
@@ -1545,32 +1575,6 @@ const photoBroken: React.CSSProperties = {
 const photoActionBtn: React.CSSProperties = {
   position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none',
   color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-};
-const photoMoveWrap: React.CSSProperties = { position: 'absolute', top: 4, left: 4, zIndex: 3 };
-const photoMoveBtn: React.CSSProperties = {
-  width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'rgba(17,24,39,0.6)',
-  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-};
-const photoMoveMenu: React.CSSProperties = {
-  position: 'absolute', top: 26, left: 0, minWidth: 180, maxHeight: 220, overflowY: 'auto',
-  background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8,
-  boxShadow: '0 6px 24px rgba(0,0,0,0.18)', padding: 4, zIndex: 10,
-};
-const photoMoveMenuTitle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, color: C.muted, padding: '4px 8px 6px', textTransform: 'uppercase',
-  letterSpacing: 0.3,
-};
-const photoMoveMenuItem: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 8px', border: 'none',
-  background: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left', color: C.text, fontSize: 12,
-};
-const photoMoveMenuOrder: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18,
-  borderRadius: '50%', background: 'rgba(90,143,90,0.15)', color: C.brand, fontSize: 10, fontWeight: 700,
-  flexShrink: 0,
-};
-const photoMoveMenuLabel: React.CSSProperties = {
-  flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 };
 const photoPendingOverlay: React.CSSProperties = {
   position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)',
