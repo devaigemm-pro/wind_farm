@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 294
-- **Última actualización**: 2026-09-30
+- **Sesiones analizadas**: 321
+- **Última actualización**: 2026-10-19
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -1978,3 +1978,264 @@
 - **Qué es**: servicio del workflow de reparaciones (/repairs/:campaignId). El cambio (+94 líneas, commit cc4e935 auto-commit) es un FIX real: las fotos importadas (bucket privado asset-documents, path inspection-imports/) necesitan signed URL, pero el código les daba URL pública → 404, no se veían. El fix detecta importadas y resuelve signed URLs en batch (mismo patrón que defects.service/drone-upload).
 - **No es basura**: es un bugfix legítimo de trabajo previo no mergeado. Recomendé A (incluirlo, porque arregla algo roto hoy en prod) pero dejé la decisión al usuario por no haberlo probado juntos.
 - **Patrón confirmado**: el usuario pregunta antes de aprobar cuando no reconoce un cambio — valora entender qué se libera. Explicar en simple (qué es el archivo, qué bug arregla, por qué apareció) antes de pedir decisión. Esperando A/B.
+
+### Sesión 293 (deploy 2) - 2026-09-30 — warnings + fix repair liberados
+- **Usuario eligió A**: deployar todo (reducción warnings 133→48 + fix fotos importadas en repair.service).
+- **Flujo**: commit kiro → rebase origin/main (integró 5 commits) → merge main --no-ff → build en main ✅ → push origin main (edb40f5..2d053fa) → vercel --prod.
+- **Deploy OK**: Production https://wind-farm-eqicpczni-dev-ai2.vercel.app, aliased wind-farm-eight.vercel.app, bundle index-C90252a-.js. Verificado headless: /login renderiza, 0 errores consola. Volví a branch de sesión.
+- **Resultado sesión completa**: auditoría V2 + reducción warnings (eslint 2 errores→0, 283→48 warnings acumulado en toda la sesión) + 2 bugs reales + fix fotos repair, todo en prod verificado.
+
+### Sesión 295 - 2026-10-14
+- **Tarea principal**: Modo compañero. En el informe de reparación (PDF), los campos "Largo" y "Ubicación del daño" estaban mal calculados. Fórmula correcta dada por el usuario: Largo = z1 - z2 (resta), Ubicación (mm) = (z1 + z2) / 2 (promedio). Evidencia en foto.
+- **Observaciones nuevas**:
+  - Fórmula literal = especificación exacta. El usuario dio ambas fórmulas explícitas → implementar tal cual. Los campos estaban CRUZADOS: Largo usaba (z1+z2)/2 y Ubicación usaba defect.distanceFromRoot (del Excel). Lo correcto: Largo=|z1-z2|, Ubicación=(z1+z2)/2.
+  - Usé Math.abs(z1-z2) para el largo (longitud física nunca negativa). Verificado con la evidencia: z1=44220, z2=44620 → Largo=400mm, Ubicación=44420mm (antes mostraba 44420 y 45mm respectivamente, mal).
+  - Fix quirúrgico de 2 líneas en src/services/repairReportPdf.service.ts (función renderBlockTable, ~línea 1118). Cambio simple → lo hice directo sin delegar al desarrollador.
+  - defect.distanceFromRoot dejó de usarse para ubicación pero sigue en la interfaz/mapeo → no quedó huérfano, build OK.
+  - Desplegado vercel --prod (banner de update de Vercel CLI cortó la salida; verifiqué por cambio de hash index-CwdnKctp.js + chunk RepairWorkflow-CshbZCOD con 'Ubicación del daño' + Math.abs en build local).
+- **Patrones confirmados**: español, directo, modo compañero, fórmula/evidencia = especificación exacta, cambio simple directo sin delegar, verificar contra el caso exacto de la evidencia, deploy vercel --prod + verificación por hash
+
+### Sesión 296 - 2026-10-14
+- **Tarea principal**: Modo compañero. En el informe de reparación: (1) "Técnico a cargo" debe ser quien cargó las fotos; (2) "Fecha inicio" = fecha de la foto de la 2ª etapa; (3) "Fecha fin" = fecha de la foto de la última etapa.
+- **Observaciones nuevas**:
+  - DIAGNÓSTICO BD (Management API con SUPABASE_ACCESS_TOKEN): repair_photo NO tiene columna uploaded_by/created_by. Solo id, repair_id, repair_stage_id, stage_code, storage_path, filename, capture_order, captured_at, uploaded_at, metadata(jsonb), created_at. metadata solo guarda {selected_for_report}. NO hay registro de QUÉ usuario subió cada foto.
+  - La vista repair_photos_detailed expone technician_id/technician_name (= repair.technician_id), que es lo que "Técnico(s) a cargo" ya usa hoy. En la app móvil el técnico asignado a la repair es quien sube las fotos → repair.technician_id YA representa a "quien cargó las fotos".
+  - AMBIGÜEDAD: pedí aclaración al usuario (opción A: dejar técnico como está = técnico de la repair, solo arreglar fechas; opción B: existe otra fuente de uploader que yo no veo). No inventé un campo inexistente. Quedé esperando respuesta.
+  - Las fechas inicio/fin SÍ son implementables: Fecha inicio = captured_at de la foto con 2º stage_order; Fecha fin = captured_at de la foto de la última etapa con foto. Los datos (stage_order, captured_at por foto) ya se recorren en repairReportPdf.service.ts (loop ~444-490). Hoy usan repair_started_at/repair_completed_at de la vista.
+  - El informe de reparación (repairReportPdf.service.ts) es un área recurrente de ajustes finos del usuario (fórmulas de campos, fuentes de datos). Siempre verificar la fuente real en BD antes de implementar.
+- **Patrones confirmados**: español, directo, modo compañero, preguntar ante ambigüedad genuina (campo inexistente en BD), verificar fuente real con Management API antes de implementar, no inventar datos que no existen
+
+### Sesión 297 - 2026-10-14
+- **Tarea principal**: Continuación: en el informe de reparación, (1) Técnico a cargo = quien cargó las fotos (= "CP: Jhonatan" visible en el workflow, NO el técnico asignado Andres), (2) Fecha inicio = foto de la 2ª etapa, (3) Fecha fin = foto de la última etapa.
+- **Observaciones nuevas**:
+  - CORRECCIÓN A MI DIAGNÓSTICO ANTERIOR: en s296 concluí que no había uploader en la BD. ERROR. El dato SÍ existe: el workflow muestra "CP: <nombre>" (CP = cargado por) por cada foto, resuelto vía RPC SECURITY DEFINER get_repair_photo_uploaders (storage.objects.owner_id → profiles.name, fallback a técnico). Está en repair.service.ts (fetchUploaderByPhotoId). LECCIÓN: cuando el usuario dice "si te fijas X aparece en la UI", buscar en el FRONTEND cómo se renderiza ese dato para hallar la fuente real, antes de concluir que no existe.
+  - El usuario señala la evidencia visual (CP: Jhonatan) como prueba de que el dato existe → siempre revisar la UI que él ve, no solo las columnas crudas de la tabla.
+  - Implementación (delegada): resolveUploadersByPhotoIds (replica fetchUploaderByPhotoId, RPC get_repair_photo_uploaders) → técnico a cargo = uploaders distintos de las fotos en scope. deriveStageDates → fecha inicio = captured_at de la 2ª etapa (por stageOrder; 1ª es Etiqueta), fecha fin = captured_at de la última etapa. Fallback a repairStartedAt/CompletedAt de la vista. Eliminó resolveTechnicians (muerta). Build OK, desplegado (index-DYuPMOPx.js, chunk con get_repair_photo_uploaders verificado).
+- **Patrones confirmados**: español, directo, modo compañero, evidencia visual = prueba de que el dato existe, "usar el mismo método que X" (replicar fetchUploaderByPhotoId del RPC), diagnosticar en el frontend la fuente de un dato visible, deploy vercel --prod + verificación por hash/grep
+
+### Sesión 298 - 2026-10-14
+- **Tarea principal**: Informe de reparación, 3 cambios: (1) campo Color = color dominante de la imagen de la 1ª etapa, (2) centrar los campos de las tablas de cada etapa, (3) ajustar la primera celda del header donde el nombre del daño se cortaba (encimaba con el bloque naranja de categoría).
+- **Observaciones nuevas**:
+  - Ante ambigüedad del "color" (la 1ª etapa es la etiqueta/ficha, no la pala) pregunté opción A (color dominante de la imagen tal cual) vs B (RAL de la pala vía OCR). El usuario respondió "A". Confirma: preguntar ante ambigüedad genuina es correcto y el usuario responde con la letra.
+  - Implementación (delegada): sampleDominantColor(url) replica el patrón de loadImageAsBase64 (canvas ~50px, getImageData, promedia RGB ignorando alpha=0, devuelve #RRGGBB). Toma la foto de menor stageOrder/captureOrder. Campo Color = ctx.bladeColor || NA. Centrado: halign 'left'→'center' en renderBlockTable. Header: celda izq 65% / der 35% + reducción dinámica de fuente (11→min 7) con doc.getTextWidth hasta que entre, para que el nombre no invada el naranja. Build OK, desplegado (index-C_MLpCta.js, getImageData verificado en chunk).
+  - Las correcciones de la sesión 295 (Largo=|z1-z2|, Ubicación=(z1+z2)/2) se confirmaron correctas en la evidencia de esta sesión (Largo=400mm, Ubicación=44420mm). Fix validado en prod.
+  - El informe PDF de reparación (repairReportPdf.service.ts) es el área de trabajo más recurrente del usuario últimamente: ajustes finos de campos, fórmulas, fuentes de datos y layout. Patrón de refinamiento incremental sobre el mismo artefacto.
+- **Patrones confirmados**: español, directo, modo compañero, evidencia visual = especificación, preguntar ante ambigüedad genuina (respuesta A/B/C de 1 letra), "replicar patrón existente" (loadImageAsBase64→sampleDominantColor), delegar a desarrollador + compañero hace build/deploy, vercel --prod + verificación por hash/grep, iteración incremental sobre el mismo artefacto (PDF de reparación)
+
+### Sesión 299 - 2026-10-14
+- **Tarea principal**: Informe de reparación, 3 cambios: (1) Color en PALABRAS (nombre, no el hex), (2) eliminar el campo "Horas de producción", (3) cambiar lógica de Fecha fin: debe completarse cuando el usuario presiona "Finalizar revisión".
+- **Observaciones nuevas**:
+  - Corrección al cambio de la sesión 298: el color NO debe ser el código hex sino el nombre en palabras (ej. "Blanco", "Gris"). Hay que mapear el RGB muestreado al nombre de color más cercano. Iteración: s298 implementó hex → s299 pide convertirlo a palabra.
+  - DIAGNÓSTICO: la pantalla /repairs/:id (RepairWorkflow) NO tiene hoy botón "Finalizar revisión". El punto 3 requiere CREARLO. Fecha fin hoy = repair_completed_at de la vista. "Horas de producción" = ctx.totalHH (línea ~1059/1072 de repairReportPdf.service.ts).
+  - AMBIGÜEDAD punto 3: pregunté (a) dónde va el botón (asumo cabecera de /repairs/:campaignId) y (b) a qué nivel finaliza (campaña con fecha de cierre vs por defecto/pala). Recomendé: botón en cabecera que marca campaña finalizada + guarda fecha actual, y el PDF usa esa fecha en Fecha fin. Quedé esperando confirmación. Puntos 1 y 2 son claros y los implementaré; el 3 espera respuesta.
+  - El informe PDF de reparación sigue siendo el artefacto de iteración más frecuente (4+ sesiones seguidas de ajustes finos). Confianza alta en este patrón.
+- **Patrones confirmados**: español, directo, modo compañero, iteración incremental sobre el mismo artefacto (PDF reparación), corrige el resultado anterior cuando no es lo esperado (hex→palabra), preguntar ante ambigüedad genuina de alcance (crear un botón/flujo nuevo), descomponer: avanzar lo claro + preguntar lo ambiguo
+
+### Sesión 300 - 2026-10-14
+- **Tarea principal**: Aclaración + implementación de los 3 cambios del informe de reparación: (1) Color en palabras, (2) eliminar Horas de producción, (3) Fecha fin = fecha de "Finalizar reparación".
+- **Observaciones nuevas**:
+  - ACLARACIÓN CLAVE punto 3: "Finalizar reparación" es un botón de la APP DE TÉCNICOS (externa, móvil), NO de la web. Esa acción deja registro con fecha en repair.completed_at. El usuario razona "imagino que esa acción deja un registro con fecha" → correcto. Entonces NO había que crear botón; solo usar repair.completed_at.
+  - Esto REVIERTE mi cambio de la s297 (fecha fin = foto de última etapa, que fue incorrecto). La fecha fin correcta es repair.completed_at (ya expuesta como repair_completed_at en la vista repair_photos_detailed, ya capturada en ctx.repairCompletedAt). Verificado en BD: los repairs de WTG03 tienen completed_at=null, status=in_progress → la reparación NO está finalizada → Fecha fin debe ser N/A hasta que se presione Finalizar en la app. Correcto.
+  - Fecha inicio se mantiene (foto de la 2ª etapa). Solo cambió la fecha fin.
+  - Implementación (delegada): rgbToColorName(hex) con paleta ES (Blanco/Negro/Gris por luminancia+baja saturación; Rojo/Naranjo/Amarillo/Verde/Azul/Celeste/Café/Rosado/Morado por distancia euclidiana). Fila Color usa el nombre. Eliminada fila+variable Horas de producción (totalHH queda en interfaz, sin uso en render). Revertido: ctx.repairCompletedAt ya NO se pisa con endDate de etapas; conserva repair.completed_at. Build OK, desplegado (index-D0u4e_yR.js; 'Naranjo' presente, 'Horas de producción' con 0 ocurrencias en prod).
+  - LECCIÓN: cuando el usuario menciona una acción ("Finalizar X"), preguntar/verificar si es de ESTE sistema (web) o de la app de técnicos (externa que escribe en la misma BD). Muchas acciones del flujo de reparación las hace la app móvil y solo dejan datos en la BD que la web lee.
+- **Patrones confirmados**: español, directo, modo compañero, el usuario distingue web vs app de técnicos (acciones externas dejan datos en BD), revierte cambios míos cuando el enfoque fue incorrecto, verificar fuente real en BD (Management API) antes de implementar, deploy vercel --prod + verificación por grep
+
+### Sesión 301 - 2026-10-14
+- **Tarea principal**: El usuario trae confirmación del dev de la app móvil: al "Finalizar reparación" se setea repair.status='completed' y repair.completed_at=timestamp ISO-8601 UTC (Instant.now()). Pide usar ese dato para Fecha fin.
+- **Observaciones nuevas**:
+  - VALIDACIÓN: lo que pide el dev móvil YA está implementado (sesión 300). ctx.repairCompletedAt = repair.completed_at vía la vista repair_photos_detailed. No requirió cambio nuevo.
+  - Verifiqué en BD (Management API): existen reparaciones con status='completed' y completed_at poblado (WTG23: 2026-09-11, 2026-09-09; FDM-T02). La vista expone repair_completed_at correctamente. El informe ya lo lee. Fix de s300 validado end-to-end.
+  - El usuario CONSULTA a devs de otros sistemas (app móvil) para alinear contratos de datos y me trae la respuesta como especificación. Cuando trae info de otro dev, es autoritativa — contrastar con lo ya implementado antes de re-hacer.
+  - Buen cierre de ciclo: s297 (fecha fin = última etapa, incorrecto) → s300 (revertido a completed_at) → s301 (dev móvil confirma que completed_at es lo correcto). La corrección fue acertada.
+- **Patrones confirmados**: español, directo, modo compañero, trae especificaciones de devs de sistemas externos (app móvil), verificar lo ya implementado antes de re-hacer, verificar fuente real en BD, no implementar de más cuando ya está resuelto
+
+### Sesión 302 - 2026-10-14
+- **Tarea principal**: El usuario reporta (con evidencia) que Fecha fin sigue en N/A y dice "no estás poblando el campo".
+- **Observaciones nuevas**:
+  - DIAGNÓSTICO con Management API: TODOS los repairs de la campaña CI732-WTG03 (quote 67f95e1c, pala 82517, defecto "Daño2 Rotura en BS") tienen status='in_progress' y completed_at=NULL. current_stage en etapas intermedias (aplicacion_filler, analisis_falla), NO en la última. updated_at reciente (hoy) pero NO finalizada.
+  - CONCLUSIÓN: el código es CORRECTO. Fecha fin = N/A porque repair.completed_at es null (la reparación NO se ha finalizado en la app de técnicos). El campo se poblará cuando el técnico presione "Finalizar reparación" y la app setee completed_at='completed'+timestamp. No hay bug en la web.
+  - Reparaciones de WTG23 (otra turbina) SÍ tienen completed_at → el informe de ESAS sí mostraría la fecha. El problema es específico de datos: esta campaña no está finalizada.
+  - PATRÓN IMPORTANTE: cuando el usuario insiste "no funciona" pero la causa es un DATO ausente en la BD (no un bug de código), hay que diagnosticar con la BD y reportar honestamente el estado real con evidencia, en vez de "arreglar" código que ya está bien. Correlaciona con "diagnosticar más profundo" y "ser riguroso".
+  - Pendiente de confirmar con el usuario: ¿él cree que esta reparación YA está finalizada en la app? Si es así, el problema estaría en la app móvil (no setea completed_at), no en la web. Reporté esto para que lo verifique.
+- **Patrones confirmados**: español, directo, modo compañero, evidencia visual, "diagnosticar más profundo" con BD real, honestidad sobre causa raíz (dato ausente ≠ bug de código), no implementar de más
+
+### Sesión 303 - 2026-10-14
+- **Tarea principal**: Cuando la reparación no está finalizada (completed_at null), la Fecha fin del informe debe mostrar "Reparación sin finalizar" en vez de N/A.
+- **Observaciones nuevas**:
+  - Cierre del hilo de la fecha fin: tras diagnosticar (s302) que el N/A era correcto porque la reparación está in_progress, el usuario optó por un texto explícito en vez de N/A. Decisión de UX clara y simple.
+  - Cambio de 1 línea en repairReportPdf.service.ts: fila Fecha fin usa 'Reparación sin finalizar' como fallback cuando repairCompletedAt es null (antes NA). Lo hice directo sin delegar (cambio trivial). Build OK, desplegado (index-ByTJWd1f.js, texto verificado en prod).
+  - El usuario prefiere mensajes de estado explícitos y legibles sobre un genérico "N/A" cuando el vacío tiene un significado concreto (reparación en curso).
+- **Patrones confirmados**: español, directo, modo compañero, cambio simple directo sin delegar, prefiere textos de estado explícitos sobre N/A genérico, deploy vercel --prod + verificación por grep
+
+### Sesión 304 - 2026-10-14
+- **Tarea principal**: En la pantalla de reparación (/repairs/:id, RepairWorkflow), por cada daño agregar 3 combobox ("Categoría de inicio", "Categoría final" cargando categorías de daños; "Técnico a cargo" con lista de técnicos) + un campo para ingresar % de avance.
+- **Observaciones nuevas**:
+  - DIAGNÓSTICO BD: categorías de daño = defect.severity 1-5 (Cat 1-5, no hay tabla aparte). Técnicos = profiles con role='technician' (roles: technician/inspector/admin/supervisor). NO existen columnas en repair/defect para persistir los 4 nuevos valores (categoría inicio, categoría final, técnico a cargo, % avance).
+  - AMBIGÜEDAD de alcance+persistencia → pregunté 3 cosas antes de implementar: (1) ¿categorías = Cat 1-5 (severity) o los tipos CRACK/DELAMINATION? (2) ¿autorizo crear columnas nuevas en repair (migración de esquema en prod) para persistir? (3) ¿deben guardarse al cambiar (como edición inline) o solo visuales? Recomendé: Cat 1-5, técnicos=role technician, persistir en columnas nuevas de repair. Quedé esperando confirmación.
+  - Patrón de nuevos controles editables en el flujo de reparación: el usuario sigue enriqueciendo la pantalla de reparación (edición inline, ahora combobox de categorías/técnico/avance). Área de trabajo activa.
+  - Esta es una feature más grande (4 campos + persistencia + posible migración) → requiere context del área, delegar al desarrollador tras confirmar alcance.
+- **Patrones confirmados**: español, directo, modo compañero, preguntar ante ambigüedad genuina (persistencia/migración de esquema), verificar fuentes de datos reales en BD antes de implementar, no inventar columnas/tablas, el usuario marca el área en la imagen (bajo el header del daño)
+
+### Sesión 305 - 2026-10-14
+- **Tarea principal**: Implementar los 4 controles por daño en la pantalla de reparación (confirmado: Cat 1-5, crear columnas en BD, persistentes).
+- **Observaciones nuevas**:
+  - El usuario respondió las 3 preguntas con "1.-si; 2.-si crea en la bd; 3.- deben guardarse" — formato numerado conciso. Confirma: responde preguntas etiquetadas punto por punto.
+  - Migración de esquema en prod (Management API): ALTER TABLE repair ADD start_category int, final_category int, assigned_technician_id uuid FK profiles, progress_percent int. Guardada en repo: supabase/migrations/20260923000002_repair_progress_fields.sql.
+  - Implementación (delegada): repairService.updateRepairProgress (UPDATE directo) + listTechnicians (profiles role=technician) + getRepairTree extendido para leer las 4 columnas → RepairDefectNode. Hooks useUpdateRepairProgress + useTechnicians. UI: bloque progressBlock bajo el header del daño, siempre visible, 4 controles (2 selects Cat1-5, select técnicos, input % 0-100). Comboboxes guardan onChange, % onBlur (clamp 0-100). Read-only para cliente. i18n repair.startCategory/finalCategory/assignedTechnician/progressPercent. Build OK, desplegado (index-PidLthlJ.js verificado).
+  - Flujo completo del compañero funcionando: preguntar alcance → migración BD → delegar UI → build → deploy → verificar. Para features con persistencia nueva, SIEMPRE: crear columnas (con autorización) + leer en el tree + escribir vía service + hook + UI.
+- **Patrones confirmados**: español, directo, modo compañero, responde preguntas etiquetadas, autoriza migraciones de esquema cuando se explica, enriquecimiento incremental de la pantalla de reparación, migración guardada en repo, deploy vercel --prod + verificación por grep
+
+### Sesión 306 - 2026-10-14
+- **Tarea principal**: Llevar al informe PDF (tabla "Datos generales") los campos "Categoría de inicio", "Categoría final" y "Porcentaje de avance" (desde los datos del defecto), y poblar "Técnico(s) a cargo" con el combobox assigned_technician_id del defecto.
+- **Observaciones nuevas**:
+  - Continuación directa de s305 (los 4 controles por daño). Ahora esos datos (repair.start_category/final_category/progress_percent/assigned_technician_id) fluyen al PDF. Patrón: primero UI+persistencia, luego reflejar en el informe.
+  - CAMBIO de fuente del "Técnico(s) a cargo" del PDF: antes (s297) = uploaders de fotos (resolveUploadersByPhotoIds). Ahora = assigned_technician_id del combobox. El usuario redefinió qué significa ese campo. Eliminada la función resolveUploadersByPhotoIds (quedó muerta).
+  - Implementación (delegada): fetchRepairData lee las 4 columnas de repair + resuelve nombre del técnico (profiles) → mapa repairProgressByRepairId. Tras el scope por-defecto en generateAndDownloadRepairReport, se asignan los valores del repair en scope a ctx. 3 filas nuevas en Datos generales (Cat N / Cat N / N%) + Técnico(s) a cargo = assignedTechnicianName. Build OK, desplegado (index-BPEUCYYA.js).
+  - SCOPE del informe de reparación: se genera POR DEFECTO (data.defectId = repair_id); el contexto se filtra a ese repair. Los datos a nivel "Datos generales" que son por-repair se toman del repair en scope. Dato de arquitectura importante del PDF.
+- **Patrones confirmados**: español, directo, modo compañero, enriquecimiento incremental (UI → persistencia → informe), redefine el significado de campos existentes, "usar datos ya guardados", delegar a desarrollador + build/deploy por compañero, vercel --prod + verificación por grep
+
+### Sesión 307 - 2026-10-14
+- **Tarea principal**: Corregir el informe de reparación: (1) el campo Color estaba mal (decía Café/Marrón cuando la pala es naranja); (2) la sección "Hallazgos" se partía entre pág 2 y 3, debe iniciar en pág 3. El usuario precisó: el color debe salir de la foto de la SEGUNDA etapa y captar el naranjo predominante.
+- **Observaciones nuevas**:
+  - CORRECCIÓN doble al color: (a) la fuente era la 1ª etapa (etiqueta) → cambiada a la 2ª etapa (análisis de daño, muestra la pala); (b) el método era PROMEDIO aritmético → cambiado a MODA cuantizada (buckets de 32 niveles por canal, gana el color más frecuente). El promedio mezclaba naranja+papel+cielo+pasto = marrón; la moda deja ganar el naranja real de la pala.
+  - El usuario da evidencia precisa: adjunta la foto real + el valor incorrecto del informe + el color esperado ("naranjo"). Cuando describe el color esperado, es la verificación exacta del fix.
+  - LECCIÓN de color dominante: para "color predominante" de una foto NUNCA usar promedio aritmético (da colores sucios/marrones). Usar moda por buckets o similar. Promedio ≠ dominante.
+  - Hallazgos: doc.addPage() + y=28 antes del título, para que arranque limpio en pág 3. Problema de encuadre = sección a página propia.
+  - Implementación delegada, build OK, desplegado (index-D4ANcdpR.js, lógica >>5 verificada en prod).
+  - El informe PDF de reparación lleva ~8 sesiones de refinamiento continuo. Área de altísima iteración.
+- **Patrones confirmados**: español, directo, modo compañero, evidencia visual precisa (foto+valor malo+valor esperado), "diagnosticar más profundo" (2 causas del color: fuente + método), iteración incremental sobre el PDF de reparación, delegar + build/deploy por compañero, vercel --prod + verificación por grep
+
+### Sesión 308 - 2026-10-14
+- **Tarea principal**: En la portada del informe de reparación, el campo "Generado por" debe mostrar el mismo dato que "Informe realizado por" (ctx.reportedBy, el usuario autenticado que genera el PDF), en vez del nombre del parque.
+- **Observaciones nuevas**:
+  - Cambio de 1 línea en renderCoverPage (repairReportPdf.service.ts): footer "Generado por" usaba ctx.windFarmName → cambiado a ctx.reportedBy (mismo valor que la fila "Informe realizado por" de Datos generales). Lo hice directo sin delegar (trivial). Build OK, desplegado (index-Y2sEneym.js).
+  - "completar X con el mismo dato que Y" = usar la MISMA variable/fuente que otro campo ya resuelto. Buscar de dónde sale Y (reportedBy = auth.uid→profiles) y reusarla en X.
+  - Continúa el refinamiento del PDF de reparación (sesión ~9 consecutiva). Área de iteración constante.
+- **Patrones confirmados**: español, directo, modo compañero, cambio simple directo sin delegar, "mismo dato que X" = reusar la fuente existente, iteración incremental sobre el PDF de reparación, deploy vercel --prod + verificación por hash
+
+### Sesión 309 - 2026-10-14
+- **Tarea principal**: El campo Color debe completarse revisando la IMAGEN 1 de la PRIMERA etapa (corrección a la s307 que lo había puesto en la 2ª etapa).
+- **Observaciones nuevas**:
+  - Vaivén de la fuente del color: s298 (1ª etapa) → s307 (2ª etapa, por mi interpretación de "foto de la segunda etapa") → s309 (de vuelta a 1ª etapa, imagen 1). El usuario fue explícito: "imagen 1 de la primera etapa". "Imagen 1" = la primera foto de la etapa = menor captureOrder.
+  - Cambio: targetStageOrder = distinctStageOrders[0] (1ª etapa) en vez de [1] (2ª). Se mantiene la detección por moda (s307, que quedó correcta). Cambio directo de 1 bloque, sin delegar. Build OK, desplegado (index-CNpLHAKI.js).
+  - LECCIÓN: el usuario especifica con precisión "imagen N de la etapa M". Mapear: etapa M = M-ésimo stageOrder distinto (1-indexed), imagen N = N-ésimo captureOrder dentro de esa etapa. Antes confundí la etapa; ahora acatar la indicación literal.
+  - El refinamiento del PDF de reparación continúa (~10 sesiones). Confianza alta en: iteración constante sobre este artefacto, el usuario ajusta detalle a detalle.
+- **Patrones confirmados**: español, directo, modo compañero, especificación precisa (imagen/etapa), corrige cuando interpreté mal la fuente, cambio simple directo sin delegar, iteración incremental sobre el PDF de reparación, deploy vercel --prod + verificación por hash
+
+### Sesión 310 - 2026-10-14
+- **Tarea principal**: El color detectado dio "Rosado" cuando el color más FUERTE de la imagen es el naranjo. "El color debe ser el más fuerte."
+- **Observaciones nuevas**:
+  - CAUSA RAÍZ: la moda por buckets (s307) elige el color con MÁS ÁREA (conteo de píxeles). En la imagen, el beige/rosado claro de la pala ocupa más área que el naranja, así que ganaba por cantidad aunque el naranja es el color más vívido/fuerte. "más fuerte" ≠ "más abundante".
+  - FIX: cambié el criterio de selección del bucket. Antes: max(count). Ahora: max(count × saturación²), donde saturación HSV = (max-min)/max del color promedio del bucket. Esto favorece fuertemente colores vívidos (naranja sat~0.87 → sat²~0.76) sobre tonos lavados/claros (beige sat~0.2 → sat²~0.04, ~19x menos), exigiendo área significativa pero premiando la intensidad. Fallback a moda pura si todo es gris (score 0).
+  - LECCIÓN CLAVE (color dominante): "color más fuerte/predominante" que un humano nombraría = ponderar por SATURACIÓN, no solo por frecuencia/área ni promedio. Evolución: promedio (malo) → moda por área (s307, elige el beige grande) → moda ponderada por saturación² (s310, elige el vívido). Esta es la fórmula correcta para "color dominante percibido".
+  - Cambio directo de 1 bloque, sin delegar. Build OK, desplegado (index-z5e877T_, chunk RepairWorkflow-BbmlAvew).
+- **Patrones confirmados**: español, directo, modo compañero, evidencia visual + color esperado explícito, "diagnosticar más profundo" (3ª iteración del algoritmo de color), cambio simple directo sin delegar, iteración incremental sobre el PDF de reparación, deploy vercel --prod + verificación por hash/grep
+
+### Sesión 311 - 2026-10-14
+- **Tarea principal**: El color detectado ahora da "Café" en vez de "Naranjo" para la misma imagen (la detección del hex ya es correcta, el problema es el NOMBRE).
+- **Observaciones nuevas**:
+  - CAUSA RAÍZ: rgbToColorName clasificaba por distancia euclidiana RGB a una paleta de referencia. El RGB mezcla tono y brillo → un naranja oscuro queda más cerca de "Café/Marrón [120,70,40]" que de "Naranjo [255,140,0]" (muy brillante). Café ES un naranja oscuro: mismo hue, menor brillo.
+  - FIX: reescribí rgbToColorName para clasificar por HUE (HSV), no por distancia RGB. Convierto a HSV: baja saturación → Blanco/Gris/Negro por value; por hue → Rojo(<15/≥345)/Naranjo(<45)/Amarillo(<70)/Verde(<170)/Celeste(<200)/Azul(<255)/Morado(<290)/Rosado. "Café/Marrón" SOLO cuando hue naranja/amarillo Y value<0.45 Y sat<0.6 (oscuro+apagado de verdad). Un naranja vívido/brillante queda "Naranjo" aunque sea algo oscuro. Eliminé COLOR_NAME_PALETTE.
+  - LECCIÓN DEFINITIVA del color (4 iteraciones): detección del hex = moda ponderada por saturación² (s310); nombre del hex = clasificación por HUE en HSV (s311), NO por distancia RGB. RGB distance confunde naranja/café/rosado. HSV separa tono (hue) de brillo/saturación, que es como un humano nombra colores.
+  - Cambio directo, sin delegar. Build OK (COLOR_NAME_PALETTE sin referencias huérfanas), desplegado (index-DR-lx3up).
+- **Patrones confirmados**: español, directo, modo compañero, evidencia + color esperado, "diagnosticar más profundo" (separó detección-de-hex vs mapeo-a-nombre como 2 problemas distintos), cambio simple directo sin delegar, iteración incremental sobre el PDF de reparación, deploy vercel --prod + verificación
+
+### Sesión 312 - 2026-10-14
+- **Tarea principal**: CAMBIO DE LÓGICA del campo Color: en vez de muestrear el color dominante de los píxeles, debe EXTRAER el texto del campo "Coating Method:" que aparece en la etiqueta de la primera imagen de la primera etapa (ficha de la pala, ej. "COATING METHOD: RAL 7035-2009").
+- **Observaciones nuevas**:
+  - Cierre del largo hilo del color por píxeles (s298→s311): el usuario abandonó el enfoque de detección de color por imagen y pasó a OCR del texto de la etiqueta. Toda la lógica de sampleDominantColor/rgbToColorName quedará obsoleta o como fallback.
+  - El "Coating Method" trae un código RAL de pintura (ej. RAL 7035), no un nombre de color simple. El valor real a mostrar es ese texto.
+  - OCR es un cambio grande (nueva dependencia Tesseract.js o servicio cloud). PREGUNTÉ antes de implementar: (a) ¿mostrar el texto tal cual tras "Coating Method:"? (b) ¿Tesseract.js cliente —sin infra/costo, precisión según calidad de foto— vs OCR en la nube —preciso pero requiere credenciales/costo?. Recomendé Tesseract.js + texto del coating + fallback. Quedé esperando respuesta.
+  - PATRÓN: ante feature grande con tradeoffs técnicos (OCR), no asumir el enfoque — presentar opciones con sus costos y recomendar una. El usuario decide infra/dependencia.
+- **Patrones confirmados**: español, directo, modo compañero, "cambio de lógica" = reemplazar enfoque anterior, preguntar ante decisión técnica de alcance/infra (OCR), ofrecer opciones con tradeoffs + recomendación, iteración constante sobre el PDF de reparación
+
+### Sesión 313 - 2026-10-14
+- **Tarea principal**: Implementar el nuevo enfoque del campo Color: OCR con Tesseract.js del texto "Coating Method:" en la imagen 1 de la 1ª etapa, mostrando el texto tal cual (ej. "RAL 7035-2009").
+- **Observaciones nuevas**:
+  - El usuario confirmó ambas opciones ("si debe mostrar el texto tal cual se lee. si usar tessract.js") → procedí.
+  - Instalé tesseract.js 7.0.0 con pnpm (aviso ERR_PNPM_IGNORED_BUILDS es normal, Tesseract carga workers/wasm en runtime, no necesita build script).
+  - Implementación (delegada): extractCoatingMethod(url) con import dinámico de tesseract.js (no infla bundle), Tesseract.recognize(url,'eng'), parsea la línea con /coating\s*method/i y toma lo que sigue tras ":". try/catch nunca lanza, null si falla. Reutiliza ctx.bladeColor para guardar el TEXTO. Fila Color = ctx.bladeColor || NA (sin rgbToColorName). Eliminadas sampleDominantColor y rgbToColorName (0 referencias); hexToRgb conservada (usada en portada/bandas).
+  - GOTCHA de build: `pnpm run build` falló por el chequeo deps-status del wrapper de pnpm (por el build script ignorado de tesseract), NO por el build real. Solución: correr `npx tsc -b` + `npx vite build` por separado → ambos OK. Útil cuando pnpm run build da error de deps-status tras instalar un paquete con build script ignorado.
+  - Fin del hilo del color por píxeles (s298-s311): reemplazado por OCR del dato real de la etiqueta. Mucho más fiable que adivinar el color de los píxeles.
+  - Desplegado (index-CGvWqCQK.js, chunk RepairWorkflow-DH9DdVbQ, "coating" verificado en prod).
+- **Patrones confirmados**: español, directo, modo compañero, confirma opciones y procedo, "cambio de lógica" = reemplazar enfoque, instalar dependencia con versión del lockfile, import dinámico para libs pesadas, delegar + compañero hace build/deploy, workaround tsc+vite cuando pnpm run build falla por deps-status, deploy vercel --prod + verificación
+
+### Sesión 314 - 2026-10-14
+- **Tarea principal**: El campo Color sigue en N/A (OCR Tesseract.js de la s313 no funcionó). El usuario dejó evidencia (informe con Color=N/A).
+- **Observaciones nuevas**:
+  - DIAGNÓSTICO con BD + agent-browser: (1) la foto correcta ES la etiqueta Vestas de la 1ª etapa (sort_order=1), accesible (HTTP 200, CORS *), legible, y SÍ dice "COATING METHOD: RAL-7035-2009" (lo vi al descargar la imagen). (2) El flujo del PDF llama bien `await extractCoatingMethod`. (3) CAUSA RAÍZ: Tesseract.js en el navegador es inviable aquí — prueba directa en prod (agent-browser eval cargando tesseract desde CDN) tardó >90s SIN responder. El OCR falla/excede tiempo y cae al catch → null → N/A.
+  - Confirmado que el dato existe y la imagen es buena: el problema es 100% el motor OCR en cliente (lento/frágil con worker+wasm+traineddata de varios MB bundleado por Vite).
+  - El approach Tesseract.js falló → según el perfil (si un approach falla, ir a la raíz + enfoque distinto, y preguntar si cambia infra). PREGUNTÉ opciones: A) OCR en nube/Edge Function (rápido, fiable, requiere credenciales/costo); B) Tesseract afinado con worker/wasm auto-hospedado (sigue lento, incierto); C) capturar "Coating Method" como dato en la app/manual y leerlo de BD (lo más fiable, sin OCR). Recomendé A o C. Quedé esperando decisión.
+  - TÉCNICA ÚTIL: agent-browser eval puede ejecutar JS en la página de prod para probar hipótesis (ej. correr el OCR real). Pero el eval inline falla con regex/sintaxis compleja; escribir el script a archivo y pasarlo. Timeouts largos pueden exceder el límite del eval.
+  - LECCIÓN: antes de culpar datos/imagen, verifiqué los 3 eslabones (dato en BD, imagen accesible+legible, motor OCR). El fallo estaba en el motor, no en los datos. Diagnóstico por capas.
+- **Patrones confirmados**: español, directo, modo compañero, evidencia visual, "diagnosticar más profundo" (verifiqué cada eslabón con BD+browser+descarga de imagen), si un approach falla ir a la raíz y proponer enfoque distinto, preguntar ante decisión de infra, honestidad sobre qué no funciona (Tesseract >90s)
+
+### Sesión 315 - 2026-10-14
+- **Tarea principal**: Tras descartar Tesseract.js, el usuario dudó entre A (OCR nube) y C (dato manual) — dijo "A" y luego "opción C" — y finalmente preguntó "¿no existe una librería para hacer OCR más efectivo?". Es decir: quiere mantener OCR automático pero efectivo.
+- **Observaciones nuevas**:
+  - Preparé la opción C a medias: creé columna repair.blade_color (text) + migración 20260923000003 + desinstalé tesseract.js. PERO el usuario reconsideró y volvió a querer OCR efectivo (no manual). La columna blade_color queda como respaldo/caché útil igual.
+  - Expliqué que el problema de Tesseract.js no es "mal OCR" sino DÓNDE corre (navegador, motor pesado wasm → lento/frágil). Alternativas efectivas: (1) APIs nube — Google Cloud Vision (recomendado, ~1-2s, capa gratis 1000/mes), AWS Textract, Azure Read; (2) Tesseract nativo en servidor/Edge Function; (3) LLM multimodal (GPT-4o/Gemini visión). La clave: OCR en SERVIDOR/nube vía Edge Function de Supabase, no en el browser.
+  - Recomendé Google Cloud Vision llamado desde Edge Function de Supabase (encaja con el stack). PREGUNTÉ: (1) ¿Google Vision u otro? (2) ¿puede conseguir la API key o la dejo preparada para que la pegue? Quedé esperando.
+  - El usuario itera sobre la decisión (A→C→"librería mejor"): no tenía claro el tradeoff; mi explicación de las opciones reales lo ayuda a decidir. Dar panorama técnico claro cuando el usuario está indeciso sobre infra.
+  - Pendiente: definir proveedor OCR + obtener credencial para montar la Edge Function.
+- **Patrones confirmados**: español, directo, modo compañero, reconsidera decisiones (no casarse con la 1ª respuesta), prefiere la solución más efectiva aunque implique infra, pide recomendaciones técnicas honestas, preguntar ante decisión de proveedor/credenciales
+
+### Sesión 316 - 2026-10-14
+- **Tarea principal**: El usuario eligió opción 2 (OCR con Tesseract nativo en servidor). Implementé Edge Function Deno con tesseract.js → FALLÓ en runtime.
+- **Observaciones nuevas**:
+  - Creé y DESPLEGUÉ Edge Function `ocr-coating-method` (Deno) con tesseract.js@6, frontend reapuntado a supabase.functions.invoke. Build frontend OK (tsc+vite). Deploy de la función OK (supabase functions deploy, aunque Docker no corría — se subió igual).
+  - FALLO en runtime al probar con curl + imagen real: `{"error":"Not implemented: Worker.prototype.constructor"}`. CAUSA RAÍZ (confirmada con web search): tesseract.js REQUIERE Web Workers (browser) o worker threads (Node); el Supabase Edge Runtime (Deno) NO los soporta como tesseract espera. Y "Tesseract nativo real" (binario del SO) tampoco corre en Deno edge (no ejecuta binarios arbitrarios). → La opción 2 NO es viable en Supabase Edge Functions.
+  - 2º approach de OCR que falla por el runtime (browser lento/frágil; Deno sin workers). Según el perfil: 2 fallos → ir a la raíz, ser honesto, no seguir parchando. Debo reportar las vías que SÍ funcionan.
+  - Vías viables reales: (A) API OCR en nube (Google Vision/AWS/Azure) llamada desde la Edge Function con credencial — rápida y fiable; (B) LLM multimodal con visión (GPT-4o/Gemini) vía API; (C) OCR en un servicio/contenedor Node propio (no Supabase edge) donde tesseract.js SÍ corre con worker threads; (D) opción C original: capturar el dato manualmente (columna blade_color ya existe). 
+  - Infra existente: Supabase CLI en ~/.local/bin, proyecto linkeado, Edge Functions en Deno. Para OCR server fiable sin binarios → API nube o LLM visión (requieren credencial).
+- **Patrones confirmados**: español, directo, modo compañero, el usuario elige la opción pero el runtime la limita, honestidad cuando un approach no es viable técnicamente, "diagnosticar más profundo" (verifiqué el error real con curl + web search), proponer vías viables tras 2 fallos
+
+### Sesión 317 - 2026-10-14
+- **Tarea principal**: El usuario propone desacoplar el OCR de la generación del informe: hacer el OCR UNA VEZ al cargar la foto a la etapa y guardar el resultado en BD (repair.blade_color); el informe solo lee el dato guardado.
+- **Observaciones nuevas**:
+  - Aclaré que el N/A NO es solo lentitud: la Edge Function Deno FALLA técnicamente (tesseract.js no corre en Deno, sin Web Workers). El OCR nunca devuelve nada.
+  - La propuesta del usuario es arquitectónicamente correcta (desacopla OCR del render, se procesa una vez en background → latencia deja de importar). PERO el OCR real sigue necesitando un motor que funcione (tesseract en Deno no sirve).
+  - PUNTO CLAVE: las fotos de reparación las sube la APP MÓVIL de técnicos, NO la web. Entonces "al cargar la foto a la etapa" ocurre en la app, no en el sistema web. Esto bifurca la solución: Opción 1 (la web detecta la foto sin blade_color y corre OCR en background con un motor que SÍ funcione, ej. Google Vision via Edge Function fetch, y guarda) vs Opción 2 (coordinar con la app móvil que dispare OCR al subir, como se hizo con completed_at).
+  - El fetch a una API de nube (Google Vision) SÍ corre en Deno edge (a diferencia de tesseract.js). Esa es la pieza que faltaba: OCR en nube llamado desde la Edge Function.
+  - PREGUNTÉ: ¿web (opción 1) o app móvil (opción 2)? ¿motor = Google Vision (requiere API key) u otro? Recomendé opción 1 + Google Vision disparado al abrir la pantalla de reparación si falta blade_color. Quedé esperando.
+  - El usuario razona bien sobre arquitectura (desacoplar, procesar una vez, cachear en BD) — confirma nivel técnico alto y pensamiento sistémico.
+- **Patrones confirmados**: español, directo, modo compañero, propone soluciones arquitectónicas (desacoplar/cachear), pensamiento sistémico, honestidad sobre la causa real (falla técnica, no solo lentitud), preguntar ante decisión de dónde corre + motor/credenciales, las fotos vienen de la app móvil (no la web)
+
+### Sesión 318 - 2026-10-14
+- **Tarea principal**: El usuario eligió opción 1 SIN servicios de pago. Implementar OCR del Coating Method gratis y desacoplado.
+- **Observaciones nuevas**:
+  - SOLUCIÓN GRATIS QUE FUNCIONA: tesseract.js en el NAVEGADOR (tiene Web Workers, a diferencia de Deno), pero ejecutado UNA VEZ en BACKGROUND al abrir la pantalla de reparación (no durante la generación del PDF), con el resultado cacheado en repair.blade_color. El informe solo LEE blade_color de la BD. Esto resuelve los 2 fracasos previos: browser-síncrono-en-PDF (bloqueaba) y Deno-sin-workers (no corría). La latencia de tesseract deja de importar porque es background + una vez.
+  - Implementación (delegada): useEffect en RepairWorkflow que al cargar el tree, para cada repair sin blade_color, corre tesseract.js (import dinámico) sobre la foto 1ª etapa/imagen 1, parsea "Coating Method:" (util parseCoatingMethod), guarda vía useUpdateBladeColor y invalida el tree. Ref-Set evita reproceso; secuencial; try/catch; solo no-cliente. repair.service: getRepairTree lee blade_color → node.bladeColor; nuevo updateBladeColor. El PDF (repairReportPdf) ya NO hace OCR: lee blade_color del repair en scope (eliminada extractCoatingMethod y el invoke a la Edge Function obsoleta).
+  - Reinstalé tesseract.js (lo había quitado). Build con npx tsc -b + npx vite build (pnpm run build falla por deps-status). OK, desplegado (index-CyFbYOlc.js).
+  - LECCIÓN de arquitectura (confirmada con el usuario): desacoplar una operación cara/frágil (OCR) del render → ejecutarla una vez en background + cachear en BD. El mismo motor "malo" (tesseract.js browser) se vuelve viable cuando dejas de correrlo en el camino crítico.
+  - La Edge Function ocr-coating-method quedó desplegada pero sin uso (el frontend ya no la llama). No molesta; se puede limpiar luego.
+  - PENDIENTE DE VERIFICAR por el usuario: que al abrir la pantalla de reparación de un daño con etiqueta Vestas legible, tras unos segundos el blade_color se poble y el informe muestre el Coating Method. No pude probar el OCR real end-to-end sin login.
+- **Patrones confirmados**: español, directo, modo compañero, sin servicios de pago (restricción de costo), arquitectura desacoplada (background+caché), reusar lo que falló cuando el contexto cambia, build tsc+vite, deploy vercel --prod + verificación
+
+### Sesión 319 - 2026-10-14
+- **Tarea principal**: (1) Procesar en batch el OCR del Coating Method de las etiquetas de todos los defectos; (2) fix visual: el título "Diseño de la pala" quedaba muy separado de la imagen en el informe.
+- **Observaciones nuevas**:
+  - FIX TÍTULO (resuelto, desplegado): renderBladeDesignPage centraba la imagen verticalmente en el espacio restante (y = titleY + (availH-drawH)/2) → gran hueco bajo el título. Cambiado a y = titleY + 4 (imagen justo debajo del título). Build OK, desplegado index-DiOk5pEi.js.
+  - OCR BATCH (resultado pobre, honestidad): script Node scripts/ocr-coating-batch.mjs con tesseract.js + sharp (grayscale/normalize + 4 rotaciones 0/90/180/270). Inventario: 53 repairs, 29 con foto de etiqueta sin blade_color. Resultado: solo 6/29 extrajeron valor, con ERRORES ("RAL-7025-2009" probablemente es 7035 — tesseract confunde 3↔2; una con ruido "E. | = ~ RAL-7035:20097"). Las 23 restantes = fichas CORE-TEC manuscritas (sin Coating Method) o Vestas con mala calidad/ángulo/tinte azulado.
+  - DIAGNÓSTICO de por qué el OCR gratis falla en campo: fotos rotadas (texto vertical), plástico con reflejos, tinte azulado, baja resolución. tesseract no es fiable aquí. Las placas Vestas reales dicen RAL-7035-2009.
+  - NO escribí el batch en la BD: guardar datos sucios/erróneos (7025 vs 7035, ruido) sería peor. Según el perfil (rigor, no reportar éxito falso), reporté el resultado real y pregunté: ¿guardar solo los limpios asumiendo riesgo, o dejar OCR automático en background + corrección manual (blade_color es editable)? Quedé esperando.
+  - Técnica: scripts Node one-off con tesseract.js+sharp para batch OCR; agent-browser eval y Management API para diagnóstico. sharp ya está en node_modules (lo usa Vite).
+- **Patrones confirmados**: español, directo, modo compañero, batch de datos (no solo código), honestidad sobre resultado pobre (no inventar/no guardar datos erróneos), "diagnosticar más profundo" (causa del fallo OCR), fix visual simple directo, deploy vercel --prod, preguntar ante decisión de calidad de datos
+
+### Sesión 320 - 2026-10-14
+- **Tarea principal**: Continuación de la saga OCR del campo "Color" del informe de reparación. Verificación de estado tras resultado pobre del OCR batch (6/29 con errores 7035↔7025).
+- **Observaciones nuevas**:
+  - Ante un resultado dudoso de datos (OCR confundiendo RAL-7035 vs RAL-7025), lo correcto fue NO escribir en BD. El usuario valora más un campo editable vacío que datos sucios en el informe. Default seguro = no contaminar la BD con inferencias de baja confianza.
+  - Cuando hay una decisión A/B pendiente del usuario y no responde, avanzar con la opción más segura/reversible (B: no tocar BD masivamente) y verificar el estado real del deploy en vez de quedarse bloqueado.
+  - Verificación de consistencia deploy↔código: comparar hash `index-*.js` servido en prod contra los cambios del working tree. Los cambios "desplegados" vía `vercel --prod` pueden estar sin commitear en git pero sí presentes en el bundle de prod (se buildearon localmente antes del deploy).
+- **Patrones confirmados**: español, directo, alta autonomía, "todo gratis" (rechaza servicios de pago como Google Vision), deploy manual con vercel --prod, verificación rigurosa antes de reportar éxito, barrido de calidad del informe PDF por iteraciones.
+
+### Sesión 321 - 2026-10-19
+- **Tarea principal**: En `/repairs/:id` permitir mover fotos de una etapa a otra (selección cruzada entre etapas) porque los técnicos cargan fotos en la etapa equivocada.
+- **Observaciones nuevas**:
+  - Activó modo compañero con "compañero" al inicio + URL exacta + descripción del problema real (técnicos se equivocan de etapa) en una sola frase.
+  - Describe el PORQUÉ del negocio, no la solución técnica — confía en que el agente decida el mecanismo UX (menú vs drag). No especificó cómo mover, solo que se pueda.
+  - Distinción importante del dominio: en repairs las fotos pertenecen a una etapa (repair_stage_id/stage_code); ya existía drag&drop pero SOLO para selección de reporte, scoped a la misma etapa. La feature nueva es reubicar la foto entre etapas (distinto de seleccionar).
+  - Verificación bloqueada: la app propia (wind_farm) requiere login y no hay credenciales en el perfil (solo las de Skyvisor). Preferible pedir credenciales o dejar preview para que el usuario pruebe, en vez de deployar a ciegas.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta como referencia, describe problema de negocio desde UX no desde código, comunicación ultra-mínima, "replicar patrón existente" (reusó el patrón de useSetPhotoSelected: optimistic update + invalidación).
