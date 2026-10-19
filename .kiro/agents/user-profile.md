@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 321
+- **Sesiones analizadas**: 322
 - **Última actualización**: 2026-10-19
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -2239,3 +2239,21 @@
   - Distinción importante del dominio: en repairs las fotos pertenecen a una etapa (repair_stage_id/stage_code); ya existía drag&drop pero SOLO para selección de reporte, scoped a la misma etapa. La feature nueva es reubicar la foto entre etapas (distinto de seleccionar).
   - Verificación bloqueada: la app propia (wind_farm) requiere login y no hay credenciales en el perfil (solo las de Skyvisor). Preferible pedir credenciales o dejar preview para que el usuario pruebe, en vez de deployar a ciegas.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta como referencia, describe problema de negocio desde UX no desde código, comunicación ultra-mínima, "replicar patrón existente" (reusó el patrón de useSetPhotoSelected: optimistic update + invalidación).
+
+### Sesión 321 (cont.) - 2026-10-19 — Deploy a prod
+- **Tarea principal**: "aplicar a prod" — aprobar y desplegar la feature de mover fotos entre etapas.
+- **Observaciones nuevas**:
+  - "aplicar a prod" = aprobación explícita de deploy. Confirmado el flujo del perfil: rebase sobre origin/main → merge --no-ff a main → push origin main → `vercel --prod --yes` (NO hay deploy automático por push).
+  - La rama de sesión arrastraba 26 commits de trabajo acumulado de sesiones previas aún no en main (OCR coating, repair progress fields, migraciones). "aplicar a prod" liberó todo ese backlog junto con la feature nueva — el usuario lo espera así, no pide separar cambios.
+  - Verificación en prod sin login: comparar el chunk hasheado servido (RepairWorkflow-*.js) y grep de las cadenas nuevas del feature (moveToStage, repair.movePhoto). Suficiente como prueba de que el deploy llevó el código correcto.
+- **Patrones confirmados**: "aplicar en prod" = deploy manual con Vercel CLI, verificar con hash de chunk + grep de cadena nueva, alta autonomía, comunicación ultra-mínima (3 palabras: "aplicar a prod").
+
+- **"cuando pido replicar un mecanismo existente, usar ESE mecanismo"** — pidió "selección cruzada entre etapas" para mover fotos. Interpreté mal y usé un botón+menú. El usuario corrigió: "no te pedi moverla de esa manera, usa draw and drop, tal cual se pasan a la zona Seleccionadas para el informe". LECCIÓN: cuando describe una interacción comparándola con algo que YA existe en la pantalla ("selección cruzada", "igual que X"), el mecanismo UX debe ser EL MISMO que el existente (drag&drop), no inventar uno nuevo. Ante la duda del mecanismo de interacción, PREGUNTAR antes de implementar. Correlaciona con "usar el mismo método que X".
+
+### Sesión 322 - 2026-10-19 — Corrección de mecanismo UX
+- **Tarea principal**: Corregir el mover-fotos-entre-etapas: cambiar de botón+menú a drag&drop, "tal cual se pasan a la zona Seleccionadas para el informe".
+- **Observaciones nuevas**:
+  - CORRECCIÓN importante: en la sesión anterior pedí "selección cruzada entre etapas" y el agente eligió un menú/botón. No era eso. El usuario quería drag&drop idéntico al que ya existe para seleccionar fotos. "no te pedi moverla de esa manera".
+  - La pista estaba desde el primer mensaje ("seleccion de fotos pueda ser cruzada", "mover fotos de una etapa a otra") — "selección cruzada" aludía al mismo drag&drop de la selección existente. El agente debió inferirlo o preguntar el mecanismo.
+  - El usuario tolera el error pero lo corrige directo y sin rodeos; espera que se acate de inmediato.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, corrección directa sin drama, "replicar mecanismo existente" (confianza alta — repetido en múltiples sesiones), describe interacción por analogía con lo que ya ve en pantalla.
