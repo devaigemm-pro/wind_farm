@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 323
+- **Sesiones analizadas**: 324
 - **Última actualización**: 2026-10-19
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -2273,3 +2273,19 @@
   - Micro-iteración de pulido tras el deploy: usa la feature real, detecta detalle visual, pide el ajuste. Patrón de refinamiento incremental post-deploy.
   - Causa raíz: con drag&drop + optimistic update, onDragLeave no dispara de forma fiable → highlight pegado. Solución robusta: listener global dragend/drop en vez de parche sobre onDragLeave.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, comunicación ultra-mínima, describe bug desde lo visual/UX, iteración incremental de pulido tras validar en prod.
+
+### Sesión 323 (cont.) - 2026-10-19 — Deploy del fix a prod
+- **Tarea principal**: "aplicar en prod" — desplegar el fix del borde residual.
+- **Observaciones nuevas**:
+  - Ciclo confirmado: fix → preview → "aplicar en prod" (aprobación 3 palabras) → rebase/merge/push/vercel → verificación por chunk.
+  - Verificación por grep de la marca del fix (`dragend` presente) + marca de la feature intacta (`application/x-stage-id`). Validar que el fix entró Y que no rompió lo anterior.
+  - Deploy rápido esta vez (33s). Tiempos de Vercel varían (43s / 5min / 33s) sin patrón; solo esperar.
+- **Patrones confirmados**: "aplicar en prod" = deploy manual Vercel CLI, verificación por hash de chunk + grep (fix presente / feature intacta), alta autonomía, comunicación ultra-mínima, iteración incremental de pulido.
+
+### Sesión 324 - 2026-10-19 — Fix raíz borde etapa destino + deploy
+- **Tarea principal**: El borde de la etapa que RECIBE la foto seguía marcado (el fix anterior solo resolvió el origen). Rediseño de raíz + "aplicar en prod".
+- **Observaciones nuevas**:
+  - "AUN no funciona" implícito: el fix superficial anterior (listener global que apagaba estado local por fila) no resolvió el destino. Confirmó el patrón "diagnosticar más profundo": el segundo intento NO debe ser otro parche.
+  - Causa raíz real: estado `stageDropActive` local por StageRow + optimistic re-render de la etapa destino creaban una carrera; el `true` del último dragOver ganaba. Solución de raíz: estado compartido único `hoverTargetStageId` a nivel del defecto con un solo reset → elimina la clase entera de bug.
+  - Reportó el problema con precisión quirúrgica ("la etapa que recibe la fotografia"), distinguiendo del origen que ya estaba resuelto. Observación visual muy afinada.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, "diagnosticar más profundo" cuando un fix no basta (NO parche superficial), iteración de pulido post-deploy, "aplicar en prod" = deploy manual Vercel.
