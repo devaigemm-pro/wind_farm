@@ -1061,23 +1061,96 @@ function DefectSection({
       )}
 
       {open && (
-        <div style={stagesWrap}>
-          {node.stages.map((stage) => (
-            <StageRow
-              key={stage.stageId ?? stage.stageCode}
-              defectId={defect.id}
-              stage={stage}
-              defectStages={node.stages}
-              t={t}
-              readOnly={readOnly}
-              pendingPhotoIds={pendingPhotoIds}
-              onSelect={onSelect}
-              onMovePhoto={onMovePhoto}
-              onPreview={onPreview}
-            />
-          ))}
-        </div>
+        <StagesList
+          node={node}
+          t={t}
+          readOnly={readOnly}
+          pendingPhotoIds={pendingPhotoIds}
+          onSelect={onSelect}
+          onMovePhoto={onMovePhoto}
+          onPreview={onPreview}
+        />
       )}
+    </div>
+  );
+}
+
+// ─── Stages list (owns the shared cross-stage move highlight) ───────────────────
+
+interface StagesListProps {
+  node: RepairDefectNode;
+  t: (key: string) => string;
+  readOnly: boolean;
+  pendingPhotoIds: Set<string>;
+  onSelect: (photo: RepairPhoto, selected: boolean) => void;
+  onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
+  onPreview: (photo: RepairPhoto) => void;
+}
+
+/**
+ * Renders a defect's stages and owns the cross-stage move highlight as a SINGLE
+ * shared state (`hoverTargetStageId`) instead of one `stageDropActive` boolean
+ * per StageRow.
+ *
+ * Why this fixes the stuck green border on the DESTINATION stage: with per-row
+ * local state, dropping on the target stage created a race — the last
+ * `onDragOver` set that row's `stageDropActive=true`, then `onDrop` fired the
+ * optimistic update that re-renders/remounts the target row's photos, and the
+ * global `dragend` tried to set `false`. Because each row owned its own state
+ * and the target re-rendered mid-flight, the `false` wasn't guaranteed to win,
+ * so the border stuck. With ONE shared value, a single `setHoverTargetStageId(null)`
+ * clears every stage at once — there are no competing per-row states left to
+ * leave stale, so the whole class of bug is gone.
+ *
+ * Reset is unconditional on both the drop (inside each StageRow, after calling
+ * onMovePhoto) and on a document-level `dragend` listener mounted ONCE here.
+ */
+function StagesList({
+  node,
+  t,
+  readOnly,
+  pendingPhotoIds,
+  onSelect,
+  onMovePhoto,
+  onPreview,
+}: StagesListProps) {
+  // Which stage is currently hovered as the target of a cross-stage move
+  // (null = none). Shared by every StageRow of this defect.
+  const [hoverTargetStageId, setHoverTargetStageId] = useState<string | null>(null);
+
+  // Single global drag-end safety net for the WHOLE defect: whenever any HTML5
+  // drag finishes (drop OR cancel), clear the shared highlight. Mounted once —
+  // not once per StageRow — so there's exactly one reset and no race between
+  // multiple listeners/states. `drop` is covered too because some browsers skip
+  // `dragend` on a source whose DOM node was removed by the optimistic re-render.
+  useEffect(() => {
+    const clear = () => setHoverTargetStageId(null);
+    document.addEventListener('dragend', clear);
+    document.addEventListener('drop', clear);
+    return () => {
+      document.removeEventListener('dragend', clear);
+      document.removeEventListener('drop', clear);
+    };
+  }, []);
+
+  return (
+    <div style={stagesWrap}>
+      {node.stages.map((stage) => (
+        <StageRow
+          key={stage.stageId ?? stage.stageCode}
+          defectId={node.defect.id}
+          stage={stage}
+          defectStages={node.stages}
+          t={t}
+          readOnly={readOnly}
+          pendingPhotoIds={pendingPhotoIds}
+          onSelect={onSelect}
+          onMovePhoto={onMovePhoto}
+          onPreview={onPreview}
+          hoverTargetStageId={hoverTargetStageId}
+          setHoverTargetStageId={setHoverTargetStageId}
+        />
+      ))}
     </div>
   );
 }
@@ -1097,6 +1170,13 @@ interface StageRowProps {
   /** Move a photo to another stage of the same defect (undefined = read-only client). */
   onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
   onPreview: (photo: RepairPhoto) => void;
+  /** Stage id currently hovered as a cross-stage move target (shared by all
+      StageRows of the defect). This row is highlighted when it equals its own
+      stageId. */
+  hoverTargetStageId: string | null;
+  /** Setter for the shared hover target. Called with this stage's id on
+      foreign dragOver, and with null on drop/leave to clear the highlight. */
+  setHoverTargetStageId: (id: string | null) => void;
 }
 
 // Custom dataTransfer MIME carrying the ORIGIN stage id of the dragged photo.
@@ -1113,34 +1193,40 @@ const STAGE_MIME = 'application/x-stage-id';
 // safe as a singleton because only one HTML5 drag can be in flight at a time.
 let activeDragOriginStageId: string | null = null;
 
-function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds, onSelect, onMovePhoto, onPreview }: StageRowProps) {
+function StageRow({
+  defectId,
+  stage,
+  defectStages,
+  t,
+  readOnly,
+  pendingPhotoIds,
+  onSelect,
+  onMovePhoto,
+  onPreview,
+  hoverTargetStageId,
+  setHoverTargetStageId,
+}: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
-  // Stage-level drop highlight: active while a photo from ANOTHER stage is
-  // dragged over this stage card (reuses the colDropActive look on stageCard).
-  const [stageDropActive, setStageDropActive] = useState(false);
+  // This stage's own id (empty string for catalog fallback stages with no id).
+  const thisStageId = stage.stageId ?? '';
+  // Cross-stage move highlight is derived from the SHARED hover target, not a
+  // local boolean — so a single reset upstream clears every stage at once (see
+  // StagesList). No per-row dragend listener is needed for the stage highlight.
+  const stageDropActive = hoverTargetStageId != null && hoverTargetStageId === thisStageId;
 
-  // Global drag-end safety net: when ANY HTML5 drag finishes (drop OR cancel),
-  // force every stage's highlights off. onDragLeave is unreliable here because
-  // onDrop fires an optimistic update that reorders/remounts the photos, so the
-  // leave event of the origin (and sometimes the target) stage never arrives,
-  // leaving the green border stuck. A document-level `dragend` listener always
-  // fires exactly once per drag regardless of where the pointer is, so it's the
-  // reliable place to clear the residual highlight without touching the
-  // in-drag feedback (which still works via onDragOver/onDragLeave).
+  // Safety net for the same-stage selection-column highlight (`dropActive`).
+  // Its drop/leave handlers normally clear it, but a cancelled drag may skip
+  // the leave; a single dragend reset guarantees it never sticks. (The
+  // cross-stage move highlight is handled upstream by StagesList's shared
+  // state, so it is NOT touched here.)
   useEffect(() => {
-    const clearHighlights = () => {
-      setStageDropActive(false);
-      setDropActive(false);
-    };
-    document.addEventListener('dragend', clearHighlights);
-    // `drop` also clears as a belt-and-suspenders fallback: in some browsers a
-    // successful drop may not be followed by a dragend on the original source
-    // if its DOM node was removed by the optimistic re-render.
-    document.addEventListener('drop', clearHighlights);
+    const clear = () => setDropActive(false);
+    document.addEventListener('dragend', clear);
+    document.addEventListener('drop', clear);
     return () => {
-      document.removeEventListener('dragend', clearHighlights);
-      document.removeEventListener('drop', clearHighlights);
+      document.removeEventListener('dragend', clear);
+      document.removeEventListener('drop', clear);
     };
   }, []);
 
@@ -1174,7 +1260,11 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
               if (!isForeignDrag(e)) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
-              setStageDropActive(true);
+              // Point the SHARED hover target at this stage. Setting the same
+              // value repeatedly (dragOver fires continuously) is a no-op for
+              // React, and switching stages reassigns it so only one stage is
+              // ever highlighted.
+              setHoverTargetStageId(thisStageId);
             }
           : undefined
       }
@@ -1183,7 +1273,9 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
           ? (e) => {
               // Ignore leave events bubbling from children still inside the card.
               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-              setStageDropActive(false);
+              // Only clear if WE are the current target — avoids a late leave
+              // from a previous stage wiping the highlight of the new one.
+              if (hoverTargetStageId === thisStageId) setHoverTargetStageId(null);
             }
           : undefined
       }
@@ -1193,9 +1285,8 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
               const origin =
                 e.dataTransfer.getData(STAGE_MIME) || (activeDragOriginStageId ?? '');
               // Same-stage drop → let the inner "selected" column handle it.
-              if (origin === (stage.stageId ?? '')) return;
+              if (origin === thisStageId) return;
               e.preventDefault();
-              setStageDropActive(false);
               const id = e.dataTransfer.getData('text/plain');
               const photo = photos.find((p) => p.id === id);
               // The dragged photo belongs to another stage, so it won't be in
@@ -1206,6 +1297,12 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
               if (moved && onMovePhoto) {
                 onMovePhoto(moved, stage.stageId!, stage.stageCode);
               }
+              // Reset the shared highlight LAST and unconditionally. Because it's
+              // a single shared value (not one state per row), this clears the
+              // destination stage too even though onMovePhoto just triggered an
+              // optimistic re-render of this row — no stale per-row `true` is
+              // left behind. The global dragend in StagesList is the backstop.
+              setHoverTargetStageId(null);
             }
           : undefined
       }
@@ -1273,7 +1370,10 @@ function StageRow({ defectId, stage, defectStages, t, readOnly, pendingPhotoIds,
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = 'move';
                     setDropActive(true);
-                    setStageDropActive(false);
+                    // A same-stage selection drag is NOT a cross-stage move, so
+                    // make sure this stage isn't also highlighted as a move
+                    // target (clears the shared hover if it points here).
+                    if (hoverTargetStageId === thisStageId) setHoverTargetStageId(null);
                   }
             }
             onDragLeave={readOnly ? undefined : () => setDropActive(false)}
