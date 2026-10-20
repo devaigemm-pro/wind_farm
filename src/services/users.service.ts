@@ -58,6 +58,30 @@ async function throwInvokeError(
   throw new UserServiceError(error.message);
 }
 
+/**
+ * Invokes the admin-users Edge Function with a GUARANTEED-fresh session.
+ * `functions.invoke` attaches the in-memory access token, which may be expired
+ * (tab left open, background refresh missed) → the function returns 401
+ * "Invalid or expired token". Calling getSession() first forces supabase-js to
+ * refresh the token when it's near/after expiry, and we pass it explicitly in
+ * the Authorization header so the function always receives a valid JWT.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function invokeAdminUsers<T = any>(body: Record<string, unknown>): Promise<T> {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    throw new UserServiceError('Sesión expirada. Por favor inicie sesión nuevamente.');
+  }
+  const accessToken = sessionData.session.access_token;
+  const { data, error } = await supabase.functions.invoke('admin-users', {
+    body,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (error) await throwInvokeError(error, data);
+  if (data?.error) throw new UserServiceError(data.error);
+  return data as T;
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const usersService = {
@@ -95,53 +119,37 @@ export const usersService = {
 
   /** Full wind farm catalog for the maintainer selector (via Edge Function). */
   async getAllWindFarmsForAdmin(): Promise<AdminWindFarm[]> {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'listFarms' },
-    });
-    if (error) await throwInvokeError(error, data);
-    if (data?.error) throw new UserServiceError(data.error);
+    const data = await invokeAdminUsers({ action: 'listFarms' });
     return (data?.farms ?? []) as AdminWindFarm[];
   },
 
   async createUser(input: CreateUserInput): Promise<void> {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: {
-        action: 'create',
-        email: input.email,
-        password: input.password,
-        name: input.name,
-        last_name: input.last_name,
-        rut: input.rut,
-        roles: input.roles,
-        windFarmIds: input.windFarmIds,
-      },
+    await invokeAdminUsers({
+      action: 'create',
+      email: input.email,
+      password: input.password,
+      name: input.name,
+      last_name: input.last_name,
+      rut: input.rut,
+      roles: input.roles,
+      windFarmIds: input.windFarmIds,
     });
-    if (error) await throwInvokeError(error, data);
-    if (data?.error) throw new UserServiceError(data.error);
   },
 
   async updateUser(input: UpdateUserInput): Promise<void> {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: {
-        action: 'update',
-        userId: input.userId,
-        name: input.name,
-        last_name: input.last_name,
-        rut: input.rut,
-        roles: input.roles,
-        password: input.password,
-        windFarmIds: input.windFarmIds,
-      },
+    await invokeAdminUsers({
+      action: 'update',
+      userId: input.userId,
+      name: input.name,
+      last_name: input.last_name,
+      rut: input.rut,
+      roles: input.roles,
+      password: input.password,
+      windFarmIds: input.windFarmIds,
     });
-    if (error) await throwInvokeError(error, data);
-    if (data?.error) throw new UserServiceError(data.error);
   },
 
   async deleteUser(userId: string): Promise<void> {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'delete', userId },
-    });
-    if (error) await throwInvokeError(error, data);
-    if (data?.error) throw new UserServiceError(data.error);
+    await invokeAdminUsers({ action: 'delete', userId });
   },
 };
