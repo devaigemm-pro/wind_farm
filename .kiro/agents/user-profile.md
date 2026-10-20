@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 325
+- **Sesiones analizadas**: 327
 - **Última actualización**: 2026-10-19
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -2305,3 +2305,28 @@
   - Solución profesional = QUITAR código: eliminar el onDragLeave del stageCard. Cada dragOver reasigna el único estado compartido; reset en drop/dragend. Cero guards frágiles.
   - El usuario describe el síntoma con precisión reproducible ("si la foto viaja por 3 etapas hacia arriba o abajo marca todos los bordes") — da el caso exacto para reproducir.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, "diagnosticar más profundo" (confianza muy alta), "no sobrecomplicar / es básico", describe bug con caso reproducible, iteración de pulido, frustración marcada cuando se repite el error.
+
+### Sesión 325 (cont.) - 2026-10-19 — Deploy del fix a prod
+- **Tarea principal**: "aplicar en prod" del fix de highlight (y pregunta de seguimiento "aplicaste en prod?" porque el deploy había quedado interrumpido por el hook de actualización de perfil).
+- **Observaciones nuevas**:
+  - El hook obligatorio de actualizar user-profile.md al cerrar puede INTERRUMPIR un deploy en curso: el usuario dijo "aplicar en prod", pero la ejecución se cortó en la actualización del perfil y el deploy no se completó hasta que preguntó "aplicaste en prod?". LECCIÓN: cuando el usuario pide deploy, completar el deploy ANTES de actualizar el perfil; el perfil se actualiza al final de todo.
+  - Deploy sin novedad: `eb6ac40..35f6ce5` → vercel --prod, 45s. Verificación por chunk (49847 B = build local, feature intacta).
+- **Patrones confirmados**: "aplicar en prod" = deploy manual Vercel, verificación por chunk, el usuario hace seguimiento si no ve confirmación clara del deploy ("aplicaste en prod?").
+
+### Sesión 326 - 2026-10-19 — Nuevo tipo de campaña "Limpieza de Turbina"
+- **Tarea principal**: Agregar un nuevo tipo de campaña "Limpieza de Turbina" basado en las campañas de reparación (etapas + selección de fotos), con estructura de zonas: Palas (A/B/C), Nacelle (lado derecho/inferior/izquierdo/trasero), Hub, Torre. Entregó imagen con la jerarquía.
+- **Observaciones nuevas**:
+  - Feature grande (nuevo tipo de campaña paralelo a repair). Describe por analogía: "basarse en las campañas de reparación, debe funcionar de la misma manera". Entrega la estructura como imagen (screenshot de Excel con jerarquía de zonas) — patrón de imagen/DOM como spec.
+  - Punto de arquitectura crítico detectado antes de delegar: las campañas de reparación NO se crean en la web, nacen de cotización aprobada / import Excel, y los datos de etapas/fotos los llena un APP MÓVIL EXTERNO del equipo técnico (la web solo lee vía RPCs get_repairs_for_quote/get_repair_photos_by_stage). Limpieza no tiene defectos ni cotizaciones → modelo de datos y origen de fotos son ambiguos.
+  - Usé context-gatherer para mapear toda la arquitectura (tipos, DB, servicio, hooks, rutas, creación, PDF, UI) ANTES de preguntar, para hacer preguntas informadas y acotadas.
+  - Decisión: ante una feature grande con ambigüedad de arquitectura (origen de fotos: app móvil vs upload web; cómo se crea la campaña; zonas fijas vs configurables), PREGUNTAR antes de implementar, en vez de asumir. Alineado con el perfil (preguntar ante ambigüedad en features grandes).
+- **Patrones confirmados**: español, directo, modo compañero, imagen como spec, "replicar funcionalidad existente" (repair como base), feature descrita a nivel conceptual confiando en el agente. NUEVO matiz: en features grandes con decisiones de arquitectura no triviales, el agente debe pausar y preguntar antes de delegar/implementar.
+
+### Sesión 327 - 2026-10-19 — Implementación "Limpieza de Turbina"
+- **Tarea principal**: Implementar el nuevo tipo de campaña cleaning tras aclarar las 3 preguntas (fotos del app móvil como repair, formulario selector para crear, zonas fijas con selección de fotos por zona).
+- **Observaciones nuevas**:
+  - Responde las preguntas de arquitectura ultra-breve y directo: "1.- exactamente igual que la de reparacion desde a app. 2.- si formulario selector. 3.- exacto". Confirma que preguntar fue correcto: dio las 3 respuestas sin fricción.
+  - Feature grande entregada en una sola delegación al desarrollador (todo el stack: tipos, constantes, servicio, hooks, página, PDF, modal, pestaña, ruta, i18n). El usuario confía en que el agente implemente todo de una vez tras aclarar la arquitectura.
+  - Patrón de "replicar lo que ya funciona" llevado al máximo: clonar repair → cleaning con nomenclatura paralela, reusando el mecanismo de drag&drop YA corregido en sesiones previas (no reintroducir bugs resueltos).
+  - El MCP de Supabase conectado apunta a OTRO proyecto (no wind_farm) — no sirve para inspeccionar el esquema real de este proyecto. Anotar: para wind_farm el esquema de repair/cleaning es externo (app móvil), se documenta el contrato y se degrada con gracia.
+- **Patrones confirmados**: español, directo, modo compañero, respuestas ultra-mínimas, "replicar funcionalidad existente" (confianza muy alta), confía en implementación completa del agente, preguntar ante ambigüedad de arquitectura en features grandes dio buen resultado.
