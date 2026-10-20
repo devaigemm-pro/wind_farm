@@ -58,25 +58,17 @@ async function throwInvokeError(
   throw new UserServiceError(error.message);
 }
 
-/**
- * Invokes the admin-users Edge Function with a GUARANTEED-fresh session.
- * `functions.invoke` attaches the in-memory access token, which may be expired
- * (tab left open, background refresh missed) → the function returns 401
- * "Invalid or expired token". Calling getSession() first forces supabase-js to
- * refresh the token when it's near/after expiry, and we pass it explicitly in
- * the Authorization header so the function always receives a valid JWT.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function invokeAdminUsers<T = any>(body: Record<string, unknown>): Promise<T> {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !sessionData.session) {
+  // Force supabase-js to refresh the in-memory access token if it's near expiry,
+  // so functions.invoke attaches a valid Authorization header. We do NOT pass
+  // custom headers: doing so makes supabase-js drop the `apikey` header, which
+  // breaks the Edge Function gateway and yields a false "Invalid or expired token".
+  const { error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
     throw new UserServiceError('Sesión expirada. Por favor inicie sesión nuevamente.');
   }
-  const accessToken = sessionData.session.access_token;
-  const { data, error } = await supabase.functions.invoke('admin-users', {
-    body,
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const { data, error } = await supabase.functions.invoke('admin-users', { body });
   if (error) await throwInvokeError(error, data);
   if (data?.error) throw new UserServiceError(data.error);
   return data as T;
