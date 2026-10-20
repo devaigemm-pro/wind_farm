@@ -5,6 +5,7 @@ import { Button } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { useRepairSummary } from '@/hooks/useRepair';
+import { useCleaningSummary } from '@/hooks/useCleaning';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
@@ -33,9 +34,11 @@ export function CampaignAccordion({
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const isRepair = campaign.type === 'repair';
+  const isCleaning = campaign.type === 'cleaning';
+  const isInspection = !isRepair && !isCleaning;
 
   // When a filter is active, always load inspections to show filtered results
-  const shouldLoadInspections = !isRepair && (isExpanded || !!filterBySubasset);
+  const shouldLoadInspections = isInspection && (isExpanded || !!filterBySubasset);
   const { data: inspections, isLoading } = useCampaignInspections(
     shouldLoadInspections ? campaign.id : undefined,
     campaign.windFarmId,
@@ -76,19 +79,23 @@ export function CampaignAccordion({
         <button style={expandBtnStyle} onClick={() => setIsExpanded(!effectiveExpanded)}>
           {effectiveExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <span style={campaignNameStyle}>
-            {campaign.name}{campaign.type !== 'repair' ? ` (${inspectionCount})` : ''}
+            {campaign.name}{isInspection ? ` (${inspectionCount})` : ''}
           </span>
           <span style={{
             padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, marginLeft: 8,
-            background: campaign.type === 'repair' ? '#FEF3C7' : '#DBEAFE',
-            color: campaign.type === 'repair' ? '#92400E' : '#1E40AF',
+            background: isRepair ? '#FEF3C7' : isCleaning ? '#DCFCE7' : '#DBEAFE',
+            color: isRepair ? '#92400E' : isCleaning ? '#166534' : '#1E40AF',
           }}>
-            {campaign.type === 'repair' ? t('campaign.typeRepair') : t('campaign.typeInspection')}
+            {isRepair
+              ? t('campaign.typeRepair')
+              : isCleaning
+                ? t('campaign.typeCleaning')
+                : t('campaign.typeInspection')}
           </span>
         </button>
 
         <div style={actionsStyle}>
-          {!isRepair && (
+          {isInspection && (
             <Button
               variant="primary"
               size="sm"
@@ -144,8 +151,15 @@ export function CampaignAccordion({
         </div>
       )}
 
+      {/* Expanded Table — cleaning variant */}
+      {effectiveExpanded && isCleaning && (
+        <div style={tableWrapperStyle}>
+          <CleaningCampaignRows campaign={campaign} />
+        </div>
+      )}
+
       {/* Expanded Table — inspection variant */}
-      {effectiveExpanded && !isRepair && (
+      {effectiveExpanded && isInspection && (
         <div style={tableWrapperStyle}>
           {isLoading ? (
             <p style={loadingStyle}>{t('campaigns.loadingInspections')}</p>
@@ -285,6 +299,66 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
           <td style={tdStyle}>{isLoading ? '…' : `${summary?.viewedPercent ?? 0}%`}</td>
           <td style={tdStyle}>{isLoading ? '…' : (summary?.defectsCount ?? 0)}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Cleaning campaign rows ───────────────────────────────────────────────────
+
+function CleaningCampaignRows({ campaign }: { campaign: Campaign }) {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { data: summary, isLoading } = useCleaningSummary(campaign.id);
+
+  const formatDate = (date: string) => new Date(date).toLocaleDateString();
+
+  const getCleaningStatusBadge = (status?: string | null) => {
+    const s = status || 'cleaning_open';
+    const map: Record<string, { bg: string; color: string; key: string }> = {
+      cleaning_open: { bg: '#FEF9C3', color: '#854D0E', key: 'cleaning.statusOpen' },
+      cleaning_in_progress: { bg: '#DBEAFE', color: '#1E40AF', key: 'cleaning.statusInProgress' },
+      cleaning_done: { bg: '#DEF7EC', color: '#03543F', key: 'cleaning.statusDone' },
+    };
+    const c = map[s] || map.cleaning_open!;
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: c.bg, color: c.color }}>
+        {t(c.key)}
+      </span>
+    );
+  };
+
+  const openCleaning = () => {
+    navigate(`/cleaning/${campaign.id}`);
+  };
+
+  return (
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>{t('subassetDetail.colInspectionDate')}</th>
+          <th style={thStyle}>{t('repair.colTurbine')}</th>
+          <th style={thStyle}>{t('subassetDetail.colStatus')}</th>
+          <th style={thStyle}>{t('subassetDetail.colType')}</th>
+          <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
+          <th style={thStyle}>{t('cleaning.colSelected')}</th>
+          <th style={thStyle}>{t('cleaning.colZones')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style={{ cursor: 'pointer' }} onClick={openCleaning}>
+          <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
+          <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
+          <td style={tdStyle}>{getCleaningStatusBadge(campaign.status)}</td>
+          <td style={tdStyle}>{t('campaign.typeCleaning')}</td>
+          <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
+          <td style={tdStyle}>{isLoading ? '…' : summary?.selectedCount ?? 0}</td>
+          <td style={tdStyle}>
+            {isLoading
+              ? '…'
+              : `${summary?.zonesWithPhotos ?? 0}/${summary?.totalZones ?? 0}`}
+          </td>
         </tr>
       </tbody>
     </table>
