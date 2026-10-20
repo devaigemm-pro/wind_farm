@@ -149,6 +149,8 @@ export function WindFarmDetail() {
             <CampaignsPanel
               campaigns={campaigns ?? []}
               isLoading={campaignsLoading}
+              windFarmId={windFarmId}
+              canCreate={role !== 'supervisor' && role !== 'client'}
               onViewResults={handleViewResults}
               onSubassetClick={handleSubassetNameClick}
               onInspectionClick={(inspectionId, status, campaignId, turbineId, stage) => {

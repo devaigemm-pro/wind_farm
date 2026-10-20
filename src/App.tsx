@@ -71,6 +71,9 @@ const TraceabilityPage = lazy(() =>
 const RepairWorkflowPage = lazy(() =>
   import('@/pages/RepairWorkflow').then((m) => ({ default: m.RepairWorkflow })),
 );
+const CleaningWorkflowPage = lazy(() =>
+  import('@/pages/CleaningWorkflow').then((m) => ({ default: m.CleaningWorkflow })),
+);
 const UsersAdminPage = lazy(() =>
   import('@/pages/UsersAdmin').then((m) => ({ default: m.UsersAdmin })),
 );
@@ -189,6 +192,10 @@ function AppRoutes() {
             client can only generate/download reports; photo selection is
             disabled in the UI (and blocked by RLS). */}
         <Route path="/repairs/:campaignId" element={<RepairWorkflowPage />} />
+
+        {/* Cleaning workflow — parallel to repairs. client is read-only for
+            photo selection (RLS also blocks the write). */}
+        <Route path="/cleaning/:campaignId" element={<CleaningWorkflowPage />} />
 
         <Route path="/profile" element={<ProfilePage />} />
 
