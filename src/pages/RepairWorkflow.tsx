@@ -1268,17 +1268,15 @@ function StageRow({
             }
           : undefined
       }
-      onDragLeave={
-        canReceiveMove
-          ? (e) => {
-              // Ignore leave events bubbling from children still inside the card.
-              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-              // Only clear if WE are the current target — avoids a late leave
-              // from a previous stage wiping the highlight of the new one.
-              if (hoverTargetStageId === thisStageId) setHoverTargetStageId(null);
-            }
-          : undefined
-      }
+      // No onDragLeave here on purpose. Leaving the highlight to a per-stage
+      // dragLeave is unreliable: with fast moves across adjacent cards the
+      // leave of the OLD card fires AFTER the dragOver of the NEW one, and the
+      // handler reads a stale `hoverTargetStageId` from its render closure, so
+      // the conditional clear misfires and intermediate stages stay green.
+      // Instead, every dragOver REASSIGNS the single shared target to the stage
+      // currently under the pointer (only one stage can ever equal it), and the
+      // final reset happens on `drop`/`dragend` (StagesList safety net). This
+      // guarantees exactly one highlighted stage at a time with no residue.
       onDrop={
         canReceiveMove
           ? (e) => {

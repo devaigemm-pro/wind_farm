@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 324
+- **Sesiones analizadas**: 325
 - **Última actualización**: 2026-10-19
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -2289,3 +2289,19 @@
   - Causa raíz real: estado `stageDropActive` local por StageRow + optimistic re-render de la etapa destino creaban una carrera; el `true` del último dragOver ganaba. Solución de raíz: estado compartido único `hoverTargetStageId` a nivel del defecto con un solo reset → elimina la clase entera de bug.
   - Reportó el problema con precisión quirúrgica ("la etapa que recibe la fotografia"), distinguiendo del origen que ya estaba resuelto. Observación visual muy afinada.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, "diagnosticar más profundo" cuando un fix no basta (NO parche superficial), iteración de pulido post-deploy, "aplicar en prod" = deploy manual Vercel.
+
+### Sesión 324 (cont.) - 2026-10-19 — Deploy del fix de raíz
+- **Tarea principal**: "aplicar en prod" del rediseño del highlight compartido.
+- **Observaciones nuevas**: Deploy sin novedad (rebase/merge/push `fb4942b..eb6ac40` → vercel --prod, 34s). Verificación por tamaño de chunk (49931 B coincide con build local) + grep de feature (x-stage-id) y reset (dragend) presentes. Ciclo de 4 sesiones consecutivas sobre la MISMA feature (repair photo move): base → mecanismo correcto → fix origen → fix destino de raíz. Barrido de pulido muy detallado antes de dar por cerrada una feature.
+- **Patrones confirmados**: "aplicar en prod" = deploy manual Vercel, verificación por chunk, iteración incremental de pulido, alta autonomía, comunicación ultra-mínima.
+
+- **"el cambio es basico, favor se profesional"** — señal de frustración cuando el agente sobre-complica un fix visual simple. Tras 3 intentos sobre el mismo bug de highlight (cada fix introdujo o dejó un problema distinto), el usuario marca que la solución debería ser trivial. LECCIÓN: ante un bug visual de drag&drop, NO acumular mecanismos (estado local → listener global → estado compartido → ...); diagnosticar la causa raíz REAL primero (usar context-gatherer si hace falta) y aplicar el cambio mínimo. Aquí la raíz era un guard con closure stale en onDragLeave; la solución profesional fue ELIMINAR ese handler, no agregar más lógica. "básico" = menos código, no más.
+
+### Sesión 325 - 2026-10-19 — Fix definitivo highlight (quitar onDragLeave frágil)
+- **Tarea principal**: Al arrastrar una foto por varias etapas, TODAS las etapas por las que pasó quedaban marcadas. "el cambio es basico, favor se profesional".
+- **Observaciones nuevas**:
+  - Tercer intento fallido sobre el mismo highlight → el usuario expresa que es trivial y pide profesionalismo. Confirma el patrón "diagnosticar más profundo" + "es un cambio simple, no sobrecomplicar".
+  - Usé context-gatherer para hallar la causa EXACTA antes de tocar: guard condicional `if (hoverTargetStageId === thisStageId)` en onDragLeave con closure stale + orden tardío de dragleave vs dragover de la card adyacente. Esto evitó un cuarto parche a ciegas.
+  - Solución profesional = QUITAR código: eliminar el onDragLeave del stageCard. Cada dragOver reasigna el único estado compartido; reset en drop/dragend. Cero guards frágiles.
+  - El usuario describe el síntoma con precisión reproducible ("si la foto viaja por 3 etapas hacia arriba o abajo marca todos los bordes") — da el caso exacto para reproducir.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, "diagnosticar más profundo" (confianza muy alta), "no sobrecomplicar / es básico", describe bug con caso reproducible, iteración de pulido, frustración marcada cuando se repite el error.
