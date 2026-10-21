@@ -6,6 +6,7 @@ import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { useRepairSummary } from '@/hooks/useRepair';
 import { useCleaningSummary } from '@/hooks/useCleaning';
+import { useHoistSummary } from '@/hooks/useHoistCertification';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
@@ -35,7 +36,8 @@ export function CampaignAccordion({
 
   const isRepair = campaign.type === 'repair';
   const isCleaning = campaign.type === 'cleaning';
-  const isInspection = !isRepair && !isCleaning;
+  const isHoist = campaign.type === 'hoist_certification';
+  const isInspection = !isRepair && !isCleaning && !isHoist;
 
   // When a filter is active, always load inspections to show filtered results
   const shouldLoadInspections = isInspection && (isExpanded || !!filterBySubasset);
@@ -83,14 +85,16 @@ export function CampaignAccordion({
           </span>
           <span style={{
             padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, marginLeft: 8,
-            background: isRepair ? '#FEF3C7' : isCleaning ? '#DCFCE7' : '#DBEAFE',
-            color: isRepair ? '#92400E' : isCleaning ? '#166534' : '#1E40AF',
+            background: isRepair ? '#FEF3C7' : isCleaning ? '#DCFCE7' : isHoist ? '#DCFCE7' : '#DBEAFE',
+            color: isRepair ? '#92400E' : isCleaning ? '#166534' : isHoist ? '#166534' : '#1E40AF',
           }}>
             {isRepair
               ? t('campaign.typeRepair')
               : isCleaning
                 ? t('campaign.typeCleaning')
-                : t('campaign.typeInspection')}
+                : isHoist
+                  ? t('campaign.typeHoistCertification')
+                  : t('campaign.typeInspection')}
           </span>
         </button>
 
@@ -155,6 +159,13 @@ export function CampaignAccordion({
       {effectiveExpanded && isCleaning && (
         <div style={tableWrapperStyle}>
           <CleaningCampaignRows campaign={campaign} />
+        </div>
+      )}
+
+      {/* Expanded Table — hoist-certification variant */}
+      {effectiveExpanded && isHoist && (
+        <div style={tableWrapperStyle}>
+          <HoistCampaignRows campaign={campaign} />
         </div>
       )}
 
@@ -358,6 +369,72 @@ function CleaningCampaignRows({ campaign }: { campaign: Campaign }) {
             {isLoading
               ? '…'
               : `${summary?.zonesWithPhotos ?? 0}/${summary?.totalZones ?? 0}`}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Hoist-certification campaign rows ─────────────────────────────────────────
+
+function HoistCampaignRows({ campaign }: { campaign: Campaign }) {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { data: summary, isLoading } = useHoistSummary(campaign.id);
+
+  const formatDate = (date: string) => new Date(date).toLocaleDateString();
+
+  const getHoistStatusBadge = (status?: string | null) => {
+    const s = status || 'hoist_open';
+    const map: Record<string, { bg: string; color: string; key: string }> = {
+      hoist_open: { bg: '#FEF9C3', color: '#854D0E', key: 'hoist.statusOpen' },
+      hoist_in_progress: { bg: '#DBEAFE', color: '#1E40AF', key: 'hoist.statusInProgress' },
+      hoist_done: { bg: '#DEF7EC', color: '#03543F', key: 'hoist.statusDone' },
+    };
+    const c = map[s] || map.hoist_open!;
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: c.bg, color: c.color }}>
+        {t(c.key)}
+      </span>
+    );
+  };
+
+  const openHoist = () => {
+    navigate(`/hoist-certification/${campaign.id}`);
+  };
+
+  return (
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>{t('subassetDetail.colInspectionDate')}</th>
+          <th style={thStyle}>{t('repair.colTurbine')}</th>
+          <th style={thStyle}>{t('subassetDetail.colStatus')}</th>
+          <th style={thStyle}>{t('subassetDetail.colType')}</th>
+          <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
+          <th style={thStyle}>{t('cleaning.colSelected')}</th>
+          <th style={thStyle}>{t('hoist.colChecks')}</th>
+          <th style={thStyle}>{t('hoist.colItems')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style={{ cursor: 'pointer' }} onClick={openHoist}>
+          <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
+          <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
+          <td style={tdStyle}>{getHoistStatusBadge(campaign.status)}</td>
+          <td style={tdStyle}>{t('campaign.typeHoistCertification')}</td>
+          <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
+          <td style={tdStyle}>{isLoading ? '…' : summary?.selectedCount ?? 0}</td>
+          <td style={tdStyle}>
+            {isLoading
+              ? '…'
+              : `${summary?.checksPassed ?? 0}/${summary?.checksEvaluated ?? 0}`}
+          </td>
+          <td style={tdStyle}>
+            {isLoading
+              ? '…'
+              : `${summary?.itemsWithData ?? 0}/${summary?.totalItems ?? 0}`}
           </td>
         </tr>
       </tbody>

@@ -87,6 +87,24 @@ export function useCreateCleaningCampaign() {
   });
 }
 
+export function useCreateHoistCertificationCampaign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      windFarmId,
+      turbineId,
+      name,
+    }: {
+      windFarmId: string;
+      turbineId: string;
+      name: string;
+    }) => assetDetailService.createHoistCertificationCampaign(windFarmId, turbineId, name),
+    onSuccess: (_, { windFarmId }) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns', windFarmId] });
+    },
+  });
+}
+
 export function useUpdateCampaign() {
   const queryClient = useQueryClient();
   return useMutation({

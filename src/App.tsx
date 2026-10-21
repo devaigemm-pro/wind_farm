@@ -74,6 +74,11 @@ const RepairWorkflowPage = lazy(() =>
 const CleaningWorkflowPage = lazy(() =>
   import('@/pages/CleaningWorkflow').then((m) => ({ default: m.CleaningWorkflow })),
 );
+const HoistCertificationWorkflowPage = lazy(() =>
+  import('@/pages/HoistCertificationWorkflow').then((m) => ({
+    default: m.HoistCertificationWorkflow,
+  })),
+);
 const UsersAdminPage = lazy(() =>
   import('@/pages/UsersAdmin').then((m) => ({ default: m.UsersAdmin })),
 );
@@ -196,6 +201,13 @@ function AppRoutes() {
         {/* Cleaning workflow — parallel to repairs. client is read-only for
             photo selection (RLS also blocks the write). */}
         <Route path="/cleaning/:campaignId" element={<CleaningWorkflowPage />} />
+
+        {/* Hoist certification workflow — parallel to cleaning. client is
+            read-only for photo selection (RLS also blocks the write). */}
+        <Route
+          path="/hoist-certification/:campaignId"
+          element={<HoistCertificationWorkflowPage />}
+        />
 
         <Route path="/profile" element={<ProfilePage />} />
 

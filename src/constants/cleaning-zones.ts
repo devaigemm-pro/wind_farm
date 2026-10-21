@@ -59,18 +59,19 @@ export const CLEANING_ZONE_CATALOG: readonly CleaningZoneCatalogEntry[] = [
   { code: 'palas_b', labelEs: 'Pala B', labelEn: 'Blade B', sortOrder: 3, parentCode: 'palas', isRoot: false, isLeaf: true },
   { code: 'palas_c', labelEs: 'Pala C', labelEn: 'Blade C', sortOrder: 4, parentCode: 'palas', isRoot: false, isLeaf: true },
 
-  // ── Nacelle (container + 4 sub-zones) ─────────────────────────────────────
+  // ── Nacelle (container + 5 sub-zones) ─────────────────────────────────────
   { code: 'nacelle', labelEs: 'Nacelle', labelEn: 'Nacelle', sortOrder: 5, parentCode: null, isRoot: true, isLeaf: false },
-  { code: 'nacelle_derecho', labelEs: 'Lado derecho', labelEn: 'Right side', sortOrder: 6, parentCode: 'nacelle', isRoot: false, isLeaf: true },
-  { code: 'nacelle_inferior', labelEs: 'Lado inferior', labelEn: 'Bottom side', sortOrder: 7, parentCode: 'nacelle', isRoot: false, isLeaf: true },
-  { code: 'nacelle_izquierdo', labelEs: 'Lado izquierdo', labelEn: 'Left side', sortOrder: 8, parentCode: 'nacelle', isRoot: false, isLeaf: true },
-  { code: 'nacelle_trasero', labelEs: 'Lado trasero', labelEn: 'Rear side', sortOrder: 9, parentCode: 'nacelle', isRoot: false, isLeaf: true },
+  { code: 'nacelle_superior', labelEs: 'Lado superior (techo)', labelEn: 'Top side (roof)', sortOrder: 6, parentCode: 'nacelle', isRoot: false, isLeaf: true },
+  { code: 'nacelle_derecho', labelEs: 'Lado derecho', labelEn: 'Right side', sortOrder: 7, parentCode: 'nacelle', isRoot: false, isLeaf: true },
+  { code: 'nacelle_inferior', labelEs: 'Lado inferior', labelEn: 'Bottom side', sortOrder: 8, parentCode: 'nacelle', isRoot: false, isLeaf: true },
+  { code: 'nacelle_izquierdo', labelEs: 'Lado izquierdo', labelEn: 'Left side', sortOrder: 9, parentCode: 'nacelle', isRoot: false, isLeaf: true },
+  { code: 'nacelle_trasero', labelEs: 'Lado trasero', labelEn: 'Rear side', sortOrder: 10, parentCode: 'nacelle', isRoot: false, isLeaf: true },
 
   // ── Hub (leaf zone, no sub-zones) ─────────────────────────────────────────
-  { code: 'hub', labelEs: 'Hub', labelEn: 'Hub', sortOrder: 10, parentCode: null, isRoot: true, isLeaf: true },
+  { code: 'hub', labelEs: 'Hub', labelEn: 'Hub', sortOrder: 11, parentCode: null, isRoot: true, isLeaf: true },
 
   // ── Torre (leaf zone, no sub-zones) ───────────────────────────────────────
-  { code: 'torre', labelEs: 'Torre', labelEn: 'Tower', sortOrder: 11, parentCode: null, isRoot: true, isLeaf: true },
+  { code: 'torre', labelEs: 'Torre', labelEn: 'Tower', sortOrder: 12, parentCode: null, isRoot: true, isLeaf: true },
 ] as const;
 
 /** Lookup map: zone code → catalog entry. */

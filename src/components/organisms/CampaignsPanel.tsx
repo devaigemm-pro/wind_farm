@@ -4,6 +4,7 @@ import { Skeleton } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
 import { CampaignAccordion } from './CampaignAccordion';
 import { NewCleaningCampaignModal } from './NewCleaningCampaignModal';
+import { NewHoistCertificationModal } from './NewHoistCertificationModal';
 import type { Campaign } from '@/types';
 
 export interface CampaignsPanelProps {
@@ -26,8 +27,11 @@ export function CampaignsPanel({
   campaigns, isLoading, windFarmId, onViewResults, onSubassetClick, onInspectionClick, onEditCampaign, onDeleteCampaign, canCreate = true, filterBySubasset, onClearFilter,
 }: CampaignsPanelProps) {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'inspection' | 'repair' | 'cleaning'>('inspection');
+  const [activeTab, setActiveTab] = useState<
+    'inspection' | 'repair' | 'cleaning' | 'hoist_certification'
+  >('inspection');
   const [showNewCleaning, setShowNewCleaning] = useState(false);
+  const [showNewHoist, setShowNewHoist] = useState(false);
 
   const inspectionCampaigns = useMemo(
     () => campaigns.filter((c) => (c.type ?? 'inspection') === 'inspection'),
@@ -41,12 +45,18 @@ export function CampaignsPanel({
     () => campaigns.filter((c) => c.type === 'cleaning'),
     [campaigns],
   );
+  const hoistCampaigns = useMemo(
+    () => campaigns.filter((c) => c.type === 'hoist_certification'),
+    [campaigns],
+  );
   const visibleCampaigns =
     activeTab === 'repair'
       ? repairCampaigns
       : activeTab === 'cleaning'
         ? cleaningCampaigns
-        : inspectionCampaigns;
+        : activeTab === 'hoist_certification'
+          ? hoistCampaigns
+          : inspectionCampaigns;
 
   return (
     <div style={containerStyle}>
@@ -73,6 +83,12 @@ export function CampaignsPanel({
         >
           {t('campaign.typeCleaning')} ({cleaningCampaigns.length})
         </button>
+        <button
+          style={activeTab === 'hoist_certification' ? activeHoistTabStyle : tabStyle}
+          onClick={() => setActiveTab('hoist_certification')}
+        >
+          {t('campaign.typeHoistCertification')} ({hoistCampaigns.length})
+        </button>
       </div>
 
       {/* Create a new cleaning campaign (selector modal) — only on the
@@ -81,6 +97,15 @@ export function CampaignsPanel({
         <div style={createBarStyle}>
           <button style={createBtnStyle} onClick={() => setShowNewCleaning(true)}>
             <Plus size={14} /> {t('cleaning.newCampaign')}
+          </button>
+        </div>
+      )}
+      {/* Create a new hoist-certification campaign (selector modal) — only on
+          the Certificación tab, for users who can create campaigns. */}
+      {activeTab === 'hoist_certification' && canCreate && windFarmId && (
+        <div style={createBarStyle}>
+          <button style={createHoistBtnStyle} onClick={() => setShowNewHoist(true)}>
+            <Plus size={14} /> {t('hoist.newCampaign')}
           </button>
         </div>
       )}
@@ -127,6 +152,15 @@ export function CampaignsPanel({
           onClose={() => setShowNewCleaning(false)}
         />
       )}
+
+      {/* New hoist-certification campaign selector modal */}
+      {windFarmId && showNewHoist && (
+        <NewHoistCertificationModal
+          windFarmId={windFarmId}
+          isOpen
+          onClose={() => setShowNewHoist(false)}
+        />
+      )}
     </div>
   );
 }
@@ -139,6 +173,9 @@ const createBtnStyle: React.CSSProperties = {
   background: '#5A8F5A', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)',
   fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer',
 };
+const createHoistBtnStyle: React.CSSProperties = {
+  ...createBtnStyle, background: '#5A8F5A',
+};
 const containerStyle: React.CSSProperties = { padding: 'var(--space-4)' };
 const tabsStyle: React.CSSProperties = { display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-neutral-200)' };
 const tabStyle: React.CSSProperties = {
@@ -147,6 +184,9 @@ const tabStyle: React.CSSProperties = {
   color: 'var(--color-neutral-500)', fontFamily: 'var(--font-family-sans)',
 };
 const activeTabStyle: React.CSSProperties = {
+  ...tabStyle, color: '#5A8F5A', borderBottom: '2px solid #5A8F5A',
+};
+const activeHoistTabStyle: React.CSSProperties = {
   ...tabStyle, color: '#5A8F5A', borderBottom: '2px solid #5A8F5A',
 };
 const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' };

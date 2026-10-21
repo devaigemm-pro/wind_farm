@@ -269,14 +269,17 @@ export interface TurbineSubassetRow {
   inspectionsCount: number;
 }
 
-/** Campaign discriminator: inspection (drone photos) vs repair (from approved quote) vs cleaning (turbine cleaning) */
-export type CampaignType = 'inspection' | 'repair' | 'cleaning';
+/** Campaign discriminator: inspection (drone photos) vs repair (from approved quote) vs cleaning (turbine cleaning) vs hoist_certification (hoist certification) */
+export type CampaignType = 'inspection' | 'repair' | 'cleaning' | 'hoist_certification';
 
 /** Repair campaign workflow status */
 export type RepairCampaignStatus = 'repair_open' | 'repair_in_progress' | 'repair_done';
 
 /** Cleaning campaign workflow status */
 export type CleaningCampaignStatus = 'cleaning_open' | 'cleaning_in_progress' | 'cleaning_done';
+
+/** Hoist-certification campaign workflow status */
+export type HoistCertificationStatus = 'hoist_open' | 'hoist_in_progress' | 'hoist_done';
 
 /** Campaign entity */
 export interface Campaign {

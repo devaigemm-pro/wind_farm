@@ -206,6 +206,47 @@ export const assetDetailService = {
     };
   },
 
+  /**
+   * Create a HOIST-CERTIFICATION ("Certificación de polipastos") campaign.
+   * Inserts a `campaign` row with type='hoist_certification',
+   * status='hoist_open' and the selected turbine. Mirrors createCleaningCampaign
+   * — the items/photos themselves are later uploaded by the technician mobile
+   * app into hoist_cert_item / hoist_cert_photo (see
+   * hoistCertification.service.ts for the data contract).
+   */
+  async createHoistCertificationCampaign(
+    windFarmId: string,
+    turbineId: string,
+    name: string,
+  ): Promise<Campaign> {
+    const user = (await db.auth.getUser()).data.user;
+    const { data, error } = await db
+      .from('campaign')
+      .insert({
+        wind_farm_id: windFarmId,
+        turbine_id: turbineId,
+        name,
+        type: 'hoist_certification',
+        status: 'hoist_open',
+        created_by: user?.id ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw new AssetDetailServiceError(error.message, error.code);
+    const r = data as Record<string, unknown>;
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      windFarmId: r.wind_farm_id as string,
+      createdBy: r.created_by as string | null,
+      createdAt: r.created_at as string,
+      updatedAt: r.updated_at as string,
+      type: 'hoist_certification',
+      turbineId: (r.turbine_id as string) ?? null,
+      status: (r.status as string) ?? 'hoist_open',
+    };
+  },
+
   async updateCampaign(campaignId: string, name: string): Promise<void> {
     const { error } = await db
       .from('campaign')
