@@ -304,7 +304,9 @@ function RepairCampaignRows({ campaign }: { campaign: Campaign }) {
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
           <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
           <td style={tdStyle}>
-            {getRepairStatusBadge(campaign.status)}
+            <span style={statusCellStyle}>
+              {getRepairStatusBadge(campaign.status)}
+            </span>
           </td>
           <td style={tdStyle}>Blade</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
@@ -361,7 +363,11 @@ function CleaningCampaignRows({ campaign }: { campaign: Campaign }) {
         <tr style={{ cursor: 'pointer' }} onClick={openCleaning}>
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
           <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
-          <td style={tdStyle}>{getCleaningStatusBadge(campaign.status)}</td>
+          <td style={tdStyle}>
+            <span style={statusCellStyle}>
+              {getCleaningStatusBadge(campaign.status)}
+            </span>
+          </td>
           <td style={tdStyle}>{t('campaign.typeCleaning')}</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.selectedCount ?? 0}</td>
@@ -422,7 +428,11 @@ function HoistCampaignRows({ campaign }: { campaign: Campaign }) {
         <tr style={{ cursor: 'pointer' }} onClick={openHoist}>
           <td style={tdStyle}>{formatDate(campaign.createdAt)}</td>
           <td style={tdStyle}>{isLoading ? '…' : (summary?.turbineName ?? '—')}</td>
-          <td style={tdStyle}>{getHoistStatusBadge(campaign.status)}</td>
+          <td style={tdStyle}>
+            <span style={statusCellStyle}>
+              {getHoistStatusBadge(campaign.status)}
+            </span>
+          </td>
           <td style={tdStyle}>{t('campaign.typeHoistCertification')}</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.photosCount ?? 0}</td>
           <td style={tdStyle}>{isLoading ? '…' : summary?.selectedCount ?? 0}</td>
@@ -553,4 +563,10 @@ const pdfBtnStyle: React.CSSProperties = {
   padding: '4px',
   display: 'flex',
   alignItems: 'center',
+};
+
+const statusCellStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
 };

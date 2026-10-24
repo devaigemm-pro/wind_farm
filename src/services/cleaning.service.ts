@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { fetchInChunks, DEFAULT_CHUNK_SIZE } from '@/utils/chunk';
 import {
   CLEANING_ROOT_ZONES,
   CLEANING_ZONE_BY_CODE,
@@ -249,13 +250,17 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
   const unique = [...new Set(photoIds.filter(Boolean))];
   if (unique.length === 0) return selected;
   try {
-    const { data, error } = await db
-      .from('cleaning_photo')
-      .select('id, metadata')
-      .in('id', unique);
-    if (error) return selected;
-    for (const row of (data as unknown[]) ?? []) {
-      const r = row as Record<string, unknown>;
+    // Chunk the .in('id', ...) query: a single request with hundreds of photo
+    // ids overflows the PostgREST URL length limit and is rejected (HTTP 400).
+    const rows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+      const { data, error } = await db
+        .from('cleaning_photo')
+        .select('id, metadata')
+        .in('id', chunk);
+      if (error) throw error;
+      return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+    });
+    for (const r of rows) {
       if (isSelectedForReport(r.metadata)) selected.add(r.id as string);
     }
   } catch {

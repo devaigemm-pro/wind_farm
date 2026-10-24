@@ -6,6 +6,7 @@ import type {
   HoistItemNode,
   HoistSummary,
 } from '@/services/hoistCertification.service';
+import type { HoistCertificationStatus } from '@/types';
 
 // ─── Hoist campaign header ────────────────────────────────────────────────────
 
@@ -190,6 +191,24 @@ export function useMoveHoistPhoto(campaignId: string | undefined) {
         queryKey: ['hoist-cert-tree', campaignId],
         refetchType: 'none',
       });
+    },
+  });
+}
+
+/**
+ * Update hoist-certification campaign status, then refresh detail + summary +
+ * the wind farm campaigns list (so the panel status badge updates without a
+ * reload).
+ */
+export function useUpdateHoistStatus(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (status: HoistCertificationStatus) =>
+      hoistCertificationService.updateHoistStatus(campaignId!, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
 }

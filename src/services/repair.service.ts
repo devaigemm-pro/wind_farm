@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { REPAIR_STAGE_CATALOG } from '@/constants/repair-stages';
 import { fullName } from '@/utils/fullName';
+import { fetchInChunks, DEFAULT_CHUNK_SIZE } from '@/utils/chunk';
 import type { RepairCampaignStatus } from '@/types';
 import { buildCampaignAnnotationCodeMap, isUuid, BLADE_LETTERS as ANNOTATION_BLADE_LETTERS } from './defectNumbering';
 
@@ -317,11 +318,15 @@ async function resolveBladeInfoByDefect(
   const unique = [...new Set(defectIds.filter(Boolean))];
   if (unique.length === 0) return result;
 
-  // 1. Load the defects (with inspection + creation order).
-  const { data: defectRows } = await db
-    .from('defect')
-    .select('id, inspection_id, created_at')
-    .in('id', unique);
+  // 1. Load the defects (with inspection + creation order). Chunked to keep the
+  //    .in('id', ...) request under the PostgREST URL length limit.
+  const defectRows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+    const { data } = await db
+      .from('defect')
+      .select('id, inspection_id, created_at')
+      .in('id', chunk);
+    return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+  });
 
   const inspectionByDefect = new Map<string, string>();
   const createdAtByDefect = new Map<string, string>();
@@ -339,11 +344,18 @@ async function resolveBladeInfoByDefect(
   const positionByInspection = new Map<string, number>();
   const serialByInspection = new Map<string, string | null>();
   if (inspectionIds.size > 0) {
-    const { data: inspRows } = await db
-      .from('inspection')
-      .select('id, blade:blade_id ( position, serial_number )')
-      .in('id', [...inspectionIds]);
-    for (const ir of (inspRows as unknown[]) ?? []) {
+    const inspRows = await fetchInChunks(
+      [...inspectionIds],
+      DEFAULT_CHUNK_SIZE,
+      async (chunk) => {
+        const { data } = await db
+          .from('inspection')
+          .select('id, blade:blade_id ( position, serial_number )')
+          .in('id', chunk);
+        return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+      },
+    );
+    for (const ir of inspRows) {
       const r = ir as Record<string, unknown>;
       const blade = (r.blade as Record<string, unknown>) ?? {};
       positionByInspection.set(r.id as string, Number(blade.position) || 0);
@@ -414,14 +426,16 @@ async function fetchStageFlagsByRepair(
   const unique = [...new Set(repairIds.filter(Boolean))];
   if (unique.length === 0) return result;
 
-  const { data, error } = await db
-    .from('repair_stage')
-    .select('repair_id, stage_code, optional, enabled, z1, z2')
-    .in('repair_id', unique);
-  if (error) throw new RepairServiceError(error.message, error.code);
+  const rows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+    const { data, error } = await db
+      .from('repair_stage')
+      .select('repair_id, stage_code, optional, enabled, z1, z2')
+      .in('repair_id', chunk);
+    if (error) throw new RepairServiceError(error.message, error.code);
+    return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+  });
 
-  for (const row of (data as unknown[]) ?? []) {
-    const r = row as Record<string, unknown>;
+  for (const r of rows) {
     const repairId = r.repair_id as string;
     const stageCode = (r.stage_code as string) ?? '';
     if (!repairId || !stageCode) continue;
@@ -452,14 +466,18 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
   const unique = [...new Set(photoIds.filter(Boolean))];
   if (unique.length === 0) return selected;
 
-  const { data, error } = await db
-    .from('repair_photo')
-    .select('id, metadata')
-    .in('id', unique);
-  if (error) throw new RepairServiceError(error.message, error.code);
+  // Chunk the .in('id', ...) query: a single request with hundreds of photo ids
+  // overflows the PostgREST URL length limit and gets rejected with HTTP 400.
+  const rows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+    const { data, error } = await db
+      .from('repair_photo')
+      .select('id, metadata')
+      .in('id', chunk);
+    if (error) throw new RepairServiceError(error.message, error.code);
+    return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+  });
 
-  for (const row of (data as unknown[]) ?? []) {
-    const r = row as Record<string, unknown>;
+  for (const r of rows) {
     if (isSelectedForReport(r.metadata)) selected.add(r.id as string);
   }
   return selected;
@@ -480,13 +498,17 @@ async function fetchUploaderByPhotoId(photoIds: string[]): Promise<Map<string, s
   const unique = [...new Set(photoIds.filter(Boolean))];
   if (unique.length === 0) return byId;
 
-  const { data, error } = await db.rpc('get_repair_photo_uploaders', {
-    photo_ids: unique,
+  // The RPC takes the photo ids as a query param too, so a single call with
+  // hundreds of ids can overflow the URL limit (HTTP 400). Call it in batches.
+  const rows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+    const { data, error } = await db.rpc('get_repair_photo_uploaders', {
+      photo_ids: chunk,
+    });
+    if (error) throw new RepairServiceError(error.message, error.code);
+    return ((data as unknown[]) ?? []) as Record<string, unknown>[];
   });
-  if (error) throw new RepairServiceError(error.message, error.code);
 
-  for (const row of (data as unknown[]) ?? []) {
-    const r = row as Record<string, unknown>;
+  for (const r of rows) {
     const id = r.photo_id as string;
     const name = (r.uploader_name as string) ?? '';
     if (id && name) byId.set(id, name);
@@ -721,14 +743,21 @@ export const repairService = {
     // 3. Repairs of those work_orders → Map<work_order_id, repairRow>.
     const repairByWorkOrder = new Map<string, Record<string, unknown>>();
     if (workOrderIds.length > 0) {
-      const { data: repairRows, error: repErr } = await db
-        .from('repair')
-        .select(
-          'id, work_order_id, defect_id, status, technician_id, start_category, final_category, assigned_technician_id, progress_percent, blade_color',
-        )
-        .in('work_order_id', workOrderIds);
-      if (repErr) throw new RepairServiceError(repErr.message, repErr.code);
-      for (const rr of (repairRows as unknown[]) ?? []) {
+      const repairRows = await fetchInChunks(
+        workOrderIds,
+        DEFAULT_CHUNK_SIZE,
+        async (chunk) => {
+          const { data, error: repErr } = await db
+            .from('repair')
+            .select(
+              'id, work_order_id, defect_id, status, technician_id, start_category, final_category, assigned_technician_id, progress_percent, blade_color',
+            )
+            .in('work_order_id', chunk);
+          if (repErr) throw new RepairServiceError(repErr.message, repErr.code);
+          return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+        },
+      );
+      for (const rr of repairRows) {
         const r = rr as Record<string, unknown>;
         const woId = r.work_order_id as string;
         if (woId && !repairByWorkOrder.has(woId)) repairByWorkOrder.set(woId, r);
@@ -738,14 +767,17 @@ export const repairService = {
     // 4. Real defect rows → Map<defect_id, defectRow>.
     const defectById = new Map<string, Record<string, unknown>>();
     if (defectIds.length > 0) {
-      const { data: defectRows, error: defErr } = await db
-        .from('defect')
-        .select(
-          'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at, defect_number, defect_identifier',
-        )
-        .in('id', defectIds);
-      if (defErr) throw new RepairServiceError(defErr.message, defErr.code);
-      for (const dr of (defectRows as unknown[]) ?? []) {
+      const defectRows = await fetchInChunks(defectIds, DEFAULT_CHUNK_SIZE, async (chunk) => {
+        const { data, error: defErr } = await db
+          .from('defect')
+          .select(
+            'id, type, severity, side, distance_from_root, width_cm, height_cm, description, inspection_id, created_at, defect_number, defect_identifier',
+          )
+          .in('id', chunk);
+        if (defErr) throw new RepairServiceError(defErr.message, defErr.code);
+        return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+      });
+      for (const dr of defectRows) {
         const r = dr as Record<string, unknown>;
         defectById.set(r.id as string, r);
       }
@@ -832,11 +864,11 @@ export const repairService = {
       ...new Set(workOrders.map((w) => w.turbineId).filter((id): id is string => Boolean(id))),
     ];
     if (turbineIds.length > 0) {
-      const { data: turbineRows } = await db
-        .from('turbine')
-        .select('id, name')
-        .in('id', turbineIds);
-      for (const tr of (turbineRows as unknown[]) ?? []) {
+      const turbineRows = await fetchInChunks(turbineIds, DEFAULT_CHUNK_SIZE, async (chunk) => {
+        const { data } = await db.from('turbine').select('id, name').in('id', chunk);
+        return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+      });
+      for (const tr of turbineRows) {
         const r = tr as Record<string, unknown>;
         turbineNameById.set(r.id as string, (r.name as string) ?? '');
       }
@@ -1200,6 +1232,34 @@ export const repairService = {
 
     const { error } = await db.from('repair').update(patch).eq('id', repairId);
     if (error) throw new RepairServiceError(error.message, error.code);
+  },
+
+  /**
+   * Reopen a SINGLE finished defect: set its `repair` row status back to
+   * 'in_progress'. As a consequence, if the whole campaign was marked
+   * 'repair_done', bump it back to 'repair_in_progress' (work resumed). The
+   * campaign bump is a no-op when it's already in progress/open. Robust: reads
+   * the campaign status and only writes when it's 'repair_done'.
+   */
+  async reopenDefect(repairId: string, campaignId: string): Promise<void> {
+    // 1. Reopen the defect's repair row.
+    const { error: repairErr } = await db
+      .from('repair')
+      .update({ status: 'in_progress' })
+      .eq('id', repairId);
+    if (repairErr) throw new RepairServiceError(repairErr.message, repairErr.code);
+
+    // 2. If the campaign was done, resume it (no-op otherwise).
+    const { data: campaignRow, error: readErr } = await db
+      .from('campaign')
+      .select('status')
+      .eq('id', campaignId)
+      .single();
+    if (readErr) throw new RepairServiceError(readErr.message, readErr.code);
+
+    if ((campaignRow as { status?: string } | null)?.status === 'repair_done') {
+      await this.updateRepairStatus(campaignId, 'repair_in_progress');
+    }
   },
 
   /**

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, RotateCcw, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +14,7 @@ import {
   useUpdateDefectFields,
   useUpdateRepairProgress,
   useUpdateBladeColor,
+  useReopenDefect,
   useTechnicians,
 } from '@/hooks/useRepair';
 import { parseCoatingMethod } from '@/utils/coatingMethod';
@@ -110,6 +111,7 @@ export function RepairWorkflow() {
   const updateDefectFields = useUpdateDefectFields(campaignId);
   const updateRepairProgress = useUpdateRepairProgress(campaignId);
   const updateBladeColor = useUpdateBladeColor(campaignId);
+  const reopenDefect = useReopenDefect(campaignId);
   const { data: technicians = [] } = useTechnicians();
 
   // defectId currently being generated (null = none). Scopes the spinner to
@@ -361,6 +363,23 @@ export function RepairWorkflow() {
     );
   };
 
+  // Reopen a FINISHED defect (repair.status 'completed' → 'in_progress'). As a
+  // consequence the service resumes the campaign if it was repair_done. Returns
+  // a promise so the button can show a spinner while saving.
+  const handleReopenDefect = (repairId: string) =>
+    new Promise<void>((resolve, reject) => {
+      reopenDefect.mutate(repairId, {
+        onSuccess: () => {
+          toast.success(t('repair.reopenDefectSuccess'));
+          resolve();
+        },
+        onError: (err) => {
+          toast.error((err as Error)?.message || t('repair.reopenDefectError'));
+          reject(err);
+        },
+      });
+    });
+
   // Persist the three editable defect fields (type, defect_number,
   // defect_identifier) with a DIRECT update — the manual number is NOT
   // recomputed. Returns a promise so the card can await + exit edit mode.
@@ -461,6 +480,7 @@ export function RepairWorkflow() {
               onDownloadReport={handleDownloadDefectPdf}
               repairsWithReport={repairsWithReport}
               onDelete={isClient ? undefined : handleDeleteDefect}
+              onReopenDefect={isClient ? undefined : handleReopenDefect}
               downloadingDefectId={downloadingDefectId}
               onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
               typeOptions={typeOptions}
@@ -513,6 +533,8 @@ interface BladeGroupSectionProps {
   onDownloadReport: (repairId: string) => void;
   repairsWithReport: Set<string>;
   onDelete?: (node: RepairDefectNode) => void;
+  /** Reopen a finished defect (undefined = read-only client). */
+  onReopenDefect?: (repairId: string) => Promise<void>;
   downloadingDefectId: string | null;
   /** Persist the three editable defect fields (undefined = read-only client). */
   onSaveDefectFields?: (
@@ -553,6 +575,7 @@ function BladeGroupSection({
   onDownloadReport,
   repairsWithReport,
   onDelete,
+  onReopenDefect,
   downloadingDefectId,
   onSaveDefectFields,
   typeOptions,
@@ -591,6 +614,7 @@ function BladeGroupSection({
               onDownloadReport={onDownloadReport}
               hasReport={node.repairId != null && repairsWithReport.has(node.repairId)}
               onDelete={onDelete}
+              onReopenDefect={onReopenDefect}
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
               onSaveDefectFields={onSaveDefectFields}
               typeOptions={typeOptions}
@@ -621,6 +645,8 @@ interface DefectSectionProps {
   /** True when this repair already has a persisted report → show "Download". */
   hasReport: boolean;
   onDelete?: (node: RepairDefectNode) => void;
+  /** Reopen a finished defect (undefined = read-only client). */
+  onReopenDefect?: (repairId: string) => Promise<void>;
   downloading: boolean;
   /** Persist the three editable defect fields (undefined = read-only client). */
   onSaveDefectFields?: (
@@ -656,6 +682,7 @@ function DefectSection({
   onDownloadReport,
   hasReport,
   onDelete,
+  onReopenDefect,
   downloading,
   onSaveDefectFields,
   typeOptions,
@@ -727,6 +754,24 @@ function DefectSection({
     if (String(n) !== String(node.progressPercent ?? '')) {
       setProgress(String(n));
       commitProgressField({ progressPercent: n });
+    }
+  };
+
+  // ── Reopen-defect state (spinner while the status flips to in_progress) ───
+  const [reopening, setReopening] = useState(false);
+  // Only a FINISHED defect (repair.status 'completed') with a repair row can be
+  // reopened; and never for the read-only client (onReopenDefect is undefined).
+  const canReopenDefect =
+    Boolean(onReopenDefect) && node.repairId != null && node.repairStatus === 'completed';
+  const handleReopen = async () => {
+    if (!onReopenDefect || node.repairId == null || reopening) return;
+    setReopening(true);
+    try {
+      await onReopenDefect(node.repairId);
+    } catch {
+      /* toast handled upstream */
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -931,6 +976,36 @@ function DefectSection({
           >
             <Trash2 size={14} />
             {t('repair.deleteDefect')}
+          </span>
+        )}
+        {canReopenDefect && (
+          <span
+            role="button"
+            tabIndex={0}
+            style={{
+              ...defectReopenBtn,
+              opacity: reopening ? 0.5 : 1,
+              cursor: reopening ? 'not-allowed' : 'pointer',
+            }}
+            aria-disabled={reopening}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!reopening) void handleReopen();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                if (!reopening) void handleReopen();
+              }
+            }}
+            title={t('repair.reopenDefect')}
+          >
+            {reopening ? (
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <RotateCcw size={14} />
+            )}
+            {t('repair.reopenDefect')}
           </span>
         )}
       </button>
@@ -1606,6 +1681,9 @@ const defectDeleteBtn: React.CSSProperties = {
 };
 const defectEditBtn: React.CSSProperties = {
   ...defectPdfBtn, background: '#6B7280',
+};
+const defectReopenBtn: React.CSSProperties = {
+  ...defectPdfBtn, background: '#2563EB',
 };
 const editForm: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 12, padding: 16,

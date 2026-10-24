@@ -6,6 +6,7 @@ import type {
   CleaningZoneNode,
   CleaningSummary,
 } from '@/services/cleaning.service';
+import type { CleaningCampaignStatus } from '@/types';
 
 // ─── Cleaning campaign header ────────────────────────────────────────────────
 
@@ -182,6 +183,23 @@ export function useMovePhotoToZone(campaignId: string | undefined) {
         queryKey: ['cleaning-tree', campaignId],
         refetchType: 'none',
       });
+    },
+  });
+}
+
+/**
+ * Update cleaning campaign status, then refresh detail + summary + the wind
+ * farm campaigns list (so the panel status badge updates without a reload).
+ */
+export function useUpdateCleaningStatus(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (status: CleaningCampaignStatus) =>
+      cleaningService.updateCleaningStatus(campaignId!, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cleaning-campaign-detail', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['cleaning-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
 }

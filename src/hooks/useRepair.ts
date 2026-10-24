@@ -278,6 +278,24 @@ export function useTechnicians() {
   });
 }
 
+/**
+ * Reopen a single finished defect (set its repair row back to 'in_progress')
+ * and, as a consequence, resume the campaign if it was 'repair_done'. Refreshes
+ * the tree + summary (so the defect badge flips) and the campaigns list (so the
+ * panel status badge updates without a reload).
+ */
+export function useReopenDefect(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (repairId: string) => repairService.reopenDefect(repairId, campaignId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+    },
+  });
+}
+
 /** Update repair campaign status, then refresh detail + summary. */
 export function useUpdateRepairStatus(campaignId: string | undefined) {
   const queryClient = useQueryClient();
@@ -287,6 +305,7 @@ export function useUpdateRepairStatus(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repair-campaign-detail', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
 }
