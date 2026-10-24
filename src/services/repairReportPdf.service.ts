@@ -870,7 +870,7 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
  * Cover page (page 1). Ported EXACTLY from the inspection cover in
  * ExportPanel.tsx (handleGeneratePDF → "PAGE 1: Cover"), so the repair cover is
  * faithful to the real inspection cover, with two differences:
- *   - the hero image is `/repairs.jpg` instead of `/portada.png`
+ *   - the hero image is `/repairs.png` instead of `/portada.png`
  *   - the title's second line is "Informe de Reparación"
  *
  * Layout: full-page hero image with the green overlay (rgba(90,143,90,0.55))
@@ -896,7 +896,7 @@ async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
     const heroLoaded = await new Promise<boolean>((resolve) => {
       heroImg.onload = () => resolve(true);
       heroImg.onerror = () => resolve(false);
-      heroImg.src = '/repairs.jpg';
+      heroImg.src = '/repairs.png';
     });
     if (heroLoaded && heroImg.naturalWidth > 0) {
       const canvas = document.createElement('canvas');
@@ -912,7 +912,7 @@ async function renderCoverPage(doc: jsPDF, ctx: RepairPdfContext) {
       coverImageLoaded = true;
     }
   } catch (e) {
-    console.warn('[repairReportPdf] Could not load repairs.jpg:', e);
+    console.warn('[repairReportPdf] Could not load repairs.png:', e);
   }
 
   if (!coverImageLoaded) {
@@ -1587,7 +1587,7 @@ export async function generateAndDownloadRepairReport(
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
-  // 1. Cover page (page 1): repairs.jpg hero + title + subtitles + CORE Insight logo.
+  // 1. Cover page (page 1): repairs.png hero + title + subtitles + CORE Insight logo.
   await renderCoverPage(doc, ctx);
 
   // 1b. General data + blade data + findings (page 2 onwards).

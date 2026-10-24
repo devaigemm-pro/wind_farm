@@ -233,7 +233,7 @@ async function renderCoverPage(doc: jsPDF, ctx: CleaningPdfContext) {
       heroImg.onload = () => resolve(true);
       heroImg.onerror = () => resolve(false);
       // Reuse the repairs hero if present; otherwise the fallback green panel.
-      heroImg.src = '/repairs.jpg';
+      heroImg.src = '/repairs.png';
     });
     if (heroLoaded && heroImg.naturalWidth > 0) {
       const canvas = document.createElement('canvas');

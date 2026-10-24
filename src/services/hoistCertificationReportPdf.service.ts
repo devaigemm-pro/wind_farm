@@ -265,7 +265,7 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
     const heroLoaded = await new Promise<boolean>((resolve) => {
       heroImg.onload = () => resolve(true);
       heroImg.onerror = () => resolve(false);
-      heroImg.src = '/repairs.jpg';
+      heroImg.src = '/repairs.png';
     });
     if (heroLoaded && heroImg.naturalWidth > 0) {
       const canvas = document.createElement('canvas');
