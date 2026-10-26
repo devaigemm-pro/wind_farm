@@ -122,8 +122,6 @@ interface RepairPdfContext {
    *  report NEVER runs OCR — it only reads this cached value. Null when it
    *  hasn't been resolved yet. */
   bladeColor: string | null;
-  /** repair.start_category (1-5) of the repair in scope. Null when absent. */
-  startCategory: number | null;
   /** repair.final_category (1-5) of the repair in scope. Null when absent. */
   finalCategory: number | null;
   /** repair.progress_percent (0-100) of the repair in scope. Null when absent. */
@@ -789,7 +787,6 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     photos,
     failureZByRepair,
     bladeColor: null,
-    startCategory: null,
     finalCategory: null,
     progressPercent: null,
     assignedTechnicianName: null,
@@ -1011,6 +1008,12 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext): number {
     .filter(Boolean);
   const bladesInRepair = bladeSerials.length > 0 ? bladeSerials.join(', ') : NA;
 
+  // "Categoría de inicio" = CATEGORY (severity) OF THE DEFECT in scope — NOT
+  // repair.start_category. The report is scoped to a single defect/repair
+  // (data.defectId), so ctx.defects already holds the scoped defect(s). Use the
+  // first (and normally only) scoped defect's severity. NA when absent.
+  const startCategoryFromDefect = ctx.defects.find((d) => d.severity != null)?.severity ?? null;
+
   // Estado turbina ANTES — defect type(s) + category, e.g. "Grieta (Cat 3), ...".
   const stateBefore = ctx.defects.length > 0
     ? ctx.defects
@@ -1042,7 +1045,7 @@ function renderGeneralData(doc: jsPDF, ctx: RepairPdfContext): number {
       // "Reparación sin finalizar" instead of N/A.
       ['Fecha fin', ctx.repairCompletedAt ? formatDateES(ctx.repairCompletedAt) : 'Reparación sin finalizar'],
       ['Daños reparados (cantidad)', String(ctx.defects.length)],
-      ['Categoría de inicio', ctx.startCategory != null ? `Cat ${ctx.startCategory}` : NA],
+      ['Categoría de inicio', startCategoryFromDefect != null ? `Cat ${startCategoryFromDefect}` : NA],
       ['Categoría final', ctx.finalCategory != null ? `Cat ${ctx.finalCategory}` : NA],
       ['Porcentaje de avance', ctx.progressPercent != null ? `${ctx.progressPercent}%` : NA],
       ['Informe realizado por', ctx.reportedBy],
@@ -1560,7 +1563,6 @@ export async function generateAndDownloadRepairReport(
   for (const rid of scopedRepairIds) {
     const prog = ctx.repairProgressByRepairId[rid];
     if (!prog) continue;
-    if (ctx.startCategory == null && prog.startCategory != null) ctx.startCategory = prog.startCategory;
     if (ctx.finalCategory == null && prog.finalCategory != null) ctx.finalCategory = prog.finalCategory;
     if (ctx.progressPercent == null && prog.progressPercent != null) ctx.progressPercent = prog.progressPercent;
     if (ctx.assignedTechnicianName == null && prog.assignedTechnicianName != null) {

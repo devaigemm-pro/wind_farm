@@ -698,9 +698,6 @@ function DefectSection({
   // persists immediately on change; the % input persists on blur to avoid a
   // write per keystroke. Seeded from the node's saved values.
   const canEditProgress = Boolean(onSaveProgress) && node.repairId != null;
-  const [startCat, setStartCat] = useState<string>(
-    node.startCategory != null ? String(node.startCategory) : '',
-  );
   const [finalCat, setFinalCat] = useState<string>(
     node.finalCategory != null ? String(node.finalCategory) : '',
   );
@@ -711,11 +708,10 @@ function DefectSection({
 
   // Re-seed when the node's saved values change (e.g. after a tree refetch).
   useEffect(() => {
-    setStartCat(node.startCategory != null ? String(node.startCategory) : '');
     setFinalCat(node.finalCategory != null ? String(node.finalCategory) : '');
     setAssignedTech(node.assignedTechnicianId ?? '');
     setProgress(node.progressPercent != null ? String(node.progressPercent) : '');
-  }, [node.startCategory, node.finalCategory, node.assignedTechnicianId, node.progressPercent]);
+  }, [node.finalCategory, node.assignedTechnicianId, node.progressPercent]);
 
   const commitProgressField = (fields: {
     startCategory?: number | null;
@@ -729,10 +725,6 @@ function DefectSection({
     });
   };
 
-  const handleStartCatChange = (value: string) => {
-    setStartCat(value);
-    commitProgressField({ startCategory: value === '' ? null : Number(value) });
-  };
   const handleFinalCatChange = (value: string) => {
     setFinalCat(value);
     commitProgressField({ finalCategory: value === '' ? null : Number(value) });
@@ -1014,22 +1006,6 @@ function DefectSection({
           category, assigned technician, progress %). Shown right below the
           defect header and BEFORE the stages. Read-only for the client. */}
       <div style={progressBlock}>
-        <label style={editField}>
-          <span style={editLabel}>{t('repair.startCategory')}</span>
-          <select
-            style={editSelect}
-            value={startCat}
-            onChange={(e) => handleStartCatChange(e.target.value)}
-            disabled={!canEditProgress}
-          >
-            <option value="">—</option>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
-                Cat {n}
-              </option>
-            ))}
-          </select>
-        </label>
         <label style={editField}>
           <span style={editLabel}>{t('repair.finalCategory')}</span>
           <select
