@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, RotateCcw, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Loader2, Pencil, RotateCcw, Star, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -117,7 +117,10 @@ export function RepairWorkflow() {
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
   const [downloadingDefectId, setDownloadingDefectId] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
+  // Lightbox holds the id of the photo being previewed (not a snapshot) so it
+  // always reflects the fresh tree — selection toggles update the star icon and
+  // left/right navigation reads the live sibling list.
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   // Photo ids whose selection mutation is in flight → drives a per-photo spinner.
   // A Set handles several rapid clicks across different photos concurrently.
   const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
@@ -259,7 +262,39 @@ export function RepairWorkflow() {
   };
 
   const handlePreview = (photo: RepairPhoto) => {
-    if (photo.url) setLightbox(photo);
+    if (photo.url) setLightboxPhotoId(photo.id);
+  };
+
+  // Resolve the previewed photo and its same-stage siblings from the LIVE tree,
+  // so the lightbox reflects selection toggles and can navigate within the stage.
+  // Siblings are the photos of the stage the opened photo belongs to (matched by
+  // repairStageId), ordered by captureOrder — the same order shown in the grid.
+  const lightboxCtx = useMemo(() => {
+    if (!lightboxPhotoId || !tree) return null;
+    for (const node of tree) {
+      for (const stage of node.stages) {
+        const match = stage.photos.find((p) => p.id === lightboxPhotoId);
+        if (match) {
+          const siblings = stage.photos
+            .filter((p) => !!p.url)
+            .slice()
+            .sort((a, b) => a.captureOrder - b.captureOrder);
+          const index = siblings.findIndex((p) => p.id === lightboxPhotoId);
+          return { photo: match, siblings, index };
+        }
+      }
+    }
+    return null;
+  }, [lightboxPhotoId, tree]);
+
+  const lightbox = lightboxCtx?.photo ?? null;
+
+  // Navigate to the previous/next photo of the same stage (loops at the edges).
+  const handleLightboxNav = (dir: -1 | 1) => {
+    if (!lightboxCtx || lightboxCtx.siblings.length < 2) return;
+    const n = lightboxCtx.siblings.length;
+    const nextIdx = (lightboxCtx.index + dir + n) % n;
+    setLightboxPhotoId(lightboxCtx.siblings[nextIdx]!.id);
   };
 
   // Generate a PDF report scoped to a SINGLE repair. The PDF service scopes by
@@ -514,16 +549,66 @@ export function RepairWorkflow() {
       )}
 
       {/* Lightbox: enlarged photo preview */}
-      {lightbox && (
+      {lightbox && lightboxCtx && (
         <div
           style={lightboxOverlay}
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxPhotoId(null)}
           role="dialog"
           aria-modal="true"
         >
-          <button style={lightboxClose} onClick={() => setLightbox(null)} aria-label={t('general.close')}>
+          {/* Top-right controls: star (select for report) + close */}
+          {!isClient && (
+            <button
+              style={{
+                ...lightboxStar,
+                background: lightbox.repairSelected ? C.brand : 'rgba(255,255,255,0.15)',
+                cursor: pendingPhotoIds.has(lightbox.id) ? 'progress' : 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelect(lightbox, !lightbox.repairSelected);
+              }}
+              aria-label={t('repair.selectedForReport')}
+              aria-pressed={lightbox.repairSelected}
+              title={t('repair.selectedForReport')}
+            >
+              <Star
+                size={20}
+                color="#fff"
+                fill={lightbox.repairSelected ? '#fff' : 'none'}
+              />
+            </button>
+          )}
+          <button style={lightboxClose} onClick={() => setLightboxPhotoId(null)} aria-label={t('general.close')}>
             <X size={22} />
           </button>
+
+          {/* Navigation arrows — only within the same stage, ≥2 photos */}
+          {lightboxCtx.siblings.length > 1 && (
+            <>
+              <button
+                style={{ ...lightboxNav, left: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(-1);
+                }}
+                aria-label={t('general.previous')}
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <button
+                style={{ ...lightboxNav, right: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(1);
+                }}
+                aria-label={t('general.next')}
+              >
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+
           <img
             src={lightbox.url}
             alt={lightbox.filename}
@@ -1834,4 +1919,15 @@ const lightboxClose: React.CSSProperties = {
 };
 const lightboxCaption: React.CSSProperties = {
   marginTop: 12, color: '#fff', fontSize: 13, opacity: 0.85, cursor: 'default',
+};
+const lightboxStar: React.CSSProperties = {
+  position: 'fixed', top: 20, right: 72, width: 40, height: 40, borderRadius: '50%',
+  border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const lightboxNav: React.CSSProperties = {
+  position: 'fixed', top: '50%', transform: 'translateY(-50%)',
+  width: 48, height: 48, borderRadius: '50%',
+  background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001,
 };
