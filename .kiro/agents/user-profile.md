@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 327
-- **Última actualización**: 2026-10-19
+- **Sesiones analizadas**: 357
+- **Última actualización**: 2026-10-27
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -97,6 +97,8 @@
 
 - **"un ejemplo concreto = especificación exacta"** — cuando el usuario da un ejemplo de datos (ej. códigos "A1, A34, B4, B6" no consecutivos), ese ejemplo DEFINE el comportamiento esperado al detalle. Los números no consecutivos indicaban que el código debía ser el ORIGINAL de la pantalla de referencia (ANALYZE), no un correlativo nuevo. No interpretar de forma laxa: reproducir el patrón exacto que el ejemplo implica. Correlaciona con "usar el mismo método que X" y "diagnosticar más profundo".
 - **"aplicar en prod" = deploy manual con Vercel CLI** — en este proyecto el push a `main` NO dispara deploy automático de Vercel. Cuando el usuario aprueba deploy ("aplicar en prod", "mergea", "libera"): rebase sobre origin/main → merge a main → push origin main → `vercel --prod --yes` (CLI ya autenticado, proyecto dev-ai2/wind-farm, alias `wind-farm-eight.vercel.app`). Verificar comparando el hash del chunk `index-*.js` servido en prod y grep de la cadena nueva del feature. NO asumir que el push solo basta.
+
+- **"arrastrar fotos" = subir desde el disco** — cuando el usuario pide "arrastrar/agregar fotos" en una pantalla que ya tiene drag interno, se refiere a subir archivos locales del laptop (drag & drop de OS files), NO al drag interno existente de mover elementos. No preguntar por diseño/UX cuando la intención es literal y simple: asumir subida desde disco y proceder. Solo preguntar si hay ambigüedad REAL de datos.
 
 ## 8. Historial de Observaciones por Sesión
 
@@ -2330,3 +2332,306 @@
   - Patrón de "replicar lo que ya funciona" llevado al máximo: clonar repair → cleaning con nomenclatura paralela, reusando el mecanismo de drag&drop YA corregido en sesiones previas (no reintroducir bugs resueltos).
   - El MCP de Supabase conectado apunta a OTRO proyecto (no wind_farm) — no sirve para inspeccionar el esquema real de este proyecto. Anotar: para wind_farm el esquema de repair/cleaning es externo (app móvil), se documenta el contrato y se degrada con gracia.
 - **Patrones confirmados**: español, directo, modo compañero, respuestas ultra-mínimas, "replicar funcionalidad existente" (confianza muy alta), confía en implementación completa del agente, preguntar ante ambigüedad de arquitectura en features grandes dio buen resultado.
+
+### Sesión 312 (deploy fix usuarios) - 2026-10-20
+- **Tarea principal**: "aplica en prod" — desplegar el fix de "Invalid or expired token" al crear usuario.
+- **Observaciones nuevas**: Solo frontend. Flujo: stash locales → rebase origin/main → merge --no-ff main → push (f7ce792) → npx tsc -b && npx vite build → vercel deploy → promote. Verificación por bundle: UsersAdmin-DOT9KvCa.js contiene getSession/admin-users/Bearer/"Sesión expirada". Limpieza: borré archivo basura vacío "312" (de un sed mal escapado previo). La migración SQL campaign_type_status_cleaning venía en la branch pero NO se ejecuta en deploy frontend (Vercel solo sirve build) — no la corrí contra BD. Reconfirmado gotcha pnpm: usar npx tsc/vite directo.
+- **Patrones confirmados**: "aplica en prod" = deploy frontend; verificar diff vs main antes de mergear (solo el archivo esperado); limpiar basura de git; merge-base --is-ancestor para confirmar estado; vercel deploy+promote; verificación por bundle con cache-bust + sleep 55s; honesto sobre verificación funcional (login no automatizable). Confianza alta.
+
+### Sesión 314 - 2026-10-20
+- **Tarea principal**: (modo compañero) "siguen sin verse los parques, ni tampoco puedo crear usuarios" — el bug de admin-users PERSISTE tras DOS fixes de cliente fallidos (sesión 312 headers custom, sesión 313 quitar headers).
+- **Observaciones nuevas**:
+  - DOS fixes fallidos seguidos = señal fuerte de que el diagnóstico de cliente era equivocado. Dejé de parchear a ciegas y busqué evidencia dura: (a) `supabase functions list` → admin-users ACTIVE v5; (b) descargué la función de prod y la comparé con el fuente git → son idénticas salvo un `catch` trivial, así que el CÓDIGO de la función NO es el problema; (c) curl directo confirmó que el gateway valida apikey+JWT antes del código (sin auth→"Missing authorization header", token malo→"Invalid JWT"). El mensaje "Invalid or expired token" es del código (getUser falla).
+  - BLOQUEO REAL: no pude reproducir el llamado con un token admin válido — no tengo el password de ningún admin y NO hay service_role key en local (.vercel/.env.production.local solo tiene anon+url). Login por curl se colgó (posible rate-limit); no insistí para no bloquear cuentas.
+  - DECISIÓN CORRECTA SEGÚN PERFIL: tras 2 intentos fallidos + bloqueo, PARÉ y PREGUNTÉ al usuario en vez de seguir adivinando. Le pedí 2 opciones: (1) status+body de la respuesta admin-users en DevTools Network + errores de Console, o (2) credenciales de un admin de prueba para reproducir. Hipótesis a confirmar: podría ser 403 "Only admins can manage users" (rol admin faltante en user_roles del usuario de prueba, o query de roles falla), lo que explicaría que ningún fix de token sirva.
+  - Limpié el repo: restauré supabase/functions/*.ts tras la descarga para no dejar cambios no deseados.
+- **Patrones confirmados**: español directo, modo compañero, "persiste/siguen" = fix anterior malo → NO parchear, ir a raíz con evidencia; tras N fallos + bloqueo preguntar al usuario (no adivinar); honesto sobre lo que no puede verificar (sin password/service key); gotcha pnpm (npx directo); screenshot/estado real como evidencia. Confianza alta. SESIÓN ABIERTA esperando datos del usuario (DevTools o credenciales admin).
+
+### Sesión 315 - 2026-10-20
+- **Tarea principal**: (modo compañero) El usuario dio credenciales admin (gmunoz@windfarm.dev / Admin123!) para diagnosticar por qué admin-users seguía fallando tras 2 fixes.
+- **Observaciones nuevas**:
+  - EVIDENCIA DURA obtenida por curl con el token admin real: la Edge Function admin-users FUNCIONA AL 100% → listFarms HTTP 200 (devuelve 4 parques), create HTTP 201 (usuario creado), delete HTTP 200. El backend, el token y el rol admin están PERFECTOS. Limpié el usuario de prueba creado.
+  - Verifiqué que el bundle en prod (UsersAdmin-D3Z1shAS.js, referenciado por el index actual del alias) NO contiene Authorization/Bearer → tiene el fix correcto. No hay Service Worker/PWA en el proyecto.
+  - HALLAZGO: `vercel ls --prod` muestra deploys de producción recientes (11 min, 24 min) hechos por devaigemm-1057 que YO no promoví manualmente → hay deploy automático por push a main (integración Git Vercel) además de mi vercel deploy+promote. El alias wind-farm-eight apunta al de 11 min, que SÍ tiene el fix. CONCLUSIÓN: prod está correcto.
+  - DIAGNÓSTICO FINAL: como backend + bundle de prod están OK, el fallo del usuario es CACHÉ DEL NAVEGADOR (index.html viejo apuntando al chunk roto de sesión 312). NO le hice limpiar caché a ciegas: le pedí prueba en incógnito (si funciona=caché, Cmd+Shift+R; si falla=pegar status+body de Network de admin-users). agent-browser no pudo completar login UI (fills no persistían en inputs React controlados + timeouts intermitentes) — por eso usé curl directo, que fue más determinista.
+  - LECCIÓN META: cuando un fix desplegado "no funciona" pero el backend responde OK por curl y el bundle de prod tiene el cambio → sospechar caché del cliente o deploy/alias desactualizado ANTES de tocar más código. Verificar: (1) backend por curl, (2) chunk de prod por grep, (3) qué deploy sirve el alias (vercel ls/inspect).
+- **Patrones confirmados**: español directo, modo compañero, dar credenciales cuando el agente las pide para desbloquear, diagnóstico con evidencia dura (curl+grep bundle+vercel ls) en vez de parches, NO culpar al usuario (prueba incógnito antes de "limpia caché"), honesto sobre límites de agent-browser, gotcha pnpm. OJO: existe deploy automático por push a main (no solo manual) — reevaluar la regla previa "push a main NO dispara deploy". Confianza alta. SESIÓN ABIERTA esperando resultado de prueba incógnito.
+
+### Sesión 333 - 2026-10-19 — Nuevo tipo de campaña "Certificación de polipastos" (en clarificación)
+- **Tarea principal**: "hacer todo lo que hiciste para campaña de limpieza pero ahora para Certificación de polipastos". Entregó imagen con 6 pasos e ítems tipados (Foto / Check / Medición-Foto), con sub-grupos en el Paso 3 (Cadena de carga / Ojales de aluminio fundido).
+- **Observaciones nuevas**:
+  - Pide replicar el flujo completo de un tipo de campaña ya hecho (cleaning) para uno nuevo: "hacer todo lo que hiciste para X pero para Y". Patrón de reutilización de un pipeline completo (pestaña + formulario + workflow + PDF + contrato app móvil).
+  - DIFERENCIA de modelo clave vs limpieza/reparación: aquí los ítems son TIPADOS (Foto / Check booleano / Medición numérica + Foto), no solo fotos. Esto requiere adaptar el modelo, no un clon 1:1. Por eso pausé a preguntar 3 puntos (origen de datos, si la web muestra checks/mediciones o solo fotos, y si los sub-grupos del Paso 3 son sub-secciones).
+  - Confirma el patrón: ante feature grande con matiz de modelo nuevo (ítems tipados), preguntar antes de implementar en vez de asumir. Las sesiones previas (326 cleaning) validaron que preguntar da buen resultado.
+  - Imagen como spec detallada (igual que cleaning): 6 pasos, sub-grupos, 3 tipos de ítem.
+- **Patrones confirmados**: español, directo, modo compañero, imagen como spec, "replicar pipeline completo existente", confía en el agente pero el agente debe preguntar ante ambigüedad de modelo en features grandes.
+
+### Sesión 334 - 2026-10-19 — Implementación "Certificación de polipastos"
+- **Tarea principal**: Implementar el tipo de campaña hoist_certification tras confirmar las 3 preguntas (datos del app móvil, la web muestra checks/mediciones, sub-grupos del Paso 3 como sub-secciones).
+- **Observaciones nuevas**:
+  - Confirmó las 3 preguntas de modelo ultra-breve: "1.- origen desde la app movil; 2.- si, check y medidiciones; 3.- si". Preguntar antes de implementar (modelo con ítems tipados) fue acertado.
+  - Modelo NUEVO vs cleaning/repair: ítems TIPADOS (photo/check/measurement). La web muestra badge Cumple/No cumple para checks y valor+unidad para mediciones, además de galerías de foto con selección. Jerarquía paso → (sub-grupo) → ítem tipado.
+  - Replicó todo el pipeline de cleaning (constants/service/hooks/workflow/pdf/modal/panel/accordion/types/App/i18n + migración de constraints) adaptando el modelo. Color propio azul (#1F6FB2) para distinguir de cleaning (verde) y repair (ámbar).
+  - APRENDIZAJE DB confirmado: al agregar tipo de campaña, SIEMPRE crear migración que amplíe campaign_type_check + campaign_status_check. El desarrollador la creó proactivamente (20261019000002_...) por el precedente de cleaning.
+  - El usuario escribió "continua" varias veces — esperaba que el agente avanzara (build + preview) sin más preguntas. Interpretar "continua" como "sigue con el flujo hasta dejarlo revisable".
+  - Durante la sesión el contador de perfil fluctuó (sistema de aprendizaje lo regenera) — mantener coherencia reconciliando al final.
+- **Patrones confirmados**: español, directo, modo compañero, imagen como spec detallada, "replicar pipeline completo existente" adaptando el modelo, preguntar ante modelo nuevo, confía en implementación completa del agente.
+
+### Sesión 335 - 2026-10-19 — Fix DB: constraint campaign rechazaba hoist_certification
+- **Tarea principal**: Bug "No se pudo crear la campaña de certificación" (toast, reportado con screenshot). Mismo caso que la sesión 329 (cleaning).
+- **Observaciones nuevas**:
+  - Causa raíz idéntica a cleaning: constraints CHECK campaign_type_check / campaign_status_check en prod no incluían 'hoist_certification' ni 'hoist_*'. La migración estaba versionada pero NO aplicada a la DB (quedó pendiente del "aplicar en prod").
+  - APRENDIZAJE REFORZADO: al agregar un tipo de campaña, la migración de constraints hay que APLICARLA a la DB, no solo versionarla. El usuario prueba la creación apenas tiene el código, así que conviene aplicar la migración de constraints junto con (o antes de) que pruebe, aunque el resto del deploy espere aprobación. Considerar aplicar el constraint de DB de forma proactiva al implementar el tipo.
+  - Fix: `supabase db query --linked` ampliando ambos constraints (no destructivo), verificado con insert+ROLLBACK. Sin re-deploy del frontend.
+  - El usuario estaba probando en producción: el código de hoist ya se servía en prod (deploy del frontend ya hecho o sesión apuntando a prod), solo faltaba el constraint de DB.
+- **Patrones confirmados**: español, directo, modo compañero, reporta bug con screenshot, diagnosticar la raíz (DB no código), verificación rigurosa (insert+rollback), MCP Supabase apunta a otro proyecto → usar CLI --linked para la DB real.
+
+- **"respeta el verde que ya existe en todas las campañas"** — el agente eligió un azul propio (#1F6FB2) para distinguir el nuevo tipo de campaña (hoist); el usuario lo corrigió: todas las campañas usan el verde #5A8F5A y el nuevo tipo DEBE usar el mismo. LECCIÓN: NO introducir una identidad cromática nueva para distinguir módulos. Respetar el design system existente (verde #5A8F5A / rgba(90,143,90,...) / #EFF5EF). Cuando se crea un módulo nuevo replicando otro, copiar TAMBIÉN su paleta, no inventar un color distintivo.
+
+### Sesión 336 - 2026-10-19 — Corregir color de hoist a verde del sistema
+- **Tarea principal**: "todos los cambios que aplicaste lo hiciste en color azul, respeta el verde que ya existe en todas las campañas". Cambiar la identidad cromática de Certificación de polipastos de azul (#1F6FB2) al verde compartido (#5A8F5A).
+- **Observaciones nuevas**:
+  - El agente había elegido azul para distinguir el tipo nuevo; fue un error de criterio. El usuario quiere consistencia visual: TODAS las campañas en verde.
+  - Corrección cromática en 5 archivos (workflow, modal, panel, accordion, PDF): #1F6FB2→#5A8F5A, rgba(31,111,178)→rgba(90,143,90), #EAF2F9/#E0EDF7→#EFF5EF/#DCFCE7, [31,111,178]→[90,143,90].
+  - Hice el cambio directo con sed/str_replace (cambio simple y acotado), sin delegar — coherente con "es un cambio básico".
+- **Patrones confirmados**: español, directo, modo compañero, corrección directa sin drama, prioriza consistencia con el design system existente, "replicar lo existente" incluye la paleta de colores.
+
+### Sesión 337 - 2026-10-19 — Doc de contrato app móvil para Certificación de polipastos
+- **Tarea principal**: "dame las instrucciones para el dev de la app mobile, en un doc para copiarlo y entregar" (hoist_certification).
+- **Observaciones nuevas**:
+  - Mismo patrón que la sesión 330 (doc de contrato de limpieza): el usuario necesita un documento entregable para el equipo móvil externo. "en un doc para copiarlo y entregar" = archivo listo, no solo artefacto.
+  - Apliqué el aprendizaje de la sesión 331: creé directamente el ARCHIVO en dist/ (convención INSTRUCCIONES-APP-MOVIL-*.md) sin preguntar dónde. Extraído 1:1 del service que ya consume el frontend.
+  - El doc incluye el matiz de ítems tipados (photo/check/measurement) y las dos tablas (hoist_cert_item + hoist_cert_photo), más todos los item_code por paso/sub-grupo.
+  - Ofrecí moverlo a docs/ (dist/ se regenera) o imprimirlo en chat — pendiente preferencia.
+- **Patrones confirmados**: español, directo, modo compañero, entregables como archivos concretos, convención dist/INSTRUCCIONES-APP-MOVIL-*.md para docs a equipo móvil externo, contrato extraído del service.
+
+### Sesión 338 - 2026-10-19 — Agregar "Lado superior (techo)" a Nacelle (limpieza)
+- **Tarea principal**: "a la etapa de limpieza seccion Nacelle agregar como primer paso la etapa Lado superior (techo)".
+- **Observaciones nuevas**:
+  - Cambio simple y acotado en un catálogo (cleaning-zones.ts): agregué sub-zona nacelle_superior como primera, reordené sortOrder. Lo hice directo con str_replace (no delegué) — coherente con "es un cambio básico".
+  - "primer paso" = primera en el orden visual de la sub-sección. Interpretar posición desde lo que el usuario ve.
+  - CONFIRMADO el riesgo de dist/: los builds que corrí borraron los docs de limpieza y certificación que había dejado en dist/. Los recreé en docs/ (versionado). LECCIÓN DEFINITIVA: los docs entregables van en docs/, NUNCA en dist/ (se regenera con cada build). Actualizar la convención: usar docs/INSTRUCCIONES-APP-MOVIL-*.md.
+  - Al cambiar el catálogo, actualicé también el contrato del app móvil (nuevo zone_code nacelle_superior) — cuando cambia la estructura de zonas/ítems, el doc del app móvil debe reflejarlo.
+- **Patrones confirmados**: español, directo, modo compañero, cambio básico sin delegar, interpretar posición desde lo visual, mantener sincronizado el contrato del app móvil con el catálogo. ACTUALIZACIÓN de convención: docs entregables en docs/ no dist/.
+
+### Sesión 339 - 2026-10-19 — Deploy a prod (certificación + color verde + Lado superior Nacelle)
+- **Tarea principal**: "aplicar en prod" de todos los cambios acumulados: feature Certificación de polipastos, color verde, y sub-zona Lado superior (techo) en Nacelle.
+- **Observaciones nuevas**:
+  - DIFERENCIA de estado git: esta vez estábamos en `main` con cambios SIN COMMITEAR (el auto-commit de rama de sesión NO corrió). Hubo que `git add` explícito de los archivos de la feature + commit + push directo a main. No siempre hay rama de sesión con auto-commit; verificar el estado real de git antes de asumir el flujo.
+  - Deploy de un commit único `d13d2ed..ba9ddfb` con todo lo acumulado. Vercel tardó 2m.
+  - Verificación en prod de feature con pantalla nueva + cambio de catálogo: chunk lazy (HoistCertificationWorkflow referenciado en index) + ruta (/hoist-certification/) + el string del catálogo (nacelle_superior) que quedó en el INDEX, no en el chunk de la página. Al verificar un cambio de constantes, buscar en el index además de en el chunk de la pantalla.
+  - La migración de constraints hoist ya estaba aplicada de antes (al aparecer el error de creación), no hubo que reaplicarla.
+- **Patrones confirmados**: "aplicar en prod" = deploy manual Vercel, verificación por chunk+ruta+string, completar deploy antes del perfil, alta autonomía, comunicación ultra-mínima.
+
+### Sesión 340 - 2026-10-19 — Reabrir campañas cerradas (en clarificación)
+- **Tarea principal**: "una reparacion, limpieza o certificacion polipasto se puedan reabrir (una vez cerradas)". Feature transversal a los 3 tipos de campaña.
+- **Observaciones nuevas**:
+  - Los 3 tipos tienen status *_done (finalizada) y un updateXStatus en su service, pero NO hay botón de cerrar/finalizar visible en la web (useUpdateRepairStatus no se usa en ninguna pantalla). El cierre hoy no vive en la web → ambigüedad sobre el ciclo cerrar↔reabrir.
+  - Pausé a preguntar 3 cosas antes de delegar: (1) reabrir va a *_in_progress o *_open, (2) dónde el botón (fila del panel / header workflow / ambos), (3) si también agregar el "cerrar" ya que no existe en la web.
+  - Feature pequeña-media pero con decisión de diseño no trivial (estado destino + ubicación + alcance cerrar/reabrir) → preguntar antes de implementar, coherente con el perfil.
+- **Patrones confirmados**: español, directo, modo compañero, instrucción conceptual breve confiando en el agente, preguntar ante ambigüedad de diseño antes de delegar.
+
+### Sesión 340 (cont.) - 2026-10-19 — Esperando respuesta del "reabrir"
+- **Nota**: El usuario envió un mensaje vacío; aún no respondió las 3 preguntas de diseño del "reabrir" (estado destino, ubicación del botón, si agregar también "cerrar"). Sigo bloqueado esperando esas definiciones antes de delegar la implementación.
+- **Patrón**: mantener la pregunta abierta y no asumir — no implementar hasta tener las respuestas, coherente con "preguntar ante ambigüedad de diseño".
+
+### Sesión 340 (cont.) - 2026-10-19 — Implementación del "reabrir"
+- **Respuestas del usuario**: (1) reabrir → *_in_progress; (2) botón en la fila del panel; (3) no agregar "cerrar". Confirmó que preguntar fue acertado.
+- **Implementado**: botón "Reabrir" (icono RotateCcw) en la celda de estado de las 3 filas (RepairCampaignRows/CleaningCampaignRows/HoistCampaignRows de CampaignAccordion), visible solo cuando status === '*_done' y canReopen. stopPropagation para no navegar. Cambia a *_in_progress, toast, spinner. Reutilizó useUpdateRepairStatus; creó useUpdateCleaningStatus y useUpdateHoistStatus. Los 3 hooks invalidan ['campaigns'] (prefijo) para refrescar el badge del panel.
+- **Observaciones nuevas**: La query de campañas es ['campaigns', windFarmId]; invalidar por prefijo ['campaigns'] refresca todas (patrón ya usado por updateCampaign/deleteCampaign). Build OK.
+- **Patrones confirmados**: español, directo, modo compañero, respuestas ultra-mínimas a preguntas numeradas, feature transversal replicada igual en los 3 tipos de campaña, "cambio básico sin sobrecomplicar".
+
+### Sesión 341 - 2026-10-19 — Diagnóstico: reparación "desaparecida" en Talinay Oriente
+- **Tarea principal**: "esta reparacion desaparecio de la lista del parque PTO Talinay Oriente, revisa" (con screenshot de una fila WTG23/Abierta/443 fotos).
+- **Observaciones nuevas**:
+  - Diagnostiqué con datos reales en la DB de prod (supabase db query --linked) ANTES de delegar/cambiar: el parque (5af008ad...) tiene 2 campañas repair de la misma turbina WTG23, ambas repair_in_progress, con 2 y 19 work_orders, quotes distintos. NINGUNA se borró.
+  - El código de render (getCampaigns + CampaignsPanel + CampaignAccordion) NO deduplica ni colapsa; key = campaign.id única. Las 2 deberían verse. (context-gatherer lo confirmó.)
+  - 2 señales de que el reporte puede ser un falso positivo: (a) el "reabrir" aún NO está en prod (quedó en preview), así que el usuario probablemente está en localhost:4173; (b) el screenshot muestra "Abierta" (repair_open) pero en DB ninguna está Abierta → el screenshot podría ser de SubassetDetail, no del panel del parque. CI798 tiene updated_at de hoy → la reabrió en el preview.
+  - Decisión: NO cambiar nada a ciegas. Reporté el diagnóstico con tabla de datos y pedí precisar URL/pantalla exacta. "Revisa" no siempre = "hay un bug que arreglar"; a veces el dato está intacto y hay que ubicar dónde mira el usuario.
+  - REGLA reforzada del perfil: "se riguroso" / "diagnosticar más profundo" — verificar datos reales antes de asumir un bug. Aquí la verificación mostró que no había pérdida de datos.
+- **Patrones confirmados**: español, directo, modo compañero, reporta con screenshot, espera rigor. NUEVO matiz: cuando el dato está intacto y el síntoma no cuadra, preguntar la pantalla/URL exacta en vez de delegar un fix especulativo.
+
+### Sesión 341 (cont.) - 2026-10-19 — Esperando precisión de URL/pantalla
+- **Nota**: Mensaje vacío del usuario; aún no respondió en qué URL (preview vs prod) ni en qué pantalla falta la reparación. Diagnóstico de datos ya cerrado (ambas campañas existen en DB). Dos tareas abiertas en paralelo pendientes de su input: (1) deploy del "reabrir" a prod, (2) ubicar dónde mira la reparación "desaparecida".
+- **Patrón**: no asumir ni cambiar código sin la precisión pedida; mantener las preguntas abiertas.
+
+### Sesión 342 - 2026-10-19 — Diagnóstico profundo reparación no listada (Talinay)
+- **Tarea principal**: Usuario precisó pantalla: /assets-wind/5af008ad... (WindFarmDetail, pestaña Reparación) en localhost:4173; "fijate en la fecha y la cantidad de fotos". No aparece la campaña del 11-09-2026 (CI791, 712 fotos); sí aparece CI798 (09-09, 26 fotos).
+- **Observaciones nuevas**:
+  - Verifiqué TODO lo posible sin login (rigor): DB tiene ambas con fotos (26 y 712); RLS de campaign = using(true) para authenticated (no filtra); getCampaigns sin filtro/límite/dedup; panel/accordion con key campaign.id única, sin slice. Según código+data+permisos, ambas deberían verse.
+  - El preview pide login (no tengo credenciales de la app propia wind_farm) → no pude ver el render autenticado ni el network real.
+  - Hipótesis principal: caché de react-query (useCampaigns usa default staleTime 10min + gcTime 30min + placeholderData) en el navegador del usuario → lista con versión previa sin la 2a campaña. No confirmable sin ver el navegador.
+  - Propuse 2 caminos: (1) que el usuario haga hard-reload (Ctrl+Shift+R) y reporte, (2) que me dé credenciales para reproducir. No cambié código sin confirmar la causa.
+  - El usuario da pistas precisas para localizar ("fíjate en fecha y fotos") — usa atributos visibles para identificar el registro exacto.
+- **Patrones confirmados**: español, directo, modo compañero, da pistas concretas de identificación, espera rigor (verificar antes de afirmar). Bloqueo recurrente: sin credenciales de la app no puedo hacer verificación visual end-to-end; conviene pedirlas temprano cuando el síntoma solo se ve autenticado.
+
+### Sesión 343 - 2026-10-19 — "sigue sin aparecer" (descarta caché, bug real)
+- **Tarea principal**: Tras hard-reload la campaña CI791 (11-09, 712 fotos) SIGUE sin aparecer en /assets-wind/5af008ad... → mi hipótesis de "caché react-query" fue INCORRECTA. Bug real en el camino de ejecución.
+- **Observaciones nuevas**:
+  - CORRECCIÓN A MÍ MISMO: propuse "es caché" sin poder verlo; el usuario lo refutó empíricamente ("sigue sin aparecer"). No volver a afirmar una causa sin reproducir. Diagnosticar la raíz (regla del perfil).
+  - Verificado exhaustivo: DB tiene ambas (CI798 26 fotos / CI791 712 fotos), RLS = using(true) para authenticated, getCampaigns sin filtro/límite/dedup, accordion key única, datos de CI791 completos (19 WO con defect+inspection). Todo dice que DEBERÍA verse.
+  - Intenté reproducir vía PostgREST REST con anon key → devuelve [] (RLS exige sesión). No puedo simular el rol authenticated sin token real del usuario → no reproduje el bug.
+  - Diferencia entre las 2: CI798 created_by=NULL, CI791 created_by=<uuid>; pero las políticas RLS de SELECT no filtran por created_by.
+  - Hipótesis viva no descartada: la query devuelve solo 1 fila con la sesión real (algo no visible desde service-role), o CI791 llega pero su acordeón no se pinta. Para discriminar pedí: credenciales para reproducir, O que el usuario mire Console (errores) + Network (cuántos objetos campaign devuelve: 1 o 2).
+  - BLOQUEO RECURRENTE Y COSTOSO: la falta de credenciales de la app propia impide la verificación visual/network que varias veces es la única vía. CONVIENE pedir credenciales al PRIMER síntoma que solo se ve autenticado, no tras varios turnos.
+- **Patrones confirmados**: español, directo, modo compañero, espera rigor ("diagnosticar más profundo" confianza muy alta), refuta hipótesis no verificadas. Correción propia registrada: no afirmar causa sin reproducir.
+
+- **"error 400 = diagnóstico, no caché"** — en la saga de la reparación "desaparecida" (Talinay), mi primera hipótesis fue "caché react-query" sin poder verlo, y el usuario la refutó ("sigue sin aparecer"). La causa REAL la dio el error de consola "status 400": una query `.in('id', [712 UUIDs])` sobre repair_photo genera una URL de ~28k chars que PostgREST rechaza con HTTP 400 → la campaña con muchas fotos no carga y su fila no se renderiza. LECCIÓN: cuando el usuario reporta que algo "no aparece", PEDIR TEMPRANO el error de consola/Network (status HTTP). Un 400 apunta directo a una query mal formada o URL excedida. No especular con caché sin ver la red. Regla general: `.in(ids)` con listas grandes (fotos) SIEMPRE chunkear (lotes ~150) — patrón de bug recurrente en este proyecto con campañas de muchas fotos.
+
+### Sesión 344 - 2026-10-19 — Fix raíz: HTTP 400 por .in() con 712 photo ids
+- **Tarea principal**: El usuario compartió el error de consola "Failed to load resource: status 400", que destrabó el diagnóstico de la reparación CI791 (712 fotos) que no aparecía.
+- **Observaciones nuevas**:
+  - Causa raíz confirmada EMPÍRICAMENTE: reproduje vía REST que `.in('id', [712 ids])` sobre repair_photo → HTTP 400, y con 150 ids → 200. El fetchSelectedPhotoIds de repair.service cargaba TODAS las fotos en un solo .in() → URL ~28k chars → 400 → la campaña pesada no se renderiza.
+  - Fix: helper src/utils/chunk.ts (fetchInChunks, chunkArray, DEFAULT_CHUNK_SIZE=150) aplicado en los 3 services (repair/cleaning/hoist) en todos los .in() sobre ids de fotos + el RPC get_repair_photo_uploaders. Build OK.
+  - El dato del usuario (error de consola) fue la pista que faltaba tras 3 turnos de diagnóstico sin login. Valida pedir el error HTTP temprano.
+  - Yo había afirmado "caché" sin reproducir (error de criterio); corregido. Rigor = ver la red, no suponer.
+- **Patrones confirmados**: español, directo, modo compañero, da pistas precisas (status 400) cuando se le pide, espera rigor/diagnóstico profundo. Regla técnica del proyecto reforzada: chunkear .in() con muchas fotos.
+
+### Sesión 345 - 2026-10-19 — Cambiar alcance del reabrir: por defecto, no campaña (en clarificación)
+- **Tarea principal**: Corregir el alcance de "reabrir": reabrir un DEFECTO individual (para que el técnico lo retome desde la app), no la campaña completa. Como consecuencia, al reabrir un defecto la campaña vuelve a in_progress.
+- **Observaciones nuevas**:
+  - Refinamiento del feature de reabrir (que aún estaba en preview sin desplegar): el usuario precisó el alcance real a nivel de defecto. Pensamiento de producto: el técnico trabaja defectos individuales en la app, así que reabrir debe ser granular.
+  - Modelo: en reparación cada `repair` row = un defecto, status 'completed'/'in_progress' (sin constraint CHECK → valores libres, no toca DB). Reabrir defecto = repair.status completed→in_progress + propagar campaign a repair_in_progress si estaba done.
+  - Los defectos solo existen en REPARACIÓN. Limpieza (zonas) y certificación (ítems) no tienen defectos → pregunté si el reabrir por-defecto es exclusivo de reparación y qué hacer con el reabrir a nivel campaña en limpieza/certificación.
+  - El botón "reabrir defecto" iría en DefectSection (RepairWorkflow), junto a Editar/Eliminar/Reporte, visible cuando repair.status='completed'.
+- **Patrones confirmados**: español, directo, modo compañero, refina alcance tras ver la primera versión (iteración), piensa en el flujo real del técnico. Preguntar ante ambigüedad de alcance cross-tipo antes de delegar.
+
+### Sesión 345 (cont.) - 2026-10-19 — Reabrir granular para los 3 tipos
+- **Aclaración del usuario**: "no es exclusivo es para todos" → el reabrir por-unidad aplica a reparación (defecto), limpieza (zona) y certificación (ítem). Al reabrir una unidad, la campaña vuelve a *_in_progress.
+- **Matiz de modelo detectado**: en reparación el estado por-defecto existe (repair.status completed/in_progress → directo). En limpieza/certificación NO hay estado por-zona/ítem en la web — esas tablas las llena el app móvil y no existen aún. Pregunté si el estado completado/reabierto por zona/ítem lo maneja el app móvil (web solo marca reabierto + documentar contrato) o si la web debe ser dueña de ese estado. Enfoque propuesto: reparación ya; limpieza/certificación con botón + contrato documentado para el equipo móvil.
+- **Patrones confirmados**: español, directo, modo compañero, respuestas ultra-mínimas, quiere consistencia cross-tipo ("para todos"), pensamiento de producto granular. Preguntar ante matiz de modelo (dónde vive el estado) antes de delegar.
+
+### Sesión 345 (cont.) - 2026-10-19 — Implementado reabrir-defecto (solo repair)
+- **Respuesta final del usuario**: "aplicalo por el momento a repair" → reabrir granular solo en reparación por ahora (limpieza/certificación quedan para después).
+- **Implementado**: revertido el botón reabrir-campaña del panel (3 tipos); agregado "Reabrir defecto" en DefectSection del RepairWorkflow (visible si repair.status==='completed' y no client). Servicio reopenDefect(repairId, campaignId): repair→in_progress y si campaign estaba repair_done → repair_in_progress. Hook useReopenDefect invalida tree/summary/campaigns. Build OK.
+- **Observaciones nuevas**: Secuencia de refinamiento del feature a lo largo de varios turnos: reabrir-campaña (todos) → cambiar a reabrir-unidad (todos) → acotar a solo repair por ahora. El usuario acota el alcance progresivamente; implementar lo mínimo acordado y dejar el resto documentado como pendiente.
+- **Patrones confirmados**: español, directo, modo compañero, respuestas ultra-mínimas, acota alcance iterativamente, "por el momento" = entregar lo pedido ahora y dejar el resto para después.
+
+### Sesión 346 - 2026-10-19 — Deploy a prod: fix 400 + reabrir-defecto
+- **Tarea principal**: "aplicar a prod" de los dos cambios acumulados (fix chunking .in() que causaba el 400 y hacía desaparecer la reparación CI791; reabrir-defecto en repair).
+- **Observaciones nuevas**:
+  - Deploy de un commit único `ba9ddfb..7b6ad9f` (10 archivos). En main con cambios sin commitear → git add explícito + commit + push + vercel --prod. 45s.
+  - Verificación en prod: chunk RepairWorkflow nuevo con reopenDefect/reabrir presente + marcas del chunking en bundles. El fix del 400 ya validado empíricamente antes (712 ids→400, 150→200).
+  - Pendiente de confirmación del usuario: que al recargar /assets-wind/5af008ad... aparezca la reparación del 11-09 (cierre del caso original).
+- **Patrones confirmados**: "aplicar a prod" = deploy manual Vercel, verificación por chunk+marcas, completar deploy antes del perfil, alta autonomía, comunicación ultra-mínima.
+
+### Sesión 346 (cont.) - 2026-10-19 — Caso cerrado ("si, esta todo ok")
+- **Confirmación del usuario**: tras el deploy, verificó en prod que la reparación del 11-09 (CI791, 712 fotos) de Talinay Oriente ya aparece. Cierre formal del caso del error 400.
+- **Cierre de la saga**: el bug (reparación "desaparecida") era HTTP 400 por .in() con 712 photo ids → URL excedida. Fix: chunking en lotes de 150 en los 3 services. También quedó vivo el reabrir-defecto.
+- **Aprendizaje consolidado**: el usuario confirma con frase ultra-mínima ("si, esta todo ok") cuando algo quedó bien. Cierra el loop cuando verifica en prod.
+- **Patrones confirmados**: español, directo, modo compañero, confirma cierre con frase mínima, verifica en prod antes de dar por cerrado.
+
+- **"olvida lo anterior" / edición de imagen con muchos intentos** — tarea: borrar la marca "MADE / Gamesa Eólica" de public/repairs.jpg (portada de reportes). Intenté retoque programático (PIL/OpenCV: copia por fila, tiling, interpolación, blur enmascarado, cv2.inpaint) ~8 veces sin lograr un resultado limpio; el usuario cortó con "olvida lo anterior". LECCIÓN: el retoque fotográfico fino (quitar un logo de una superficie con degradado dejándolo natural) NO es adecuado para iteración a ciegas por script — se nota cada artefacto y desgasta la paciencia. Si a los 2 intentos no queda limpio, PARAR y: (a) proponer que el usuario pase una imagen ya editada / sin marca, o una imagen de reemplazo, o (b) sugerir una herramienta de edición dedicada. No encadenar múltiples intentos de inpaint. Trabajar SIEMPRE sobre copia (lo hice: el original quedó intacto).
+
+### Sesión 347 - 2026-10-19 — Borrar marca de turbina en repairs.jpg (abortada)
+- **Tarea principal**: Quitar la marca/logo "MADE · Gamesa Eólica" de la imagen public/repairs.jpg usada como portada en los reportes. Luego el usuario dijo "olvida lo anterior".
+- **Observaciones nuevas**:
+  - Hice ~8 intentos de retoque programático (PIL + OpenCV inpaint) y ninguno quedó limpio; el usuario abortó. Trabajé sobre copias en /tmp, así que el original NUNCA se modificó (verificado git status). Limpié los temporales.
+  - El usuario tolera iteración en bugs de código, pero el retoque de imagen fino a ciegas lo cansa rápido → "olvida lo anterior" = basta, cambiemos de rumbo. Señal de parar.
+  - Para futuras tareas de edición de imagen: ofrecer que el usuario provea la imagen ya sin marca, o una de reemplazo, en vez de intentar inpainting repetido.
+- **Patrones confirmados**: español, directo, modo compañero, corta en seco cuando una vía no rinde ("olvida lo anterior"). NUEVO: no es buen terreno el photo-retouch iterativo por script; pedir activo del usuario o herramienta dedicada.
+
+### Sesión 348 - 2026-10-19 — Actualizar repairs.jpg → repairs.png en el código
+- **Tarea principal**: El usuario reemplazó la portada de reportes de jpg a png; actualizar el código para que use repairs.png.
+- **Observaciones nuevas**:
+  - El usuario había dejado el png nuevo en dist/ (carpeta de build), con el jpg viejo aún en public/. Corregí: copié el png a public/ (source real), borré public/repairs.jpg. CLAVE: el usuario a veces deja archivos en dist/ sin saber que se regenera; el source de assets es public/.
+  - 4 referencias a /repairs.jpg en 3 servicios de PDF (repair/cleaning/hoist) → cambiadas a /repairs.png, más comentarios/warning.
+  - Detalle técnico: la portada carga la imagen en <img>→<canvas>→toDataURL('image/jpeg')→addImage('JPEG'). El formato de origen (png/jpg) es indiferente porque se re-codifica en canvas. No hubo que tocar addImage.
+  - Cambio de assets (no requiere migración DB). Build OK.
+- **Patrones confirmados**: español, directo, modo compañero, instrucción breve, confía en que el agente ubique y actualice todas las referencias. NUEVO: assets de portada viven en public/; si el usuario deja algo en dist/, moverlo a public/.
+
+### Sesión 349 - 2026-10-19 — Informe sin la imagen nueva (falta deploy)
+- **Tarea principal**: "generé un informe y no se generó con la nueva imagen".
+- **Observaciones nuevas**:
+  - Diagnóstico: el cambio repairs.jpg→png está correcto en LOCAL pero NO desplegado a prod (quedó pendiente el "aplicar a prod" del turno anterior). El informe se generó contra prod, donde el código aún pedía /repairs.jpg → portada sin imagen nueva. No es bug, falta deploy.
+  - Verifiqué el código (apunta a /repairs.png, archivo en public/, build limpio lo incluye) → todo OK local.
+  - Trampa de verificación: `vite preview` responde 200 con Content-Type text/html (SPA fallback) para assets inexistentes → un curl al .jpg daba 200 engañoso. Confirmé con ls dist/ (jpg no existe) y content-type (text/html). LECCIÓN: para verificar que un asset existe en el preview, revisar Content-Type (debe ser image/*), no solo el código HTTP.
+  - PATRÓN REFORZADO: cuando el usuario reporta que un cambio "no se ve/no funciona" poco después de implementarlo pero antes de desplegar, el 90% de las veces es que falta el deploy a prod. Recordar proactivamente al usuario que el cambio no está en prod hasta aplicarlo.
+- **Patrones confirmados**: español, directo, modo compañero, prueba en prod apenas hay un cambio. El agente debe recordar que los cambios viven en preview hasta el "aplicar a prod" explícito.
+
+### Sesión 349 (cont.) - 2026-10-19 — Deploy de repairs.png a prod
+- **Tarea principal**: "despliega" — aplicar a prod el cambio de portada repairs.jpg→png.
+- **Observaciones nuevas**: Deploy `7b6ad9f..cc9c404` → vercel --prod, 43s. Verificación en prod: repairs.png sirve content-type image/png (1.9MB), bundle apunta a /repairs.png sin rastro de .jpg. El jpg da 200 pero es SPA-fallback HTML (no imagen) — irrelevante porque el código ya no lo pide. Confirmado el diagnóstico previo: el informe salía sin imagen por falta de deploy, no por bug.
+- **Patrones confirmados**: "despliega" = deploy manual Vercel, verificación por content-type del asset + grep del bundle, completar deploy antes del perfil.
+
+### Sesión 350 - 2026-10-19 — Quitar "Categoría de inicio" del defecto + poblar PDF con severity
+- **Tarea principal**: En /repairs/:id eliminar el campo "Categoría de inicio" de cada defecto; en el reporte PDF poblar "Categoría de inicio" con la categoría del defecto (severity).
+- **Observaciones nuevas**:
+  - Instrucción de dos partes clara (quitar control de UI + cambiar fuente del dato en el PDF). "categoría del defecto" = defect.severity (Cat 1-5). "Categoría de inicio" (UI/PDF) era repair.start_category.
+  - Decisión del usuario: el dato de categoría de inicio del reporte ya no lo edita el usuario en la pantalla; se deriva automáticamente del severity del defecto. Simplifica el flujo (menos campos manuales).
+  - Delegado al desarrollador; build OK. No se tocó DB (la columna start_category queda, solo deja de usarse desde la UI y el PDF).
+  - Modo compañero: activado por el hook. Verificación visual en prod bloqueada por falta de login; confirmé por código.
+- **Patrones confirmados**: español, directo, modo compañero, instrucción conceptual precisa, confía en implementación del agente. Mapea términos de negocio a campos ("categoría del defecto"=severity).
+
+### Sesión 350 (cont.) - 2026-10-19 — Deploy a prod
+- **Tarea principal**: "pasar a prod" del cambio (quitar categoría de inicio del defecto + PDF con severity).
+- **Observaciones nuevas**: Deploy `cc9c404..a932d58` → vercel --prod, 43s. Chunk RepairWorkflow actualizado en prod. "pasar a prod" = sinónimo de "aplicar a prod"/"despliega" → mismo flujo de deploy manual Vercel.
+- **Patrones confirmados**: "pasar a prod" = deploy manual Vercel, completar deploy antes del perfil, alta autonomía, comunicación ultra-mínima.
+
+### Sesión 351 - 2026-10-19 — Reincluir "Categoría de inicio" enlazado a severity (bidireccional)
+- **Tarea principal**: Volver a mostrar el campo "Categoría de inicio" en el defecto, cargado con el severity del defecto; y si se edita, actualizar el severity del defecto.
+- **Observaciones nuevas**:
+  - Refinamiento iterativo del mismo campo a lo largo de 3 sesiones: (349/350) quitar el campo + PDF usa severity → (351) reincluir el campo pero como EDITOR bidireccional del severity. El usuario convergió a: "Categoría de inicio" = severity del defecto, editable desde la pantalla, reflejado en el PDF. Una sola fuente de verdad (defect.severity).
+  - Modelo: severity es del DEFECTO (tabla defect), NO del repair. El campo usa updateDefectFields (ampliado con severity?), no onSaveProgress. Clave: mapear bien el término de negocio al campo correcto y a su tabla.
+  - Build OK. No toca DB (severity ya existe en defect).
+  - Activó modo compañero (hook). Verificación visual bloqueada por login; confirmado por código.
+- **Patrones confirmados**: español, directo, modo compañero, refina el mismo feature en iteraciones hasta el modelo final, piensa en una sola fuente de verdad (UI y PDF comparten defect.severity).
+
+### Sesión 351 (cont.) - 2026-10-19 — Deploy a prod
+- **Tarea principal**: "pasar a prod" del campo "Categoría de inicio" enlazado al severity.
+- **Observaciones nuevas**: Deploy `a932d58..258a799` → vercel --prod, 1m. Verificado: chunk RepairWorkflow-Qfhti2gS.js nuevo con repair.startCategory presente. Cierre del ciclo de 3 sesiones sobre este campo (quitar → PDF usa severity → reincluir bidireccional), todo coherente con defect.severity como única fuente.
+- **Patrones confirmados**: "pasar a prod" = deploy manual Vercel, verificación por chunk, completar deploy antes del perfil.
+
+### Sesión 352 - 2026-10-19 — Consulta: separar BD local vs prod (análisis)
+- **Tarea principal**: "qué tan costoso sería duplicar la BD para tener una asociada a local y otra a prod". Consulta de arquitectura/costos, NO implementación.
+- **Observaciones nuevas**:
+  - Hoy hay UN solo proyecto Supabase (esphlzrzwmzeozjmyvqm) compartido entre local y prod — por eso migraciones/queries tocan la misma base. El usuario quiere separar ambientes.
+  - Respondí con análisis (3 opciones: Supabase branches de pago ~$0.32/h + Pro $25/mes; Supabase local Docker gratis; 2º proyecto cloud, free tier 2 proyectos). Recomendé Supabase local (gratis) para dev + cloud actual como prod.
+  - Punto clave del proyecto: las tablas repair/cleaning/hoist las llena el app móvil externo vía RPCs que NO están en las migraciones del repo → en local estarían vacías, el esfuerzo real es el SEED de datos de prueba, no el costo monetario.
+  - Pregunta pendiente al usuario: cuál de las 3 vías le interesa para profundizar; ofrecí consultar el tamaño de la BD de prod.
+  - Patrón del perfil: cuando pide analizar/comparar opciones, responder con análisis, no implementar. El usuario piensa a nivel de infraestructura/ambientes (meta-nivel).
+- **Patrones confirmados**: español, directo, modo compañero, pensamiento de infraestructura/meta-nivel, pregunta de análisis antes de decidir implementar.
+
+### Sesión 353 - 2026-10-19 — Dimensionar separación BD local/prod (datos reales)
+- **Tarea principal**: "si consulta" — consultar tamaño de la BD de prod para dimensionar la separación de ambientes.
+- **Observaciones nuevas**:
+  - DATOS REALES del proyecto wind_farm prod: BD total 30 MB (minúscula); tablas top: inspection_photo 3.8MB/1091 filas, repair_photo 656kB/1068, annotation 408kB, repair_stage 336kB/798, defect 184kB/146, inspection 160kB/25, work_order 144kB/55, campaign 136kB/10. STORAGE: 2398 fotos = ~3.98 GB en bucket inspection-photos.
+  - Conclusión: separar local/prod es casi gratis (BD de 30MB se replica trivial; Supabase local Docker = $0). El único peso real son los 4GB de fotos, que NO conviene copiar a dev (free tier storage = 1GB; copiar excede → plan de pago innecesario). Para dev bastan pocas fotos de prueba + seed.
+  - Recomendación: Supabase local para dev + prod cloud actual; no copiar fotos; montar seed de campañas de prueba (trabajo de una vez).
+  - Ofrecí montar el entorno local (supabase start + seed) o dejarlo en análisis.
+- **Patrones confirmados**: español, directo, modo compañero, pensamiento de infraestructura, pide datos reales para decidir ("si consulta"), análisis antes de implementar.
+
+### Sesión 354 - 2026-10-19 — Plan Pro de Supabase (separación de ambientes)
+- **Tarea principal**: "tengo el plan pro" — aclaración sobre la separación de ambientes BD local/prod.
+- **Observaciones nuevas**:
+  - DATO DE INFRA: el usuario tiene **Supabase Pro** ($25/mes). Esto habilita Branching (~$0.32/h por rama activa), 100 GB storage (los 4GB de fotos caben de sobra), sin pausa por inactividad.
+  - Con Pro, recomendé: Supabase local (Docker, gratis) para dev diario + Branching puntual para staging/pre-prod cloud cuando se quiera espejar prod.
+  - Pregunté el OBJETIVO real de la separación (3 opciones: desarrollar sin riesgo / staging estable para QA / separar env-configs local vs prod) antes de montar nada — la meta define la vía.
+  - Pendiente: respuesta del usuario sobre su prioridad.
+- **Patrones confirmados**: español, directo, modo compañero, pensamiento de infraestructura, da datos de contexto (plan Pro) para afinar la recomendación, prefiere análisis+pregunta antes de implementar infra.
+
+### Sesión 355 - 2026-10-27
+- **Tarea principal**: Modo compañero. En el modal de foto ampliada de la pantalla /repairs/:id, agregar flechas prev/next para navegar entre fotos de la misma etapa + botón estrella (arriba-derecha, junto a X) para agregar/quitar de "seleccionadas para el informe".
+- **Observaciones nuevas**:
+  - Adjuntó imagen de referencia con dibujos a mano (flechas verdes/azules + estrella) marcando exactamente dónde van los controles. Patrón: imagen anotada a mano como spec de posición UI.
+  - Describe la funcionalidad en términos de UX ("avanzar entre las fotos", "agregar directamente a seleccionadas para el informe"), no técnico. Confía en que el agente encuentre el mecanismo existente de selección.
+  - Activó modo compañero con "compañero" + URL exacta de prod en la misma frase.
+  - Implementación aceptada por el desarrollador reutilizando handleSelect + useSetPhotoSelected (mecanismo existente), sin crear servicio nuevo.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta como referencia, imagen anotada como spec, "replicar mecanismo existente" > inventar, comunicación ultra-mínima.
+- **Nota operativa**: Las credenciales del perfil (risto.martinez@core-tec.cl) dan "Invalid login credentials" en la DB del preview actual — no se pudo verificar visualmente en vivo. Build (tsc + vite) pasó OK. Entregado preview local http://localhost:4173 para validación del usuario.
+
+### Sesión 356 - 2026-10-27
+- **Tarea principal**: Modo compañero. En /repairs/:id quiere poder arrastrar fotos desde archivos locales (drag & drop) para subirlas. Investigación previa: NO existe upload de RepairPhoto en la web (las fotos solo entran desde app móvil); hay que crear servicio de inserción a repair_photo + storage (bucket inspection-photos). Existe patrón de drag&drop reutilizable en EvidenceGallery.tsx y UploadsPage.tsx.
+- **Observaciones nuevas**:
+  - Antes de delegar, surgió ambigüedad real de diseño: las fotos de reparación viven en defecto → 1 de 11 etapas. No está claro a qué etapa van las fotos arrastradas. Siguiendo el perfil ("si hay ambigüedad real, preguntar"), pausé y pregunté UNA sola cosa clave con 3 opciones + recomendación.
+  - Instrucción ultra-mínima (URL + "quisiera poder arrastrar fotos desde los archivos locales") — confía en que el agente descubra el mecanismo existente y el diseño correcto.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta como referencia, comunicación ultra-mínima, "replicar patrón existente" > inventar (EvidenceGallery como molde de drag&drop).
+- **Estado**: esperando respuesta del usuario sobre dónde soltar las fotos (por etapa vs drop global + selector) antes de delegar al desarrollador.
+
+### Sesión 357 - 2026-10-27
+- **Tarea principal**: (1) Corrección: aclaró que "arrastrar fotos" era subir desde el laptop, no mover entre etapas — mi pregunta de diseño sobró. (2) Implementar drag & drop de fotos locales por etapa en /repairs/:id. (3) "pasar los cambios a prod" → deploy.
+- **Observaciones nuevas**:
+  - CORRECCIÓN: "no es eso lo que te pedi, es arrastrar y agregar fotos desde el laptop". Cuando dice "arrastrar fotos" en una pantalla que ya tiene drag interno, se refiere a subir archivos del disco (drag & drop de OS files), NO al drag interno existente. No sobre-interpretar ni preguntar por diseño cuando la intención es literal y simple.
+  - Pregunté por diseño (dónde soltar) cuando no hacía falta — el usuario esperaba que procediera con el approach natural. Lección: ante "arrastrar fotos", asumir subida desde disco y proceder; solo preguntar si hay ambigüedad REAL de datos, no de UX.
+  - "pasar los cambios a prod" = aprobación explícita de deploy → ejecutar flujo: rebase origin/main → merge a main → push → vercel --prod.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta, comunicación ultra-mínima, corrección directa sin drama, "replicar patrón existente" (EvidenceGallery como molde).
