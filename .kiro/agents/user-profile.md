@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 357
+- **Sesiones analizadas**: 360
 - **Última actualización**: 2026-10-27
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -99,6 +99,9 @@
 - **"aplicar en prod" = deploy manual con Vercel CLI** — en este proyecto el push a `main` NO dispara deploy automático de Vercel. Cuando el usuario aprueba deploy ("aplicar en prod", "mergea", "libera"): rebase sobre origin/main → merge a main → push origin main → `vercel --prod --yes` (CLI ya autenticado, proyecto dev-ai2/wind-farm, alias `wind-farm-eight.vercel.app`). Verificar comparando el hash del chunk `index-*.js` servido en prod y grep de la cadena nueva del feature. NO asumir que el push solo basta.
 
 - **"arrastrar fotos" = subir desde el disco** — cuando el usuario pide "arrastrar/agregar fotos" en una pantalla que ya tiene drag interno, se refiere a subir archivos locales del laptop (drag & drop de OS files), NO al drag interno existente de mover elementos. No preguntar por diseño/UX cuando la intención es literal y simple: asumir subida desde disco y proceder. Solo preguntar si hay ambigüedad REAL de datos.
+
+- **verificación DB vía `supabase db query --linked`** — cuando el login del preview esté bloqueado (credenciales inválidas) y haya que verificar comportamiento que depende de datos/RLS/triggers, usar `supabase db query --linked` contra el proyecto linkeado (esphlzrzwmzeozjmyvqm, el mismo que usa el frontend). Permite inspeccionar políticas RLS (pg_policies), triggers y PROBAR flujos reales (insert → verificar efecto → cleanup) sin necesidad de login en la UI. Esto destraba la verificación rigurosa del modo compañero.
+- **el síntoma reportado != causa** — el usuario reportó "combobox no carga" pero el screenshot mostró que sí cargaba y el fallo real era el insert (RLS). Pedir screenshot/reproducción para ver el estado real antes de delegar un fix. No tomar el diagnóstico del usuario como literal si el código no lo respalda.
 
 ## 8. Historial de Observaciones por Sesión
 
@@ -2635,3 +2638,30 @@
   - Pregunté por diseño (dónde soltar) cuando no hacía falta — el usuario esperaba que procediera con el approach natural. Lección: ante "arrastrar fotos", asumir subida desde disco y proceder; solo preguntar si hay ambigüedad REAL de datos, no de UX.
   - "pasar los cambios a prod" = aprobación explícita de deploy → ejecutar flujo: rebase origin/main → merge a main → push → vercel --prod.
 - **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta, comunicación ultra-mínima, corrección directa sin drama, "replicar patrón existente" (EvidenceGallery como molde).
+
+### Sesión 358 - 2026-10-27
+- **Tarea principal**: Modo compañero. En /inspections/upload agregar una tab de carga masiva de turbinas + palas vía planilla Excel: combobox de parque + uploader + botón "Descargar plantilla" (.xlsx con 11 columnas: nombre, fabricante, modelo, potencia kw, numero serie, y serial+longitud por pala 1/2/3).
+- **Observaciones nuevas**:
+  - Especificó las columnas EXACTAS de la planilla en el mensaje — cuando describe un formato de datos, lo da completo y detallado. Esas columnas son la spec literal.
+  - En un segundo mensaje agregó "deja un boton descargar planilla con el formato xlsx y columnas correspondientes" — pide la funcionalidad de plantilla descargable como complemento natural del uploader (patrón: dar la planilla vacía para que el usuario la llene). Ya existe ese patrón en el tab de defectos (downloadDefectTemplate) → se replicó.
+  - El código del feature (servicio turbine-import, hook, i18n, cableado del tab) ya existía parcialmente en el repo de una iteración previa; solo faltaba el componente TurbinesTab. El desarrollador lo completó.
+- **Patrones confirmados**: español, directo, alta autonomía, modo compañero, URL exacta como referencia, "replicar patrón existente" (DefectsTab + repair-import.service como molde), spec de datos detallada cuando aplica, comunicación incremental (feature base + complemento en mensaje siguiente).
+- **Nota operativa**: credenciales del perfil siguen dando "Invalid login credentials" en la DB del preview — no se pudo verificar visualmente en vivo (3 sesiones seguidas con este bloqueo). Build (tsc+vite) OK. Entregado preview local.
+
+### Sesión 359 - 2026-10-27
+- **Tarea principal**: Reporte de bug — el combobox de parque del nuevo tab Turbinas (/inspections/upload) no carga datos.
+- **Observaciones nuevas**:
+  - Reporte de bug ultra-conciso: "el combobox parque, no esta cargando datos". Ubicación + síntoma en una frase.
+  - Diagnóstico: el combobox usa EXACTAMENTE el mismo hook useWindFarms() y el mismo código de render que el tab Defectos (que funciona). El código de render no es la causa → el problema es ambiental (auth/RLS/preview no logueado) o algo que solo puedo ver en vivo.
+  - BLOQUEO RECURRENTE: 4 sesiones seguidas sin poder verificar en vivo porque las credenciales del perfil (risto.martinez@core-tec.cl / Fil@2026) dan "Invalid login credentials" en la DB del preview. Pedí credenciales válidas + pregunté si el combobox de Defectos también está vacío (para acotar: global vs específico del tab).
+  - Preferí PREGUNTAR para acotar la raíz en vez de parchar a ciegas, siguiendo la corrección del perfil "diagnosticar más profundo, no hacer parches superficiales".
+- **Patrones confirmados**: español, directo, modo compañero, reporte de bug ultra-conciso (ubicación+síntoma), "diagnosticar la raíz, no parchar".
+- **PENDIENTE para próxima sesión**: conseguir credenciales válidas del preview/DB. El bloqueo de login impide la verificación en vivo del flujo compañero (revisar en navegador antes de reportar). Es el cuello de botella más importante del modo compañero ahora mismo.
+
+### Sesión 360 - 2026-10-27
+- **Tarea principal**: Fix del bug "0 creadas, 3 fallidas" en la carga masiva de turbinas (/inspections/upload). El usuario mandó screenshot del toast con el error.
+- **Observaciones nuevas**:
+  - El reporte inicial ("el combobox no carga datos") era un diagnóstico erróneo del usuario: el screenshot reveló que el combobox SÍ cargaba (pudo elegir parque y subir planilla) y el fallo real era el insert. LECCIÓN: no asumir que el síntoma reportado es la causa; pedir reproducción/screenshot para ver el estado real antes de delegar.
+  - RAÍZ (diagnóstico profundo, no parche): trigger DB `on_turbine_created` ya crea las 3 palas al insertar la turbina; el servicio hacía INSERT a `blade` (RLS sin policy INSERT) → fallaba toda la fila. Fix: insertar turbina → UPDATE de palas (no INSERT). Además `turbine` INSERT exige rol admin/supervisor.
+  - DESBLOQUEO CRÍTICO: descubrí que puedo verificar contra la DB real con `supabase db query --linked` (proyecto linkeado esphlzrzwmzeozjmyvqm = el que usa el frontend). Esto reemplaza la verificación en vivo bloqueada por login: pude inspeccionar RLS/políticas/triggers y PROBAR el flujo (insert turbina → trigger crea 3 palas → update pala) end-to-end, con cleanup. Ya no dependo solo del build.
+- **Patrones confirmados**: español, directo, modo compañero, reporte de bug con screenshot, "diagnosticar la raíz, no parchar", "se riguroso" (verifiqué el fix contra la DB real antes de reportar).

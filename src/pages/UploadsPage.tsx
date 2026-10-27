@@ -1272,18 +1272,6 @@ function TurbinesTab() {
           >
             {t('uploads.downloadTemplate')}
           </Button>
-
-          {/* Upload spreadsheet — disabled until a park is selected */}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={importTurbines.isPending ? Loader2 : UploadCloud}
-            onClick={handleImportClick}
-            disabled={!windFarmId || importTurbines.isPending}
-            loading={importTurbines.isPending}
-          >
-            {t('uploads.importTurbines')}
-          </Button>
         </div>
 
         {!windFarmId && (
