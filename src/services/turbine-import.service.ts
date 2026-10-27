@@ -160,11 +160,17 @@ export async function downloadTurbineTemplate(): Promise<void> {
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 /**
- * Insert turbines + blades from a parsed set of Excel rows. Each row is
- * processed independently (try/catch) so a single failure does not abort the
- * whole run. The wind farm comes from the Turbines tab combobox (shared by
- * every row). For each row: insert the turbine, then insert the 3 blades
- * (positions 1/2/3) — skipping blades that have neither serial nor length.
+ * Insert turbines from a parsed set of Excel rows. Each row is processed
+ * independently (try/catch) so a single failure does not abort the whole run.
+ * The wind farm comes from the Turbines tab combobox (shared by every row).
+ *
+ * IMPORTANT (RLS / DB trigger): inserting into `turbine` fires the AFTER INSERT
+ * trigger `on_turbine_created` (SECURITY DEFINER fn `create_blades_for_turbine`)
+ * which auto-creates the 3 blades (position 1/2/3, serial/length null). The
+ * `blade` table has RLS with NO INSERT policy, so we must NOT insert blades
+ * from the client — it would be rejected and fail the whole row. Instead, after
+ * the turbine insert we UPDATE the already-created blades (UPDATE is allowed for
+ * admin/supervisor by the existing policy) to set serial_number / length_meters.
  */
 export async function importTurbines(
   rows: TurbineImportRow[],
@@ -197,25 +203,34 @@ export async function importTurbines(
       if (turbineErr) throw new Error(turbineErr.message);
       const turbineId = turbine.id as string;
 
-      // 2. Insert the 3 blades (only those with at least a serial or length).
+      // 2. Update the 3 blades auto-created by the `on_turbine_created` trigger.
+      //    We do NOT insert blades (RLS has no INSERT policy on `blade`). For
+      //    each position we only UPDATE when the row carries a serial or a
+      //    length; otherwise the blade is left as the trigger created it.
       const bladeDefs = [
         { position: 1, serial: row.blade1Serial.trim(), length: row.blade1Length },
         { position: 2, serial: row.blade2Serial.trim(), length: row.blade2Length },
         { position: 3, serial: row.blade3Serial.trim(), length: row.blade3Length },
       ];
 
-      const bladePayload = bladeDefs
-        .filter((b) => b.serial || parseNumber(b.length) != null)
-        .map((b) => ({
-          turbine_id: turbineId,
-          position: b.position,
-          serial_number: b.serial || null,
-          length_meters: parseNumber(b.length),
-        }));
+      for (const b of bladeDefs) {
+        const length = parseNumber(b.length);
+        if (!b.serial && length == null) continue; // nothing to set for this blade
 
-      if (bladePayload.length > 0) {
-        const { error: bladeErr } = await db.from('blade').insert(bladePayload);
-        if (bladeErr) throw new Error(bladeErr.message);
+        const { error: bladeErr } = await db
+          .from('blade')
+          .update({
+            serial_number: b.serial || null,
+            length_meters: length,
+          })
+          .eq('turbine_id', turbineId)
+          .eq('position', b.position);
+
+        // The turbine already exists; a blade UPDATE failure should not discard
+        // the row. Record the reason but keep the turbine counted as created.
+        if (bladeErr) {
+          errors.push(`Fila ${row.fila} (pala ${b.position}): ${bladeErr.message}`);
+        }
       }
 
       created += 1;

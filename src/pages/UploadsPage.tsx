@@ -1190,11 +1190,14 @@ function TurbinesTab() {
             t('uploads.turbinesImportSuccess').replace('{created}', String(result.created)),
           );
         } else {
-          toast.warning(
-            t('uploads.turbinesImportPartial')
-              .replace('{created}', String(result.created))
-              .replace('{failed}', String(result.failed)),
-          );
+          // Show the count AND the real reason of the first failure so the
+          // user understands WHY (e.g. an RLS/role error) instead of just
+          // seeing "X failed". result.errors[0] carries the Supabase message.
+          const base = t('uploads.turbinesImportPartial')
+            .replace('{created}', String(result.created))
+            .replace('{failed}', String(result.failed));
+          const reason = result.errors[0];
+          toast.warning(reason ? `${base} — ${reason}` : base);
         }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t('uploads.turbinesImportFailed'));
