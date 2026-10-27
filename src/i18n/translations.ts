@@ -698,6 +698,34 @@ export const translations: TranslationMap = {
     es: 'Descarga una plantilla .xlsx vacía con las columnas esperadas.',
   },
 
+  // ─── Turbine bulk import (Excel) ─────────────────────────────────────────────
+  'uploads.tabTurbines': { en: 'Turbines', es: 'Turbinas' },
+  'uploads.turbinesImportTitle': {
+    en: 'Bulk upload turbines + blades',
+    es: 'Carga masiva de turbinas + palas',
+  },
+  'uploads.turbinesImportHint': {
+    en: 'Upload an .xlsx file — each row is a turbine with its 3 blades.',
+    es: 'Sube un archivo .xlsx — cada fila es una turbina con sus 3 palas.',
+  },
+  'uploads.pickFarmFirst': {
+    en: 'Select a wind farm before importing.',
+    es: 'Selecciona un parque antes de importar.',
+  },
+  'uploads.importTurbines': { en: 'Upload spreadsheet', es: 'Cargar planilla' },
+  'uploads.turbinesImportSuccess': {
+    en: '{created} turbine(s) created',
+    es: '{created} turbina(s) creada(s)',
+  },
+  'uploads.turbinesImportPartial': {
+    en: '{created} created, {failed} failed',
+    es: '{created} creadas, {failed} fallidas',
+  },
+  'uploads.turbinesImportFailed': {
+    en: 'Could not process the file',
+    es: 'No se pudo procesar el archivo',
+  },
+
   // ─── Two-tab layout ─────────────────────────────────────────────────────────
   'uploads.tabPhotos': { en: 'Inspection photos', es: 'Fotos a inspección' },
   'uploads.tabDefects': { en: 'Defects upload', es: 'Carga de defectos' },
