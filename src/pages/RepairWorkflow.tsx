@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, Loader2, Pencil, RotateCcw, Star, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Loader2, Pencil, Plus, RotateCcw, Star, Trash2, Upload, X } from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +10,7 @@ import {
   useRepairTree,
   useSetPhotoSelected,
   useMovePhotoToStage,
+  useUploadRepairPhoto,
   useDeleteRepairDefect,
   useUpdateDefectFields,
   useUpdateRepairProgress,
@@ -107,6 +108,7 @@ export function RepairWorkflow() {
   const typeOptions = annotationTypes.map((at) => at.name);
   const setSelected = useSetPhotoSelected(campaignId);
   const movePhoto = useMovePhotoToStage(campaignId);
+  const uploadPhoto = useUploadRepairPhoto(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
   const updateRepairProgress = useUpdateRepairProgress(campaignId);
@@ -117,7 +119,10 @@ export function RepairWorkflow() {
   // defectId currently being generated (null = none). Scopes the spinner to
   // the specific defect card whose report is being generated.
   const [downloadingDefectId, setDownloadingDefectId] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<RepairPhoto | null>(null);
+  // Lightbox holds the id of the photo being previewed (not a snapshot) so it
+  // always reflects the fresh tree — selection toggles update the star icon and
+  // left/right navigation reads the live sibling list.
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   // Photo ids whose selection mutation is in flight → drives a per-photo spinner.
   // A Set handles several rapid clicks across different photos concurrently.
   const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
@@ -259,7 +264,65 @@ export function RepairWorkflow() {
   };
 
   const handlePreview = (photo: RepairPhoto) => {
-    if (photo.url) setLightbox(photo);
+    if (photo.url) setLightboxPhotoId(photo.id);
+  };
+
+  // Upload one or more image files (dropped from the OS or picked via the
+  // hidden input) into a SPECIFIC repair stage. Read-only for the client (RLS
+  // also blocks the write). Each file is uploaded sequentially so a single
+  // failure is reported without aborting the rest; the stage re-renders once
+  // the tree invalidation lands. Returns a promise so the StageRow can show a
+  // per-stage uploading spinner while it runs.
+  const handleUploadPhotos = async (
+    files: File[],
+    target: { repairId: string; repairStageId: string; stageCode: string },
+  ): Promise<void> => {
+    if (isClient || files.length === 0) return;
+    for (const file of files) {
+      try {
+        await uploadPhoto.mutateAsync({
+          file,
+          repairId: target.repairId,
+          repairStageId: target.repairStageId,
+          stageCode: target.stageCode,
+        });
+        toast.success(t('repair.uploadPhotoSuccess'));
+      } catch (err) {
+        toast.error((err as Error)?.message || t('repair.uploadPhotoError'));
+      }
+    }
+  };
+
+  // Resolve the previewed photo and its same-stage siblings from the LIVE tree,
+  // so the lightbox reflects selection toggles and can navigate within the stage.
+  // Siblings are the photos of the stage the opened photo belongs to (matched by
+  // repairStageId), ordered by captureOrder — the same order shown in the grid.
+  const lightboxCtx = useMemo(() => {
+    if (!lightboxPhotoId || !tree) return null;
+    for (const node of tree) {
+      for (const stage of node.stages) {
+        const match = stage.photos.find((p) => p.id === lightboxPhotoId);
+        if (match) {
+          const siblings = stage.photos
+            .filter((p) => !!p.url)
+            .slice()
+            .sort((a, b) => a.captureOrder - b.captureOrder);
+          const index = siblings.findIndex((p) => p.id === lightboxPhotoId);
+          return { photo: match, siblings, index };
+        }
+      }
+    }
+    return null;
+  }, [lightboxPhotoId, tree]);
+
+  const lightbox = lightboxCtx?.photo ?? null;
+
+  // Navigate to the previous/next photo of the same stage (loops at the edges).
+  const handleLightboxNav = (dir: -1 | 1) => {
+    if (!lightboxCtx || lightboxCtx.siblings.length < 2) return;
+    const n = lightboxCtx.siblings.length;
+    const nextIdx = (lightboxCtx.index + dir + n) % n;
+    setLightboxPhotoId(lightboxCtx.siblings[nextIdx]!.id);
   };
 
   // Generate a PDF report scoped to a SINGLE repair. The PDF service scopes by
@@ -496,6 +559,7 @@ export function RepairWorkflow() {
               pendingPhotoIds={pendingPhotoIds}
               onSelect={handleSelect}
               onMovePhoto={isClient ? undefined : handleMovePhoto}
+              onUploadPhoto={isClient ? undefined : handleUploadPhotos}
               onPreview={handlePreview}
               onGenerateReport={handleGenerateDefectPdf}
               onDownloadReport={handleDownloadDefectPdf}
@@ -514,16 +578,66 @@ export function RepairWorkflow() {
       )}
 
       {/* Lightbox: enlarged photo preview */}
-      {lightbox && (
+      {lightbox && lightboxCtx && (
         <div
           style={lightboxOverlay}
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxPhotoId(null)}
           role="dialog"
           aria-modal="true"
         >
-          <button style={lightboxClose} onClick={() => setLightbox(null)} aria-label={t('general.close')}>
+          {/* Top-right controls: star (select for report) + close */}
+          {!isClient && (
+            <button
+              style={{
+                ...lightboxStar,
+                background: lightbox.repairSelected ? C.brand : 'rgba(255,255,255,0.15)',
+                cursor: pendingPhotoIds.has(lightbox.id) ? 'progress' : 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelect(lightbox, !lightbox.repairSelected);
+              }}
+              aria-label={t('repair.selectedForReport')}
+              aria-pressed={lightbox.repairSelected}
+              title={t('repair.selectedForReport')}
+            >
+              <Star
+                size={20}
+                color="#fff"
+                fill={lightbox.repairSelected ? '#fff' : 'none'}
+              />
+            </button>
+          )}
+          <button style={lightboxClose} onClick={() => setLightboxPhotoId(null)} aria-label={t('general.close')}>
             <X size={22} />
           </button>
+
+          {/* Navigation arrows — only within the same stage, ≥2 photos */}
+          {lightboxCtx.siblings.length > 1 && (
+            <>
+              <button
+                style={{ ...lightboxNav, left: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(-1);
+                }}
+                aria-label={t('general.previous')}
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <button
+                style={{ ...lightboxNav, right: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(1);
+                }}
+                aria-label={t('general.next')}
+              >
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+
           <img
             src={lightbox.url}
             alt={lightbox.filename}
@@ -550,6 +664,11 @@ interface BladeGroupSectionProps {
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   /** Move a photo to another stage of the same defect (undefined = read-only client). */
   onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
+  /** Upload image files into a specific stage (undefined = read-only client). */
+  onUploadPhoto?: (
+    files: File[],
+    target: { repairId: string; repairStageId: string; stageCode: string },
+  ) => Promise<void>;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
@@ -594,6 +713,7 @@ function BladeGroupSection({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onPreview,
   onGenerateReport,
   onDownloadReport,
@@ -634,6 +754,7 @@ function BladeGroupSection({
               pendingPhotoIds={pendingPhotoIds}
               onSelect={onSelect}
               onMovePhoto={onMovePhoto}
+              onUploadPhoto={onUploadPhoto}
               onPreview={onPreview}
               onGenerateReport={onGenerateReport}
               onDownloadReport={onDownloadReport}
@@ -665,6 +786,11 @@ interface DefectSectionProps {
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   /** Move a photo to another stage of the same defect (undefined = read-only client). */
   onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
+  /** Upload image files into a specific stage (undefined = read-only client). */
+  onUploadPhoto?: (
+    files: File[],
+    target: { repairId: string; repairStageId: string; stageCode: string },
+  ) => Promise<void>;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
@@ -705,6 +831,7 @@ function DefectSection({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onPreview,
   onGenerateReport,
   onDownloadReport,
@@ -1181,6 +1308,7 @@ function DefectSection({
           pendingPhotoIds={pendingPhotoIds}
           onSelect={onSelect}
           onMovePhoto={onMovePhoto}
+          onUploadPhoto={onUploadPhoto}
           onPreview={onPreview}
         />
       )}
@@ -1197,6 +1325,10 @@ interface StagesListProps {
   pendingPhotoIds: Set<string>;
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
+  onUploadPhoto?: (
+    files: File[],
+    target: { repairId: string; repairStageId: string; stageCode: string },
+  ) => Promise<void>;
   onPreview: (photo: RepairPhoto) => void;
 }
 
@@ -1225,6 +1357,7 @@ function StagesList({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onPreview,
 }: StagesListProps) {
   // Which stage is currently hovered as the target of a cross-stage move
@@ -1252,6 +1385,7 @@ function StagesList({
         <StageRow
           key={stage.stageId ?? stage.stageCode}
           defectId={node.defect.id}
+          repairId={node.repairId}
           stage={stage}
           defectStages={node.stages}
           t={t}
@@ -1259,6 +1393,7 @@ function StagesList({
           pendingPhotoIds={pendingPhotoIds}
           onSelect={onSelect}
           onMovePhoto={onMovePhoto}
+          onUploadPhoto={onUploadPhoto}
           onPreview={onPreview}
           hoverTargetStageId={hoverTargetStageId}
           setHoverTargetStageId={setHoverTargetStageId}
@@ -1272,6 +1407,9 @@ function StagesList({
 
 interface StageRowProps {
   defectId: string;
+  /** The defect's repair_id (null when no repair row exists yet). Required to
+      upload a photo; uploads are disabled when null. */
+  repairId: string | null;
   stage: RepairStageNode;
   /** All stages of the defect — used to resolve a photo dragged in from
       another stage (it isn't in this stage's own photos list). */
@@ -1282,6 +1420,11 @@ interface StageRowProps {
   onSelect: (photo: RepairPhoto, selected: boolean) => void;
   /** Move a photo to another stage of the same defect (undefined = read-only client). */
   onMovePhoto?: (photo: RepairPhoto, targetStageId: string, targetStageCode: string) => void;
+  /** Upload image files into THIS stage (undefined = read-only client). */
+  onUploadPhoto?: (
+    files: File[],
+    target: { repairId: string; repairStageId: string; stageCode: string },
+  ) => Promise<void>;
   onPreview: (photo: RepairPhoto) => void;
   /** Stage id currently hovered as a cross-stage move target (shared by all
       StageRows of the defect). This row is highlighted when it equals its own
@@ -1306,8 +1449,19 @@ const STAGE_MIME = 'application/x-stage-id';
 // safe as a singleton because only one HTML5 drag can be in flight at a time.
 let activeDragOriginStageId: string | null = null;
 
+// True when the drag in flight carries OS files (a file drag from the laptop),
+// as opposed to an internal HTML5 photo-card drag (text/plain + STAGE_MIME).
+// Used to tell "upload from disk" apart from "move/select a photo".
+function isFileDrag(e: React.DragEvent): boolean {
+  const types = e.dataTransfer?.types;
+  if (!types) return false;
+  // DataTransfer.types is a DOMStringList/array; 'Files' is present on OS drags.
+  return Array.from(types).includes('Files');
+}
+
 function StageRow({
   defectId,
+  repairId,
   stage,
   defectStages,
   t,
@@ -1315,12 +1469,17 @@ function StageRow({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onPreview,
   hoverTargetStageId,
   setHoverTargetStageId,
 }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
+  // File-upload drop highlight (OS file drag over this stage) + in-flight state.
+  const [fileDropActive, setFileDropActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // This stage's own id (empty string for catalog fallback stages with no id).
   const thisStageId = stage.stageId ?? '';
   // Cross-stage move highlight is derived from the SHARED hover target, not a
@@ -1353,6 +1512,38 @@ function StageRow({
   // stage (has a repair_stage_id — catalog fallback stages have stageId null).
   const canReceiveMove = !readOnly && !!onMovePhoto && stage.stageId != null;
 
+  // This stage can RECEIVE an UPLOAD (drop files from disk / "+" button) only
+  // when writable, it's a real stage (has a repair_stage_id), and the defect
+  // has a repair row (repairId) to attach the photo to. Catalog fallback stages
+  // (no repair_stage_id) can't be uploaded to.
+  const canUpload =
+    !readOnly && !!onUploadPhoto && stage.stageId != null && repairId != null;
+
+  // Run the upload for a batch of files, scoping the spinner to THIS stage.
+  const runUpload = async (files: File[]) => {
+    if (!canUpload || !onUploadPhoto || !repairId || !stage.stageId || files.length === 0) return;
+    // Only keep image files; the service also re-validates each one.
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) return;
+    setUploading(true);
+    try {
+      await onUploadPhoto(images, {
+        repairId,
+        repairStageId: stage.stageId,
+        stageCode: stage.stageCode,
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) void runUpload(Array.from(files));
+    // Reset so the same file can be re-selected.
+    e.target.value = '';
+  };
+
   // True when the in-flight drag started in a DIFFERENT stage than this one.
   // Reads the module-level origin tracker (dataTransfer.getData is unreadable
   // during dragover). On a real `drop` the dataTransfer value is authoritative
@@ -1362,61 +1553,78 @@ function StageRow({
     return origin !== (stage.stageId ?? '');
   };
 
+  // Combined dragOver for the stage card: OS file drags (upload) take priority
+  // and are kept separate from internal cross-stage photo moves.
+  const handleStageDragOver = (e: React.DragEvent) => {
+    if (canUpload && isFileDrag(e)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      setFileDropActive(true);
+      return;
+    }
+    if (!canReceiveMove) return;
+    // Only react to cross-stage moves here; same-stage selection is handled by
+    // the "selected" column drop zone below.
+    if (!isForeignDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // Point the SHARED hover target at this stage. Setting the same value
+    // repeatedly (dragOver fires continuously) is a no-op for React, and
+    // switching stages reassigns it so only one stage is ever highlighted.
+    setHoverTargetStageId(thisStageId);
+  };
+
+  const handleStageDrop = (e: React.DragEvent) => {
+    // OS file drop → upload into this stage.
+    if (canUpload && isFileDrag(e)) {
+      e.preventDefault();
+      setFileDropActive(false);
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) void runUpload(Array.from(files));
+      return;
+    }
+    if (!canReceiveMove) return;
+    const origin = e.dataTransfer.getData(STAGE_MIME) || (activeDragOriginStageId ?? '');
+    // Same-stage drop → let the inner "selected" column handle it.
+    if (origin === thisStageId) return;
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    const photo = photos.find((p) => p.id === id);
+    // The dragged photo belongs to another stage, so it won't be in this
+    // stage's photos; find it from the full defect tree instead.
+    const moved = photo ?? defectStages.flatMap((s) => s.photos).find((p) => p.id === id);
+    if (moved && onMovePhoto) {
+      onMovePhoto(moved, stage.stageId!, stage.stageCode);
+    }
+    // Reset the shared highlight LAST and unconditionally (single shared value,
+    // see StagesList). The global dragend in StagesList is the backstop.
+    setHoverTargetStageId(null);
+  };
+
+  // Enable the drag handlers when EITHER move or upload is possible.
+  const dragEnabled = canReceiveMove || canUpload;
+
   return (
     <div
-      style={{ ...stageCard, ...(stageDropActive ? stageDropActiveStyle : {}) }}
-      onDragOver={
-        canReceiveMove
+      style={{
+        ...stageCard,
+        ...(stageDropActive ? stageDropActiveStyle : {}),
+        ...(fileDropActive ? stageDropActiveStyle : {}),
+      }}
+      onDragOver={dragEnabled ? handleStageDragOver : undefined}
+      // onDragLeave only clears the FILE-upload highlight (the move highlight is
+      // managed by StagesList's shared state + global dragend). Guard against the
+      // dragleave that fires when crossing into a child element by checking the
+      // pointer actually left the card bounds.
+      onDragLeave={
+        canUpload
           ? (e) => {
-              // Only react to cross-stage moves here; same-stage selection is
-              // handled by the "selected" column drop zone below.
-              if (!isForeignDrag(e)) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              // Point the SHARED hover target at this stage. Setting the same
-              // value repeatedly (dragOver fires continuously) is a no-op for
-              // React, and switching stages reassigns it so only one stage is
-              // ever highlighted.
-              setHoverTargetStageId(thisStageId);
+              const related = e.relatedTarget as Node | null;
+              if (!related || !e.currentTarget.contains(related)) setFileDropActive(false);
             }
           : undefined
       }
-      // No onDragLeave here on purpose. Leaving the highlight to a per-stage
-      // dragLeave is unreliable: with fast moves across adjacent cards the
-      // leave of the OLD card fires AFTER the dragOver of the NEW one, and the
-      // handler reads a stale `hoverTargetStageId` from its render closure, so
-      // the conditional clear misfires and intermediate stages stay green.
-      // Instead, every dragOver REASSIGNS the single shared target to the stage
-      // currently under the pointer (only one stage can ever equal it), and the
-      // final reset happens on `drop`/`dragend` (StagesList safety net). This
-      // guarantees exactly one highlighted stage at a time with no residue.
-      onDrop={
-        canReceiveMove
-          ? (e) => {
-              const origin =
-                e.dataTransfer.getData(STAGE_MIME) || (activeDragOriginStageId ?? '');
-              // Same-stage drop → let the inner "selected" column handle it.
-              if (origin === thisStageId) return;
-              e.preventDefault();
-              const id = e.dataTransfer.getData('text/plain');
-              const photo = photos.find((p) => p.id === id);
-              // The dragged photo belongs to another stage, so it won't be in
-              // this stage's photos; find it from the full defect tree instead.
-              const moved =
-                photo ??
-                defectStages.flatMap((s) => s.photos).find((p) => p.id === id);
-              if (moved && onMovePhoto) {
-                onMovePhoto(moved, stage.stageId!, stage.stageCode);
-              }
-              // Reset the shared highlight LAST and unconditionally. Because it's
-              // a single shared value (not one state per row), this clears the
-              // destination stage too even though onMovePhoto just triggered an
-              // optimistic re-render of this row — no stale per-row `true` is
-              // left behind. The global dragend in StagesList is the backstop.
-              setHoverTargetStageId(null);
-            }
-          : undefined
-      }
+      onDrop={dragEnabled ? handleStageDrop : undefined}
     >
       <div style={stageHeader}>
         <span style={stageOrder}>{stage.sortOrder}</span>
@@ -1424,7 +1632,46 @@ function StageRow({
         <span style={stageCount}>
           {photos.length} {t('repair.photos')} · {selected.length} {t('repair.selected')}
         </span>
+        {/* "Add photo" button + hidden input — alternative to drag&drop. Only
+            when this stage can receive uploads (writable, real stage, repair
+            exists). Shows a spinner while an upload is in flight. */}
+        {canUpload && (
+          <>
+            <button
+              type="button"
+              style={stageAddBtn}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title={t('repair.addPhoto')}
+            >
+              {uploading ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Plus size={13} />
+              )}
+              {t('repair.addPhoto')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              multiple
+              onChange={handleFileInput}
+              style={{ display: 'none' }}
+              aria-label={t('repair.addPhoto')}
+            />
+          </>
+        )}
       </div>
+
+      {/* File-drop hint: visible while an OS file drag hovers this stage, or a
+          subtle persistent dropzone affordance when the stage is empty. */}
+      {canUpload && (fileDropActive || photos.length === 0) && (
+        <div style={{ ...stageDropHint, ...(fileDropActive ? stageDropHintActive : {}) }}>
+          <Upload size={15} />
+          <span>{uploading ? t('repair.uploading') : t('repair.dropToUpload')}</span>
+        </div>
+      )}
 
       {stage.note ? (
         <p style={stageNote}>
@@ -1768,6 +2015,22 @@ const stageDropActiveStyle: React.CSSProperties = {
   borderColor: C.brand, background: 'rgba(90,143,90,0.06)', boxShadow: `0 0 0 2px ${C.brand} inset`,
 };
 const stageHeader: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 };
+// "Add photo" button in the stage header (upload alternative to drag&drop).
+const stageAddBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
+  border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer', flexShrink: 0,
+};
+// Dashed hint shown when a file drag hovers the stage or the stage is empty.
+const stageDropHint: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+  border: `2px dashed ${C.border}`, borderRadius: 10, padding: '14px 10px',
+  color: C.muted, fontSize: 12, fontWeight: 600, marginBottom: 10,
+  transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+};
+const stageDropHintActive: React.CSSProperties = {
+  borderColor: C.brand, background: 'rgba(90,143,90,0.08)', color: C.brand,
+};
 const stageOrder: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22,
   borderRadius: '50%', background: 'rgba(90,143,90,0.15)', color: C.brand, fontSize: 11, fontWeight: 700, flexShrink: 0,
@@ -1834,4 +2097,15 @@ const lightboxClose: React.CSSProperties = {
 };
 const lightboxCaption: React.CSSProperties = {
   marginTop: 12, color: '#fff', fontSize: 13, opacity: 0.85, cursor: 'default',
+};
+const lightboxStar: React.CSSProperties = {
+  position: 'fixed', top: 20, right: 72, width: 40, height: 40, borderRadius: '50%',
+  border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const lightboxNav: React.CSSProperties = {
+  position: 'fixed', top: '50%', transform: 'translateY(-50%)',
+  width: 48, height: 48, borderRadius: '50%',
+  background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001,
 };

@@ -169,6 +169,41 @@ export function useMovePhotoToStage(campaignId: string | undefined) {
 }
 
 /**
+ * Upload a photo (from the web) into a specific repair stage: upload to the
+ * public 'inspection-photos' bucket + insert a repair_photo row, then refresh
+ * tree + summary via react-query invalidation (same pattern as
+ * useDeleteRepairDefect). Unlike selection/move, this is a full refetch because
+ * a brand-new photo row needs the server pipeline (URL resolution, uploader
+ * name) to render correctly.
+ */
+export function useUploadRepairPhoto(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      file,
+      repairId,
+      repairStageId,
+      stageCode,
+    }: {
+      file: File;
+      repairId: string;
+      repairStageId: string;
+      stageCode: string;
+    }) =>
+      repairService.uploadRepairPhoto(file, {
+        repairId,
+        repairStageId,
+        stageCode,
+        campaignId: campaignId!,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['repair-summary', campaignId] });
+    },
+  });
+}
+
+/**
  * Permanently delete a defect from the repair campaign (whole chain:
  * repair_photo → repair_stage → repair → work_order → quote_item → defect),
  * then refresh tree + summary via react-query invalidation.
