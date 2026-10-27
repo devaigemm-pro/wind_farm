@@ -1007,6 +1007,80 @@ export const repairService = {
   },
 
   /**
+   * Upload a photo from the WEB into a repair stage. This is the first native
+   * web-side repair photo upload path (previously photos only came from the
+   * mobile app). It mirrors droneUploadService.uploadPhoto:
+   *   1. Validate the file is an image (jpeg/png).
+   *   2. Upload the File to the PUBLIC 'inspection-photos' bucket under a unique
+   *      path. The prefix is `repairs/...` (NOT 'inspection-imports/'), so the
+   *      tree later resolves it as a PUBLIC url via publicUrl() — no signed URL.
+   *   3. Insert a repair_photo row (repair_id, repair_stage_id, stage_code,
+   *      storage_path, filename, capture_order, metadata) so the tree picks it
+   *      up via get_repair_photos_by_stage (grouped by repair_stage_id).
+   *
+   * capture_order is resolved as the next available order within the stage
+   * (max existing + 1), falling back to 1.
+   */
+  async uploadRepairPhoto(
+    file: File,
+    payload: {
+      repairId: string;
+      repairStageId: string;
+      stageCode: string;
+      campaignId: string;
+    },
+  ): Promise<void> {
+    // 1. Validate: only JPEG/PNG images are accepted (same as EvidenceGallery).
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+      throw new RepairServiceError(
+        `Unsupported file type: ${file.type || 'unknown'}. Only JPEG and PNG are allowed.`,
+      );
+    }
+
+    // 2. Build a unique storage path in the PUBLIC bucket. The timestamp + a
+    //    short random suffix make it collision-proof even for same-name files
+    //    dropped in quick succession. The `repairs/` prefix ensures publicUrl()
+    //    resolves it (anything NOT starting with 'inspection-imports/').
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const storagePath = `repairs/${payload.campaignId}/${payload.repairStageId}/${unique}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(storagePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) {
+      throw new RepairServiceError(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    // 3. Resolve the next capture_order within this stage (max + 1, else 1).
+    let captureOrder = 1;
+    const { data: orderRows } = await db
+      .from('repair_photo')
+      .select('capture_order')
+      .eq('repair_stage_id', payload.repairStageId)
+      .order('capture_order', { ascending: false })
+      .limit(1);
+    const top = (orderRows as Array<{ capture_order: number | null }> | null)?.[0];
+    if (top?.capture_order != null) captureOrder = Number(top.capture_order) + 1;
+
+    // 4. Insert the repair_photo row. If the DB insert fails, remove the just
+    //    uploaded file so we don't leave an orphan object in storage.
+    const { error: insertError } = await db.from('repair_photo').insert({
+      repair_id: payload.repairId,
+      repair_stage_id: payload.repairStageId,
+      stage_code: payload.stageCode,
+      storage_path: storagePath,
+      filename: file.name,
+      capture_order: captureOrder,
+      metadata: {},
+    });
+    if (insertError) {
+      await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
+      throw new RepairServiceError(`DB insert failed: ${insertError.message}`, insertError.code);
+    }
+  },
+
+  /**
    * Move a photo to a DIFFERENT repair stage (within the same defect/repair),
    * to fix a photo uploaded under the wrong stage. Only the row's
    * repair_stage_id + stage_code are updated so the tree (built by
