@@ -408,6 +408,27 @@ export function RepairWorkflow() {
       );
     });
 
+  // Persist ONLY the defect's severity (= the "Start category") with a DIRECT
+  // update on the `defect` table, without touching the other defect fields
+  // (type/number/identifier). Severity belongs to the DEFECT, not the repair
+  // row, so this goes through updateDefectFields (NOT onSaveProgress).
+  const handleSaveDefectSeverity = (defectId: string, severity: number | null) =>
+    new Promise<void>((resolve, reject) => {
+      updateDefectFields.mutate(
+        { defectId, severity },
+        {
+          onSuccess: () => {
+            toast.success(t('repair.editSuccess'));
+            resolve();
+          },
+          onError: (err) => {
+            toast.error((err as Error)?.message || t('repair.editError'));
+            reject(err);
+          },
+        },
+      );
+    });
+
   // Persist a single repair progress field (start/final category, assigned
   // technician, or progress %) with a DIRECT update on the repair row. Fired
   // immediately on change (combobox) or on blur/debounce (progress %).
@@ -483,6 +504,7 @@ export function RepairWorkflow() {
               onReopenDefect={isClient ? undefined : handleReopenDefect}
               downloadingDefectId={downloadingDefectId}
               onSaveDefectFields={isClient ? undefined : handleSaveDefectFields}
+              onSaveDefectSeverity={isClient ? undefined : handleSaveDefectSeverity}
               typeOptions={typeOptions}
               technicians={technicians}
               onSaveProgress={isClient ? undefined : handleSaveProgress}
@@ -541,6 +563,8 @@ interface BladeGroupSectionProps {
     defectId: string,
     fields: { type: string; defectNumber: string; defectIdentifier: string },
   ) => Promise<void>;
+  /** Persist ONLY the defect's severity = "Start category" (undefined = read-only client). */
+  onSaveDefectSeverity?: (defectId: string, severity: number | null) => Promise<void>;
   /** Full list of annotation type names offered by the inline type <select>. */
   typeOptions: string[];
   /** Technicians (role='technician') for the "Técnico a cargo" combobox. */
@@ -578,6 +602,7 @@ function BladeGroupSection({
   onReopenDefect,
   downloadingDefectId,
   onSaveDefectFields,
+  onSaveDefectSeverity,
   typeOptions,
   technicians,
   onSaveProgress,
@@ -617,6 +642,7 @@ function BladeGroupSection({
               onReopenDefect={onReopenDefect}
               downloading={node.repairId != null && downloadingDefectId === node.repairId}
               onSaveDefectFields={onSaveDefectFields}
+              onSaveDefectSeverity={onSaveDefectSeverity}
               typeOptions={typeOptions}
               technicians={technicians}
               onSaveProgress={onSaveProgress}
@@ -653,6 +679,8 @@ interface DefectSectionProps {
     defectId: string,
     fields: { type: string; defectNumber: string; defectIdentifier: string },
   ) => Promise<void>;
+  /** Persist ONLY the defect's severity = "Start category" (undefined = read-only client). */
+  onSaveDefectSeverity?: (defectId: string, severity: number | null) => Promise<void>;
   /** Full list of annotation type names offered by the inline type <select>. */
   typeOptions: string[];
   /** Technicians (role='technician') for the "Técnico a cargo" combobox. */
@@ -685,6 +713,7 @@ function DefectSection({
   onReopenDefect,
   downloading,
   onSaveDefectFields,
+  onSaveDefectSeverity,
   typeOptions,
   technicians,
   onSaveProgress,
@@ -698,6 +727,13 @@ function DefectSection({
   // persists immediately on change; the % input persists on blur to avoid a
   // write per keystroke. Seeded from the node's saved values.
   const canEditProgress = Boolean(onSaveProgress) && node.repairId != null;
+  // "Categoría de inicio" is bound to the DEFECT's severity (not the repair
+  // row). 0/falsy severity is treated as "no value" (empty option), matching
+  // how severity is mapped (severity: Number(...) || 0).
+  const canEditSeverity = Boolean(onSaveDefectSeverity);
+  const [startCat, setStartCat] = useState<string>(
+    node.defect.severity ? String(node.defect.severity) : '',
+  );
   const [finalCat, setFinalCat] = useState<string>(
     node.finalCategory != null ? String(node.finalCategory) : '',
   );
@@ -708,10 +744,11 @@ function DefectSection({
 
   // Re-seed when the node's saved values change (e.g. after a tree refetch).
   useEffect(() => {
+    setStartCat(node.defect.severity ? String(node.defect.severity) : '');
     setFinalCat(node.finalCategory != null ? String(node.finalCategory) : '');
     setAssignedTech(node.assignedTechnicianId ?? '');
     setProgress(node.progressPercent != null ? String(node.progressPercent) : '');
-  }, [node.finalCategory, node.assignedTechnicianId, node.progressPercent]);
+  }, [node.defect.severity, node.finalCategory, node.assignedTechnicianId, node.progressPercent]);
 
   const commitProgressField = (fields: {
     startCategory?: number | null;
@@ -725,6 +762,15 @@ function DefectSection({
     });
   };
 
+  // "Categoría de inicio" writes the DEFECT's severity (NOT the repair row),
+  // so it goes through onSaveDefectSeverity (updateDefectFields), not onSaveProgress.
+  const handleStartCatChange = (value: string) => {
+    setStartCat(value);
+    if (!onSaveDefectSeverity) return;
+    void onSaveDefectSeverity(node.defect.id, value === '' ? null : Number(value)).catch(() => {
+      /* toast handled upstream */
+    });
+  };
   const handleFinalCatChange = (value: string) => {
     setFinalCat(value);
     commitProgressField({ finalCategory: value === '' ? null : Number(value) });
@@ -1006,6 +1052,22 @@ function DefectSection({
           category, assigned technician, progress %). Shown right below the
           defect header and BEFORE the stages. Read-only for the client. */}
       <div style={progressBlock}>
+        <label style={editField}>
+          <span style={editLabel}>{t('repair.startCategory')}</span>
+          <select
+            style={editSelect}
+            value={startCat}
+            onChange={(e) => handleStartCatChange(e.target.value)}
+            disabled={!canEditSeverity}
+          >
+            <option value="">—</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                Cat {n}
+              </option>
+            ))}
+          </select>
+        </label>
         <label style={editField}>
           <span style={editLabel}>{t('repair.finalCategory')}</span>
           <select

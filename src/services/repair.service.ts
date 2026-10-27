@@ -1195,12 +1195,18 @@ export const repairService = {
    */
   async updateDefectFields(
     defectId: string,
-    fields: { type?: string; defectNumber?: string | null; defectIdentifier?: string | null },
+    fields: {
+      type?: string;
+      defectNumber?: string | null;
+      defectIdentifier?: string | null;
+      severity?: number | null;
+    },
   ): Promise<void> {
     const patch: Record<string, unknown> = {};
     if (fields.type !== undefined) patch.type = fields.type;
     if (fields.defectNumber !== undefined) patch.defect_number = fields.defectNumber;
     if (fields.defectIdentifier !== undefined) patch.defect_identifier = fields.defectIdentifier;
+    if (fields.severity !== undefined) patch.severity = fields.severity;
     if (Object.keys(patch).length === 0) return;
 
     const { error } = await db.from('defect').update(patch).eq('id', defectId);

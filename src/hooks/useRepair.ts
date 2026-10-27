@@ -206,12 +206,20 @@ export function useUpdateDefectFields(campaignId: string | undefined) {
       type,
       defectNumber,
       defectIdentifier,
+      severity,
     }: {
       defectId: string;
       type?: string;
       defectNumber?: string | null;
       defectIdentifier?: string | null;
-    }) => repairService.updateDefectFields(defectId, { type, defectNumber, defectIdentifier }),
+      severity?: number | null;
+    }) =>
+      repairService.updateDefectFields(defectId, {
+        type,
+        defectNumber,
+        defectIdentifier,
+        severity,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['repair-tree', campaignId] });
     },
