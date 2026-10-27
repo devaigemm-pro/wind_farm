@@ -22,8 +22,10 @@ import {
 } from '@/hooks/useImportRepairCampaign';
 import { useWindFarms } from '@/hooks/useWindFarms';
 import { useTurbines } from '@/hooks/useTurbines';
+import { useImportTurbines } from '@/hooks/useImportTurbines';
 import { droneUploadService } from '@/services/drone-upload.service';
 import { downloadDefectTemplate } from '@/services/repair-import.service';
+import { downloadTurbineTemplate } from '@/services/turbine-import.service';
 import { BLADE_FACE_LABELS } from '@/types';
 import type { CampaignStatus, UploadRecord, BladeFace } from '@/types';
 import type { BadgeVariant } from '@/components/atoms';
@@ -45,7 +47,7 @@ const SYNC_STATE_BADGE_MAP: Record<SyncState, BadgeVariant> = {
   uploaded: 'success',
 };
 
-type TabId = 'photos' | 'defects';
+type TabId = 'photos' | 'defects' | 'turbines';
 
 // ─── Shared styles ──────────────────────────────────────────────────────────
 
@@ -174,6 +176,7 @@ export function UploadsPage() {
     () => [
       { id: 'photos', label: t('uploads.tabPhotos') },
       { id: 'defects', label: t('uploads.tabDefects') },
+      { id: 'turbines', label: t('uploads.tabTurbines') },
     ],
     [t],
   );
@@ -194,11 +197,9 @@ export function UploadsPage() {
         />
       </div>
 
-      {activeTab === 'photos' ? (
-        <PhotosTab records={records} isLoading={isLoading} />
-      ) : (
-        <DefectsTab />
-      )}
+      {activeTab === 'photos' && <PhotosTab records={records} isLoading={isLoading} />}
+      {activeTab === 'defects' && <DefectsTab />}
+      {activeTab === 'turbines' && <TurbinesTab />}
     </div>
   );
 }
@@ -1145,6 +1146,206 @@ function DefectsTab() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tab 3 — Turbines (bulk import of turbines + blades via spreadsheet)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TurbinesTab() {
+  const { t } = useLanguage();
+  const toast = useToast();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importTurbines = useImportTurbines();
+
+  // Import target: only the wind farm (turbines + blades come from the file).
+  const [windFarmId, setWindFarmId] = useState('');
+  const { data: windFarms } = useWindFarms();
+
+  const handleImportClick = useCallback(() => {
+    if (!windFarmId) {
+      toast.warning(t('uploads.pickFarmFirst'));
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [windFarmId, toast, t]);
+
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!windFarmId) {
+        toast.warning(t('uploads.pickFarmFirst'));
+        return;
+      }
+
+      try {
+        const result = await importTurbines.mutateAsync({ file, windFarmId });
+        if (result.failed === 0) {
+          toast.success(
+            t('uploads.turbinesImportSuccess').replace('{created}', String(result.created)),
+          );
+        } else {
+          // Show the count AND the real reason of the first failure so the
+          // user understands WHY (e.g. an RLS/role error) instead of just
+          // seeing "X failed". result.errors[0] carries the Supabase message.
+          const base = t('uploads.turbinesImportPartial')
+            .replace('{created}', String(result.created))
+            .replace('{failed}', String(result.failed));
+          const reason = result.errors[0];
+          toast.warning(reason ? `${base} — ${reason}` : base);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('uploads.turbinesImportFailed'));
+      }
+    },
+    [importTurbines, toast, t, windFarmId],
+  );
+
+  return (
+    <div
+      style={{
+        ...tableContainerStyle,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-4)',
+      }}
+    >
+      {/* Import action */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 'var(--text-md)',
+            fontWeight: 600,
+            color: '#111827',
+          }}
+        >
+          {t('uploads.turbinesImportTitle')}
+        </h2>
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
+          {t('uploads.turbinesImportHint')}
+        </p>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 'var(--space-3)' }}>
+          {/* Park select */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>
+              {t('uploads.farm')}
+            </span>
+            <select
+              style={selectStyle}
+              value={windFarmId}
+              onChange={(e) => setWindFarmId(e.target.value)}
+              aria-label={t('uploads.selectFarm')}
+            >
+              <option value="">{t('uploads.selectFarm')}</option>
+              {(windFarms ?? []).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            onChange={handleFileSelected}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+          />
+
+          {/* Download template — always enabled */}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={() => void downloadTurbineTemplate()}
+            title={t('uploads.downloadTemplateHint')}
+            style={{ backgroundColor: '#5A8F5A', color: '#ffffff', border: 'none' }}
+          >
+            {t('uploads.downloadTemplate')}
+          </Button>
+        </div>
+
+        {!windFarmId && (
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
+            {t('uploads.pickFarmFirst')}
+          </p>
+        )}
+      </div>
+
+      {/* Empty-state guidance */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--space-12) var(--space-6)',
+          textAlign: 'center',
+          fontFamily: 'var(--font-family-sans)',
+        }}
+        role="status"
+      >
+        <button
+          type="button"
+          onClick={handleImportClick}
+          disabled={!windFarmId || importTurbines.isPending}
+          aria-label={t('uploads.importTurbines')}
+          title={t('uploads.turbinesImportHint')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '64px',
+            height: '64px',
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: '#5A8F5A',
+            color: '#ffffff',
+            marginBottom: 'var(--space-4)',
+            border: 'none',
+            padding: 0,
+            cursor: !windFarmId || importTurbines.isPending ? 'not-allowed' : 'pointer',
+            opacity: !windFarmId || importTurbines.isPending ? 0.6 : 1,
+            transition: 'all var(--duration-normal) var(--easing-default)',
+          }}
+        >
+          {importTurbines.isPending ? (
+            <Loader2 size={28} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+          ) : (
+            <UploadCloud size={28} aria-hidden="true" />
+          )}
+        </button>
+        <h3
+          style={{
+            fontSize: 'var(--text-lg)',
+            fontWeight: 600,
+            color: 'var(--color-neutral-900)',
+            margin: 0,
+            marginBottom: 'var(--space-2)',
+          }}
+        >
+          {t('uploads.tabTurbines')}
+        </h3>
+        <p
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-neutral-500)',
+            margin: 0,
+            maxWidth: '320px',
+            lineHeight: 1.5,
+          }}
+        >
+          {t('uploads.turbinesImportHint')}
+        </p>
+      </div>
     </div>
   );
 }
