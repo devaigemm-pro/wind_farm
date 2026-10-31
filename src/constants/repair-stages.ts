@@ -24,7 +24,7 @@ export const REPAIR_STAGES: readonly RepairStage[] = [
   { key: 'surface_post_lamination', labelEs: 'Ajustado de superficie post laminado', labelEn: 'Surface adjustment (post-lamination)', order: 8 },
   { key: 'filler_application', labelEs: 'Aplicación de filler', labelEn: 'Filler application', order: 9 },
   { key: 'surface_post_filler', labelEs: 'Ajustado de superficie post filler', labelEn: 'Surface adjustment (post-filler)', order: 10 },
-  { key: 'paint_first_coat', labelEs: 'Aplicación de pintura primera mano', labelEn: 'Paint (first coat)', order: 11 },
+  { key: 'paint_first_coat', labelEs: 'Aplicación de pintura', labelEn: 'Paint (first coat)', order: 11 },
 ] as const;
 
 /** Ordered list of stage keys. */
@@ -97,7 +97,7 @@ export const REPAIR_STAGE_CATALOG: readonly RepairStageCatalogEntry[] = [
   { code: 'ajuste_post_laminado', labelEs: 'Ajustado de superficie post laminado', labelEn: 'Surface adjustment (post-lamination)', sortOrder: 18, optional: false },
   { code: 'aplicacion_filler', labelEs: 'Aplicación de filler', labelEn: 'Filler application', sortOrder: 19, optional: false },
   { code: 'ajuste_post_filler', labelEs: 'Ajustado de superficie post filler', labelEn: 'Surface adjustment (post-filler)', sortOrder: 20, optional: false },
-  { code: 'pintura_primera_mano', labelEs: 'Aplicación de pintura primera mano', labelEn: 'Paint (first coat)', sortOrder: 21, optional: false },
+  { code: 'pintura_primera_mano', labelEs: 'Aplicación de pintura', labelEn: 'Paint (first coat)', sortOrder: 21, optional: false },
 ] as const;
 
 /** Lookup map: stage code → catalog entry. */
