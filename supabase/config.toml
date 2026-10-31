@@ -61,3 +61,10 @@ enable_confirmations = false
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
+
+[inbucket]
+port = 54334
+
+[analytics]
+enabled = true
+port = 54337

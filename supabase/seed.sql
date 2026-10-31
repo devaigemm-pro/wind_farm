@@ -1,146 +1,138 @@
--- Seed data for Wind Blade Inspection development environment
+-- ─────────────────────────────────────────────────────────────────────────────
+-- LOCAL SEED — test data for development (Supabase local / Docker).
+-- Runs after the prod schema is loaded. Safe to re-run: it clears and reinserts
+-- the demo rows. NEVER run against production.
 --
--- NOTE: In production, profiles are created via the auth trigger (handle_new_user)
--- when a user signs up through Supabase Auth. For development seeding, we insert
--- auth.users directly so profiles are created via the trigger. If the trigger doesn't
--- fire (e.g., RLS or permissions issue), we insert profiles as a fallback.
---
--- The turbine trigger (create_blades_for_turbine) is disabled during seeding so we
--- can insert blades with deterministic UUIDs. It is re-enabled afterwards.
---
--- Usage: Run `supabase db reset` to apply migrations and seed data.
--- Login credentials: all seed users use password "password123"
+-- Creates: 1 wind farm + 1 turbine (3 blades) + 1 inspection with defects, and
+-- one campaign of each type (repair / cleaning / hoist_certification) wired to
+-- the turbine, each with a few photos / items so the workflows are usable.
+-- ─────────────────────────────────────────────────────────────────────────────
 
-----------------------------------------------------------------------
--- 1. Auth users + Profiles (fixed UUIDs, one per role)
---    We insert into auth.users first so the FK on profiles is satisfied.
---    The handle_new_user trigger will auto-create profiles, but we use
---    raw_user_meta_data to control the role assignment.
---    Password for all seed users: "password123" (bcrypt hash below).
-----------------------------------------------------------------------
--- GoTrue's user-loading query does a strict scan into Go string types on
--- these columns, so NULLs cause "500: Database error querying schema"
--- during password login. Setting them to '' up front keeps seed users
--- usable without an extra fix-up pass.
-insert into auth.users (
-  id, instance_id, email, encrypted_password, email_confirmed_at,
-  raw_user_meta_data, raw_app_meta_data, created_at, updated_at, aud, role,
-  confirmation_token, recovery_token, email_change_token_new, email_change,
-  email_change_token_current, phone_change, phone_change_token, reauthentication_token
-) values
-  ('a1b2c3d4-0001-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'inspector@windfarm.dev',  '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "Carlos Vega", "role": "inspector"}',   '{"provider":"email","providers":["email"]}', now(), now(), 'authenticated', 'authenticated', '', '', '', '', '', '', '', ''),
-  ('a1b2c3d4-0002-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'supervisor@windfarm.dev', '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "María López", "role": "supervisor"}', '{"provider":"email","providers":["email"]}', now(), now(), 'authenticated', 'authenticated', '', '', '', '', '', '', '', ''),
-  ('a1b2c3d4-0003-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'admin@windfarm.dev',      '$2a$10$PznPCEaR7B6MFQp2sEfP7.GE2bM3pBDImJ3r5Kbv7XI/GaFgMpFHi', now(), '{"name": "Andrés Ruiz", "role": "admin"}',      '{"provider":"email","providers":["email"]}', now(), now(), 'authenticated', 'authenticated', '', '', '', '', '', '', '', '')
-on conflict (id) do nothing;
+do $$
+declare
+  v_user     uuid;
+  v_wf       uuid;
+  v_turbine  uuid;
+  v_blade_a  uuid;
+  v_insp     uuid;
+  v_def1     uuid;
+  v_def2     uuid;
+  -- repair chain
+  v_quote_r  uuid;
+  v_wo1      uuid;
+  v_wo2      uuid;
+  v_rep1     uuid;
+  v_rep2     uuid;
+  v_stage    uuid;
+  -- campaigns
+  v_camp_rep uuid;
+  v_camp_cln uuid;
+  v_camp_hoi uuid;
+begin
+  -- Clean previous demo rows (idempotent). Delete children before parents so we
+  -- don't leave orphans if FKs aren't ON DELETE CASCADE.
+  delete from cleaning_photo   where campaign_id in (select id from campaign where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from hoist_cert_photo where campaign_id in (select id from campaign where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from hoist_cert_item  where campaign_id in (select id from campaign where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from repair_photo r   where r.repair_id in (select rp.id from repair rp join work_order wo on wo.id=rp.work_order_id where wo.wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from repair_stage rs  where rs.repair_id in (select rp.id from repair rp join work_order wo on wo.id=rp.work_order_id where wo.wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from repair          where work_order_id in (select id from work_order where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from work_order      where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local');
+  delete from campaign        where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local');
+  delete from quote           where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local');
+  delete from defect          where inspection_id in (select i.id from inspection i join blade b on b.id=i.blade_id join turbine t on t.id=b.turbine_id where t.wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from inspection      where turbine_id in (select id from turbine where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from blade           where turbine_id in (select id from turbine where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local'));
+  delete from turbine         where wind_farm_id in (select id from wind_farm where name = 'PE Demo Local');
+  delete from wind_farm       where name = 'PE Demo Local';
 
--- The trigger should have created profiles, but insert as fallback
-insert into public.profiles (id, email, name, role) values
-  ('a1b2c3d4-0001-4000-8000-000000000001', 'inspector@windfarm.dev', 'Carlos Vega', 'inspector'),
-  ('a1b2c3d4-0002-4000-8000-000000000002', 'supervisor@windfarm.dev', 'María López', 'supervisor'),
-  ('a1b2c3d4-0003-4000-8000-000000000003', 'admin@windfarm.dev', 'Andrés Ruiz', 'admin')
-on conflict (id) do nothing;
+  -- Reuse an existing profile if any; otherwise leave user refs NULL (profiles.id
+  -- has a FK to auth.users, so we can't fabricate one in a plain SQL seed).
+  select id into v_user from profiles limit 1;  -- may be NULL
 
-----------------------------------------------------------------------
--- 2. Wind Farms
-----------------------------------------------------------------------
-insert into public.wind_farm (id, name, location, latitude, longitude) values
-  ('f0000000-0001-4000-8000-000000000001', 'Parque Eólico Norte', 'Navarra, España', 42.8125, -1.6458),
-  ('f0000000-0002-4000-8000-000000000002', 'Parque Eólico Sur', 'Cádiz, España', 36.5271, -6.2886)
-on conflict (id) do nothing;
+  -- Wind farm + turbine + blades.
+  insert into wind_farm (name, location) values ('PE Demo Local', 'Región Demo, Chile')
+    returning id into v_wf;
+  insert into turbine (wind_farm_id, name, model, serial_number, power_kw, powering_date)
+    values (v_wf, 'WTG-DEMO-01', 'Gamesa G114', 'SN-DEMO-01', 2000, now() - interval '3 years')
+    returning id into v_turbine;
+  -- Blades are auto-created by the trigger `on_turbine_created`
+  -- (create_blades_for_turbine) when the turbine is inserted. Read blade A
+  -- (position 1) instead of inserting it, and give it a demo serial.
+  select id into v_blade_a from blade where turbine_id = v_turbine and position = 1;
+  update blade set serial_number = 'BLADE-A-DEMO' where id = v_blade_a;
+  update blade set serial_number = 'BLADE-B-DEMO' where turbine_id = v_turbine and position = 2;
+  update blade set serial_number = 'BLADE-C-DEMO' where turbine_id = v_turbine and position = 3;
 
-----------------------------------------------------------------------
--- 3. Turbines and Blades
---    We disable the blade auto-creation trigger so we can insert blades
---    with deterministic UUIDs for referencing in inspections below.
-----------------------------------------------------------------------
-alter table public.turbine disable trigger on_turbine_created;
+  -- Inspection (finalized) with 2 defects on blade A.
+  insert into inspection (blade_id, inspector_id, status, stage, scheduled_date, completed_at,
+                          inspection_type, turbine_id, vertical_blade, notes)
+    values (v_blade_a, v_user, 'completed', 'report', current_date - 20, now() - interval '18 days',
+            'blades', v_turbine, 'A', 'Inspección demo local')
+    returning id into v_insp;
 
-insert into public.turbine (id, wind_farm_id, name, model) values
-  ('10000000-0001-4000-8000-000000000001', 'f0000000-0001-4000-8000-000000000001', 'T-N01', 'Vestas V150'),
-  ('10000000-0002-4000-8000-000000000002', 'f0000000-0001-4000-8000-000000000001', 'T-N02', 'Vestas V150'),
-  ('10000000-0003-4000-8000-000000000003', 'f0000000-0002-4000-8000-000000000002', 'T-S01', 'Siemens Gamesa SG 5.8'),
-  ('10000000-0004-4000-8000-000000000004', 'f0000000-0002-4000-8000-000000000002', 'T-S02', 'Siemens Gamesa SG 5.8')
-on conflict (id) do nothing;
+  insert into defect (inspection_id, type, severity, distance_from_root, side, width_cm, height_cm,
+                      defect_number, defect_identifier, description)
+    values (v_insp, 'crack', 3, 12.5, 'LE', 4.0, 2.0, 'A1', 'Daño 1', 'Grieta demo en LE')
+    returning id into v_def1;
+  insert into defect (inspection_id, type, severity, distance_from_root, side, width_cm, height_cm,
+                      defect_number, defect_identifier, description)
+    values (v_insp, 'le_erosion', 2, 25.0, 'TE', 6.0, 3.0, 'A2', 'Daño 2', 'Erosión demo en TE')
+    returning id into v_def2;
 
-----------------------------------------------------------------------
--- 4. Blades (deterministic UUIDs for FK references)
-----------------------------------------------------------------------
-insert into public.blade (id, turbine_id, position) values
-  -- Turbine T-N01 blades
-  ('b0000000-0001-4000-8000-000000000001', '10000000-0001-4000-8000-000000000001', 1),
-  ('b0000000-0002-4000-8000-000000000002', '10000000-0001-4000-8000-000000000001', 2),
-  ('b0000000-0003-4000-8000-000000000003', '10000000-0001-4000-8000-000000000001', 3),
-  -- Turbine T-N02 blades
-  ('b0000000-0004-4000-8000-000000000004', '10000000-0002-4000-8000-000000000002', 1),
-  ('b0000000-0005-4000-8000-000000000005', '10000000-0002-4000-8000-000000000002', 2),
-  ('b0000000-0006-4000-8000-000000000006', '10000000-0002-4000-8000-000000000002', 3),
-  -- Turbine T-S01 blades
-  ('b0000000-0007-4000-8000-000000000007', '10000000-0003-4000-8000-000000000003', 1),
-  ('b0000000-0008-4000-8000-000000000008', '10000000-0003-4000-8000-000000000003', 2),
-  ('b0000000-0009-4000-8000-000000000009', '10000000-0003-4000-8000-000000000003', 3),
-  -- Turbine T-S02 blades
-  ('b0000000-0010-4000-8000-000000000010', '10000000-0004-4000-8000-000000000004', 1),
-  ('b0000000-0011-4000-8000-000000000011', '10000000-0004-4000-8000-000000000004', 2),
-  ('b0000000-0012-4000-8000-000000000012', '10000000-0004-4000-8000-000000000004', 3)
-on conflict (turbine_id, position) do nothing;
+  -- ── REPAIR campaign (quote → work_orders → repairs → stage → photos) ────────
+  insert into quote (turbine_id, wind_farm_id, requested_by, status, currency,
+                     quoted_by, quoted_at, approved_by, approved_at, total_amount)
+    values (v_turbine, v_wf, v_user, 'approved', 'CLP', v_user, now(), v_user, now(), 0)
+    returning id into v_quote_r;
 
--- Re-enable the trigger for normal application use
-alter table public.turbine enable trigger on_turbine_created;
+  insert into campaign (name, wind_farm_id, turbine_id, quote_id, type, status, created_by)
+    values ('CI-DEMO - WTG-DEMO-01 - Reparación', v_wf, v_turbine, v_quote_r,
+            'repair', 'repair_in_progress', v_user)
+    returning id into v_camp_rep;
 
-----------------------------------------------------------------------
--- 5. Inspections (various statuses and stages)
-----------------------------------------------------------------------
-insert into public.inspection (id, blade_id, inspector_id, status, stage, scheduled_date, completed_at, approved_by, approved_at) values
-  -- In-progress inspection (recently started)
-  ('20000000-0001-4000-8000-000000000001', 'b0000000-0001-4000-8000-000000000001', 'a1b2c3d4-0001-4000-8000-000000000001', 'in_progress', 'inspect', '2024-03-15', null, null, null),
-  -- In-progress inspection (annotate stage)
-  ('20000000-0002-4000-8000-000000000002', 'b0000000-0004-4000-8000-000000000004', 'a1b2c3d4-0001-4000-8000-000000000001', 'in_progress', 'annotate', '2024-03-10', null, null, null),
-  -- Completed inspection (awaiting approval)
-  ('20000000-0003-4000-8000-000000000003', 'b0000000-0007-4000-8000-000000000007', 'a1b2c3d4-0001-4000-8000-000000000001', 'completed', 'report', '2024-02-20', '2024-02-25 14:30:00+00', null, null),
-  -- Approved inspection
-  ('20000000-0004-4000-8000-000000000004', 'b0000000-0002-4000-8000-000000000002', 'a1b2c3d4-0001-4000-8000-000000000001', 'approved', 'report', '2024-01-10', '2024-01-15 10:00:00+00', 'a1b2c3d4-0002-4000-8000-000000000002', '2024-01-18 09:00:00+00'),
-  -- Another in-progress (early stage)
-  ('20000000-0005-4000-8000-000000000005', 'b0000000-0010-4000-8000-000000000010', 'a1b2c3d4-0001-4000-8000-000000000001', 'in_progress', 'planned', '2024-04-01', null, null, null),
-  -- Approved older inspection
-  ('20000000-0006-4000-8000-000000000006', 'b0000000-0008-4000-8000-000000000008', 'a1b2c3d4-0001-4000-8000-000000000001', 'approved', 'report', '2023-11-05', '2023-11-10 16:00:00+00', 'a1b2c3d4-0002-4000-8000-000000000002', '2023-11-12 11:00:00+00')
-on conflict (id) do nothing;
+  insert into work_order (quote_id, defect_id, turbine_id, wind_farm_id, blade_side, status)
+    values (v_quote_r, v_def1, v_turbine, v_wf, 'LE', 'in_progress') returning id into v_wo1;
+  insert into work_order (quote_id, defect_id, turbine_id, wind_farm_id, blade_side, status)
+    values (v_quote_r, v_def2, v_turbine, v_wf, 'TE', 'in_progress') returning id into v_wo2;
 
-----------------------------------------------------------------------
--- 6. Evidence records (placeholder storage paths)
-----------------------------------------------------------------------
-insert into public.evidence (id, inspection_id, filename, mime_type, size_bytes, storage_path, geo_lat, geo_lng) values
-  ('e0000000-0001-4000-8000-000000000001', '20000000-0001-4000-8000-000000000001', 'blade_leading_edge_01.jpg', 'image/jpeg', 2450000, 'evidence/20000000-0001/blade_leading_edge_01.jpg', 42.8130, -1.6462),
-  ('e0000000-0002-4000-8000-000000000002', '20000000-0001-4000-8000-000000000001', 'blade_tip_damage_01.png', 'image/png', 3100000, 'evidence/20000000-0001/blade_tip_damage_01.png', 42.8130, -1.6462),
-  ('e0000000-0003-4000-8000-000000000003', '20000000-0002-4000-8000-000000000002', 'surface_crack_01.jpg', 'image/jpeg', 1850000, 'evidence/20000000-0002/surface_crack_01.jpg', 42.8126, -1.6455),
-  ('e0000000-0004-4000-8000-000000000004', '20000000-0003-4000-8000-000000000003', 'overview_blade_s01.jpg', 'image/jpeg', 4200000, 'evidence/20000000-0003/overview_blade_s01.jpg', 36.5275, -6.2890),
-  ('e0000000-0005-4000-8000-000000000005', '20000000-0003-4000-8000-000000000003', 'erosion_detail_01.jpg', 'image/jpeg', 2900000, 'evidence/20000000-0003/erosion_detail_01.jpg', 36.5275, -6.2890),
-  ('e0000000-0006-4000-8000-000000000006', '20000000-0004-4000-8000-000000000004', 'approved_inspection_img.jpg', 'image/jpeg', 1500000, 'evidence/20000000-0004/approved_inspection_img.jpg', 42.8125, -1.6458),
-  ('e0000000-0007-4000-8000-000000000007', '20000000-0006-4000-8000-000000000006', 'historical_damage_01.jpg', 'image/jpeg', 2200000, 'evidence/20000000-0006/historical_damage_01.jpg', 36.5270, -6.2885)
-on conflict (id) do nothing;
+  insert into repair (work_order_id, defect_id, turbine_id, status, start_category, progress_percent)
+    values (v_wo1, v_def1, v_turbine, 'in_progress', 3, 40) returning id into v_rep1;
+  insert into repair (work_order_id, defect_id, turbine_id, status, start_category, progress_percent)
+    values (v_wo2, v_def2, v_turbine, 'completed', 2, 100) returning id into v_rep2;
 
-----------------------------------------------------------------------
--- 7. Defects with varying types and severities
-----------------------------------------------------------------------
-insert into public.defect (id, inspection_id, type, severity, distance_from_root, description) values
-  ('d0000000-0001-4000-8000-000000000001', '20000000-0001-4000-8000-000000000001', 'le_erosion', 3, 45.5, 'Leading edge erosion near blade tip, approximately 30cm length'),
-  ('d0000000-0002-4000-8000-000000000002', '20000000-0001-4000-8000-000000000001', 'crack', 4, 22.0, 'Transverse crack on suction side, 15cm visible length'),
-  ('d0000000-0003-4000-8000-000000000003', '20000000-0002-4000-8000-000000000002', 'paint_defect', 2, 10.3, 'Paint peeling on pressure side near root section'),
-  ('d0000000-0004-4000-8000-000000000004', '20000000-0003-4000-8000-000000000003', 'lightning_damage', 5, 48.0, 'Lightning receptor damage with char marks and surface delamination'),
-  ('d0000000-0005-4000-8000-000000000005', '20000000-0003-4000-8000-000000000003', 'vortex', 2, 35.2, 'Minor vortex generator wear, cosmetic only'),
-  ('d0000000-0006-4000-8000-000000000006', '20000000-0004-4000-8000-000000000004', 'delamination', 4, 28.7, 'Trailing edge delamination extending 40cm, repaired'),
-  ('d0000000-0007-4000-8000-000000000007', '20000000-0006-4000-8000-000000000006', 'le_erosion', 3, 42.0, 'Historical leading edge erosion, monitored since 2023'),
-  ('d0000000-0008-4000-8000-000000000008', '20000000-0006-4000-8000-000000000006', 'other', 1, 5.0, 'Bird droppings accumulation near root, cleaned')
-on conflict (id) do nothing;
+  -- One stage + two photos on the first repair so the workflow shows content.
+  insert into repair_stage (repair_id, stage_code, stage_label, sort_order, status, optional, enabled)
+    values (v_rep1, 'etiqueta', 'Etiqueta', 1, 'completed', false, true) returning id into v_stage;
+  insert into repair_photo (repair_id, repair_stage_id, stage_code, storage_path, filename, capture_order, metadata)
+    values (v_rep1, v_stage, 'etiqueta', 'repairs/demo/etiqueta/IMG_0001.jpg', 'IMG_0001.jpg', 1, '{"selected_for_report": true}'::jsonb);
+  insert into repair_photo (repair_id, repair_stage_id, stage_code, storage_path, filename, capture_order, metadata)
+    values (v_rep1, v_stage, 'etiqueta', 'repairs/demo/etiqueta/IMG_0002.jpg', 'IMG_0002.jpg', 2, '{}'::jsonb);
 
-----------------------------------------------------------------------
--- 8. Defect-Image links
-----------------------------------------------------------------------
-insert into public.defect_image (defect_id, evidence_id) values
-  ('d0000000-0001-4000-8000-000000000001', 'e0000000-0001-4000-8000-000000000001'),
-  ('d0000000-0002-4000-8000-000000000002', 'e0000000-0002-4000-8000-000000000002'),
-  ('d0000000-0003-4000-8000-000000000003', 'e0000000-0003-4000-8000-000000000003'),
-  ('d0000000-0004-4000-8000-000000000004', 'e0000000-0004-4000-8000-000000000004'),
-  ('d0000000-0004-4000-8000-000000000004', 'e0000000-0005-4000-8000-000000000005'),
-  ('d0000000-0006-4000-8000-000000000006', 'e0000000-0006-4000-8000-000000000006'),
-  ('d0000000-0007-4000-8000-000000000007', 'e0000000-0007-4000-8000-000000000007')
-on conflict (defect_id, evidence_id) do nothing;
+  -- ── CLEANING campaign (zones + photos) ──────────────────────────────────────
+  insert into campaign (name, wind_farm_id, turbine_id, type, status, created_by)
+    values ('Limpieza Demo - WTG-DEMO-01', v_wf, v_turbine, 'cleaning', 'cleaning_in_progress', v_user)
+    returning id into v_camp_cln;
+  insert into cleaning_photo (campaign_id, zone_code, storage_path, filename, capture_order, metadata)
+    values (v_camp_cln, 'palas_a', 'cleaning/demo/palas_a/IMG_0001.jpg', 'IMG_0001.jpg', 1, '{"selected_for_report": true}'::jsonb);
+  insert into cleaning_photo (campaign_id, zone_code, storage_path, filename, capture_order, metadata)
+    values (v_camp_cln, 'nacelle_superior', 'cleaning/demo/nacelle_superior/IMG_0002.jpg', 'IMG_0002.jpg', 1, '{}'::jsonb);
+  insert into cleaning_photo (campaign_id, zone_code, storage_path, filename, capture_order, metadata)
+    values (v_camp_cln, 'torre', 'cleaning/demo/torre/IMG_0003.jpg', 'IMG_0003.jpg', 1, '{}'::jsonb);
+
+  -- ── HOIST CERTIFICATION campaign (typed items + photos) ─────────────────────
+  insert into campaign (name, wind_farm_id, turbine_id, type, status, created_by)
+    values ('Certificación Polipastos Demo - WTG-DEMO-01', v_wf, v_turbine, 'hoist_certification', 'hoist_in_progress', v_user)
+    returning id into v_camp_hoi;
+  insert into hoist_cert_item (campaign_id, item_code, item_type, metadata)
+    values (v_camp_hoi, 'prep_viento', 'photo', '{}'::jsonb);
+  insert into hoist_cert_item (campaign_id, item_code, item_type, passed)
+    values (v_camp_hoi, 'visual_goma_plastico', 'check', true);
+  insert into hoist_cert_item (campaign_id, item_code, item_type, measurement_value, measurement_unit)
+    values (v_camp_hoi, 'cadena_espesor', 'measurement', '12', '%');
+  insert into hoist_cert_photo (campaign_id, item_code, storage_path, filename, capture_order, metadata)
+    values (v_camp_hoi, 'prep_viento', 'hoist/demo/prep_viento/IMG_0001.jpg', 'IMG_0001.jpg', 1, '{"selected_for_report": true}'::jsonb);
+
+  raise notice 'Seed demo local completado: wf=% turbine=% repair=% cleaning=% hoist=%',
+    v_wf, v_turbine, v_camp_rep, v_camp_cln, v_camp_hoi;
+end $$;
