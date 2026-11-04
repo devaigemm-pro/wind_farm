@@ -5,7 +5,7 @@ project_id = "wind-blade-inspection"
 [api]
 enabled = true
 # Port to use for the API URL.
-port = 54321
+port = 54331
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` is always included.
 schemas = ["public", "graphql_public"]
@@ -17,9 +17,9 @@ max_rows = 1000
 
 [db]
 # Port to use for the local database URL.
-port = 54322
+port = 54332
 # Port used by db diff command to create shadow database.
-shadow_port = 54320
+shadow_port = 54330
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
 major_version = 15
@@ -27,7 +27,7 @@ major_version = 15
 [studio]
 enabled = true
 # Port to use for Supabase Studio.
-port = 54323
+port = 54333
 
 [auth]
 enabled = true
@@ -61,3 +61,10 @@ enable_confirmations = false
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
+
+[inbucket]
+port = 54334
+
+[analytics]
+enabled = true
+port = 54337

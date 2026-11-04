@@ -156,6 +156,29 @@ const COLOR_BLOCK_VALUE_BG: RGB = [255, 255, 255]; // blanco (valores)
 const COLOR_BLOCK_ORANGE: RGB = [255, 140, 0]; // naranja (categoría del daño)
 const COLOR_BLOCK_LABEL_TEXT: RGB = [0, 0, 0]; // negro bold (etiquetas)
 
+/**
+ * Colors by damage category (1-5), matching the "Categorización de Daños"
+ * table (renderDamageCategorizationPage) exactly: teal 1-2, amber 3,
+ * orange 4, red 5. Shared so every place that shows a category color
+ * (the categorization table AND the per-photo "Categoría del daño" cell)
+ * stays visually consistent.
+ */
+const CATEGORY_COLORS: Record<number, RGB> = {
+  1: [0, 139, 148], // teal/cyan
+  2: [0, 139, 148], // teal/cyan
+  3: [255, 179, 0], // amber/gold
+  4: [255, 140, 0], // orange
+  5: [255, 0, 0], // red
+};
+
+/** Color for a damage category cell; falls back to the orange block color
+ *  when the category is out of range or absent (keeps prior visual behavior
+ *  for N/A cases). */
+function categoryColor(category: number | null | undefined): RGB {
+  if (category != null && CATEGORY_COLORS[category]) return CATEGORY_COLORS[category]!;
+  return COLOR_BLOCK_ORANGE;
+}
+
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
 const MARGIN = 14;
@@ -1134,16 +1157,9 @@ function renderDamageCategorizationPage(doc: jsPDF) {
       if (data.section === 'body') {
         const rawRow = data.row.raw as unknown as unknown[];
         const catNum = parseInt(rawRow[0] as string, 10);
-        // Row colors from reference image: teal 1-2, amber 3, orange 4, red 5
-        const rowColors: Record<number, RGB> = {
-          1: [0, 139, 148],   // teal/cyan
-          2: [0, 139, 148],   // teal/cyan
-          3: [255, 179, 0],   // amber/gold
-          4: [255, 140, 0],   // orange
-          5: [255, 0, 0],     // red
-        };
-        if (rowColors[catNum]) {
-          data.cell.styles.fillColor = rowColors[catNum];
+        // Row colors (teal 1-2, amber 3, orange 4, red 5) — shared constant.
+        if (CATEGORY_COLORS[catNum]) {
+          data.cell.styles.fillColor = CATEGORY_COLORS[catNum];
           data.cell.styles.textColor = [255, 255, 255];
         }
         if (data.column.index === 0) {
@@ -1340,8 +1356,9 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
       }
       doc.text(headerLeft, MARGIN + HEADER_PAD, headerY + headerH / 2 + 1.5);
 
-      // Right cell — orange bg, white bold. Fixed at fontSize 11.
-      doc.setFillColor(...COLOR_BLOCK_ORANGE);
+      // Right cell — bg color by category (same palette as the "Categorización
+      // de Daños" table), white bold. Fixed at fontSize 11.
+      doc.setFillColor(...categoryColor(defect.severity));
       doc.rect(MARGIN + leftW, headerY, rightW, headerH, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(11);
