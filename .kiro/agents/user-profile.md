@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 374
-- **Última actualización**: 2026-10-31
+- **Sesiones analizadas**: 380
+- **Última actualización**: 2026-10-27
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -2797,3 +2797,62 @@
   - Vars sensibles de Vercel (production/preview) son write-only: no se leen por API ni env pull. Verificación concluyente = build local con las env vars de staging (grep del ref en dist/assets/*.js) + preview deploy (vercel deploy, NO --prod).
   - Preview deployments tienen deployment protection (302) — bundle no accesible sin bypass token.
 - **Patrones confirmados**: español, ultra-directo ("continuar"), alta autonomía, modo compañero, valida infra sensible por fases, "se riguroso" (verificó end-to-end sin romper prod, restauró estado local)
+
+### Sesión 375 - 2026-10-31
+- **Tarea principal**: "explicame como quedaria el flujo y luego comitea" — explicar el flujo de 3 ambientes y commitear
+- **Observaciones nuevas**:
+  - Pide explicación ANTES de commitear cuando el cambio es de infra/arquitectura — quiere entender el modelo mental completo (local→staging→prod) antes de cerrar. Patrón: "explicame X y luego haz Y" combina validación conceptual + acción en un mensaje.
+  - Valoró explicación con diagrama ASCII + tabla por ambiente + flujo día a día. Formato mixto (diagrama/tabla/prosa breve) encaja con su preferencia.
+  - "comitea" de nuevo = verificar git state real primero (auto-commit de sesión ya había capturado docs), commitear solo lo pendiente (logs+perfil), confirmar .env fuera del repo. Mismo patrón riguroso que el commit anterior.
+- **Patrones confirmados**: español, ultra-directo, alta autonomía, modo compañero, "explicar antes de actuar" en infra, "se riguroso" (verificar git state + secretos antes de reportar), separación ambientes por fases
+
+### Sesión 376 - 2026-11-02
+- **Tarea principal**: "eliminar staging solo dejar local y prod" — rollback de Fase 3
+- **Observaciones nuevas**:
+  - Decisión rápida: implementó staging (Fase 3) y al poco tiempo decidió retirarlo. No le molesta deshacer trabajo si ya no lo quiere — pragmático, no apegado al esfuerzo invertido.
+  - Para acción destructiva (borrar proyecto Supabase irreversible) presenté plan + 2 confirmaciones y respondió "si" directo. Acepta el plan cuando está bien razonado.
+  - Rollback limpio: Vercel preview de vuelta a prod, proyecto staging eliminado via API DELETE, .env.staging borrado, docs actualizados (Fase 3 marcada como retirada, no borrada del historial), commit. Prod verificado 200 en cada paso.
+  - Aprendizaje técnico: tras separar las vars de Vercel por scope (sesión previa), ahora "env rm preview" SÍ borra solo preview (son entradas independientes). El problema de borrado cruzado solo ocurre cuando una var está compartida entre scopes.
+- **Patrones confirmados**: español, ultra-directo ("si"), alta autonomía, modo compañero, valida antes de acción destructiva/irreversible, "se riguroso" (verificó prod en cada paso), pragmático (deshace sin apego)
+
+### Sesión 377 - 2026-11-02
+- **Tarea principal**: "que alternativa habria para usar una bd gratis" — consultó opciones de BD gratis para staging (tras retirar el staging de pago)
+- **Observaciones nuevas**:
+  - El costo del proyecto Supabase Pro adicional probablemente motivó retirar staging. Busca equivalente gratis. Sensible al costo de infra.
+  - Pregunta exploratoria/analítica (no pide implementar aún) — espera análisis de opciones con pros/contras antes de decidir. Respondí con comparación (Supabase free / local Docker / Neon / Railway) + recomendación, sin ejecutar nada.
+  - Punto técnico clave que condiciona la respuesta: la app depende de Supabase COMPLETO (auth + RLS + storage), no solo Postgres → alternativas Postgres-puras (Neon/Railway) no sirven sin reescribir auth.
+- **Patrones confirmados**: español, ultra-directo, pregunta analítica antes de actuar, sensible a costos de infra, confía en recomendación del agente, pensamiento meta-nivel (optimizar infra)
+
+### Sesión 378 - 2026-11-02
+- **Tarea principal**: Analizar factura PDF de Supabase ($34.71 vs plan $25) y explicar los recargos
+- **Observaciones nuevas**:
+  - Adjunta documentos PDF directamente (factura) y pide análisis/explicación — no solo imágenes y DOM, también documentos financieros
+  - Tarea NO técnica de código: análisis de billing/costos. El modo compañero/asistente también se usa para tareas administrativas del proyecto (facturación cloud)
+  - Pregunta "por qué" espera desglose claro con los números exactos del documento, no una respuesta vaga
+  - Tiene dos proyectos Supabase activos (esphlzrzwmzeozjmyvqm = el del frontend, nliltolgmocerrwhjivi = segundo proyecto)
+  - Valora respuesta con tabla resumen + explicación breve de las causas + acción concreta para reducir costo
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, espera análisis completo sin pedir más contexto, formato mixto (tabla + texto), confía en el criterio del agente
+
+### Sesión 378b - 2026-10-27
+- **Tarea principal**: Informe PDF de reparación: (1) la celda "Categoría del daño: N" por foto debe usar el color equivalente a la tabla "Categorización de Daños"; (2) cambiar el "document manager" a "Victor Hugo Cayola".
+- **Observaciones nuevas**:
+  - (1) Hecho en código: colores extraídos a constante compartida CATEGORY_COLORS + categoryColor() en repairReportPdf.service.ts (teal 1-2, amber 3, naranja 4, rojo 5). Antes la celda era siempre naranja fijo.
+  - (2) "document manager" = firmante de la página de firma, viene de wind_farm.manager_name (dato de DB, sin UI de edición). Cambiarlo requiere UPDATE en DB; el token del Supabase CLI expiró (401 Invalid access token) y no pude ejecutarlo. Pendiente: confirmar qué parque(s) y re-login del CLI o SQL manual.
+  - Patrón repetido: nombres/labels visibles en informes suelen ser datos de DB, no código.
+- **Patrones confirmados**: español, directo, modo compañero, dos pedidos en un mensaje, mismo patrón "equivalente a X" = reutilizar la fuente de verdad existente.
+
+### Sesión 379 - 2026-10-27
+- **Tarea principal**: Continuación del informe PDF de reparación. Respondió "para todos los parques" al cambio del document manager a "Victor Hugo Cayola" (wind_farm.manager_name).
+- **Observaciones nuevas**:
+  - Responde las preguntas de alcance con frases mínimas ("para todos los parques"); espera que con eso se ejecute.
+  - No pude aplicar el UPDATE: el token del Supabase CLI sigue inválido (401). Había una SUPABASE_SERVICE_ROLE_KEY en .env.local, pero no la usé: es una clave de acceso total a producción que el usuario no me dio para esto. Le pedí `supabase login` o que corra el SQL.
+  - Pendiente: aplicar el UPDATE de manager_name cuando haya acceso, y deploy del cambio de colores de categoría si dice "pasar a prod".
+- **Patrones confirmados**: español, directo, modo compañero, comunicación ultra-mínima, datos visibles en informes viven en la DB.
+
+### Sesión 380 - 2026-10-27
+- **Tarea principal**: Pidió "aplica el cambio tú en supabase" (manager_name = Victor Hugo Cayola en todos los parques) tras no poder hacerlo por token CLI inválido.
+- **Observaciones nuevas**:
+  - Prefiere que el agente ejecute los cambios de DB en vez de correr SQL él mismo; delega la operación.
+  - Seguí sin poder aplicarlo: token CLI inválido (401), .env.local apunta a Supabase local (127.0.0.1, no prod), y las variables de Vercel solo traen la anon key. No usé claves ajenas a prod. Pedí supabase login/token nuevo o que corra el SQL.
+  - Pendiente: UPDATE de wind_farm.manager_name y deploy del cambio de colores de categoría (si dice "pasar a prod").
+- **Patrones confirmados**: español, directo, modo compañero, delega operaciones de DB al agente, comunicación ultra-mínima.
