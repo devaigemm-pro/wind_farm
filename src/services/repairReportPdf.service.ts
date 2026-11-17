@@ -54,6 +54,9 @@ interface RepairPhotoForPdf {
   url: string;
   /** whether metadata.selected_for_report is true. */
   selected: boolean;
+  /** Manual position set by dragging in the repair screen
+   *  (metadata.report_order). Null = never reordered (falls back to captureOrder). */
+  reportOrder: number | null;
 }
 
 /**
@@ -412,6 +415,33 @@ function isSelectedForReport(metadata: unknown): boolean {
   return false;
 }
 
+/** Reads metadata.report_order (manual order of the photos selected for the report). */
+function reportOrderFromMetadata(metadata: unknown): number | null {
+  let obj: unknown = metadata;
+  if (typeof obj === 'string') {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const v = (obj as Record<string, unknown>).report_order;
+  const n = typeof v === 'number' ? v : Number(v);
+  return v != null && Number.isFinite(n) ? n : null;
+}
+
+/** Manual drag order first (report_order), then the rest by captureOrder — the
+ *  same rule the repair screen uses for the "selected for report" column. */
+function byReportOrder(a: RepairPhotoForPdf, b: RepairPhotoForPdf): number {
+  const ao = a.reportOrder;
+  const bo = b.reportOrder;
+  if (ao != null && bo != null && ao !== bo) return ao - bo;
+  if (ao != null && bo == null) return -1;
+  if (ao == null && bo != null) return 1;
+  return a.captureOrder - b.captureOrder;
+}
+
 /** Safe number parse → null when absent. */
 function numOrNull(v: unknown): number | null {
   if (v == null || v === '') return null;
@@ -535,6 +565,7 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
         storagePath,
         url: resolvePhotoUrl(storagePath),
         selected: isSelectedForReport(r.metadata),
+        reportOrder: reportOrderFromMetadata(r.metadata),
       });
     }
 
@@ -1306,7 +1337,7 @@ async function renderBladeSection(doc: jsPDF, ctx: RepairPdfContext, bladePositi
   const bladeDefectIds = new Set(bladeDefects.map((d) => d.id));
   const bladePhotos = ctx.photos
     .filter((p) => p.defectId != null && bladeDefectIds.has(p.defectId))
-    .sort((a, b) => a.stageOrder - b.stageOrder || a.captureOrder - b.captureOrder);
+    .sort((a, b) => a.stageOrder - b.stageOrder || byReportOrder(a, b));
 
   if (bladePhotos.length === 0) return;
 

@@ -92,6 +92,53 @@ export function useSetPhotoSelected(campaignId: string | undefined) {
 }
 
 /**
+ * Persist the manual order of the photos selected for the report (drag to
+ * reorder inside the "selected for report" column). Optimistically rewrites
+ * photo.reportOrder in the cached tree so the cards swap instantly, with
+ * rollback on error. Same pattern as useSetPhotoSelected: the tree is only
+ * marked stale (no immediate refetch) to avoid a reorder flicker.
+ */
+export function useReorderReportPhotos(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderedIds }: { orderedIds: string[] }) =>
+      repairService.setReportOrder(orderedIds),
+    onMutate: async ({ orderedIds }) => {
+      const treeKey = ['repair-tree', campaignId];
+      await queryClient.cancelQueries({ queryKey: treeKey });
+      const prev = queryClient.getQueryData<RepairTree>(treeKey);
+      if (prev) {
+        const indexById = new Map(orderedIds.map((id, i) => [id, i]));
+        const next: RepairTree = prev.map((node) => ({
+          ...node,
+          stages: node.stages.map((stage) => ({
+            ...stage,
+            photos: stage.photos.map((photo) =>
+              indexById.has(photo.id)
+                ? { ...photo, reportOrder: indexById.get(photo.id)! }
+                : photo,
+            ),
+          })),
+        }));
+        queryClient.setQueryData(treeKey, next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['repair-tree', campaignId], context.prev);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['repair-tree', campaignId],
+        refetchType: 'none',
+      });
+    },
+  });
+}
+
+/**
  * Move a photo to a DIFFERENT stage of the same defect (fixing a photo uploaded
  * under the wrong stage). Optimistically moves the photo from its origin stage's
  * photos[] to the target stage's photos[] in the cached tree so it jumps columns

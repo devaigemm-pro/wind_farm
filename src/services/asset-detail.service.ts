@@ -247,6 +247,84 @@ export const assetDetailService = {
     };
   },
 
+  /**
+   * Create a REPAIR ("Reparación") campaign. Same shape the repair import and
+   * quotes.service use: an APPROVED quote (total 0, no items yet) plus a
+   * `campaign` row with type='repair', status='repair_open' linked to it via
+   * quote_id. Defects are attached later (Excel import in Uploads, or an
+   * approved quote); the repair import reuses the latest repair campaign of the
+   * turbine, so it will fill this one. If the campaign insert fails, the quote
+   * created here is removed so no orphan is left behind.
+   *
+   * When `name` is empty the default follows the existing repair convention:
+   * "CI### - <turbine> - dd-mm-yyyy".
+   */
+  async createRepairCampaign(
+    windFarmId: string,
+    turbineId: string,
+    name: string,
+    turbineName: string,
+  ): Promise<Campaign> {
+    const user = (await db.auth.getUser()).data.user;
+    const userId = user?.id ?? null;
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const { data: quote, error: quoteErr } = await db
+      .from('quote')
+      .insert({
+        turbine_id: turbineId,
+        wind_farm_id: windFarmId,
+        requested_by: userId,
+        status: 'approved',
+        currency: 'CLP',
+        quoted_by: userId,
+        quoted_at: nowIso,
+        approved_by: userId,
+        approved_at: nowIso,
+        total_amount: 0,
+      })
+      .select('id')
+      .single();
+    if (quoteErr) throw new AssetDetailServiceError(quoteErr.message, quoteErr.code);
+    const quoteId = quote.id as string;
+
+    const dateLabel = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+    const ci = `CI${Math.floor(100 + Math.random() * 900)}`;
+    const finalName = name.trim() || `${ci} - ${turbineName} - ${dateLabel}`;
+
+    const { data, error } = await db
+      .from('campaign')
+      .insert({
+        wind_farm_id: windFarmId,
+        turbine_id: turbineId,
+        name: finalName,
+        type: 'repair',
+        status: 'repair_open',
+        quote_id: quoteId,
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) {
+      // Roll back the quote so a failed campaign doesn't leave an orphan.
+      await db.from('quote').delete().eq('id', quoteId);
+      throw new AssetDetailServiceError(error.message, error.code);
+    }
+    const r = data as Record<string, unknown>;
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      windFarmId: r.wind_farm_id as string,
+      createdBy: r.created_by as string | null,
+      createdAt: r.created_at as string,
+      updatedAt: r.updated_at as string,
+      type: 'repair',
+      turbineId: (r.turbine_id as string) ?? null,
+      status: (r.status as string) ?? 'repair_open',
+    };
+  },
+
   async updateCampaign(campaignId: string, name: string): Promise<void> {
     const { error } = await db
       .from('campaign')

@@ -5,6 +5,7 @@ import { useLanguage } from '@/components/design-system';
 import { CampaignAccordion } from './CampaignAccordion';
 import { NewCleaningCampaignModal } from './NewCleaningCampaignModal';
 import { NewHoistCertificationModal } from './NewHoistCertificationModal';
+import { NewRepairCampaignModal } from './NewRepairCampaignModal';
 import type { Campaign } from '@/types';
 
 export interface CampaignsPanelProps {
@@ -32,6 +33,7 @@ export function CampaignsPanel({
   >('inspection');
   const [showNewCleaning, setShowNewCleaning] = useState(false);
   const [showNewHoist, setShowNewHoist] = useState(false);
+  const [showNewRepair, setShowNewRepair] = useState(false);
 
   const inspectionCampaigns = useMemo(
     () => campaigns.filter((c) => (c.type ?? 'inspection') === 'inspection'),
@@ -91,6 +93,15 @@ export function CampaignsPanel({
         </button>
       </div>
 
+      {/* Create a new repair campaign (selector modal) — only on the
+          Reparación tab, for users who can create campaigns. */}
+      {activeTab === 'repair' && canCreate && windFarmId && (
+        <div style={createBarStyle}>
+          <button style={createBtnStyle} onClick={() => setShowNewRepair(true)}>
+            <Plus size={14} /> {t('repairCampaign.new')}
+          </button>
+        </div>
+      )}
       {/* Create a new cleaning campaign (selector modal) — only on the
           Limpieza tab, for users who can create campaigns. */}
       {activeTab === 'cleaning' && canCreate && windFarmId && (
@@ -150,6 +161,15 @@ export function CampaignsPanel({
           windFarmId={windFarmId}
           isOpen
           onClose={() => setShowNewCleaning(false)}
+        />
+      )}
+
+      {/* New repair campaign selector modal */}
+      {windFarmId && showNewRepair && (
+        <NewRepairCampaignModal
+          windFarmId={windFarmId}
+          isOpen
+          onClose={() => setShowNewRepair(false)}
         />
       )}
 

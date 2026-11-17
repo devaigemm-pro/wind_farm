@@ -105,6 +105,26 @@ export function useCreateHoistCertificationCampaign() {
   });
 }
 
+export function useCreateRepairCampaign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      windFarmId,
+      turbineId,
+      name,
+      turbineName,
+    }: {
+      windFarmId: string;
+      turbineId: string;
+      name: string;
+      turbineName: string;
+    }) => assetDetailService.createRepairCampaign(windFarmId, turbineId, name, turbineName),
+    onSuccess: (_, { windFarmId }) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns', windFarmId] });
+    },
+  });
+}
+
 export function useUpdateCampaign() {
   const queryClient = useQueryClient();
   return useMutation({

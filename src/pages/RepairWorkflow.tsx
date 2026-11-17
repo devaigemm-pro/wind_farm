@@ -10,6 +10,7 @@ import {
   useRepairTree,
   useSetPhotoSelected,
   useMovePhotoToStage,
+  useReorderReportPhotos,
   useUploadRepairPhoto,
   useDeleteRepairDefect,
   useUpdateDefectFields,
@@ -108,6 +109,7 @@ export function RepairWorkflow() {
   const typeOptions = annotationTypes.map((at) => at.name);
   const setSelected = useSetPhotoSelected(campaignId);
   const movePhoto = useMovePhotoToStage(campaignId);
+  const reorderReport = useReorderReportPhotos(campaignId);
   const uploadPhoto = useUploadRepairPhoto(campaignId);
   const deleteDefect = useDeleteRepairDefect(campaignId);
   const updateDefectFields = useUpdateDefectFields(campaignId);
@@ -260,6 +262,16 @@ export function RepairWorkflow() {
             return next;
           }),
       },
+    );
+  };
+
+  // Persist the dragged order of the photos selected for the report (inside a
+  // stage). Read-only for client. The optimistic update lives in the hook.
+  const handleReorderSelected = (orderedIds: string[]) => {
+    if (isClient) return;
+    reorderReport.mutate(
+      { orderedIds },
+      { onError: (err) => toast.error((err as Error)?.message || t('repair.reorderError')) },
     );
   };
 
@@ -560,6 +572,7 @@ export function RepairWorkflow() {
               onSelect={handleSelect}
               onMovePhoto={isClient ? undefined : handleMovePhoto}
               onUploadPhoto={isClient ? undefined : handleUploadPhotos}
+              onReorderSelected={isClient ? undefined : handleReorderSelected}
               onPreview={handlePreview}
               onGenerateReport={handleGenerateDefectPdf}
               onDownloadReport={handleDownloadDefectPdf}
@@ -669,6 +682,8 @@ interface BladeGroupSectionProps {
     files: File[],
     target: { repairId: string; repairStageId: string; stageCode: string },
   ) => Promise<void>;
+  /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
+  onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
@@ -714,6 +729,7 @@ function BladeGroupSection({
   onSelect,
   onMovePhoto,
   onUploadPhoto,
+  onReorderSelected,
   onPreview,
   onGenerateReport,
   onDownloadReport,
@@ -755,6 +771,7 @@ function BladeGroupSection({
               onSelect={onSelect}
               onMovePhoto={onMovePhoto}
               onUploadPhoto={onUploadPhoto}
+              onReorderSelected={onReorderSelected}
               onPreview={onPreview}
               onGenerateReport={onGenerateReport}
               onDownloadReport={onDownloadReport}
@@ -791,6 +808,8 @@ interface DefectSectionProps {
     files: File[],
     target: { repairId: string; repairStageId: string; stageCode: string },
   ) => Promise<void>;
+  /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
+  onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: RepairPhoto) => void;
   onGenerateReport: (repairId: string) => void;
   onDownloadReport: (repairId: string) => void;
@@ -832,6 +851,7 @@ function DefectSection({
   onSelect,
   onMovePhoto,
   onUploadPhoto,
+  onReorderSelected,
   onPreview,
   onGenerateReport,
   onDownloadReport,
@@ -1309,6 +1329,7 @@ function DefectSection({
           onSelect={onSelect}
           onMovePhoto={onMovePhoto}
           onUploadPhoto={onUploadPhoto}
+          onReorderSelected={onReorderSelected}
           onPreview={onPreview}
         />
       )}
@@ -1329,6 +1350,8 @@ interface StagesListProps {
     files: File[],
     target: { repairId: string; repairStageId: string; stageCode: string },
   ) => Promise<void>;
+  /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
+  onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: RepairPhoto) => void;
 }
 
@@ -1358,6 +1381,7 @@ function StagesList({
   onSelect,
   onMovePhoto,
   onUploadPhoto,
+  onReorderSelected,
   onPreview,
 }: StagesListProps) {
   // Which stage is currently hovered as the target of a cross-stage move
@@ -1394,6 +1418,7 @@ function StagesList({
           onSelect={onSelect}
           onMovePhoto={onMovePhoto}
           onUploadPhoto={onUploadPhoto}
+          onReorderSelected={onReorderSelected}
           onPreview={onPreview}
           hoverTargetStageId={hoverTargetStageId}
           setHoverTargetStageId={setHoverTargetStageId}
@@ -1425,6 +1450,8 @@ interface StageRowProps {
     files: File[],
     target: { repairId: string; repairStageId: string; stageCode: string },
   ) => Promise<void>;
+  /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
+  onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: RepairPhoto) => void;
   /** Stage id currently hovered as a cross-stage move target (shared by all
       StageRows of the defect). This row is highlighted when it equals its own
@@ -1459,6 +1486,17 @@ function isFileDrag(e: React.DragEvent): boolean {
   return Array.from(types).includes('Files');
 }
 
+/** Order of the "selected for report" photos: manual drag order first
+ *  (metadata.report_order), then the rest by captureOrder. Same rule the PDF uses. */
+function byReportOrder(a: RepairPhoto, b: RepairPhoto): number {
+  const ao = a.reportOrder;
+  const bo = b.reportOrder;
+  if (ao != null && bo != null && ao !== bo) return ao - bo;
+  if (ao != null && bo == null) return -1;
+  if (ao == null && bo != null) return 1;
+  return a.captureOrder - b.captureOrder;
+}
+
 function StageRow({
   defectId,
   repairId,
@@ -1470,12 +1508,15 @@ function StageRow({
   onSelect,
   onMovePhoto,
   onUploadPhoto,
+  onReorderSelected,
   onPreview,
   hoverTargetStageId,
   setHoverTargetStageId,
 }: StageRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
+  // Selected-for-report card currently hovered while reordering by drag.
+  const [overId, setOverId] = useState<string | null>(null);
   // File-upload drop highlight (OS file drag over this stage) + in-flight state.
   const [fileDropActive, setFileDropActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1504,7 +1545,7 @@ function StageRow({
 
   const photos = stage.photos;
   const available = photos.filter((p) => !p.repairSelected);
-  const selected = photos.filter((p) => p.repairSelected);
+  const selected = photos.filter((p) => p.repairSelected).sort(byReportOrder);
   // Scope drop zone to this defect+stage to avoid cross-stage drops.
   const dropKey = `${defectId}::${stage.stageCode}`;
 
@@ -1599,6 +1640,36 @@ function StageRow({
     // Reset the shared highlight LAST and unconditionally (single shared value,
     // see StagesList). The global dragend in StagesList is the backstop.
     setHoverTargetStageId(null);
+  };
+
+  // ── Reorder the selected-for-report photos by dragging (same stage) ─────────
+  const canReorder = !readOnly && !!onReorderSelected;
+  const isReorderDrag = (e: React.DragEvent) =>
+    canReorder && !!dragId && selected.some((p) => p.id === dragId) && !isForeignDrag(e);
+  const endDrag = () => {
+    setDragId(null);
+    setOverId(null);
+  };
+  const handleCardDragOver = (e: React.DragEvent, targetId: string) => {
+    // Not a reorder (e.g. a photo from the left column) → bubble to the column.
+    if (!isReorderDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (overId !== targetId) setOverId(targetId);
+  };
+  const handleCardDrop = (e: React.DragEvent, targetId: string) => {
+    if (!isReorderDrag(e) || !dragId || !onReorderSelected) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const ids = selected.map((p) => p.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    endDrag();
+    if (from < 0 || to < 0 || from === to) return;
+    // The dragged photo takes the position of the one it was dropped on.
+    ids.splice(to, 0, ids.splice(from, 1)[0]!);
+    onReorderSelected(ids);
   };
 
   // Enable the drag handlers when EITHER move or upload is possible.
@@ -1699,7 +1770,7 @@ function StageRow({
                     pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
-                    onDragEnd={() => setDragId(null)}
+                    onDragEnd={endDrag}
                     action="add"
                     actionLabel={t('repair.select')}
                     onAction={() => onSelect(photo, true)}
@@ -1766,12 +1837,15 @@ function StageRow({
                     pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
-                    onDragEnd={() => setDragId(null)}
+                    onDragEnd={endDrag}
                     action="remove"
                     actionLabel={t('repair.remove')}
                     onAction={() => onSelect(photo, false)}
                     onPreview={() => onPreview(photo)}
                     selected
+                    dropOver={overId === photo.id && dragId !== photo.id}
+                    onCardDragOver={canReorder ? (e) => handleCardDragOver(e, photo.id) : undefined}
+                    onCardDrop={canReorder ? (e) => handleCardDrop(e, photo.id) : undefined}
                   />
                 ))
               )}
@@ -1802,6 +1876,10 @@ interface PhotoCardProps {
   onDragEnd: () => void;
   onAction: () => void;
   onPreview: () => void;
+  /** Highlight as the reorder drop target (selected-for-report column). */
+  dropOver?: boolean;
+  onCardDragOver?: (e: React.DragEvent) => void;
+  onCardDrop?: (e: React.DragEvent) => void;
 }
 
 function PhotoCard({
@@ -1817,6 +1895,9 @@ function PhotoCard({
   onDragEnd,
   onAction,
   onPreview,
+  dropOver,
+  onCardDragOver,
+  onCardDrop,
 }: PhotoCardProps) {
   const { t } = useLanguage();
   // While pending, block drag + action to avoid a double-fire on the same photo.
@@ -1825,7 +1906,14 @@ function PhotoCard({
   // Short prefix (CP/CB) so the label fits under the thumbnail without truncating.
   const uploaderLabel = `${t('repair.uploadedByShort')}: ${uploaderName}`;
   return (
-    <div style={photoCardWrap}>
+    <div
+      style={{
+        ...photoCardWrap,
+        ...(dropOver ? { outline: `2px dashed ${C.brand}`, outlineOffset: 2, borderRadius: 8 } : {}),
+      }}
+      onDragOver={onCardDragOver}
+      onDrop={onCardDrop}
+    >
     <div
       draggable={interactive}
       onDragStart={
