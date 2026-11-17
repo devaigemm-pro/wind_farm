@@ -20,15 +20,66 @@ export class DocumentManagerSignatureError extends Error {
   }
 }
 
-/** Storage path for a manager's signature: lowercase, no accents, dashes. */
-export function signaturePath(managerName: string): string {
-  const slug = managerName
+/** Slug of a manager name: lowercase, no accents, dashes ("Víctor Hugo" → "victor-hugo"). */
+export function signatureSlug(managerName: string): string {
+  return managerName
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `signatures/document-managers/${slug}.png`;
+}
+
+/** Storage path for a manager's uploaded signature. */
+export function signaturePath(managerName: string): string {
+  return `signatures/document-managers/${signatureSlug(managerName)}.png`;
+}
+
+/**
+ * Signature as a LIGHT JPEG data URL for the PDF: capped at MAX_WIDTH_PX and
+ * flattened on white (the report page is white). Embedding the raw PNG is not an
+ * option — jsPDF stores it decompressed, so a 2828×1069 RGBA PNG of 214 KB adds
+ * ~12 MB to the PDF, which risks the upload size limit of the generated report.
+ * Returns null when the image can't be decoded (the signature line stays blank).
+ */
+async function blobToPdfDataUrl(blob: Blob): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, MAX_WIDTH_PX / bitmap.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return canvas.toDataURL('image/jpeg', 0.92);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Static fallback: a signature image committed to public/ as <slug>.png (e.g.
+ * public/victor-hugo-cayola.png). Used when no signature was uploaded through
+ * the form. The host rewrites unknown paths to index.html with HTTP 200, so the
+ * response must really be an image, not just ok.
+ */
+async function fetchPublicSignature(managerName: string): Promise<{ url: string; blob: Blob } | null> {
+  const slug = signatureSlug(managerName);
+  if (!slug) return null;
+  try {
+    const url = `${window.location.origin}/${slug}.png`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) return null;
+    return { url, blob };
+  } catch {
+    return null;
+  }
 }
 
 /** Re-encode any accepted image as a PNG capped at MAX_WIDTH_PX (light PDFs). */
@@ -51,28 +102,30 @@ async function toPng(file: File): Promise<Blob> {
 }
 
 export const documentManagerSignatureService = {
-  /** Signed URL to preview the signature, or null when none was uploaded yet. */
+  /** URL to preview the signature (uploaded one, else public/<slug>.png), or null. */
   async getSignedUrl(managerName: string): Promise<string | null> {
     if (!managerName) return null;
     const { data, error } = await db.storage
       .from(BUCKET)
       .createSignedUrl(signaturePath(managerName), 3600);
-    if (error || !data?.signedUrl) return null;
-    return data.signedUrl as string;
+    if (!error && data?.signedUrl) return data.signedUrl as string;
+    // Nothing uploaded → fall back to the image committed in public/.
+    return (await fetchPublicSignature(managerName))?.url ?? null;
   },
 
-  /** The signature as a data URL for the PDF, or null (never throws). */
+  /** The signature as a light JPEG data URL for the PDF (uploaded one, else public/<slug>.png), or null. Never throws. */
   async getDataUrl(managerName: string): Promise<string | null> {
     if (!managerName) return null;
     try {
+      // 1. A signature uploaded through the form wins.
       const { data, error } = await db.storage.from(BUCKET).download(signaturePath(managerName));
-      if (error || !data) return null;
-      return await new Promise<string | null>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(data as Blob);
-      });
+      if (!error && data) {
+        const uploaded = await blobToPdfDataUrl(data as Blob);
+        if (uploaded) return uploaded;
+      }
+      // 2. Otherwise the image committed in public/<slug>.png.
+      const fallback = await fetchPublicSignature(managerName);
+      return fallback ? await blobToPdfDataUrl(fallback.blob) : null;
     } catch {
       return null;
     }

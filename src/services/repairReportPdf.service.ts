@@ -106,7 +106,7 @@ interface RepairPdfContext {
   managerName: string;
   /** wind_farm.manager_role (dynamic, from DB) — signer's role/title. */
   managerRole: string;
-  /** Data URL of the document manager's uploaded signature (null = none → blank line). */
+  /** JPEG data URL of the document manager's signature (null = none → blank line). */
   managerSignature: string | null;
   turbineName: string;
   turbineModel: string;
@@ -1472,7 +1472,7 @@ function renderSignaturePage(doc: jsPDF, ctx: RepairPdfContext) {
         h = maxH;
         w = h * ratio;
       }
-      doc.addImage(ctx.managerSignature, 'PNG', MARGIN, y - 2 - h, w, h);
+      doc.addImage(ctx.managerSignature, 'JPEG', MARGIN, y - 2 - h, w, h);
     } catch {
       /* unreadable image → leave the line blank */
     }
