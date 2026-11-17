@@ -3,6 +3,8 @@ import { Button } from '@/components/atoms';
 import { FormField } from '@/components/molecules';
 import { useLanguage } from '@/components/design-system';
 import { windFarmSchema, type WindFarmFormData } from '@/utils/validation';
+import { DOCUMENT_MANAGERS } from '@/constants/document-managers';
+import { DocumentManagerSignature } from './DocumentManagerSignature';
 import type { WindFarm } from '@/types';
 
 export interface WindFarmFormProps {
@@ -20,6 +22,7 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
   const [client, setClient] = useState(initialData?.client ?? '');
   const [latitude, setLatitude] = useState(initialData?.latitude?.toString() ?? '');
   const [longitude, setLongitude] = useState(initialData?.longitude?.toString() ?? '');
+  const [managerName, setManagerName] = useState(initialData?.manager_name ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,6 +32,7 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
     const formData: Record<string, unknown> = {
       name: name.trim(),
       location: location.trim(),
+      manager_name: managerName.trim(),
     };
 
     if (country.trim()) {
@@ -63,7 +67,8 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
       for (const issue of result.error.issues) {
         const field = issue.path[0]?.toString();
         if (field) {
-          fieldErrors[field] = issue.message;
+          fieldErrors[field] =
+            field === 'manager_name' ? t('windFarmForm.documentManagerRequired') : issue.message;
         }
       }
       setErrors(fieldErrors);
@@ -72,6 +77,13 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
 
     await onSubmit(result.data);
   };
+
+  // Selectable managers; keep the farm's current one visible even if it is no
+  // longer in the list (e.g. a previous manager), so editing doesn't drop it.
+  const managerOptions =
+    managerName && !DOCUMENT_MANAGERS.includes(managerName)
+      ? [managerName, ...DOCUMENT_MANAGERS]
+      : [...DOCUMENT_MANAGERS];
 
   const formStyle: React.CSSProperties = {
     display: 'flex',
@@ -107,6 +119,49 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
         error={errors.location}
         placeholder={t('windFarmForm.locationPlaceholder')}
       />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <label
+          htmlFor="windFarmManager"
+          style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-neutral-800)' }}
+        >
+          {t('windFarmForm.documentManager')}
+          <span style={{ color: 'var(--color-danger-500)', marginLeft: '2px' }} aria-hidden="true">
+            *
+          </span>
+        </label>
+        <select
+          id="windFarmManager"
+          value={managerName}
+          onChange={(e) => setManagerName(e.target.value)}
+          aria-required
+          aria-invalid={errors.manager_name ? true : undefined}
+          style={{
+            width: '100%',
+            height: '40px',
+            padding: 'var(--space-2) var(--space-3)',
+            fontSize: 'var(--text-sm)',
+            fontFamily: 'var(--font-family-sans)',
+            borderRadius: 'var(--radius-md)',
+            border: `1px solid ${errors.manager_name ? 'var(--color-danger-500)' : 'var(--color-neutral-200)'}`,
+            backgroundColor: 'var(--color-neutral-0)',
+            color: 'var(--color-neutral-900)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <option value="">{t('windFarmForm.selectDocumentManager')}</option>
+          {managerOptions.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        {errors.manager_name && (
+          <p role="alert" style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-danger-500)' }}>
+            {errors.manager_name}
+          </p>
+        )}
+      </div>
+      <DocumentManagerSignature managerName={managerName} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
         <FormField
           label={t('windFarmForm.country')}

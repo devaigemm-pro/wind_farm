@@ -118,6 +118,7 @@ export const AssetsAdmin = () => {
             client: data.client ?? null,
             latitude: data.latitude ?? null,
             longitude: data.longitude ?? null,
+            manager_name: data.manager_name,
           },
         });
         toast.success(t('assetsAdmin.farmSaved'));

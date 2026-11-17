@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 import type { WindFarm, Turbine, Blade, WindFarmDashboardRow } from '@/types';
+import { DOCUMENT_MANAGER_ROLE } from '@/constants/document-managers';
 
 // ─── Custom Error ───────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ export const assetsService = {
     client?: string;
     latitude?: number;
     longitude?: number;
+    manager_name?: string;
   }): Promise<WindFarm> {
     // Atomic create via SECURITY DEFINER RPC: inserts the wind_farm row AND the
     // creator's wind_farm_user assignment in a single transaction, then returns
@@ -79,17 +81,35 @@ export const assetsService = {
 
     // The RPC returns the wind_farm row (setof exposes an array; a scalar row
     // comes back as the object directly). Normalize to a single WindFarm.
-    const row = Array.isArray(data) ? data[0] : data;
-    return row as WindFarm;
+    const row = (Array.isArray(data) ? data[0] : data) as WindFarm;
+
+    // The create RPC doesn't take the document manager, so set it right after
+    // (same user, same session). wind_farm.manager_name/manager_role feed the
+    // signature page of the reports.
+    if (input.manager_name) {
+      const { data: updated, error: managerError } = await db
+        .from('wind_farm')
+        .update({ manager_name: input.manager_name, manager_role: DOCUMENT_MANAGER_ROLE })
+        .eq('id', row.id)
+        .select()
+        .single();
+      if (managerError) handleMutationError(managerError);
+      return updated as WindFarm;
+    }
+    return row;
   },
 
   async updateWindFarm(
     id: string,
-    input: Partial<{ name: string; location: string; country: string | null; client: string | null; latitude: number | null; longitude: number | null }>,
+    input: Partial<{ name: string; location: string; country: string | null; client: string | null; latitude: number | null; longitude: number | null; manager_name: string | null }>,
   ): Promise<WindFarm> {
-    const { data, error } = await supabase
+    // Picking a document manager also sets the title printed under the name.
+    const payload = input.manager_name
+      ? { ...input, manager_role: DOCUMENT_MANAGER_ROLE }
+      : input;
+    const { data, error } = await db
       .from('wind_farm')
-      .update(input)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
