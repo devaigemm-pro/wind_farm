@@ -9,6 +9,7 @@ import type {
   HoistPhoto,
 } from '@/services/hoistCertification.service';
 import { getHoistLabel } from '@/constants/hoist-certification-steps';
+import { byReportOrder } from '@/utils/reportOrder';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -479,7 +480,7 @@ async function renderStepSection(doc: jsPDF, step: HoistStepNode, locale: 'es' |
 
   for (const grp of groups) {
     for (const item of grp.items) {
-      const photos = [...item.photos].sort((a, b) => a.captureOrder - b.captureOrder);
+      const photos = [...item.photos].sort(byReportOrder);
       for (const photo of photos) {
         await renderPhotoBlock(doc, step.stepLabel, grp.label, item.itemLabel, photo);
       }
