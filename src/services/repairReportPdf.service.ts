@@ -3,6 +3,7 @@ import autoTable, { type CellHookData } from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
 import { getStageCatalogLabel } from '@/constants/repair-stages';
 import { fullName } from '@/utils/fullName';
+import { documentManagerSignatureService } from '@/services/document-manager-signature.service';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -105,6 +106,8 @@ interface RepairPdfContext {
   managerName: string;
   /** wind_farm.manager_role (dynamic, from DB) — signer's role/title. */
   managerRole: string;
+  /** Data URL of the document manager's uploaded signature (null = none → blank line). */
+  managerSignature: string | null;
   turbineName: string;
   turbineModel: string;
   companyName: string;
@@ -829,6 +832,9 @@ async function fetchRepairData(campaignId: string): Promise<RepairPdfContext> {
     techniciansInCharge,
     managerName: (wf.manager_name as string) ?? '',
     managerRole: (wf.manager_role as string) ?? '',
+    managerSignature: await documentManagerSignatureService.getDataUrl(
+      (wf.manager_name as string) ?? '',
+    ),
     turbineName: (turbine.name as string) ?? NA,
     turbineModel: (turbine.model as string) ?? NA,
     companyName: 'HG Windtec',
@@ -1450,10 +1456,29 @@ function renderSignaturePage(doc: jsPDF, ctx: RepairPdfContext) {
   doc.text(legalLines, MARGIN, y, { align: 'justify', maxWidth: PAGE_WIDTH - 2 * MARGIN });
   y += legalLines.length * 5 + 40;
 
-  // Empty signature line (left blank for a handwritten signature).
+  const lineW = 90;
+  // Uploaded signature of the document manager, drawn just above the line
+  // (inside the 40 mm gap left for it). No signature uploaded → the gap stays
+  // blank for a handwritten signature, as before.
+  if (ctx.managerSignature) {
+    try {
+      const maxW = lineW;
+      const maxH = 34;
+      const props = doc.getImageProperties(ctx.managerSignature);
+      const ratio = props.width / props.height;
+      let w = maxW;
+      let h = w / ratio;
+      if (h > maxH) {
+        h = maxH;
+        w = h * ratio;
+      }
+      doc.addImage(ctx.managerSignature, 'PNG', MARGIN, y - 2 - h, w, h);
+    } catch {
+      /* unreadable image → leave the line blank */
+    }
+  }
   doc.setDrawColor(60, 60, 60);
   doc.setLineWidth(0.4);
-  const lineW = 90;
   doc.line(MARGIN, y, MARGIN + lineW, y);
   y += 6;
 

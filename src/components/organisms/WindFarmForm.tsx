@@ -4,6 +4,7 @@ import { FormField } from '@/components/molecules';
 import { useLanguage } from '@/components/design-system';
 import { windFarmSchema, type WindFarmFormData } from '@/utils/validation';
 import { DOCUMENT_MANAGERS } from '@/constants/document-managers';
+import { DocumentManagerSignature } from './DocumentManagerSignature';
 import type { WindFarm } from '@/types';
 
 export interface WindFarmFormProps {
@@ -160,6 +161,7 @@ export function WindFarmForm({ initialData, onSubmit, onCancel, loading = false 
           </p>
         )}
       </div>
+      <DocumentManagerSignature managerName={managerName} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
         <FormField
           label={t('windFarmForm.country')}
