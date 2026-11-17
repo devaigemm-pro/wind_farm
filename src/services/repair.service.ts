@@ -83,6 +83,10 @@ export interface RepairPhoto {
   capturedAt: string | null;
   /** Whether the photo is marked for the PDF report (repair_photo.metadata.selected_for_report). */
   repairSelected: boolean;
+  /** Position of the photo within the stage's "selected for report" list, set by
+   *  dragging (repair_photo.metadata.report_order). Null = never reordered
+   *  (falls back to captureOrder). */
+  reportOrder: number | null;
   /** Resolved public URL of the full-size photo (storage_path) for the lightbox. */
   url: string;
   /** Resolved public URL of the thumbnail (thumbnail_path) for the grid; falls back to url. */
@@ -280,6 +284,13 @@ function isSelectedForReport(metadata: unknown): boolean {
   return Boolean((metadata as Record<string, unknown>).selected_for_report);
 }
 
+/** Manual position in the report (repair_photo.metadata.report_order), or null. */
+function reportOrderFromMetadata(metadata: unknown): number | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const v = (metadata as Record<string, unknown>).report_order;
+  const n = typeof v === 'number' ? v : Number(v);
+  return v != null && Number.isFinite(n) ? n : null;
+}
 /**
  * Call get_repairs_for_quote and return its rows. Empty array when no quote.
  */
@@ -461,10 +472,13 @@ async function fetchStageFlagsByRepair(
  * that are selected_for_report. The RPCs are read-only and don't expose photo
  * metadata, so we resolve the selection state directly from repair_photo.
  */
-async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+async function fetchPhotoReportMeta(
+  photoIds: string[],
+): Promise<{ selectedIds: Set<string>; reportOrderById: Map<string, number> }> {
   const selected = new Set<string>();
+  const reportOrderById = new Map<string, number>();
   const unique = [...new Set(photoIds.filter(Boolean))];
-  if (unique.length === 0) return selected;
+  if (unique.length === 0) return { selectedIds: selected, reportOrderById };
 
   // Chunk the .in('id', ...) query: a single request with hundreds of photo ids
   // overflows the PostgREST URL length limit and gets rejected with HTTP 400.
@@ -479,8 +493,13 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
 
   for (const r of rows) {
     if (isSelectedForReport(r.metadata)) selected.add(r.id as string);
+    const order = reportOrderFromMetadata(r.metadata);
+    if (order != null) reportOrderById.set(r.id as string, order);
   }
-  return selected;
+  return { selectedIds: selected, reportOrderById };
+}
+async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+  return (await fetchPhotoReportMeta(photoIds)).selectedIds;
 }
 
 /**
@@ -524,6 +543,7 @@ function mapPhoto(
   stageCode: string,
   selectedIds: Set<string>,
   uploaderById: Map<string, string>,
+  reportOrderById?: Map<string, number>,
 ): RepairPhoto {
   const id = (raw.photo_id as string) ?? '';
   const storagePath = (raw.storage_path as string) ?? '';
@@ -550,6 +570,7 @@ function mapPhoto(
     captureOrder: Number(raw.capture_order) || 0,
     capturedAt: (raw.captured_at as string) ?? null,
     repairSelected: selectedIds.has(id),
+    reportOrder: reportOrderById?.get(id) ?? null,
     url,
     thumbnailUrl,
     uploadedBy: uploaderById.get(id) ?? null,
@@ -592,12 +613,13 @@ function mapStages(
   selectedIds: Set<string>,
   uploaderById: Map<string, string>,
   stageFlags?: Map<string, RepairStageFlags>,
+  reportOrderById?: Map<string, number>,
 ): RepairStageNode[] {
   const nodes = stageRows.map((stage) => {
     const stageId = stage.repair_stage_id ?? null;
     const stageCode = stage.stage_code ?? '';
     const photos = parsePhotosArray(stage.photos)
-      .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds, uploaderById))
+      .map((p) => mapPhoto(p, repairId, stageId, stageCode, selectedIds, uploaderById, reportOrderById))
       .sort((a, b) => a.captureOrder - b.captureOrder);
     // Optional/enabled/z1/z2 come from repair_stage (the RPC does NOT return
     // them). When a stage_code isn't present in repair_stage, default to a
@@ -893,7 +915,7 @@ export const repairService = {
     for (const rows of stagesByRepair.values()) {
       allPhotoIds.push(...collectPhotoIds(rows));
     }
-    const selectedIds = await fetchSelectedPhotoIds(allPhotoIds);
+    const { selectedIds, reportOrderById } = await fetchPhotoReportMeta(allPhotoIds);
 
     // 8b. Resolve the uploader's readable name for every photo id in one query
     //     (from repair_photos_detailed.technician_name, keyed by photo_id).
@@ -915,6 +937,7 @@ export const repairService = {
             selectedIds,
             uploaderByPhotoId,
             stageFlagsByRepair.get(repairId),
+            reportOrderById,
           )
         : catalogStages();
 
@@ -1078,6 +1101,41 @@ export const repairService = {
       await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
       throw new RepairServiceError(`DB insert failed: ${insertError.message}`, insertError.code);
     }
+  },
+
+  /**
+   * Persist the manual order of the photos selected for the report. The array
+   * is the desired order (first = first in the report); each photo gets
+   * metadata.report_order = its index. Metadata is read first and merged so
+   * selected_for_report and any other key are preserved. The PDF sorts the
+   * selected photos of each stage by this value.
+   */
+  async setReportOrder(orderedPhotoIds: string[]): Promise<void> {
+    const ids = [...new Set(orderedPhotoIds.filter(Boolean))];
+    if (ids.length === 0) return;
+
+    const { data: rows, error: readErr } = await db
+      .from('repair_photo')
+      .select('id, metadata')
+      .in('id', ids);
+    if (readErr) throw new RepairServiceError(readErr.message, readErr.code);
+    const metaById = new Map<string, Record<string, unknown>>(
+      ((rows as Array<{ id: string; metadata: unknown }>) ?? []).map((r) => [
+        r.id,
+        (r.metadata && typeof r.metadata === 'object' ? r.metadata : {}) as Record<string, unknown>,
+      ]),
+    );
+
+    const results = await Promise.all(
+      ids.map((id, index) =>
+        db
+          .from('repair_photo')
+          .update({ metadata: { ...(metaById.get(id) ?? {}), report_order: index } })
+          .eq('id', id),
+      ),
+    );
+    const failed = results.find((r: { error: { message: string; code?: string } | null }) => r.error);
+    if (failed?.error) throw new RepairServiceError(failed.error.message, failed.error.code);
   },
 
   /**

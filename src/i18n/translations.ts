@@ -325,6 +325,7 @@ export const translations: TranslationMap = {
   'repair.dropHere': { en: 'Drop photos here to add them to the report', es: 'Suelta fotos aquí para agregarlas al informe' },
   'repair.select': { en: 'Select', es: 'Seleccionar' },
   'repair.remove': { en: 'Remove', es: 'Quitar' },
+  'repair.reorderError': { en: 'Could not save the photo order', es: 'No se pudo guardar el orden de las fotos' },
   'repair.addPhoto': { en: 'Add photo', es: 'Agregar foto' },
   'repair.dropToUpload': { en: 'Drop photos here to upload to this stage', es: 'Suelta fotos aquí para subirlas a esta etapa' },
   'repair.uploading': { en: 'Uploading…', es: 'Subiendo…' },
