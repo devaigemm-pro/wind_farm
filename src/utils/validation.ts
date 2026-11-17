@@ -16,6 +16,7 @@ export const windFarmSchema = z.object({
   client: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  manager_name: z.string().min(1, 'Document manager is required'),
 });
 
 export type WindFarmFormData = z.infer<typeof windFarmSchema>;

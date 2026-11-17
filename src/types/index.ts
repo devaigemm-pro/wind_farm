@@ -76,6 +76,10 @@ export interface Profile extends Omit<Tables<'profiles'>, 'role'> {
 
 /** Wind farm with optional nested turbines */
 export interface WindFarm extends Tables<'wind_farm'> {
+  /** Document manager (signer of the reports) — wind_farm.manager_name. */
+  manager_name?: string | null;
+  /** Signer's title — wind_farm.manager_role. */
+  manager_role?: string | null;
   turbines?: Turbine[];
 }
 
