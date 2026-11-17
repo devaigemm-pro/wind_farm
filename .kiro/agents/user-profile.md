@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 396
-- **Última actualización**: 2026-11-16
+- **Sesiones analizadas**: 398
+- **Última actualización**: 2026-11-17
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -112,6 +112,8 @@
 - **(OBSOLETA, ver launchd abajo) ningún proceso que yo levante sobrevive al turno** — ni nohup, ni control_bash_process, ni python start_new_session (confirmado 3 veces: el usuario reporta "está abajo el local"). No prometer que el preview queda arriba. Levantarlo, verificarlo con curl DENTRO del turno, y darle al usuario el comando exacto para levantarlo él: `pnpm run preview -- --port 4173` (o `npx vite preview --port 4173`) tras `npx vite build`. Esto corrige las dos reglas de preview anteriores.
 
 - **preview con launchctl submit** — única forma que sobrevive entre turnos: `launchctl submit -l com.windfarm.preview -o /tmp/preview-launchd.log -e /tmp/preview-launchd.err -- /bin/zsh -c "cd <repo> && exec /usr/local/bin/node node_modules/vite/bin/vite.js preview --port 4173 --host 127.0.0.1"` (si ya existe: `launchctl remove com.windfarm.preview` antes). Verificar en un comando aparte con lsof + curl. NO darle al usuario el comando para que lo corra él: espera el local arriba. Tras cada `vite build` el preview sirve el dist nuevo sin reiniciar. Detener: `launchctl remove com.windfarm.preview`.
+
+- **preview: LaunchAgent con KeepAlive** — `launchctl submit` también murió. Usar plist en /tmp/com.windfarm.preview.plist (node node_modules/vite/bin/vite.js preview --port 4173 --host 127.0.0.1, WorkingDirectory=repo, KeepAlive+RunAtLoad) y `launchctl bootstrap gui/$(id -u) /tmp/com.windfarm.preview.plist`; si existe, `launchctl bootout gui/$(id -u)/com.windfarm.preview` antes. Se reinicia solo si lo matan (probado). Sirve dist/, así que tras `vite build` ya muestra el build nuevo. Reemplaza las reglas anteriores de preview.
 
 ## 8. Historial de Observaciones por Sesión
 
@@ -3002,3 +3004,21 @@
   - Solución que sí funciona: trabajo de launchd, fuera del árbol de procesos de la herramienta: launchctl submit -l com.windfarm.preview -o /tmp/preview-launchd.log -e /tmp/preview-launchd.err -- /bin/zsh -c 'cd <repo> && exec /usr/local/bin/node node_modules/vite/bin/vite.js preview --port 4173 --host 127.0.0.1'. Verificado en un comando aparte (pid vivo, HTTP 200). Detener: launchctl remove com.windfarm.preview.
   - Como sirve dist/ desde disco, después de cada npx vite build el preview ya muestra el build nuevo sin reiniciar.
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima, espera resultado entregado y no instrucciones para hacerlo él.
+
+### Sesión 397 - 2026-11-17
+- **Tarea principal**: "prod" (una palabra) → deploy del Document manager por parque + subida de firma + firma en el informe de reparación.
+- **Observaciones nuevas**:
+  - "prod" a secas = aprobación de deploy, igual que "pasar a prod" / "a prod". Una palabra basta.
+  - Flujo: tsc, rebase, merge a main (f9ca07d..531d3e9), push, vercel --prod. Verificado en prod: /victor-hugo-cayola.png sirve image/png 214109B; el bundle trae el servicio de firma, el formulario y la lista con Victor Hugo Cayola.
+  - Sin probar por el usuario/mí en pantalla: subida de firma bajo permisos de storage reales y un PDF con la firma. Dicho en el reporte.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima (una palabra), aprobación de deploy corta.
+
+### Sesión 398 - 2026-11-17
+- **Tarea principal**: Modo compañero. En la certificación de polipastos, paso "Preparativos", agregar la "etapa" "Etiqueta polipasto" en segundo lugar, justo después de "Viento inferior".
+- **Observaciones nuevas**:
+  - Llama "etapa" a lo que en el catálogo es un ÍTEM dentro del paso Preparativos (el paso es la etapa grande). Mismo uso laxo de "etapa" que en repair. Interpretación: ítem nuevo en el paso, no un paso nuevo.
+  - "Segundo lugar luego de viento inferior" = posición 2 de la lista de Preparativos (entre Viento inferior y Certificado de peso). Lo entendí así; hay ambigüedad real con "segundo" pero la frase "luego de viento inferior" la resuelve.
+  - Tipo del ítem: asumí photo (una etiqueta se fotografía). Lo dije en el reporte para que lo corrija si quería otro.
+  - Código nuevo prep_etiqueta_polipasto (sortOrder 3; Certificado pasó de 3 a 4). Aparece vacío en TODAS las campañas existentes porque el árbol se arma desde el catálogo; solo recibirá fotos cuando la app móvil escriba ese item_code (agregado a docs/INSTRUCCIONES-APP-MOVIL-certificacion-polipastos.md).
+  - El preview de launchd (launchctl submit) también cayó. Reemplazado por un LaunchAgent con KeepAlive cargado con launchctl bootstrap gui/UID desde /tmp/com.windfarm.preview.plist; probé matándolo y se reinició solo (pid 52882 → 53201). Detener: launchctl bootout gui/$(id -u)/com.windfarm.preview.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, "etapa" usado de forma laxa, modo compañero.
