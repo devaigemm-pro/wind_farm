@@ -118,6 +118,7 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 | `item_code`              | Ítem                          | Tipo  |
 |--------------------------|-------------------------------|-------|
 | `prep_viento`            | Viento inferior a 15 m/s      | photo |
+| `prep_etiqueta_polipasto`| Etiqueta polipasto            | photo |
 | `prep_certificado_peso`  | Certificado de peso patrón    | photo |
 
 ### Paso 2 — `inspeccion_visual`

@@ -57,7 +57,7 @@ export interface HoistCertCatalogEntry {
  * The fixed hoist-certification catalog (sort_order ascending). From the field
  * sheet ("Certificación de polipastos"):
  *
- *   1. Preparativos
+ *   1. Preparativos  → Viento inferior · Etiqueta polipasto · Certificado de peso patrón
  *   2. Inspección Visual y mecánica
  *   3. Inspección Crítica  → sub-groups: Cadena de carga / Ojales de aluminio fundido
  *   4. Verificación de Torques
@@ -71,7 +71,8 @@ export const HOIST_CERT_CATALOG: readonly HoistCertCatalogEntry[] = [
   // ── Paso 1: Preparativos ──────────────────────────────────────────────────
   { code: 'preparativos', labelEs: 'Preparativos', labelEn: 'Preparations', sortOrder: 1, parentCode: null, isStep: true, isGroup: false, isItem: false, itemType: null },
   { code: 'prep_viento', labelEs: 'Viento inferior a 15 m/s', labelEn: 'Wind below 15 m/s', sortOrder: 2, parentCode: 'preparativos', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
-  { code: 'prep_certificado_peso', labelEs: 'Certificado de peso patrón', labelEn: 'Standard weight certificate', sortOrder: 3, parentCode: 'preparativos', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
+  { code: 'prep_etiqueta_polipasto', labelEs: 'Etiqueta polipasto', labelEn: 'Hoist label', sortOrder: 3, parentCode: 'preparativos', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
+  { code: 'prep_certificado_peso', labelEs: 'Certificado de peso patrón', labelEn: 'Standard weight certificate', sortOrder: 4, parentCode: 'preparativos', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
 
   // ── Paso 2: Inspección Visual y mecánica ──────────────────────────────────
   { code: 'inspeccion_visual', labelEs: 'Inspección Visual y mecánica', labelEn: 'Visual and mechanical inspection', sortOrder: 10, parentCode: null, isStep: true, isGroup: false, isItem: false, itemType: null },
