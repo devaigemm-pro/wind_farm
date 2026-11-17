@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 389
-- **Última actualización**: 2026-11-04
+- **Sesiones analizadas**: 391
+- **Última actualización**: 2026-11-16
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -2936,3 +2936,21 @@
   - Causa: levanté el preview con nohup dentro de un comando de execute_bash; el proceso murió al terminar el comando. Afirmé que estaba corriendo sin comprobarlo después. Lección: levantar previews SOLO con control_bash_process y confirmar con lsof + curl antes de entregar la URL.
   - Reporte de una línea sin contexto; espera que arregle y confirme sin más preguntas.
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima, "se riguroso" (verificar que lo entregado funciona).
+
+### Sesión 390 - 2026-11-16
+- **Tarea principal**: "pasar a prod" tras el orden por arrastre de fotos seleccionadas y el botón Nueva campaña de reparación.
+- **Observaciones nuevas**:
+  - "pasar a prod" sin más contexto = desplegar todo lo pendiente en la branch de sesión, incluso cambios que no probó (el botón de campaña). Lo avisé en el reporte porque iba a prod sin su validación.
+  - Flujo: rebase, merge a main (255f4f2..9137909), push, vercel --prod, verificación del bundle. En el bundle los textos con acentos aparecen escapados; verificar con claves ASCII (ej. repairCampaign.new, report_order), no con el texto en español.
+  - Pendiente: probar en prod el botón (quote + campaña bajo RLS) y el orden en un PDF real.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, aprobación de deploy en 3 palabras.
+
+### Sesión 391 - 2026-11-16
+- **Tarea principal**: "aplicar este cambio a las certificaciones de polispasto, limpieza, reparacion e inspeccion" (el cambio = orden por arrastre de las fotos seleccionadas para el informe).
+- **Observaciones nuevas**:
+  - "este cambio" sin nombrarlo: resolví por contexto (era el último, el orden por arrastre; el botón de nueva campaña ya existía en limpieza/certificación). Funcionó, pero lo dije explícitamente en el reporte.
+  - Limpieza y polipastos son clones de la pantalla de reparación (mismas columnas, mismo drag, mismo metadata jsonb). Apliqué el mismo patrón: metadata.report_order, setReportOrder en el servicio, hook optimista, PDF ordena por report_order. Util compartido nuevo: src/utils/reportOrder.ts (byReportOrder).
+  - Reparación ya lo tenía. Inspección NO tiene el concepto "seleccionadas para el informe" (no hay selected_for_report), así que no lo apliqué y lo pregunté.
+  - ERROR atrapado antes de entregar: asumí la queryKey del árbol de polipastos ('hoist-tree') y la real es 'hoist-cert-tree'; con la mía la actualización optimista no habría hecho nada. Lección: copiar la queryKey del hook de lectura, no suponerla.
+  - Pendiente: probar en pantalla (sin login) y desplegar si dice "a prod".
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, "aplicar este cambio a X, Y, Z" = replicar patrón en pantallas hermanas.
