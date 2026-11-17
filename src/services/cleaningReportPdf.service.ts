@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { cleaningService } from '@/services/cleaning.service';
 import type { CleaningTree, CleaningZoneNode, CleaningPhoto } from '@/services/cleaning.service';
 import { getCleaningZoneLabel } from '@/constants/cleaning-zones';
+import { byReportOrder } from '@/utils/reportOrder';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -427,7 +428,7 @@ async function renderZoneSection(doc: jsPDF, zone: CleaningZoneNode, locale: 'es
 
   for (const row of rows) {
     const subLabel = zone.isLeaf ? null : row.zoneLabel;
-    const photos = [...row.photos].sort((a, b) => a.captureOrder - b.captureOrder);
+    const photos = [...row.photos].sort(byReportOrder);
     for (const photo of photos) {
       await renderPhotoBlock(doc, zone.zoneLabel, subLabel, photo);
     }

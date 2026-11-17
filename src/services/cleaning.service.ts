@@ -107,6 +107,9 @@ export interface CleaningPhoto {
   capturedAt: string | null;
   /** metadata.selected_for_report. */
   cleaningSelected: boolean;
+  /** Manual position in the report (metadata.report_order), set by dragging.
+   *  Null = never reordered (falls back to captureOrder). */
+  reportOrder: number | null;
   /** Resolved public URL of the full-size photo (for the lightbox). */
   url: string;
   /** Resolved public URL of the thumbnail (for the grid); falls back to url. */
@@ -183,6 +186,21 @@ function isSelectedForReport(metadata: unknown): boolean {
   return Boolean((obj as Record<string, unknown>).selected_for_report);
 }
 
+/** Manual position in the report (cleaning_photo.metadata.report_order), or null. */
+function reportOrderFromMetadata(metadata: unknown): number | null {
+  let obj: unknown = metadata;
+  if (typeof obj === 'string') {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const v = (obj as Record<string, unknown>).report_order;
+  const n = typeof v === 'number' ? v : Number(v);
+  return v != null && Number.isFinite(n) ? n : null;
+}
 /** Parse the photos[] value from a zone row into an array of raw photo objects. */
 function parsePhotosArray(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value as Record<string, unknown>[];
@@ -203,6 +221,7 @@ function mapPhoto(
   cleaningZoneId: string | null,
   zoneCode: string,
   selectedIds: Set<string>,
+  reportOrderById?: Map<string, number>,
 ): CleaningPhoto {
   const id = (raw.photo_id as string) ?? '';
   const storagePath = (raw.storage_path as string) ?? '';
@@ -219,6 +238,7 @@ function mapPhoto(
     captureOrder: Number(raw.capture_order) || 0,
     capturedAt: (raw.captured_at as string) ?? null,
     cleaningSelected: selectedIds.has(id),
+    reportOrder: reportOrderById?.get(id) ?? null,
     url,
     thumbnailUrl,
   };
@@ -245,10 +265,13 @@ async function fetchZonesForCampaign(campaignId: string): Promise<CleaningZoneRo
  * selected_for_report. Degrades gracefully to an empty set when the table
  * doesn't exist yet or errors.
  */
-async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+async function fetchPhotoReportMeta(
+  photoIds: string[],
+): Promise<{ selectedIds: Set<string>; reportOrderById: Map<string, number> }> {
   const selected = new Set<string>();
+  const reportOrderById = new Map<string, number>();
   const unique = [...new Set(photoIds.filter(Boolean))];
-  if (unique.length === 0) return selected;
+  if (unique.length === 0) return { selectedIds: selected, reportOrderById };
   try {
     // Chunk the .in('id', ...) query: a single request with hundreds of photo
     // ids overflows the PostgREST URL length limit and is rejected (HTTP 400).
@@ -262,11 +285,16 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
     });
     for (const r of rows) {
       if (isSelectedForReport(r.metadata)) selected.add(r.id as string);
+      const order = reportOrderFromMetadata(r.metadata);
+      if (order != null) reportOrderById.set(r.id as string, order);
     }
   } catch {
     /* table may not exist yet → treat all as unselected */
   }
-  return selected;
+  return { selectedIds: selected, reportOrderById };
+}
+async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+  return (await fetchPhotoReportMeta(photoIds)).selectedIds;
 }
 
 /** Collect all photo ids present across the zone rows. */
@@ -289,13 +317,14 @@ function buildLeafNode(
   code: string,
   rowsByCode: Map<string, CleaningZoneRow>,
   selectedIds: Set<string>,
+  reportOrderById?: Map<string, number>,
 ): CleaningZoneNode {
   const entry = CLEANING_ZONE_BY_CODE[code]!;
   const row = rowsByCode.get(code);
   const zoneId = (row?.cleaning_zone_id as string) ?? null;
   const photos = row
     ? parsePhotosArray(row.photos)
-        .map((p) => mapPhoto(p, zoneId, code, selectedIds))
+        .map((p) => mapPhoto(p, zoneId, code, selectedIds, reportOrderById))
         .sort((a, b) => a.captureOrder - b.captureOrder)
     : [];
   return {
@@ -316,7 +345,11 @@ function buildLeafNode(
  * yet / no photos), the tree is the empty catalog skeleton — the exact
  * graceful-degradation analog of repair's catalogStages().
  */
-function buildTree(zoneRows: CleaningZoneRow[], selectedIds: Set<string>): CleaningTree {
+function buildTree(
+  zoneRows: CleaningZoneRow[],
+  selectedIds: Set<string>,
+  reportOrderById?: Map<string, number>,
+): CleaningTree {
   const rowsByCode = new Map<string, CleaningZoneRow>();
   for (const row of zoneRows) {
     const code = (row.zone_code as string) ?? '';
@@ -326,11 +359,11 @@ function buildTree(zoneRows: CleaningZoneRow[], selectedIds: Set<string>): Clean
   return CLEANING_ROOT_ZONES.map((root) => {
     if (root.isLeaf) {
       // Hub / Torre: leaf root, photos attach directly.
-      return buildLeafNode(root.code, rowsByCode, selectedIds);
+      return buildLeafNode(root.code, rowsByCode, selectedIds, reportOrderById);
     }
     // Container root (Palas / Nacelle): no own photos, build its sub-zones.
     const children = getCleaningSubZones(root.code).map((sz) =>
-      buildLeafNode(sz.code, rowsByCode, selectedIds),
+      buildLeafNode(sz.code, rowsByCode, selectedIds, reportOrderById),
     );
     return {
       zoneId: null,
@@ -408,8 +441,8 @@ export const cleaningService = {
   async getCleaningTree(campaignId: string): Promise<CleaningTree> {
     const zoneRows = await fetchZonesForCampaign(campaignId);
     const photoIds = collectPhotoIds(zoneRows);
-    const selectedIds = await fetchSelectedPhotoIds(photoIds);
-    return buildTree(zoneRows, selectedIds);
+    const { selectedIds, reportOrderById } = await fetchPhotoReportMeta(photoIds);
+    return buildTree(zoneRows, selectedIds, reportOrderById);
   },
 
   /**
@@ -479,6 +512,39 @@ export const cleaningService = {
       .update({ metadata })
       .eq('id', photoId);
     if (error) throw new CleaningServiceError(error.message, error.code);
+  },
+
+  /**
+   * Persist the manual order of the photos selected for the report. The array
+   * is the desired order (first = first in the report); each photo gets
+   * metadata.report_order = its index (metadata is read first and merged so
+   * selected_for_report and other keys are preserved). The PDF sorts the
+   * selected photos of each zone by this value.
+   */
+  async setReportOrder(orderedPhotoIds: string[]): Promise<void> {
+    const ids = [...new Set(orderedPhotoIds.filter(Boolean))];
+    if (ids.length === 0) return;
+    const { data: rows, error: readErr } = await db
+      .from('cleaning_photo')
+      .select('id, metadata')
+      .in('id', ids);
+    if (readErr) throw new CleaningServiceError(readErr.message, readErr.code);
+    const metaById = new Map<string, Record<string, unknown>>(
+      ((rows as Array<{ id: string; metadata: unknown }>) ?? []).map((r) => [
+        r.id,
+        (r.metadata && typeof r.metadata === 'object' ? r.metadata : {}) as Record<string, unknown>,
+      ]),
+    );
+    const results = await Promise.all(
+      ids.map((id, index) =>
+        db
+          .from('cleaning_photo')
+          .update({ metadata: { ...(metaById.get(id) ?? {}), report_order: index } })
+          .eq('id', id),
+      ),
+    );
+    const failed = results.find((r: { error: { message: string; code?: string } | null }) => r.error);
+    if (failed?.error) throw new CleaningServiceError(failed.error.message, failed.error.code);
   },
 
   /**

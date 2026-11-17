@@ -23,9 +23,11 @@ import {
   useHoistTree,
   useSetHoistPhotoSelected,
   useMoveHoistPhoto,
+  useReorderHoistReportPhotos,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel } from '@/constants/hoist-certification-steps';
+import { byReportOrder } from '@/utils/reportOrder';
 import type {
   HoistPhoto,
   HoistStepNode,
@@ -60,6 +62,7 @@ export function HoistCertificationWorkflow() {
   const { data: tree, isLoading: treeLoading } = useHoistTree(campaignId);
   const setSelected = useSetHoistPhotoSelected(campaignId);
   const movePhoto = useMoveHoistPhoto(campaignId);
+  const reorderReport = useReorderHoistReportPhotos(campaignId);
 
   const [lightbox, setLightbox] = useState<HoistPhoto | null>(null);
   const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
@@ -104,6 +107,16 @@ export function HoistCertificationWorkflow() {
             return next;
           }),
       },
+    );
+  };
+
+  // Persist the dragged order of the photos selected for the report (inside an
+  // item). Read-only for client. The optimistic update lives in the hook.
+  const handleReorderSelected = (orderedIds: string[]) => {
+    if (isClient) return;
+    reorderReport.mutate(
+      { orderedIds },
+      { onError: (err) => toast.error((err as Error)?.message || t('hoist.reorderError')) },
     );
   };
 
@@ -191,6 +204,7 @@ export function HoistCertificationWorkflow() {
                 pendingPhotoIds={pendingPhotoIds}
                 onSelect={handleSelect}
                 onMovePhoto={isClient ? undefined : handleMovePhoto}
+                onReorderSelected={isClient ? undefined : handleReorderSelected}
                 onPreview={handlePreview}
               />
             ))}
@@ -262,6 +276,8 @@ interface StepSectionProps {
     targetItemId: string | null,
     targetItemCode: string,
   ) => void;
+  /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
+  onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: HoistPhoto) => void;
 }
 
@@ -282,6 +298,7 @@ function StepSection({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onReorderSelected,
   onPreview,
 }: StepSectionProps) {
   const [open, setOpen] = useState(false);
@@ -311,6 +328,7 @@ function StepSection({
       pendingPhotoIds={pendingPhotoIds}
       onSelect={onSelect}
       onMovePhoto={onMovePhoto}
+      onReorderSelected={onReorderSelected}
       onPreview={onPreview}
       hoverTargetKey={hoverTargetKey}
       setHoverTargetKey={setHoverTargetKey}
@@ -360,6 +378,8 @@ interface ItemRowProps {
     targetItemId: string | null,
     targetItemCode: string,
   ) => void;
+  /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
+  onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: HoistPhoto) => void;
   hoverTargetKey: string | null;
   setHoverTargetKey: (key: string | null) => void;
@@ -381,12 +401,15 @@ function ItemRow({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onReorderSelected,
   onPreview,
   hoverTargetKey,
   setHoverTargetKey,
 }: ItemRowProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
+  // Selected-for-report card currently hovered while reordering by drag.
+  const [overId, setOverId] = useState<string | null>(null);
   const thisKey = item.itemId ?? item.itemCode;
   const hasPhotos = item.itemType === 'photo' || item.itemType === 'measurement';
   const itemDropActive = hoverTargetKey != null && hoverTargetKey === thisKey;
@@ -403,7 +426,7 @@ function ItemRow({
 
   const photos = item.photos;
   const available = photos.filter((p) => !p.hoistSelected);
-  const selected = photos.filter((p) => p.hoistSelected);
+  const selected = photos.filter((p) => p.hoistSelected).sort(byReportOrder);
 
   // A photo-bearing item can RECEIVE a moved photo whenever writable.
   const canReceiveMove = hasPhotos && !readOnly && !!onMovePhoto;
@@ -413,6 +436,35 @@ function ItemRow({
     return origin !== item.itemCode;
   };
 
+  // ── Reorder the selected-for-report photos by dragging (same item) ──────────
+  const canReorder = hasPhotos && !readOnly && !!onReorderSelected;
+  const isReorderDrag = (e: React.DragEvent) =>
+    canReorder && !!dragId && selected.some((p) => p.id === dragId) && !isForeignDrag(e);
+  const endDrag = () => {
+    setDragId(null);
+    setOverId(null);
+  };
+  const handleCardDragOver = (e: React.DragEvent, targetId: string) => {
+    // Not a reorder (e.g. a photo from the left column) → bubble to the column.
+    if (!isReorderDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (overId !== targetId) setOverId(targetId);
+  };
+  const handleCardDrop = (e: React.DragEvent, targetId: string) => {
+    if (!isReorderDrag(e) || !dragId || !onReorderSelected) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const ids = selected.map((p) => p.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    endDrag();
+    if (from < 0 || to < 0 || from === to) return;
+    // The dragged photo takes the position of the one it was dropped on.
+    ids.splice(to, 0, ids.splice(from, 1)[0]!);
+    onReorderSelected(ids);
+  };
   const TypeIcon =
     item.itemType === 'check' ? Check : item.itemType === 'measurement' ? Ruler : Camera;
 
@@ -485,7 +537,7 @@ function ItemRow({
                     pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
-                    onDragEnd={() => setDragId(null)}
+                    onDragEnd={endDrag}
                     action="add"
                     actionLabel={t('hoist.select')}
                     onAction={() => onSelect(photo, true)}
@@ -543,12 +595,15 @@ function ItemRow({
                     pending={pendingPhotoIds.has(photo.id)}
                     readOnly={readOnly}
                     onDragStart={() => setDragId(photo.id)}
-                    onDragEnd={() => setDragId(null)}
+                    onDragEnd={endDrag}
                     action="remove"
                     actionLabel={t('hoist.remove')}
                     onAction={() => onSelect(photo, false)}
                     onPreview={() => onPreview(photo)}
                     selected
+                    dropOver={overId === photo.id && dragId !== photo.id}
+                    onCardDragOver={canReorder ? (e) => handleCardDragOver(e, photo.id) : undefined}
+                    onCardDrop={canReorder ? (e) => handleCardDrop(e, photo.id) : undefined}
                   />
                 ))
               )}
@@ -623,6 +678,10 @@ interface PhotoCardProps {
   onDragEnd: () => void;
   onAction: () => void;
   onPreview: () => void;
+  /** Highlight as the reorder drop target (selected-for-report column). */
+  dropOver?: boolean;
+  onCardDragOver?: (e: React.DragEvent) => void;
+  onCardDrop?: (e: React.DragEvent) => void;
 }
 
 function PhotoCard({
@@ -638,10 +697,20 @@ function PhotoCard({
   onDragEnd,
   onAction,
   onPreview,
+  dropOver,
+  onCardDragOver,
+  onCardDrop,
 }: PhotoCardProps) {
   const interactive = !readOnly && !pending;
   return (
-    <div style={photoCardWrap}>
+    <div
+      style={{
+        ...photoCardWrap,
+        ...(dropOver ? { outline: `2px dashed ${C.brand}`, outlineOffset: 2, borderRadius: 8 } : {}),
+      }}
+      onDragOver={onCardDragOver}
+      onDrop={onCardDrop}
+    >
       <div
         draggable={interactive}
         onDragStart={

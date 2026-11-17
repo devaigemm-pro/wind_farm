@@ -97,6 +97,47 @@ export function useSetCleaningPhotoSelected(campaignId: string | undefined) {
 }
 
 /**
+ * Persist the manual order of the photos selected for the report (drag to
+ * reorder inside the "selected for report" column). Optimistically rewrites
+ * photo.reportOrder in the cached tree, with rollback on error. Same pattern as
+ * useSetCleaningPhotoSelected: the tree is only marked stale (no refetch).
+ */
+export function useReorderCleaningReportPhotos(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderedIds }: { orderedIds: string[] }) =>
+      cleaningService.setReportOrder(orderedIds),
+    onMutate: async ({ orderedIds }) => {
+      const treeKey = ['cleaning-tree', campaignId];
+      await queryClient.cancelQueries({ queryKey: treeKey });
+      const prev = queryClient.getQueryData<CleaningTree>(treeKey);
+      if (prev) {
+        const indexById = new Map(orderedIds.map((id, i) => [id, i]));
+        const next = mapLeaves(prev, (node) => ({
+          ...node,
+          photos: node.photos.map((photo) =>
+            indexById.has(photo.id) ? { ...photo, reportOrder: indexById.get(photo.id)! } : photo,
+          ),
+        }));
+        queryClient.setQueryData(treeKey, next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['cleaning-tree', campaignId], context.prev);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['cleaning-tree', campaignId],
+        refetchType: 'none',
+      });
+    },
+  });
+}
+
+/**
  * Move a photo to a DIFFERENT zone/sub-zone (fixing a wrong-zone upload).
  * Optimistically moves the photo from its origin zone's photos[] to the target
  * zone's photos[] in the cached tree so it jumps columns instantly, with

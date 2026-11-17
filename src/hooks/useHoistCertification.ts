@@ -56,6 +56,47 @@ function mapItems(
 }
 
 /**
+ * Persist the manual order of the photos selected for the report (drag to
+ * reorder inside the "selected for report" column). Optimistically rewrites
+ * photo.reportOrder in the cached tree, with rollback on error. Same pattern as
+ * useSetHoistPhotoSelected: the tree is only marked stale (no refetch).
+ */
+export function useReorderHoistReportPhotos(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderedIds }: { orderedIds: string[] }) =>
+      hoistCertificationService.setReportOrder(orderedIds),
+    onMutate: async ({ orderedIds }) => {
+      const treeKey = ['hoist-cert-tree', campaignId];
+      await queryClient.cancelQueries({ queryKey: treeKey });
+      const prev = queryClient.getQueryData<HoistTree>(treeKey);
+      if (prev) {
+        const indexById = new Map(orderedIds.map((id, i) => [id, i]));
+        const next = mapItems(prev, (node) => ({
+          ...node,
+          photos: node.photos.map((photo) =>
+            indexById.has(photo.id) ? { ...photo, reportOrder: indexById.get(photo.id)! } : photo,
+          ),
+        }));
+        queryClient.setQueryData(treeKey, next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['hoist-cert-tree', campaignId], context.prev);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['hoist-cert-tree', campaignId],
+        refetchType: 'none',
+      });
+    },
+  });
+}
+
+/**
  * Toggle a photo's selection for the report (persisted in
  * hoist_cert_photo.metadata.selected_for_report), then refresh tree + summary.
  * Optimistically flips the photo's selection so it moves between columns instantly

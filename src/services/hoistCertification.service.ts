@@ -129,6 +129,9 @@ export interface HoistPhoto {
   capturedAt: string | null;
   /** metadata.selected_for_report. */
   hoistSelected: boolean;
+  /** Manual position in the report (metadata.report_order), set by dragging.
+   *  Null = never reordered (falls back to captureOrder). */
+  reportOrder: number | null;
   /** Resolved public URL of the full-size photo (for the lightbox). */
   url: string;
   /** Resolved public URL of the thumbnail (for the grid); falls back to url. */
@@ -258,12 +261,28 @@ function parsePhotosArray(value: unknown): Record<string, unknown>[] {
   return [];
 }
 
+/** Manual position in the report (hoist_cert_photo.metadata.report_order), or null. */
+function reportOrderFromMetadata(metadata: unknown): number | null {
+  let obj: unknown = metadata;
+  if (typeof obj === 'string') {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const v = (obj as Record<string, unknown>).report_order;
+  const n = typeof v === 'number' ? v : Number(v);
+  return v != null && Number.isFinite(n) ? n : null;
+}
 /** Map a raw photo object (from the RPC photos[] array) to a HoistPhoto. */
 function mapPhoto(
   raw: Record<string, unknown>,
   hoistItemId: string | null,
   itemCode: string,
   selectedIds: Set<string>,
+  reportOrderById?: Map<string, number>,
 ): HoistPhoto {
   const id = (raw.photo_id as string) ?? '';
   const storagePath = (raw.storage_path as string) ?? '';
@@ -280,6 +299,7 @@ function mapPhoto(
     captureOrder: Number(raw.capture_order) || 0,
     capturedAt: (raw.captured_at as string) ?? null,
     hoistSelected: selectedIds.has(id),
+    reportOrder: reportOrderById?.get(id) ?? null,
     url,
     thumbnailUrl,
   };
@@ -306,10 +326,13 @@ async function fetchItemsForCampaign(campaignId: string): Promise<HoistItemRow[]
  * is selected_for_report. Degrades gracefully to an empty set when the table
  * doesn't exist yet or errors.
  */
-async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+async function fetchPhotoReportMeta(
+  photoIds: string[],
+): Promise<{ selectedIds: Set<string>; reportOrderById: Map<string, number> }> {
   const selected = new Set<string>();
+  const reportOrderById = new Map<string, number>();
   const unique = [...new Set(photoIds.filter(Boolean))];
-  if (unique.length === 0) return selected;
+  if (unique.length === 0) return { selectedIds: selected, reportOrderById };
   try {
     // Chunk the .in('id', ...) query: a single request with hundreds of photo
     // ids overflows the PostgREST URL length limit and is rejected (HTTP 400).
@@ -323,11 +346,16 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
     });
     for (const r of rows) {
       if (isSelectedForReport(r.metadata)) selected.add(r.id as string);
+      const order = reportOrderFromMetadata(r.metadata);
+      if (order != null) reportOrderById.set(r.id as string, order);
     }
   } catch {
     /* table may not exist yet → treat all as unselected */
   }
-  return selected;
+  return { selectedIds: selected, reportOrderById };
+}
+async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+  return (await fetchPhotoReportMeta(photoIds)).selectedIds;
 }
 
 /** Collect all photo ids present across the item rows. */
@@ -366,13 +394,14 @@ function buildItemNode(
   code: string,
   rowsByCode: Map<string, HoistItemRow>,
   selectedIds: Set<string>,
+  reportOrderById?: Map<string, number>,
 ): HoistItemNode {
   const entry = HOIST_CERT_BY_CODE[code]!;
   const row = rowsByCode.get(code);
   const itemId = (row?.hoist_item_id as string) ?? null;
   const photos = row
     ? parsePhotosArray(row.photos)
-        .map((p) => mapPhoto(p, itemId, code, selectedIds))
+        .map((p) => mapPhoto(p, itemId, code, selectedIds, reportOrderById))
         .sort((a, b) => a.captureOrder - b.captureOrder)
     : [];
   return {
@@ -395,7 +424,11 @@ function buildItemNode(
  * shipped yet / no data), the tree is the empty catalog skeleton — the exact
  * graceful-degradation analog of cleaning's empty zone catalog.
  */
-function buildTree(itemRows: HoistItemRow[], selectedIds: Set<string>): HoistTree {
+function buildTree(
+  itemRows: HoistItemRow[],
+  selectedIds: Set<string>,
+  reportOrderById?: Map<string, number>,
+): HoistTree {
   const rowsByCode = new Map<string, HoistItemRow>();
   for (const row of itemRows) {
     const code = (row.item_code as string) ?? '';
@@ -417,7 +450,7 @@ function buildTree(itemRows: HoistItemRow[], selectedIds: Set<string>): HoistTre
           groupLabel: g.labelEs,
           sortOrder: g.sortOrder,
           items: getHoistItems(g.code).map((it) =>
-            buildItemNode(it.code, rowsByCode, selectedIds),
+            buildItemNode(it.code, rowsByCode, selectedIds, reportOrderById),
           ),
         })),
       };
@@ -429,7 +462,7 @@ function buildTree(itemRows: HoistItemRow[], selectedIds: Set<string>): HoistTre
       sortOrder: step.sortOrder,
       hasGroups: false,
       items: getHoistItems(step.code).map((it) =>
-        buildItemNode(it.code, rowsByCode, selectedIds),
+        buildItemNode(it.code, rowsByCode, selectedIds, reportOrderById),
       ),
       groups: [],
     };
@@ -510,8 +543,8 @@ export const hoistCertificationService = {
   async getHoistTree(campaignId: string): Promise<HoistTree> {
     const itemRows = await fetchItemsForCampaign(campaignId);
     const photoIds = collectPhotoIds(itemRows);
-    const selectedIds = await fetchSelectedPhotoIds(photoIds);
-    return buildTree(itemRows, selectedIds);
+    const { selectedIds, reportOrderById } = await fetchPhotoReportMeta(photoIds);
+    return buildTree(itemRows, selectedIds, reportOrderById);
   },
 
   /**
@@ -589,6 +622,41 @@ export const hoistCertificationService = {
       .update({ metadata })
       .eq('id', photoId);
     if (error) throw new HoistCertificationServiceError(error.message, error.code);
+  },
+
+  /**
+   * Persist the manual order of the photos selected for the report. The array
+   * is the desired order (first = first in the report); each photo gets
+   * metadata.report_order = its index (metadata is read first and merged so
+   * selected_for_report and other keys are preserved). The PDF sorts the
+   * selected photos of each item by this value.
+   */
+  async setReportOrder(orderedPhotoIds: string[]): Promise<void> {
+    const ids = [...new Set(orderedPhotoIds.filter(Boolean))];
+    if (ids.length === 0) return;
+    const { data: rows, error: readErr } = await db
+      .from('hoist_cert_photo')
+      .select('id, metadata')
+      .in('id', ids);
+    if (readErr) throw new HoistCertificationServiceError(readErr.message, readErr.code);
+    const metaById = new Map<string, Record<string, unknown>>(
+      ((rows as Array<{ id: string; metadata: unknown }>) ?? []).map((r) => [
+        r.id,
+        (r.metadata && typeof r.metadata === 'object' ? r.metadata : {}) as Record<string, unknown>,
+      ]),
+    );
+    const results = await Promise.all(
+      ids.map((id, index) =>
+        db
+          .from('hoist_cert_photo')
+          .update({ metadata: { ...(metaById.get(id) ?? {}), report_order: index } })
+          .eq('id', id),
+      ),
+    );
+    const failed = results.find((r: { error: { message: string; code?: string } | null }) => r.error);
+    if (failed?.error) {
+      throw new HoistCertificationServiceError(failed.error.message, failed.error.code);
+    }
   },
 
   /**
