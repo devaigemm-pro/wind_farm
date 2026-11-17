@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 391
+- **Sesiones analizadas**: 396
 - **Última actualización**: 2026-11-16
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -106,6 +106,12 @@
 - **labels/nombres de etapas viven en la DB, no en el front** — en la pantalla de repairs (/repairs/:id), el nombre de cada etapa se lee de la columna `stage_label` de la tabla `repair_stage` vía la RPC `get_repair_photos_by_stage`, NO del catálogo del front (`src/constants/repair-stages.ts`). Para renombrar una etapa visible hay que: UPDATE a `repair_stage` (filas existentes, por `stage_code`), UPDATE a `repair_stage_catalog` (code/label) para repairs nuevos, y actualizar el constant del front (fallback/coherencia). El cambio queda vivo en prod SIN redeploy porque el label se lee en runtime desde la DB. SIEMPRE verificar el origen de un dato mostrado (DB vs código) antes de editar: cambiar solo el front no habría tenido efecto.
 
 - **previews se levantan SOLO con control_bash_process** — un `nohup ... &` dentro de execute_bash muere al terminar el comando y deja el localhost caído (el usuario reportó "no levanta localhost"). Levantar con control_bash_process y confirmar con `lsof -i :PUERTO` + `curl` (HTTP 200) ANTES de entregar la URL. No afirmar que un servidor corre sin haberlo comprobado.
+
+- **preview independiente: python3 start_new_session** — ni `nohup &` ni `control_bash_process` sobreviven entre turnos (el usuario reportó dos veces "está abajo el local"). Levantarlo con `python3 -c` + `subprocess.Popen(["npx","vite","preview","--port","4173","--host","127.0.0.1"], start_new_session=True, stdin=DEVNULL, stdout=log, stderr=log)` y comprobar en un comando APARTE con `lsof -i :4173` + `curl` (HTTP 200). Al empezar cada turno que entregue una URL de local, re-verificar que sigue arriba antes de mencionarla. Esto reemplaza la regla anterior de usar control_bash_process.
+
+- **(OBSOLETA, ver launchd abajo) ningún proceso que yo levante sobrevive al turno** — ni nohup, ni control_bash_process, ni python start_new_session (confirmado 3 veces: el usuario reporta "está abajo el local"). No prometer que el preview queda arriba. Levantarlo, verificarlo con curl DENTRO del turno, y darle al usuario el comando exacto para levantarlo él: `pnpm run preview -- --port 4173` (o `npx vite preview --port 4173`) tras `npx vite build`. Esto corrige las dos reglas de preview anteriores.
+
+- **preview con launchctl submit** — única forma que sobrevive entre turnos: `launchctl submit -l com.windfarm.preview -o /tmp/preview-launchd.log -e /tmp/preview-launchd.err -- /bin/zsh -c "cd <repo> && exec /usr/local/bin/node node_modules/vite/bin/vite.js preview --port 4173 --host 127.0.0.1"` (si ya existe: `launchctl remove com.windfarm.preview` antes). Verificar en un comando aparte con lsof + curl. NO darle al usuario el comando para que lo corra él: espera el local arriba. Tras cada `vite build` el preview sirve el dist nuevo sin reiniciar. Detener: `launchctl remove com.windfarm.preview`.
 
 ## 8. Historial de Observaciones por Sesión
 
@@ -2954,3 +2960,45 @@
   - ERROR atrapado antes de entregar: asumí la queryKey del árbol de polipastos ('hoist-tree') y la real es 'hoist-cert-tree'; con la mía la actualización optimista no habría hecho nada. Lección: copiar la queryKey del hook de lectura, no suponerla.
   - Pendiente: probar en pantalla (sin login) y desplegar si dice "a prod".
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima, "aplicar este cambio a X, Y, Z" = replicar patrón en pantallas hermanas.
+
+### Sesión 392 - 2026-11-16
+- **Tarea principal**: "pasar a prod" del orden por arrastre en limpieza y certificación de polipastos (reparación ya estaba en prod).
+- **Observaciones nuevas**:
+  - Interrumpió mi mensaje anterior (que preguntaba por inspección) y fue directo a "pasar a prod": prefiere desplegar lo que ya está hecho antes que resolver la duda de inspección. Inspección queda sin tocar y sin respuesta suya.
+  - Flujo: tsc, rebase, merge a main (9137909..f9ca07d), push, vercel --prod. Verificado en el bundle de prod con claves ASCII: report_order x6 en el chunk index (servicios de limpieza y polipastos) y x1 en RepairWorkflow; claves cleaning/hoist/repair.reorderError presentes.
+  - Pendiente: probar en pantalla (sin login válido, no lo vi) y generar un PDF para ver el orden.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, aprobación de deploy en 3 palabras, interrumpe para redirigir.
+
+### Sesión 393 - 2026-11-16
+- **Tarea principal**: En /admin/assets, que cada parque tenga un document manager asociado al crearlo, con una lista seleccionable que incluya a "Victor Hugo Cayola".
+- **Observaciones nuevas**:
+  - Continuidad de la sesión anterior: ya había pedido cambiar manager_name a Victor Hugo Cayola en todos los parques; ahora pide que sea un dato elegible al crear el parque (dato de DB sin UI hasta ahora).
+  - Decisión: lista en una constante (src/constants/document-managers.ts) en vez de una tabla nueva, porque no tengo acceso DDL a la DB (token del CLI inválido). Para agregar otra persona hay que editar la constante y desplegar; lo dije en el reporte.
+  - La RPC create_wind_farm no recibe manager: el servicio actualiza manager_name/manager_role justo después de crear. Obligatorio en el formulario (crear y editar).
+  - Levanté el preview con control_bash_process y lo comprobé con lsof+curl antes de entregar (regla aprendida en la sesión 389).
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, URL exacta como referencia, funcionalidad descrita en términos de UX.
+
+### Sesión 394 - 2026-11-16
+- **Tarea principal**: "no está arriba el local" (preview caído) y luego: poder subir la firma del document manager y que los reportes se generen con esa firma.
+- **Observaciones nuevas**:
+  - El preview levantado con control_bash_process también muere entre turnos (no hay proceso vite al volver). Solución que sí sobrevive: python3 + subprocess.Popen(start_new_session=True, stdout a /tmp/preview-4173.log) y comprobar en un comando aparte. Es la 2da vez que el usuario reporta el local caído: dejar siempre el preview así y re-verificar con lsof+curl antes de decir que está arriba.
+  - Firma: una imagen POR document manager (no por parque), guardada en asset-documents/signatures/document-managers/<slug>.png (bucket privado, sin DDL); se sube desde el formulario del parque; el PDF de reparación la dibuja sobre la línea de firma (si no hay, queda en blanco como antes). Solo el informe de reparación tiene página de firma; limpieza y polipastos no.
+  - Probé el cálculo de la ruta y el dibujado con jsPDF en node (PNG 300x100 → 90x30mm sobre la línea). No pude probar los permisos de storage con un usuario real (sin login válido); lo avisé.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, interrumpe para agregar un pedido nuevo, "se riguroso" (probar la lógica antes de reportar).
+
+### Sesión 395 - 2026-11-16
+- **Tarea principal**: "en public dejé victor-hugo-cayola.png": el usuario dejó la firma como archivo estático en public/ en vez de subirla por el formulario.
+- **Observaciones nuevas**:
+  - Interpretación: que el informe use ese archivo. Lo implementé como RESPALDO de la firma subida por la UI (la subida tiene prioridad; si no hay, public/<slug>.png). Probablemente el usuario evitó el flujo de subida (permisos de storage sin verificar) y prefiere el camino simple de archivo en el repo. Si vuelve a pasar, considerar hacer el archivo estático la vía principal.
+  - Vercel responde 200 text/html a cualquier ruta inexistente (rewrite al index): para detectar si un archivo en public/ existe hay que validar Content-Type image/*, no solo response.ok. Verificado con curl (real: image/png; falso: text/html).
+  - Hallazgo clave: jsPDF guarda los PNG descomprimidos; la firma real (2828x1069 RGBA, 214 KB) hacía el PDF de 12 MB (riesgo del límite 413 al subir el informe). Se baja a JPEG de 800 px sobre fondo blanco en canvas: 24 KB. Regla: nunca meter un PNG grande directo a jsPDF; reducir vía canvas.
+  - CORRECCIÓN a mi regla anterior: ni siquiera start_new_session sobrevive al fin del turno (el preview volvió a caerse). Solución real: levantarlo y verificarlo DENTRO del turno, y darle al usuario el comando para levantarlo él (pnpm run preview -- --port 4173) en vez de prometer que queda arriba.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima (una frase = decisión tomada), aporta archivos al repo directamente, "se riguroso" (medí el tamaño real del PDF).
+
+### Sesión 396 - 2026-11-16
+- **Tarea principal**: "está abajo el local" (tercera vez; la anterior le di un comando para que lo levante él y no lo hizo).
+- **Observaciones nuevas**:
+  - El usuario NO quiere correr el comando él: espera que el local esté arriba cuando abre el navegador. Darle el comando como salida fue la respuesta equivocada; tiene que quedar arriba.
+  - Solución que sí funciona: trabajo de launchd, fuera del árbol de procesos de la herramienta: launchctl submit -l com.windfarm.preview -o /tmp/preview-launchd.log -e /tmp/preview-launchd.err -- /bin/zsh -c 'cd <repo> && exec /usr/local/bin/node node_modules/vite/bin/vite.js preview --port 4173 --host 127.0.0.1'. Verificado en un comando aparte (pid vivo, HTTP 200). Detener: launchctl remove com.windfarm.preview.
+  - Como sirve dist/ desde disco, después de cada npx vite build el preview ya muestra el build nuevo sin reiniciar.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, espera resultado entregado y no instrucciones para hacerlo él.
