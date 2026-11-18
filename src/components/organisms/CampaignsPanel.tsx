@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
 import { Skeleton } from '@/components/atoms';
 import { useLanguage } from '@/components/design-system';
@@ -28,6 +29,7 @@ export function CampaignsPanel({
   campaigns, isLoading, windFarmId, onViewResults, onSubassetClick, onInspectionClick, onEditCampaign, onDeleteCampaign, canCreate = true, filterBySubasset, onClearFilter,
 }: CampaignsPanelProps) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<
     'inspection' | 'repair' | 'cleaning' | 'hoist_certification'
   >('inspection');
@@ -93,6 +95,21 @@ export function CampaignsPanel({
         </button>
       </div>
 
+      {/* Create a new inspection campaign — only on the Inspección tab, for users
+          who can create campaigns. An inspection campaign needs turbines, method
+          and date, so this opens the existing "new inspection" form with this
+          wind farm preselected (same destination as "Plan inspection"); that
+          form returns here once the campaign is created. */}
+      {activeTab === 'inspection' && canCreate && windFarmId && (
+        <div style={createBarStyle}>
+          <button
+            style={createBtnStyle}
+            onClick={() => navigate(`/inspections/new?windFarm=${windFarmId}`)}
+          >
+            <Plus size={14} /> {t('inspectionCampaign.new')}
+          </button>
+        </div>
+      )}
       {/* Create a new repair campaign (selector modal) — only on the
           Reparación tab, for users who can create campaigns. */}
       {activeTab === 'repair' && canCreate && windFarmId && (

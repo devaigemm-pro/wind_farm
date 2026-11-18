@@ -278,6 +278,7 @@ export const translations: TranslationMap = {
   // ─── Campaign Results ───────────────────────────────────────────────────────
   'campaign.typeInspection': { en: 'Inspection', es: 'Inspección' },
   'campaign.typeRepair': { en: 'Repair', es: 'Reparación' },
+  'inspectionCampaign.new': { en: 'New inspection campaign', es: 'Nueva campaña de inspección' },
   'repairCampaign.new': { en: 'New repair campaign', es: 'Nueva campaña de reparación' },
   'repairCampaign.turbine': { en: 'Turbine', es: 'Turbina' },
   'repairCampaign.selectTurbine': { en: 'Select a turbine', es: 'Selecciona una turbina' },
