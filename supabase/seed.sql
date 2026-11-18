@@ -51,8 +51,17 @@ begin
   select id into v_user from profiles limit 1;  -- may be NULL
 
   -- Wind farm + turbine + blades.
-  insert into wind_farm (name, location) values ('PE Demo Local', 'Región Demo, Chile')
+  -- manager_name/manager_role = the "Document manager" that signs the repair
+  -- report (same value production uses).
+  insert into wind_farm (name, location, manager_name, manager_role)
+    values ('PE Demo Local', 'Región Demo, Chile', 'Victor Hugo Cayola', 'Document Manager')
     returning id into v_wf;
+  -- A user only SEES a farm if it has a wind_farm_user row (user_can_access_farm),
+  -- even an admin. Without this the local admin logs in to an empty screen.
+  if v_user is not null then
+    insert into wind_farm_user (user_id, wind_farm_id) values (v_user, v_wf)
+      on conflict do nothing;
+  end if;
   insert into turbine (wind_farm_id, name, model, serial_number, power_kw, powering_date)
     values (v_wf, 'WTG-DEMO-01', 'Gamesa G114', 'SN-DEMO-01', 2000, now() - interval '3 years')
     returning id into v_turbine;
@@ -136,3 +145,34 @@ begin
   raise notice 'Seed demo local completado: wf=% turbine=% repair=% cleaning=% hoist=%',
     v_wf, v_turbine, v_camp_rep, v_camp_cln, v_camp_hoi;
 end $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Repair stage catalog (21 stages) — production has it filled, a schema-only
+-- clone does not. Only inserted when the table is empty. Labels mirror
+-- src/constants/repair-stages.ts (e.g. 'Aplicación de pintura', not
+-- 'Aplicación de pintura primera mano').
+-- ─────────────────────────────────────────────────────────────────────────────
+insert into repair_stage_catalog (code, label, sort_order, optional)
+select * from (values
+  ('etiqueta', 'Etiqueta', 1, false),
+  ('analisis_falla', 'Análisis de daño', 2, false),
+  ('saneado', 'Saneado', 3, false),
+  ('lam_int', 'Laminación interior', 4, true),
+  ('lam_int_vacio', 'Sistema de vacío', 5, true),
+  ('lam_int_manta', 'Manta térmica inicio postcurado', 6, true),
+  ('lam_int_resultado', 'Resultado postcurado laminación', 7, true),
+  ('lam_int_ajuste', 'Ajuste de laminación interior', 8, true),
+  ('nucleo', 'Instalación de núcleo', 9, true),
+  ('nucleo_vacio', 'Sistema de vacío', 10, true),
+  ('nucleo_manta', 'Manta térmica inicio post-curado', 11, true),
+  ('nucleo_resultado', 'Resultado post-curado núcleo', 12, true),
+  ('nucleo_ajuste', 'Ajuste de núcleo', 13, true),
+  ('laminacion', 'Laminación exterior', 14, false),
+  ('sistema_vacio', 'Sistema de vacío', 15, false),
+  ('manta_termica', 'Manta térmica inicio postcurado', 16, false),
+  ('resultado_laminacion', 'Resultado de laminación', 17, false),
+  ('ajuste_post_laminado', 'Ajustado de superficie post laminado', 18, false),
+  ('aplicacion_filler', 'Aplicación de filler', 19, false),
+  ('ajuste_post_filler', 'Ajustado de superficie post filler', 20, false),
+  ('pintura_primera_mano', 'Aplicación de pintura', 21, false)) as v(code, label, sort_order, optional)
+where not exists (select 1 from repair_stage_catalog);
