@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/atoms/Skeleton';
 import { EmptyState } from '@/components/molecules';
 import {
   ConfirmDialog,
+  DeleteWindFarmDialog,
+  windFarmDeleteErrorMessage,
   WindFarmForm,
   TurbineForm,
   BladeForm,
@@ -178,13 +180,13 @@ export const AssetsAdmin = () => {
     try {
       if (toDelete.kind === 'farm') {
         await deleteFarm.mutateAsync(toDelete.item.id);
-        toast.success(t('assetsAdmin.farmDeleted'));
+        toast.success(t('deleteFarm.deleted'));
       } else {
         await deleteTurbine.mutateAsync(toDelete.item.id);
         toast.success(t('assetsAdmin.turbineDeleted'));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('assetsAdmin.deleteFailed'));
+      toast.error(windFarmDeleteErrorMessage(err, t));
     } finally {
       setToDelete(null);
     }
@@ -305,8 +307,17 @@ export const AssetsAdmin = () => {
         </Modal>
       )}
 
+      {/* Wind farm: shows what will be deleted with it and asks to type the name. */}
+      <DeleteWindFarmDialog
+        open={toDelete?.kind === 'farm'}
+        farmId={toDelete?.kind === 'farm' ? toDelete.item.id : null}
+        farmName={toDelete?.kind === 'farm' ? toDelete.item.name : ''}
+        deleting={deleteFarm.isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setToDelete(null)}
+      />
       <ConfirmDialog
-        open={!!toDelete}
+        open={toDelete?.kind === 'turbine'}
         title={toDelete?.kind === 'turbine' ? t('assetsAdmin.deleteTurbine') : t('assetsAdmin.deleteFarm')}
         message={
           toDelete?.kind === 'turbine'

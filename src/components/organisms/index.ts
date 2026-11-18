@@ -12,6 +12,8 @@ export type { LayoutProps } from './Layout';
 
 export { ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogProps } from './ConfirmDialog';
+export { DeleteWindFarmDialog, windFarmDeleteErrorMessage } from './DeleteWindFarmDialog';
+export type { DeleteWindFarmDialogProps } from './DeleteWindFarmDialog';
 
 export { ToastContainer } from './ToastContainer';
 
