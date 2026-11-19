@@ -16,6 +16,14 @@ export class AssetServiceError extends Error {
   }
 }
 
+/** What delete_wind_farm_cascade removed (or would remove, on a dry run). */
+export interface WindFarmDeletionSummary {
+  name: string;
+  dryRun: boolean;
+  /** Rows per table, e.g. { turbine: 2, blade: 6, wind_farm: 1 }. */
+  counts: Record<string, number>;
+}
+
 // ─── Error Handling Helpers ─────────────────────────────────────────────────
 
 function handleMutationError(error: { code?: string; message?: string }): never {
@@ -32,6 +40,28 @@ function handleMutationError(error: { code?: string; message?: string }): never 
 }
 
 // ─── Wind Farm CRUD ─────────────────────────────────────────────────────────
+
+async function callDeleteWindFarm(
+  id: string,
+  dryRun: boolean,
+): Promise<WindFarmDeletionSummary> {
+  const { data, error } = await db.rpc('delete_wind_farm_cascade', {
+    p_wind_farm_id: id,
+    p_dry_run: dryRun,
+  });
+  if (error) {
+    // PGRST202 / 42883: the function isn't in the database yet (migration not applied).
+    if (error.code === 'PGRST202' || error.code === '42883') {
+      throw new AssetServiceError('Delete function is not installed in the database', 'RPC_MISSING');
+    }
+    if (error.code === '42501') {
+      throw new AssetServiceError('Only administrators can delete wind farms', '42501');
+    }
+    throw new AssetServiceError(error.message ?? 'Delete failed', error.code);
+  }
+  const r = (data ?? {}) as { name?: string; dry_run?: boolean; counts?: Record<string, number> };
+  return { name: r.name ?? '', dryRun: !!r.dry_run, counts: r.counts ?? {} };
+}
 
 export const assetsService = {
   // Wind Farms
@@ -117,9 +147,22 @@ export const assetsService = {
     return data as WindFarm;
   },
 
-  async deleteWindFarm(id: string): Promise<void> {
-    const { error } = await supabase.from('wind_farm').delete().eq('id', id);
-    if (error) handleMutationError(error);
+  /**
+   * Dry run of the cascade delete: what WOULD be removed with the farm. Nothing
+   * is changed (the RPC rolls its own deletes back).
+   */
+  async previewWindFarmDeletion(id: string): Promise<WindFarmDeletionSummary> {
+    return callDeleteWindFarm(id, true);
+  },
+
+  /**
+   * Permanently delete a wind farm TOGETHER WITH everything under it
+   * (turbines, blades, inspections, campaigns, defects, repairs ...) in one
+   * transaction, via the admin-only RPC delete_wind_farm_cascade. A plain
+   * DELETE can't work: turbine/blade/inspection are ON DELETE RESTRICT.
+   */
+  async deleteWindFarm(id: string): Promise<WindFarmDeletionSummary> {
+    return callDeleteWindFarm(id, false);
   },
 
   // Turbines

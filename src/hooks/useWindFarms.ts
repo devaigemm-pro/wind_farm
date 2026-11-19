@@ -48,14 +48,35 @@ export function useUpdateWindFarm() {
   });
 }
 
+/** What deleting a wind farm would remove (dry run). Never cached: it must reflect the data NOW. */
+export function useWindFarmDeletionPreview(id: string | null | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['wind-farm-deletion-preview', id],
+    queryFn: () => assetsService.previewWindFarmDeletion(id!),
+    enabled: enabled && !!id,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  });
+}
+
 export function useDeleteWindFarm() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => assetsService.deleteWindFarm(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['wind-farms'] });
-      queryClient.invalidateQueries({ queryKey: ['asset-tree'] });
+      // The farm and everything under it is gone: refresh every list that showed it.
+      for (const key of [
+        'wind-farms',
+        'wind-farm',
+        'asset-tree',
+        'wind-farms-dashboard',
+        'campaigns',
+        'turbines',
+      ]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
     },
   });
 }

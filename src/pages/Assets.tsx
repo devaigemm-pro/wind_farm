@@ -7,6 +7,8 @@ import {
   WindFarmForm,
   TurbineForm,
   ConfirmDialog,
+  DeleteWindFarmDialog,
+  windFarmDeleteErrorMessage,
 } from '@/components/organisms';
 import { useAssetTree } from '@/hooks/useAssetTree';
 import { useCreateWindFarm, useUpdateWindFarm, useDeleteWindFarm } from '@/hooks/useWindFarms';
@@ -125,12 +127,14 @@ export function Assets() {
       } else if (selectedType === 'turbine') {
         await deleteTurbine.mutateAsync(selectedId);
       }
-      toast.success(`${selectedType === 'wind_farm' ? t('toast.windFarmDeleted') : t('toast.turbineDeleted')}`);
+      toast.success(`${selectedType === 'wind_farm' ? t('deleteFarm.deleted') : t('toast.turbineDeleted')}`);
       setSelectedId(null);
       setSelectedType(null);
       setMobileShowDetail(false);
     } catch (err) {
-      if (err instanceof AssetServiceError && err.code === '23503') {
+      if (selectedType === 'wind_farm') {
+        toast.error(windFarmDeleteErrorMessage(err, t));
+      } else if (err instanceof AssetServiceError && err.code === '23503') {
         toast.error(err.message);
       } else {
         toast.error(t('toast.deleteAssetFailed'));
@@ -356,8 +360,16 @@ export function Assets() {
           )}
         </div>
 
+        <DeleteWindFarmDialog
+          open={showConfirmDelete && selectedType === 'wind_farm'}
+          farmId={selectedType === 'wind_farm' ? selectedId : null}
+          farmName={selectedType === 'wind_farm' ? ((selectedData as WindFarm | null)?.name ?? '') : ''}
+          deleting={deleteWindFarm.isPending}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
         <ConfirmDialog
-          open={showConfirmDelete}
+          open={showConfirmDelete && selectedType !== 'wind_farm'}
           title={selectedType === 'wind_farm' ? t('assets.deleteWindFarm') : t('assets.deleteTurbine')}
           message={selectedType === 'wind_farm' ? t('assets.confirmDeleteWindFarm') : t('assets.confirmDeleteTurbine')}
           confirmLabel={t('button.delete')}
@@ -415,8 +427,16 @@ export function Assets() {
         </div>
       </div>
 
+      <DeleteWindFarmDialog
+        open={showConfirmDelete && selectedType === 'wind_farm'}
+        farmId={selectedType === 'wind_farm' ? selectedId : null}
+        farmName={selectedType === 'wind_farm' ? ((selectedData as WindFarm | null)?.name ?? '') : ''}
+        deleting={deleteWindFarm.isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
       <ConfirmDialog
-        open={showConfirmDelete}
+        open={showConfirmDelete && selectedType !== 'wind_farm'}
         title={selectedType === 'wind_farm' ? t('assets.deleteWindFarm') : t('assets.deleteTurbine')}
         message={selectedType === 'wind_farm' ? t('assets.confirmDeleteWindFarm') : t('assets.confirmDeleteTurbine')}
         confirmLabel={t('button.delete')}
