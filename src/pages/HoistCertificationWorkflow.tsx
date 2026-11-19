@@ -509,7 +509,7 @@ function ItemRow({
         <h3 style={itemRowTitle}>{getHoistLabel(item.itemCode, locale)}</h3>
         {/* State badge for check / measurement */}
         {item.itemType === 'check' && <CheckBadge passed={item.passed} t={t} />}
-        {(item.itemType === 'measurement' || item.measurementValue !== null) && (
+        {item.itemType === 'measurement' && (
           <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
         )}
         {hasPhotos && (
