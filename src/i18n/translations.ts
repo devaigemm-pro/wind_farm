@@ -433,6 +433,13 @@ export const translations: TranslationMap = {
   'hoist.colChecks': { en: 'Checks', es: 'Verificaciones' },
   'hoist.colItems': { en: 'Items', es: 'Ítems' },
   // Statuses
+  'hoist.reopen': { en: 'Reopen', es: 'Reabrir' },
+  'hoist.reopenTitle': { en: 'Reopen certification', es: 'Reabrir certificación' },
+  'hoist.reopenMessage': { en: 'The certification goes back to "In progress" and the technician will see it again in the app.', es: 'La certificación vuelve a "En progreso" y el técnico la verá de nuevo en la app.' },
+  'hoist.reopenHint': { en: 'Back to "In progress" so the technician sees it in the app', es: 'Vuelve a "En progreso" para que el técnico la vea en la app' },
+  'hoist.reopenOnlyDone': { en: 'Only a finished certification can be reopened', es: 'Solo se puede reabrir una certificación finalizada' },
+  'hoist.reopenSuccess': { en: 'Certification reopened', es: 'Certificación reabierta' },
+  'hoist.reopenError': { en: 'Could not reopen the certification', es: 'No se pudo reabrir la certificación' },
   'hoist.statusOpen': { en: 'Open', es: 'Abierta' },
   'hoist.statusInProgress': { en: 'In progress', es: 'En progreso' },
   'hoist.statusDone': { en: 'Done', es: 'Finalizada' },

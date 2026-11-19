@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 414
+- **Sesiones analizadas**: 416
 - **Última actualización**: 2026-11-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -3175,3 +3175,20 @@
   - CORRECCIÓN: cuando pidió "todos deben ser verificación" quería que se vieran SOLO como verificación. Mi decisión de seguir mostrando la medición vieja en ítems de tipo check fue no deseada. Revertí: la medición solo se muestra en ítems 'measurement' (pantalla, resultado del PDF y conteo de datos). Las fotos ya capturadas en ítems check SÍ siguen visibles (eso no lo objetó).
   - Reporta el defecto con screenshot y una frase; espera que se arregle sin más preguntas.
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima, screenshot como evidencia, corrección directa sin drama.
+
+### Sesión 415 - 2026-11-18
+- **Tarea principal**: "prod" para desplegar el arreglo de la regla y el % en ítems de verificación de polipastos.
+- **Observaciones nuevas**:
+  - Deploy: tsc, vitest (3/3), merge a main (8a0b572..acedbe5), push, vercel --prod. Verificado en el bundle publicado: la condición vieja no está y los 15 ítems siguen como check.
+  - No pude verlo en la pantalla de prod (sin login de prod); la verificación visual se hizo en local.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima (una palabra), aprobación de deploy corta.
+  - Validado por el usuario en prod: "todo ok". Cierra un ciclo con dos palabras cuando el resultado está bien.
+
+### Sesión 416 - 2026-11-18
+- **Tarea principal**: Botón "Reabrir" en cada certificación de polipastos, para volverla a "en proceso" y que el técnico la vea otra vez en la app.
+- **Observaciones nuevas**:
+  - Lo repitió dos veces (el primer intento falló por carga del servicio): no es impaciencia, es reenvío.
+  - Implementación mínima: campaign.status es la ÚNICA columna de estado (prod: 51 hoist_open, 6 hoist_in_progress, 2 hoist_done). Reabrir = status 'hoist_done' → 'hoist_in_progress' con el hook existente useUpdateHoistStatus. Botón en la cabecera de la certificación, visible siempre para no-client pero habilitado solo si está Finalizada (tooltip lo explica), con confirmación. Agregué el estado como chip junto al título para que se entienda cuándo se puede reabrir.
+  - Probado en local: finalizada → Reabrir → confirmar → base en hoist_in_progress, chip "En progreso", botón deshabilitado. Estado original restaurado.
+  - Supuesto no verificable: que la app móvil oculta las certificaciones 'hoist_done' y muestra las 'hoist_in_progress'. No tengo el código de la app; lo dije.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, describe la funcionalidad por su efecto en el usuario final (el técnico), replicar patrón existente (reabrir defecto de reparación).

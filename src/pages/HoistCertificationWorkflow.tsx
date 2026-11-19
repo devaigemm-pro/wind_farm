@@ -14,7 +14,9 @@ import {
   CircleCheck,
   CircleX,
   CircleDashed,
+  RotateCcw,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/organisms/ConfirmDialog';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +26,7 @@ import {
   useSetHoistPhotoSelected,
   useMoveHoistPhoto,
   useReorderHoistReportPhotos,
+  useUpdateHoistStatus,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel } from '@/constants/hoist-certification-steps';
@@ -63,6 +66,8 @@ export function HoistCertificationWorkflow() {
   const setSelected = useSetHoistPhotoSelected(campaignId);
   const movePhoto = useMoveHoistPhoto(campaignId);
   const reorderReport = useReorderHoistReportPhotos(campaignId);
+  const updateStatus = useUpdateHoistStatus(campaignId);
+  const [confirmReopen, setConfirmReopen] = useState(false);
 
   const [lightbox, setLightbox] = useState<HoistPhoto | null>(null);
   const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
@@ -124,6 +129,19 @@ export function HoistCertificationWorkflow() {
     if (photo.url) setLightbox(photo);
   };
 
+  // Reopen a FINISHED certification: back to 'hoist_in_progress' so the
+  // technician sees it again in the mobile app. Only meaningful when the
+  // certification is done; read-only for client.
+  const isDone = campaign?.status === 'hoist_done';
+  const canReopen = !isClient && isDone && !updateStatus.isPending;
+  const handleReopen = () => {
+    setConfirmReopen(false);
+    updateStatus.mutate('hoist_in_progress', {
+      onSuccess: () => toast.success(t('hoist.reopenSuccess')),
+      onError: (err) => toast.error((err as Error)?.message || t('hoist.reopenError')),
+    });
+  };
+
   const handleGenerateReport = async () => {
     if (!campaignId || downloading) return;
     setDownloading(true);
@@ -151,12 +169,40 @@ export function HoistCertificationWorkflow() {
         </button>
         <div style={headerRow}>
           <div>
-            <h1 style={title}>{t('hoist.workflowTitle')}</h1>
+            <h1 style={title}>
+              {t('hoist.workflowTitle')}
+              {campaign?.status && (
+                <span style={{ ...statusChip, ...(STATUS_CHIP[campaign.status] ?? {}) }}>
+                  {t(STATUS_KEY[campaign.status] ?? 'hoist.statusOpen')}
+                </span>
+              )}
+            </h1>
             <p style={subtitle}>
               {campaign?.turbineName ?? '—'}
               {campaign?.windFarmName ? ` · ${campaign.windFarmName}` : ''}
             </p>
           </div>
+          <div style={headerActions}>
+          {!isClient && (
+            <button
+              type="button"
+              style={{
+                ...reopenBtn,
+                opacity: canReopen ? 1 : 0.5,
+                cursor: canReopen ? 'pointer' : 'not-allowed',
+              }}
+              disabled={!canReopen}
+              onClick={() => setConfirmReopen(true)}
+              title={isDone ? t('hoist.reopenHint') : t('hoist.reopenOnlyDone')}
+            >
+              {updateStatus.isPending ? (
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <RotateCcw size={14} />
+              )}
+              {t('hoist.reopen')}
+            </button>
+          )}
           <span
             role="button"
             tabIndex={downloading ? -1 : 0}
@@ -179,8 +225,18 @@ export function HoistCertificationWorkflow() {
             )}
             {t('hoist.generateReport')}
           </span>
+          </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmReopen}
+        title={t('hoist.reopenTitle')}
+        message={t('hoist.reopenMessage')}
+        confirmLabel={t('hoist.reopen')}
+        cancelLabel={t('button.cancel')}
+        onConfirm={handleReopen}
+        onCancel={() => setConfirmReopen(false)}
+      />
 
       <p style={hint}>{t('hoist.workflowHint')}</p>
 
@@ -801,6 +857,29 @@ const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 12 };
 const totalsLine: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 16 };
+const headerActions: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0,
+};
+const reopenBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', color: C.brand,
+  border: `1px solid ${C.brand}`, borderRadius: 8, padding: '7px 14px', fontSize: 12,
+  fontWeight: 600, userSelect: 'none',
+};
+const statusChip: React.CSSProperties = {
+  marginLeft: 10, padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+  verticalAlign: 'middle',
+};
+// Same colors as the campaign list badges (CampaignAccordion.getHoistStatusBadge).
+const STATUS_CHIP: Record<string, React.CSSProperties> = {
+  hoist_open: { background: '#FEF9C3', color: '#854D0E' },
+  hoist_in_progress: { background: '#DBEAFE', color: '#1E40AF' },
+  hoist_done: { background: '#DEF7EC', color: '#03543F' },
+};
+const STATUS_KEY: Record<string, string> = {
+  hoist_open: 'hoist.statusOpen',
+  hoist_in_progress: 'hoist.statusInProgress',
+  hoist_done: 'hoist.statusDone',
+};
 const reportBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
   borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, userSelect: 'none',
