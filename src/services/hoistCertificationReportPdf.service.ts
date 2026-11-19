@@ -96,6 +96,10 @@ function checkResultLabel(item: HoistItemNode): string {
   if (item.itemType !== 'check') return '—';
   if (item.passed === true) return 'Cumple';
   if (item.passed === false) return 'No cumple';
+  // Items that were 'measurement' before becoming 'check' keep their value.
+  if (item.measurementValue !== null && item.measurementValue !== '') {
+    return `${item.measurementValue}${item.measurementUnit ? ' ' + item.measurementUnit : ''}`;
+  }
   return 'Sin dato';
 }
 

@@ -124,10 +124,10 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 ### Paso 2 — `inspeccion_visual`
 | `item_code`                 | Ítem                          | Tipo  |
 |-----------------------------|-------------------------------|-------|
-| `visual_caja_cadena`        | Caja de cadena y suspensión   | photo |
-| `visual_gancho`             | Gancho                        | photo |
+| `visual_caja_cadena`        | Caja de cadena y suspensión   | check |
+| `visual_gancho`             | Gancho                        | check |
 | `visual_goma_plastico`      | Piezas de goma y plásticas    | check |
-| `visual_cable_control`      | Cable de control y colgante   | photo |
+| `visual_cable_control`      | Cable de control y colgante   | check |
 | `visual_sin_ruido`          | Funcionamiento sin ruido      | check |
 | `visual_lubricacion_cadena` | Lubricación de cadena         | check |
 | `visual_nivel_aceite`       | Nivel de aceite               | check |
@@ -137,16 +137,16 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 **Sub-grupo `cadena_carga` (Cadena de carga):**
 | `item_code`            | Ítem                                                               | Tipo        |
 |------------------------|--------------------------------------------------------------------|-------------|
-| `cadena_sin_desgaste`  | Sin desgaste, abrasión, grietas, deformación ni eslabones rígidos  | measurement |
-| `cadena_espesor`       | Espesor no inferior al 10%                                         | measurement |
-| `cadena_alargamiento`  | Alargamiento no mayor al 5% o 2% en 11 eslabones                   | measurement |
-| `cadena_rueda_guia`    | Rueda y guía de cadena sin desgaste excesivo                       | photo       |
+| `cadena_sin_desgaste`  | Sin desgaste, abrasión, grietas, deformación ni eslabones rígidos  | check       |
+| `cadena_espesor`       | Espesor no inferior al 10%                                         | check       |
+| `cadena_alargamiento`  | Alargamiento no mayor al 5% o 2% en 11 eslabones                   | check       |
+| `cadena_rueda_guia`    | Rueda y guía de cadena sin desgaste excesivo                       | check       |
 
 **Sub-grupo `ojales_aluminio` (Ojales de aluminio fundido):**
 | `item_code`                 | Ítem                                                      | Tipo  |
 |-----------------------------|-----------------------------------------------------------|-------|
-| `ojales_tintas_penetrantes` | Inspección de grietas tintas penetrantes                  | photo |
-| `ojales_arandela_seguro`    | Reemplazar arandela y seguro                              | photo |
+| `ojales_tintas_penetrantes` | Inspección de grietas tintas penetrantes                  | check |
+| `ojales_arandela_seguro`    | Reemplazar arandela y seguro                              | check |
 | `ojales_distancia`          | Medir distancia de ojales y suspensión (menor a 2mm)      | check |
 
 ### Paso 4 — `verificacion_torques`
