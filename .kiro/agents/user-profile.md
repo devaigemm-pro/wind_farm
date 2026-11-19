@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 412
+- **Sesiones analizadas**: 414
 - **Última actualización**: 2026-11-18
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -122,6 +122,8 @@
 - **zsh no separa variables sin comillas y el detector de servidores bloquea comandos con banderas de puerto/host** — (1) en zsh, `for R in $REFS` NO itera por palabra: usar refs explícitos o `${=REFS}`. (2) Un execute_bash cuyo texto contenga banderas de puerto o host (incluso solo dentro de un heredoc que escribe el perfil) lo rechaza el detector de "comandos que levantan un servidor": escribir el texto con fs_write a /tmp y añadirlo con `cat`. (3) Los comandos con `agent-browser eval "(() => ...)()"` o heredoc seguido de `2>&1 |` no pasan el parser de permisos: usar expresiones simples o archivos en /tmp.
 - **revisar el acceso a la DB de prod en el momento, antes de pedirle al usuario que corra SQL** — un 401 del CLI en un turno anterior no significa que siga sin acceso (el usuario puede haber dejado SUPABASE_ACCESS_TOKEN en el entorno). Probar `supabase db query --linked "select 1"` justo antes; si responde, aplicar con `supabase db query --linked -f <archivo.sql>` y verificar. Solo pedirle el SQL Editor si la prueba falla en ese momento. Para simular como un usuario: archivo SQL con begin; set_config('request.jwt.claims', '{"sub":"<uid>","role":"authenticated"}', true); set local role authenticated; ...; rollback.
 - **el token de Supabase para prod está en .env.production.local, no en el entorno** — cada execute_bash arranca sin él. Antes de `supabase db query --linked` hacer en el MISMO comando `set -a; . ./.env.production.local; set +a`. Sin eso el CLI responde 401 "Invalid access token" y parece que no hay acceso.
+- **cambio de tipo = solo ese tipo a la vista** — cuando pide que unos ítems "sean verificación" (u otro tipo), deben mostrarse SOLO como ese tipo: no mezclar restos del tipo anterior (p.ej. medición "0 %" con ícono de regla junto a "Sin dato"). Conservar datos ya capturados solo si no cambian lo que se ve del tipo nuevo (las fotos sí se pueden seguir mostrando). Si un dato viejo se va a ocultar, decirlo en el reporte en vez de mostrarlo mezclado.
+
 ## 8. Historial de Observaciones por Sesión
 
 ### Sesión 1 - 2026-07-21 (madrugada)
@@ -3158,3 +3160,18 @@
   - Probado en el local (dev server :5173): 15 ítems con "VERIFICACIÓN", una foto de prueba en Gancho siguió visible, la medición de Espesor (12 %) siguió visible. Limpié la foto de prueba. Sin deploy (espera "a prod").
   - La app móvil decide qué captura: hay que avisar al equipo móvil que esos ítems ahora piden cumple/no cumple (doc actualizado).
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima, modo compañero, "etapa"/"paso" usados de forma laxa.
+
+### Sesión 413 - 2026-11-18
+- **Tarea principal**: "pasar a prod" del cambio a Verificación en "Inspección Visual y mecánica" e "Inspección Crítica" de la certificación de polipastos.
+- **Observaciones nuevas**:
+  - Deploy: tsc, vitest (3/3), commit, rebase, merge a main (032114b..8a0b572), push, vercel --prod. Verificado en el bundle publicado: los 15 ítems de los dos pasos son 'check'.
+  - El cambio es solo de front (catálogo + render); no hubo SQL que aplicar en prod.
+  - Pendiente del lado del usuario: avisar al equipo de la app móvil, que sigue pidiendo foto o medición en esos ítems hasta que se actualice.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, aprobación de deploy en 3 palabras.
+
+### Sesión 414 - 2026-11-18
+- **Tarea principal**: Con screenshot de prod: "una de las etapas quedó con el ícono de la regla y %, favor actualizar" (Alargamiento mostraba "0 %" junto a "Sin dato").
+- **Observaciones nuevas**:
+  - CORRECCIÓN: cuando pidió "todos deben ser verificación" quería que se vieran SOLO como verificación. Mi decisión de seguir mostrando la medición vieja en ítems de tipo check fue no deseada. Revertí: la medición solo se muestra en ítems 'measurement' (pantalla, resultado del PDF y conteo de datos). Las fotos ya capturadas en ítems check SÍ siguen visibles (eso no lo objetó).
+  - Reporta el defecto con screenshot y una frase; espera que se arregle sin más preguntas.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, screenshot como evidencia, corrección directa sin drama.

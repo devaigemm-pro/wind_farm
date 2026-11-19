@@ -485,7 +485,7 @@ function allItems(tree: HoistTree): HoistItemNode[] {
 function itemHasData(item: HoistItemNode): boolean {
   if (item.photos.length > 0) return true;
   if (item.itemType === 'check' && item.passed !== null) return true;
-  if (item.measurementValue !== null) return true;
+  if (item.itemType === 'measurement' && item.measurementValue !== null) return true;
   return false;
 }
 
