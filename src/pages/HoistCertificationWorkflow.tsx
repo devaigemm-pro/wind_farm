@@ -411,7 +411,10 @@ function ItemRow({
   // Selected-for-report card currently hovered while reordering by drag.
   const [overId, setOverId] = useState<string | null>(null);
   const thisKey = item.itemId ?? item.itemCode;
-  const hasPhotos = item.itemType === 'photo' || item.itemType === 'measurement';
+  // Photo/measurement items always show their gallery. A 'check' item shows it
+  // only when photos were captured (e.g. items that were 'photo' before becoming
+  // 'check'), so already-uploaded photos never disappear from the screen.
+  const hasPhotos = item.itemType !== 'check' || item.photos.length > 0;
   const itemDropActive = hoverTargetKey != null && hoverTargetKey === thisKey;
 
   useEffect(() => {
@@ -506,7 +509,7 @@ function ItemRow({
         <h3 style={itemRowTitle}>{getHoistLabel(item.itemCode, locale)}</h3>
         {/* State badge for check / measurement */}
         {item.itemType === 'check' && <CheckBadge passed={item.passed} t={t} />}
-        {item.itemType === 'measurement' && (
+        {(item.itemType === 'measurement' || item.measurementValue !== null) && (
           <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
         )}
         {hasPhotos && (

@@ -76,10 +76,10 @@ export const HOIST_CERT_CATALOG: readonly HoistCertCatalogEntry[] = [
 
   // ── Paso 2: Inspección Visual y mecánica ──────────────────────────────────
   { code: 'inspeccion_visual', labelEs: 'Inspección Visual y mecánica', labelEn: 'Visual and mechanical inspection', sortOrder: 10, parentCode: null, isStep: true, isGroup: false, isItem: false, itemType: null },
-  { code: 'visual_caja_cadena', labelEs: 'Caja de cadena y suspensión', labelEn: 'Chain box and suspension', sortOrder: 11, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
-  { code: 'visual_gancho', labelEs: 'Gancho', labelEn: 'Hook', sortOrder: 12, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
+  { code: 'visual_caja_cadena', labelEs: 'Caja de cadena y suspensión', labelEn: 'Chain box and suspension', sortOrder: 11, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
+  { code: 'visual_gancho', labelEs: 'Gancho', labelEn: 'Hook', sortOrder: 12, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'visual_goma_plastico', labelEs: 'Piezas de goma y plásticas', labelEn: 'Rubber and plastic parts', sortOrder: 13, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
-  { code: 'visual_cable_control', labelEs: 'Cable de control y colgante', labelEn: 'Control cable and pendant', sortOrder: 14, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
+  { code: 'visual_cable_control', labelEs: 'Cable de control y colgante', labelEn: 'Control cable and pendant', sortOrder: 14, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'visual_sin_ruido', labelEs: 'Funcionamiento sin ruido', labelEn: 'Operation without noise', sortOrder: 15, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'visual_lubricacion_cadena', labelEs: 'Lubricación de cadena', labelEn: 'Chain lubrication', sortOrder: 16, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'visual_nivel_aceite', labelEs: 'Nivel de aceite', labelEn: 'Oil level', sortOrder: 17, parentCode: 'inspeccion_visual', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
@@ -89,14 +89,14 @@ export const HOIST_CERT_CATALOG: readonly HoistCertCatalogEntry[] = [
   { code: 'inspeccion_critica', labelEs: 'Inspección Crítica', labelEn: 'Critical inspection', sortOrder: 20, parentCode: null, isStep: true, isGroup: false, isItem: false, itemType: null },
   // Sub-grupo: Cadena de carga
   { code: 'cadena_carga', labelEs: 'Cadena de carga', labelEn: 'Load chain', sortOrder: 21, parentCode: 'inspeccion_critica', isStep: false, isGroup: true, isItem: false, itemType: null },
-  { code: 'cadena_sin_desgaste', labelEs: 'Sin desgaste, abrasión, grietas, deformación ni eslabones rígidos', labelEn: 'No wear, abrasion, cracks, deformation or rigid links', sortOrder: 22, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'measurement' },
-  { code: 'cadena_espesor', labelEs: 'Espesor no inferior al 10%', labelEn: 'Thickness not below 10%', sortOrder: 23, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'measurement' },
-  { code: 'cadena_alargamiento', labelEs: 'Alargamiento no mayor al 5% o 2% en 11 eslabones', labelEn: 'Elongation not greater than 5% or 2% over 11 links', sortOrder: 24, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'measurement' },
-  { code: 'cadena_rueda_guia', labelEs: 'Rueda y guía de cadena sin desgaste excesivo', labelEn: 'Chain wheel and guide without excessive wear', sortOrder: 25, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
+  { code: 'cadena_sin_desgaste', labelEs: 'Sin desgaste, abrasión, grietas, deformación ni eslabones rígidos', labelEn: 'No wear, abrasion, cracks, deformation or rigid links', sortOrder: 22, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
+  { code: 'cadena_espesor', labelEs: 'Espesor no inferior al 10%', labelEn: 'Thickness not below 10%', sortOrder: 23, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
+  { code: 'cadena_alargamiento', labelEs: 'Alargamiento no mayor al 5% o 2% en 11 eslabones', labelEn: 'Elongation not greater than 5% or 2% over 11 links', sortOrder: 24, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
+  { code: 'cadena_rueda_guia', labelEs: 'Rueda y guía de cadena sin desgaste excesivo', labelEn: 'Chain wheel and guide without excessive wear', sortOrder: 25, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   // Sub-grupo: Ojales de aluminio fundido
   { code: 'ojales_aluminio', labelEs: 'Ojales de aluminio fundido', labelEn: 'Cast aluminium eyelets', sortOrder: 26, parentCode: 'inspeccion_critica', isStep: false, isGroup: true, isItem: false, itemType: null },
-  { code: 'ojales_tintas_penetrantes', labelEs: 'Inspección de grietas tintas penetrantes', labelEn: 'Dye penetrant crack inspection', sortOrder: 27, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
-  { code: 'ojales_arandela_seguro', labelEs: 'Reemplazar arandela y seguro', labelEn: 'Replace washer and lock', sortOrder: 28, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'photo' },
+  { code: 'ojales_tintas_penetrantes', labelEs: 'Inspección de grietas tintas penetrantes', labelEn: 'Dye penetrant crack inspection', sortOrder: 27, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
+  { code: 'ojales_arandela_seguro', labelEs: 'Reemplazar arandela y seguro', labelEn: 'Replace washer and lock', sortOrder: 28, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'ojales_distancia', labelEs: 'Medir distancia de ojales y suspensión (menor a 2mm)', labelEn: 'Measure eyelet and suspension distance (less than 2mm)', sortOrder: 29, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
 
   // ── Paso 4: Verificación de Torques ───────────────────────────────────────
