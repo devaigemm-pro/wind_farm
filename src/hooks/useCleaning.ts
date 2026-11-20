@@ -244,3 +244,33 @@ export function useUpdateCleaningStatus(campaignId: string | undefined) {
     },
   });
 }
+
+/**
+ * Upload a photo (from the web) into a specific cleaning zone/sub-zone: upload
+ * to the public 'inspection-photos' bucket + insert a cleaning_photo row, then
+ * refresh tree + summary. Mirrors useUploadRepairPhoto (full refetch because a
+ * brand-new row needs the server pipeline to render).
+ */
+export function useUploadCleaningPhoto(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      file,
+      zoneId,
+      zoneCode,
+    }: {
+      file: File;
+      zoneId: string | null;
+      zoneCode: string;
+    }) =>
+      cleaningService.uploadCleaningPhoto(file, {
+        campaignId: campaignId!,
+        zoneId,
+        zoneCode,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cleaning-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['cleaning-summary', campaignId] });
+    },
+  });
+}

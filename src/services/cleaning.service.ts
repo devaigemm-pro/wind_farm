@@ -114,6 +114,8 @@ export interface CleaningPhoto {
   url: string;
   /** Resolved public URL of the thumbnail (for the grid); falls back to url. */
   thumbnailUrl: string;
+  /** Real uploader's name (storage owner via get_cleaning_photo_uploaders); null when unknown. */
+  uploadedBy: string | null;
 }
 
 /**
@@ -241,6 +243,7 @@ function mapPhoto(
     reportOrder: reportOrderById?.get(id) ?? null,
     url,
     thumbnailUrl,
+    uploadedBy: null,
   };
 }
 
@@ -297,6 +300,45 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
   return (await fetchPhotoReportMeta(photoIds)).selectedIds;
 }
 
+
+/** Resolve the REAL uploader's name per photo id (batched) via the get_cleaning_photo_uploaders RPC. */
+async function fetchUploaderByPhotoId(photoIds: string[]): Promise<Map<string, string>> {
+  const byId = new Map<string, string>();
+  const unique = [...new Set(photoIds.filter(Boolean))];
+  if (unique.length === 0) return byId;
+  try {
+    const rows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+      const { data, error } = await db.rpc('get_cleaning_photo_uploaders', { photo_ids: chunk });
+      if (error) throw new CleaningServiceError(error.message, error.code);
+      return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+    });
+    for (const r of rows) {
+      const id = r.photo_id as string;
+      const name = (r.uploader_name as string) ?? '';
+      if (id && name) byId.set(id, name);
+    }
+  } catch {
+    // RPC not deployed yet / transient error: the label just shows "—".
+  }
+  return byId;
+}
+/** Walk the tree and set `uploadedBy` on every photo found in any `photos` array. */
+function applyUploaders(node: unknown, uploaderById: Map<string, string>): void {
+  if (Array.isArray(node)) {
+    for (const n of node) applyUploaders(n, uploaderById);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (key === 'photos' && Array.isArray(value)) {
+      for (const p of value as { id: string; uploadedBy: string | null }[]) {
+        p.uploadedBy = uploaderById.get(p.id) ?? null;
+      }
+    } else if (value && typeof value === 'object') {
+      applyUploaders(value, uploaderById);
+    }
+  }
+}
 /** Collect all photo ids present across the zone rows. */
 function collectPhotoIds(zoneRows: CleaningZoneRow[]): string[] {
   const ids: string[] = [];
@@ -442,7 +484,9 @@ export const cleaningService = {
     const zoneRows = await fetchZonesForCampaign(campaignId);
     const photoIds = collectPhotoIds(zoneRows);
     const { selectedIds, reportOrderById } = await fetchPhotoReportMeta(photoIds);
-    return buildTree(zoneRows, selectedIds, reportOrderById);
+    const tree = buildTree(zoneRows, selectedIds, reportOrderById);
+    applyUploaders(tree, await fetchUploaderByPhotoId(photoIds));
+    return tree;
   },
 
   /**
@@ -565,6 +609,69 @@ export const cleaningService = {
       .update({ cleaning_zone_id: targetZoneId, zone_code: targetZoneCode })
       .eq('id', photoId);
     if (error) throw new CleaningServiceError(error.message, error.code);
+  },
+
+  /**
+   * Upload a photo from the WEB into a cleaning zone/sub-zone. Mirrors
+   * repairService.uploadRepairPhoto:
+   *   1. Validate the file is an image (jpeg/png).
+   *   2. Upload the File to the PUBLIC 'inspection-photos' bucket under
+   *      `cleaning/{campaign_id}/{zone_code}/...` (same prefix the mobile app
+   *      uses), so publicUrl() resolves it.
+   *   3. Insert a cleaning_photo row (campaign_id, cleaning_zone_id, zone_code,
+   *      storage_path, filename, capture_order, metadata {}) so the tree picks it
+   *      up via get_cleaning_photos_by_zone.
+   * The uploader is recorded the same way as repair: storage.objects.owner_id of
+   * the uploaded object (set by Supabase from the session). No extra column.
+   *
+   * capture_order = max existing within the zone (campaign + zone_code) + 1, else 1.
+   */
+  async uploadCleaningPhoto(
+    file: File,
+    payload: { campaignId: string; zoneId: string | null; zoneCode: string },
+  ): Promise<void> {
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+      throw new CleaningServiceError(
+        `Unsupported file type: ${file.type || 'unknown'}. Only JPEG and PNG are allowed.`,
+      );
+    }
+
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const storagePath = `cleaning/${payload.campaignId}/${payload.zoneCode}/${unique}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(storagePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) {
+      throw new CleaningServiceError(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    let captureOrder = 1;
+    const { data: orderRows } = await db
+      .from('cleaning_photo')
+      .select('capture_order')
+      .eq('campaign_id', payload.campaignId)
+      .eq('zone_code', payload.zoneCode)
+      .order('capture_order', { ascending: false })
+      .limit(1);
+    const top = (orderRows as Array<{ capture_order: number | null }> | null)?.[0];
+    if (top?.capture_order != null) captureOrder = Number(top.capture_order) + 1;
+
+    // If the DB insert fails, remove the uploaded file so no orphan object stays.
+    const { error: insertError } = await db.from('cleaning_photo').insert({
+      campaign_id: payload.campaignId,
+      cleaning_zone_id: payload.zoneId,
+      zone_code: payload.zoneCode,
+      storage_path: storagePath,
+      filename: file.name,
+      capture_order: captureOrder,
+      metadata: {},
+    });
+    if (insertError) {
+      await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
+      throw new CleaningServiceError(`DB insert failed: ${insertError.message}`, insertError.code);
+    }
   },
 
   /** Update the cleaning campaign workflow status. */

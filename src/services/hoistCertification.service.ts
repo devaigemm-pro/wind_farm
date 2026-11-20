@@ -136,6 +136,8 @@ export interface HoistPhoto {
   url: string;
   /** Resolved public URL of the thumbnail (for the grid); falls back to url. */
   thumbnailUrl: string;
+  /** Real uploader's name (storage owner via get_hoist_photo_uploaders); null when unknown. */
+  uploadedBy: string | null;
 }
 
 /**
@@ -302,6 +304,7 @@ function mapPhoto(
     reportOrder: reportOrderById?.get(id) ?? null,
     url,
     thumbnailUrl,
+    uploadedBy: null,
   };
 }
 
@@ -358,6 +361,45 @@ async function fetchSelectedPhotoIds(photoIds: string[]): Promise<Set<string>> {
   return (await fetchPhotoReportMeta(photoIds)).selectedIds;
 }
 
+
+/** Resolve the REAL uploader's name per photo id (batched) via the get_hoist_photo_uploaders RPC. */
+async function fetchUploaderByPhotoId(photoIds: string[]): Promise<Map<string, string>> {
+  const byId = new Map<string, string>();
+  const unique = [...new Set(photoIds.filter(Boolean))];
+  if (unique.length === 0) return byId;
+  try {
+    const rows = await fetchInChunks(unique, DEFAULT_CHUNK_SIZE, async (chunk) => {
+      const { data, error } = await db.rpc('get_hoist_photo_uploaders', { photo_ids: chunk });
+      if (error) throw new HoistCertificationServiceError(error.message, error.code);
+      return ((data as unknown[]) ?? []) as Record<string, unknown>[];
+    });
+    for (const r of rows) {
+      const id = r.photo_id as string;
+      const name = (r.uploader_name as string) ?? '';
+      if (id && name) byId.set(id, name);
+    }
+  } catch {
+    // RPC not deployed yet / transient error: the label just shows "—".
+  }
+  return byId;
+}
+/** Walk the tree and set `uploadedBy` on every photo found in any `photos` array. */
+function applyUploaders(node: unknown, uploaderById: Map<string, string>): void {
+  if (Array.isArray(node)) {
+    for (const n of node) applyUploaders(n, uploaderById);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (key === 'photos' && Array.isArray(value)) {
+      for (const p of value as { id: string; uploadedBy: string | null }[]) {
+        p.uploadedBy = uploaderById.get(p.id) ?? null;
+      }
+    } else if (value && typeof value === 'object') {
+      applyUploaders(value, uploaderById);
+    }
+  }
+}
 /** Collect all photo ids present across the item rows. */
 function collectPhotoIds(itemRows: HoistItemRow[]): string[] {
   const ids: string[] = [];
@@ -544,7 +586,9 @@ export const hoistCertificationService = {
     const itemRows = await fetchItemsForCampaign(campaignId);
     const photoIds = collectPhotoIds(itemRows);
     const { selectedIds, reportOrderById } = await fetchPhotoReportMeta(photoIds);
-    return buildTree(itemRows, selectedIds, reportOrderById);
+    const tree = buildTree(itemRows, selectedIds, reportOrderById);
+    applyUploaders(tree, await fetchUploaderByPhotoId(photoIds));
+    return tree;
   },
 
   /**
@@ -677,6 +721,69 @@ export const hoistCertificationService = {
       .update({ hoist_item_id: targetItemId, item_code: targetItemCode })
       .eq('id', photoId);
     if (error) throw new HoistCertificationServiceError(error.message, error.code);
+  },
+
+  /**
+   * Upload a photo from the WEB into a hoist-certification item. Mirrors
+   * repairService.uploadRepairPhoto / cleaningService.uploadCleaningPhoto:
+   *   1. Validate the file is an image (jpeg/png).
+   *   2. Upload to the PUBLIC 'inspection-photos' bucket under
+   *      `hoist/{campaign_id}/{item_code}/...` (same prefix the mobile app uses).
+   *   3. Insert a hoist_cert_photo row (campaign_id, hoist_item_id, item_code,
+   *      storage_path, filename, capture_order, metadata {}).
+   * The uploader is recorded like repair: storage.objects.owner_id. No extra column.
+   *
+   * capture_order = max existing within the item (campaign + item_code) + 1, else 1.
+   */
+  async uploadHoistPhoto(
+    file: File,
+    payload: { campaignId: string; itemId: string | null; itemCode: string },
+  ): Promise<void> {
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+      throw new HoistCertificationServiceError(
+        `Unsupported file type: ${file.type || 'unknown'}. Only JPEG and PNG are allowed.`,
+      );
+    }
+
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const storagePath = `hoist/${payload.campaignId}/${payload.itemCode}/${unique}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(storagePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) {
+      throw new HoistCertificationServiceError(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    let captureOrder = 1;
+    const { data: orderRows } = await db
+      .from('hoist_cert_photo')
+      .select('capture_order')
+      .eq('campaign_id', payload.campaignId)
+      .eq('item_code', payload.itemCode)
+      .order('capture_order', { ascending: false })
+      .limit(1);
+    const top = (orderRows as Array<{ capture_order: number | null }> | null)?.[0];
+    if (top?.capture_order != null) captureOrder = Number(top.capture_order) + 1;
+
+    // If the DB insert fails, remove the uploaded file so no orphan object stays.
+    const { error: insertError } = await db.from('hoist_cert_photo').insert({
+      campaign_id: payload.campaignId,
+      hoist_item_id: payload.itemId,
+      item_code: payload.itemCode,
+      storage_path: storagePath,
+      filename: file.name,
+      capture_order: captureOrder,
+      metadata: {},
+    });
+    if (insertError) {
+      await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
+      throw new HoistCertificationServiceError(
+        `DB insert failed: ${insertError.message}`,
+        insertError.code,
+      );
+    }
   },
 
   /** Update the hoist-certification campaign workflow status. */
