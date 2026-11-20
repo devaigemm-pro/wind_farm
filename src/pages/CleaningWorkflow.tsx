@@ -1,6 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Star, X, Download } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Star,
+  Upload,
+  X,
+  Download,
+} from 'lucide-react';
 import { useLanguage } from '@/components/design-system';
 import { useToast } from '@/store/toastStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +21,7 @@ import {
   useSetCleaningPhotoSelected,
   useMovePhotoToZone,
   useReorderCleaningReportPhotos,
+  useUploadCleaningPhoto,
 } from '@/hooks/useCleaning';
 import { generateAndDownloadCleaningReport } from '@/services/cleaningReportPdf.service';
 import { getCleaningZoneLabel } from '@/constants/cleaning-zones';
@@ -38,8 +50,12 @@ export function CleaningWorkflow() {
   const setSelected = useSetCleaningPhotoSelected(campaignId);
   const movePhoto = useMovePhotoToZone(campaignId);
   const reorderReport = useReorderCleaningReportPhotos(campaignId);
+  const uploadPhoto = useUploadCleaningPhoto(campaignId);
 
-  const [lightbox, setLightbox] = useState<CleaningPhoto | null>(null);
+  // Lightbox holds the id of the photo being previewed (not a snapshot) so it
+  // always reflects the fresh tree — selection toggles update the star icon and
+  // left/right navigation reads the live sibling list. Same as RepairWorkflow.
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   // Photo ids whose selection mutation is in flight → per-photo spinner.
   const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
@@ -97,8 +113,74 @@ export function CleaningWorkflow() {
   };
 
   const handlePreview = (photo: CleaningPhoto) => {
-    if (photo.url) setLightbox(photo);
+    if (photo.url) setLightboxPhotoId(photo.id);
   };
+
+  // Upload one or more image files (dropped from the OS or picked via the
+  // hidden input) into a SPECIFIC zone/sub-zone. Read-only for the client (RLS
+  // also blocks the write). Sequential, one toast per file, same as
+  // RepairWorkflow.handleUploadPhotos. Returns a promise so the ZoneRow can show
+  // a per-zone uploading spinner while it runs.
+  const handleUploadPhotos = async (
+    files: File[],
+    target: { zoneId: string | null; zoneCode: string },
+  ): Promise<void> => {
+    if (isClient || files.length === 0) return;
+    for (const file of files) {
+      try {
+        await uploadPhoto.mutateAsync({ file, zoneId: target.zoneId, zoneCode: target.zoneCode });
+        toast.success(t('cleaning.uploadPhotoSuccess'));
+      } catch (err) {
+        toast.error((err as Error)?.message || t('cleaning.uploadPhotoError'));
+      }
+    }
+  };
+
+  // Resolve the previewed photo and its same-zone siblings from the LIVE tree,
+  // so the lightbox reflects selection toggles and can navigate within the
+  // zone. Siblings = photos of the leaf zone the opened photo belongs to,
+  // ordered by captureOrder (same rule as RepairWorkflow's lightboxCtx).
+  const lightboxCtx = useMemo(() => {
+    if (!lightboxPhotoId || !tree) return null;
+    for (const root of tree) {
+      const leaves = root.isLeaf ? [root] : root.children;
+      for (const leaf of leaves) {
+        const match = leaf.photos.find((p) => p.id === lightboxPhotoId);
+        if (match) {
+          const siblings = leaf.photos
+            .filter((p) => !!p.url)
+            .slice()
+            .sort((a, b) => a.captureOrder - b.captureOrder);
+          const index = siblings.findIndex((p) => p.id === lightboxPhotoId);
+          return { photo: match, siblings, index };
+        }
+      }
+    }
+    return null;
+  }, [lightboxPhotoId, tree]);
+
+  const lightbox = lightboxCtx?.photo ?? null;
+
+  // Navigate to the previous/next photo of the same zone (loops at the edges).
+  const handleLightboxNav = (dir: -1 | 1) => {
+    if (!lightboxCtx || lightboxCtx.siblings.length < 2) return;
+    const n = lightboxCtx.siblings.length;
+    const nextIdx = (lightboxCtx.index + dir + n) % n;
+    setLightboxPhotoId(lightboxCtx.siblings[nextIdx]!.id);
+  };
+
+  // Keyboard: ←/→ navigate, Esc closes. Only while the lightbox is open.
+  useEffect(() => {
+    if (!lightboxCtx) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxPhotoId(null);
+      else if (e.key === 'ArrowLeft') handleLightboxNav(-1);
+      else if (e.key === 'ArrowRight') handleLightboxNav(1);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxCtx]);
 
   const handleGenerateReport = async () => {
     if (!campaignId || downloading) return;
@@ -180,6 +262,7 @@ export function CleaningWorkflow() {
                 pendingPhotoIds={pendingPhotoIds}
                 onSelect={handleSelect}
                 onMovePhoto={isClient ? undefined : handleMovePhoto}
+                onUploadPhoto={isClient ? undefined : handleUploadPhotos}
                 onReorderSelected={isClient ? undefined : handleReorderSelected}
                 onPreview={handlePreview}
               />
@@ -189,16 +272,62 @@ export function CleaningWorkflow() {
       )}
 
       {/* Lightbox: enlarged photo preview */}
-      {lightbox && (
+      {lightbox && lightboxCtx && (
         <div
           style={lightboxOverlay}
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxPhotoId(null)}
           role="dialog"
           aria-modal="true"
         >
-          <button style={lightboxClose} onClick={() => setLightbox(null)} aria-label={t('general.close')}>
+          {/* Top-right controls: star (select for report) + close */}
+          {!isClient && (
+            <button
+              style={{
+                ...lightboxStar,
+                background: lightbox.cleaningSelected ? C.brand : 'rgba(255,255,255,0.15)',
+                cursor: pendingPhotoIds.has(lightbox.id) ? 'progress' : 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelect(lightbox, !lightbox.cleaningSelected);
+              }}
+              aria-label={t('cleaning.selectedForReport')}
+              aria-pressed={lightbox.cleaningSelected}
+              title={t('cleaning.selectedForReport')}
+            >
+              <Star size={20} color="#fff" fill={lightbox.cleaningSelected ? '#fff' : 'none'} />
+            </button>
+          )}
+          <button style={lightboxClose} onClick={() => setLightboxPhotoId(null)} aria-label={t('general.close')}>
             <X size={22} />
           </button>
+
+          {/* Navigation arrows — only within the same zone, ≥2 photos */}
+          {lightboxCtx.siblings.length > 1 && (
+            <>
+              <button
+                style={{ ...lightboxNav, left: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(-1);
+                }}
+                aria-label={t('general.previous')}
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <button
+                style={{ ...lightboxNav, right: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(1);
+                }}
+                aria-label={t('general.next')}
+              >
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+
           <img
             src={lightbox.url}
             alt={lightbox.filename}
@@ -249,10 +378,17 @@ interface ZoneSectionProps {
     targetZoneId: string | null,
     targetZoneCode: string,
   ) => void;
+  /** Upload image files into a specific zone (undefined = read-only client). */
+  onUploadPhoto?: UploadToZone;
   /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
   onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: CleaningPhoto) => void;
 }
+
+type UploadToZone = (
+  files: File[],
+  target: { zoneId: string | null; zoneCode: string },
+) => Promise<void>;
 
 /**
  * A collapsible ROOT zone (Palas / Nacelle / Hub / Torre). Container roots
@@ -275,6 +411,7 @@ function ZoneSection({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onReorderSelected,
   onPreview,
 }: ZoneSectionProps) {
@@ -331,6 +468,7 @@ function ZoneSection({
               pendingPhotoIds={pendingPhotoIds}
               onSelect={onSelect}
               onMovePhoto={onMovePhoto}
+              onUploadPhoto={onUploadPhoto}
               onReorderSelected={onReorderSelected}
               onPreview={onPreview}
               hoverTargetKey={hoverTargetKey}
@@ -358,6 +496,8 @@ interface ZoneRowProps {
     targetZoneId: string | null,
     targetZoneCode: string,
   ) => void;
+  /** Upload image files into THIS zone (undefined = read-only client). */
+  onUploadPhoto?: UploadToZone;
   /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
   onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: CleaningPhoto) => void;
@@ -381,6 +521,14 @@ const ZONE_MIME = 'application/x-zone-code';
 // as a singleton because only one HTML5 drag can be in flight at a time.
 let activeDragOriginZoneCode: string | null = null;
 
+// True when the drag in flight carries OS files (a file drag from the laptop),
+// as opposed to an internal photo-card drag. Same as RepairWorkflow.isFileDrag.
+function isFileDrag(e: React.DragEvent): boolean {
+  const types = e.dataTransfer?.types;
+  if (!types) return false;
+  return Array.from(types).includes('Files');
+}
+
 function ZoneRow({
   zone,
   locale,
@@ -389,6 +537,7 @@ function ZoneRow({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onReorderSelected,
   onPreview,
   hoverTargetKey,
@@ -398,6 +547,10 @@ function ZoneRow({
   const [dropActive, setDropActive] = useState(false);
   // Selected-for-report card currently hovered while reordering by drag.
   const [overId, setOverId] = useState<string | null>(null);
+  // File-upload drop highlight (OS file drag over this zone) + in-flight state.
+  const [fileDropActive, setFileDropActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // This row's stable shared key (zoneId when present, else zoneCode).
   const thisKey = zone.zoneId ?? zone.zoneCode;
   // Cross-zone move highlight derived from the SHARED hover target (not a local
@@ -427,6 +580,32 @@ function ZoneRow({
   // accept; a target without a zoneId still works — movePhotoToZone passes null
   // and the tree regroups by zone_code).
   const canReceiveMove = !readOnly && !!onMovePhoto;
+
+  // This zone can RECEIVE an UPLOAD (drop files from disk / "+" button) when
+  // writable. Rows are always leaf zones; a zone without a zoneId still works
+  // (the insert stores cleaning_zone_id null + zone_code, like a move does).
+  const canUpload = !readOnly && !!onUploadPhoto;
+
+  // Run the upload for a batch of files, scoping the spinner to THIS zone.
+  const runUpload = async (files: File[]) => {
+    if (!canUpload || !onUploadPhoto || files.length === 0) return;
+    // Only keep image files; the service also re-validates each one.
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) return;
+    setUploading(true);
+    try {
+      await onUploadPhoto(images, { zoneId: zone.zoneId, zoneCode: zone.zoneCode });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) void runUpload(Array.from(files));
+    // Reset so the same file can be re-selected.
+    e.target.value = '';
+  };
 
   // True when the in-flight drag started in a DIFFERENT zone than this one.
   const isForeignDrag = (e: React.DragEvent) => {
@@ -464,12 +643,38 @@ function ZoneRow({
     onReorderSelected(ids);
   };
 
+  // Enable the drag handlers when EITHER move or upload is possible.
+  const dragEnabled = canReceiveMove || canUpload;
+
   return (
     <div
-      style={{ ...zoneCard, ...(zoneDropActive ? zoneDropActiveStyle : {}) }}
-      onDragOver={
-        canReceiveMove
+      style={{
+        ...zoneCard,
+        ...(zoneDropActive ? zoneDropActiveStyle : {}),
+        ...(fileDropActive ? zoneDropActiveStyle : {}),
+      }}
+      // onDragLeave only clears the FILE-upload highlight (the move highlight is
+      // the shared state of ZoneSection). Ignore the dragleave fired when
+      // crossing into a child element. Same as RepairWorkflow StageRow.
+      onDragLeave={
+        canUpload
           ? (e) => {
+              const related = e.relatedTarget as Node | null;
+              if (!related || !e.currentTarget.contains(related)) setFileDropActive(false);
+            }
+          : undefined
+      }
+      onDragOver={
+        dragEnabled
+          ? (e) => {
+              // OS file drags (upload) take priority over internal photo moves.
+              if (canUpload && isFileDrag(e)) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                setFileDropActive(true);
+                return;
+              }
+              if (!canReceiveMove) return;
               if (!isForeignDrag(e)) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
@@ -479,13 +684,22 @@ function ZoneRow({
             }
           : undefined
       }
-      // No onDragLeave on purpose (same reasoning as RepairWorkflow StageRow):
-      // per-row dragLeave is unreliable with fast moves across adjacent cards.
+      // The MOVE highlight is never cleared on dragLeave (same reasoning as
+      // RepairWorkflow StageRow): it's unreliable with fast moves across cards.
       // Every dragOver reassigns the single shared target; the final reset
       // happens on drop/dragend (ZoneSection safety net).
       onDrop={
-        canReceiveMove
+        dragEnabled
           ? (e) => {
+              // OS file drop → upload into this zone.
+              if (canUpload && isFileDrag(e)) {
+                e.preventDefault();
+                setFileDropActive(false);
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) void runUpload(Array.from(files));
+                return;
+              }
+              if (!canReceiveMove) return;
               const origin =
                 e.dataTransfer.getData(ZONE_MIME) || (activeDragOriginZoneCode ?? '');
               // Same-zone drop → let the inner "selected" column handle it.
@@ -511,7 +725,44 @@ function ZoneRow({
         <span style={zoneRowCount}>
           {photos.length} {t('cleaning.photos')} · {selected.length} {t('cleaning.selected')}
         </span>
+        {/* "Add photo" button + hidden input — alternative to drag&drop. */}
+        {canUpload && (
+          <>
+            <button
+              type="button"
+              style={zoneAddBtn}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title={t('cleaning.addPhoto')}
+            >
+              {uploading ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Plus size={13} />
+              )}
+              {t('cleaning.addPhoto')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              multiple
+              onChange={handleFileInput}
+              style={{ display: 'none' }}
+              aria-label={t('cleaning.addPhoto')}
+            />
+          </>
+        )}
       </div>
+
+      {/* File-drop hint: visible while an OS file drag hovers this zone, or a
+          subtle persistent dropzone affordance when the zone is empty. */}
+      {canUpload && (fileDropActive || photos.length === 0) && (
+        <div style={{ ...zoneDropHint, ...(fileDropActive ? zoneDropHintActive : {}) }}>
+          <Upload size={15} />
+          <span>{uploading ? t('cleaning.uploading') : t('cleaning.dropToUpload')}</span>
+        </div>
+      )}
 
       {photos.length === 0 ? (
         <p style={emptyZone}>{t('cleaning.noPhotosZone')}</p>
@@ -653,6 +904,8 @@ function PhotoCard({
   onCardDragOver,
   onCardDrop,
 }: PhotoCardProps) {
+  const { t } = useLanguage();
+  const uploaderLabel = `${t('cleaning.uploadedByShort')}: ${photo.uploadedBy ?? '—'}`;
   // While pending, block drag + action to avoid a double-fire on the same photo.
   const interactive = !readOnly && !pending;
   return (
@@ -732,6 +985,8 @@ function PhotoCard({
           </div>
         )}
       </div>
+      {/* Uploader label: who uploaded this photo (sits below the image). */}
+      <span style={photoUploader} title={uploaderLabel}>{uploaderLabel}</span>
     </div>
   );
 }
@@ -807,6 +1062,10 @@ const photoCard: React.CSSProperties = {
   position: 'relative', border: `2px solid ${C.border}`, borderRadius: 8, overflow: 'hidden',
   cursor: 'grab', aspectRatio: '4 / 3', background: '#f3f4f6',
 };
+const photoUploader: React.CSSProperties = {
+  fontSize: 11, color: C.muted, lineHeight: 1.3,
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+};
 const photoImg: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'cover', display: 'block' };
 const photoBroken: React.CSSProperties = {
   width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted,
@@ -835,4 +1094,31 @@ const lightboxClose: React.CSSProperties = {
 };
 const lightboxCaption: React.CSSProperties = {
   marginTop: 12, color: '#fff', fontSize: 13, opacity: 0.85, cursor: 'default',
+};
+const lightboxStar: React.CSSProperties = {
+  position: 'fixed', top: 20, right: 72, width: 40, height: 40, borderRadius: '50%',
+  border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const lightboxNav: React.CSSProperties = {
+  position: 'fixed', top: '50%', transform: 'translateY(-50%)',
+  width: 48, height: 48, borderRadius: '50%',
+  background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001,
+};
+// "Add photo" button in the zone header (upload alternative to drag&drop).
+const zoneAddBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
+  border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer', flexShrink: 0,
+};
+// Dashed hint shown when a file drag hovers the zone or the zone is empty.
+const zoneDropHint: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+  border: `2px dashed ${C.border}`, borderRadius: 10, padding: '14px 10px',
+  color: C.muted, fontSize: 12, fontWeight: 600, marginBottom: 10,
+  transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+};
+const zoneDropHintActive: React.CSSProperties = {
+  borderColor: C.brand, background: 'rgba(90,143,90,0.08)', color: C.brand,
 };

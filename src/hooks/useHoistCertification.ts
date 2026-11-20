@@ -253,3 +253,32 @@ export function useUpdateHoistStatus(campaignId: string | undefined) {
     },
   });
 }
+
+/**
+ * Upload a photo (from the web) into a specific hoist-certification item:
+ * upload to the public 'inspection-photos' bucket + insert a hoist_cert_photo
+ * row, then refresh tree + summary. Mirrors useUploadRepairPhoto.
+ */
+export function useUploadHoistPhoto(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      file,
+      itemId,
+      itemCode,
+    }: {
+      file: File;
+      itemId: string | null;
+      itemCode: string;
+    }) =>
+      hoistCertificationService.uploadHoistPhoto(file, {
+        campaignId: campaignId!,
+        itemId,
+        itemCode,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+    },
+  });
+}

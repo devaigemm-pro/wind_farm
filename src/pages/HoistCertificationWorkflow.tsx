@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Loader2,
+  Plus,
   Star,
+  Upload,
   X,
   Download,
   Check,
@@ -27,6 +30,7 @@ import {
   useMoveHoistPhoto,
   useReorderHoistReportPhotos,
   useUpdateHoistStatus,
+  useUploadHoistPhoto,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel } from '@/constants/hoist-certification-steps';
@@ -67,9 +71,12 @@ export function HoistCertificationWorkflow() {
   const movePhoto = useMoveHoistPhoto(campaignId);
   const reorderReport = useReorderHoistReportPhotos(campaignId);
   const updateStatus = useUpdateHoistStatus(campaignId);
+  const uploadPhoto = useUploadHoistPhoto(campaignId);
   const [confirmReopen, setConfirmReopen] = useState(false);
 
-  const [lightbox, setLightbox] = useState<HoistPhoto | null>(null);
+  // Lightbox holds the id of the photo being previewed (not a snapshot) so it
+  // always reflects the fresh tree. Same as RepairWorkflow.
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [pendingPhotoIds, setPendingPhotoIds] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
 
@@ -126,8 +133,70 @@ export function HoistCertificationWorkflow() {
   };
 
   const handlePreview = (photo: HoistPhoto) => {
-    if (photo.url) setLightbox(photo);
+    if (photo.url) setLightboxPhotoId(photo.id);
   };
+
+  // Upload one or more image files (dropped from the OS or picked via the
+  // hidden input) into a SPECIFIC item. Read-only for the client (RLS also
+  // blocks the write). Sequential, one toast per file, same as
+  // RepairWorkflow.handleUploadPhotos.
+  const handleUploadPhotos = async (
+    files: File[],
+    target: { itemId: string | null; itemCode: string },
+  ): Promise<void> => {
+    if (isClient || files.length === 0) return;
+    for (const file of files) {
+      try {
+        await uploadPhoto.mutateAsync({ file, itemId: target.itemId, itemCode: target.itemCode });
+        toast.success(t('hoist.uploadPhotoSuccess'));
+      } catch (err) {
+        toast.error((err as Error)?.message || t('hoist.uploadPhotoError'));
+      }
+    }
+  };
+
+  // Resolve the previewed photo and its same-item siblings from the LIVE tree,
+  // ordered by captureOrder (same rule as RepairWorkflow's lightboxCtx).
+  const lightboxCtx = useMemo(() => {
+    if (!lightboxPhotoId || !tree) return null;
+    for (const step of tree) {
+      for (const item of stepItems(step)) {
+        const match = item.photos.find((p) => p.id === lightboxPhotoId);
+        if (match) {
+          const siblings = item.photos
+            .filter((p) => !!p.url)
+            .slice()
+            .sort((a, b) => a.captureOrder - b.captureOrder);
+          const index = siblings.findIndex((p) => p.id === lightboxPhotoId);
+          return { photo: match, siblings, index };
+        }
+      }
+    }
+    return null;
+  }, [lightboxPhotoId, tree]);
+
+  const lightbox = lightboxCtx?.photo ?? null;
+
+  // Navigate to the previous/next photo of the same item (loops at the edges).
+  const handleLightboxNav = (dir: -1 | 1) => {
+    if (!lightboxCtx || lightboxCtx.siblings.length < 2) return;
+    const n = lightboxCtx.siblings.length;
+    const nextIdx = (lightboxCtx.index + dir + n) % n;
+    setLightboxPhotoId(lightboxCtx.siblings[nextIdx]!.id);
+  };
+
+  // Keyboard: ←/→ navigate, Esc closes. Only while the lightbox is open.
+  useEffect(() => {
+    if (!lightboxCtx) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxPhotoId(null);
+      else if (e.key === 'ArrowLeft') handleLightboxNav(-1);
+      else if (e.key === 'ArrowRight') handleLightboxNav(1);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxCtx]);
 
   // Reopen a FINISHED certification: back to 'hoist_in_progress' so the
   // technician sees it again in the mobile app. Only meaningful when the
@@ -260,6 +329,7 @@ export function HoistCertificationWorkflow() {
                 pendingPhotoIds={pendingPhotoIds}
                 onSelect={handleSelect}
                 onMovePhoto={isClient ? undefined : handleMovePhoto}
+                onUploadPhoto={isClient ? undefined : handleUploadPhotos}
                 onReorderSelected={isClient ? undefined : handleReorderSelected}
                 onPreview={handlePreview}
               />
@@ -269,16 +339,62 @@ export function HoistCertificationWorkflow() {
       )}
 
       {/* Lightbox: enlarged photo preview */}
-      {lightbox && (
+      {lightbox && lightboxCtx && (
         <div
           style={lightboxOverlay}
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxPhotoId(null)}
           role="dialog"
           aria-modal="true"
         >
-          <button style={lightboxClose} onClick={() => setLightbox(null)} aria-label={t('general.close')}>
+          {/* Top-right controls: star (select for report) + close */}
+          {!isClient && (
+            <button
+              style={{
+                ...lightboxStar,
+                background: lightbox.hoistSelected ? C.brand : 'rgba(255,255,255,0.15)',
+                cursor: pendingPhotoIds.has(lightbox.id) ? 'progress' : 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelect(lightbox, !lightbox.hoistSelected);
+              }}
+              aria-label={t('hoist.selectedForReport')}
+              aria-pressed={lightbox.hoistSelected}
+              title={t('hoist.selectedForReport')}
+            >
+              <Star size={20} color="#fff" fill={lightbox.hoistSelected ? '#fff' : 'none'} />
+            </button>
+          )}
+          <button style={lightboxClose} onClick={() => setLightboxPhotoId(null)} aria-label={t('general.close')}>
             <X size={22} />
           </button>
+
+          {/* Navigation arrows — only within the same item, ≥2 photos */}
+          {lightboxCtx.siblings.length > 1 && (
+            <>
+              <button
+                style={{ ...lightboxNav, left: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(-1);
+                }}
+                aria-label={t('general.previous')}
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <button
+                style={{ ...lightboxNav, right: 16 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLightboxNav(1);
+                }}
+                aria-label={t('general.next')}
+              >
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+
           <img
             src={lightbox.url}
             alt={lightbox.filename}
@@ -332,9 +448,24 @@ interface StepSectionProps {
     targetItemId: string | null,
     targetItemCode: string,
   ) => void;
+  /** Upload image files into a specific item (undefined = read-only client). */
+  onUploadPhoto?: UploadToItem;
   /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
   onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: HoistPhoto) => void;
+}
+
+type UploadToItem = (
+  files: File[],
+  target: { itemId: string | null; itemCode: string },
+) => Promise<void>;
+
+// True when the drag in flight carries OS files (a file drag from the laptop),
+// as opposed to an internal photo-card drag. Same as RepairWorkflow.isFileDrag.
+function isFileDrag(e: React.DragEvent): boolean {
+  const types = e.dataTransfer?.types;
+  if (!types) return false;
+  return Array.from(types).includes('Files');
 }
 
 /**
@@ -354,6 +485,7 @@ function StepSection({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onReorderSelected,
   onPreview,
 }: StepSectionProps) {
@@ -384,6 +516,7 @@ function StepSection({
       pendingPhotoIds={pendingPhotoIds}
       onSelect={onSelect}
       onMovePhoto={onMovePhoto}
+      onUploadPhoto={onUploadPhoto}
       onReorderSelected={onReorderSelected}
       onPreview={onPreview}
       hoverTargetKey={hoverTargetKey}
@@ -434,6 +567,8 @@ interface ItemRowProps {
     targetItemId: string | null,
     targetItemCode: string,
   ) => void;
+  /** Upload image files into THIS item (undefined = read-only client). */
+  onUploadPhoto?: UploadToItem;
   /** Persist the dragged order of the selected-for-report photos (undefined = read-only). */
   onReorderSelected?: (orderedIds: string[]) => void;
   onPreview: (photo: HoistPhoto) => void;
@@ -457,6 +592,7 @@ function ItemRow({
   pendingPhotoIds,
   onSelect,
   onMovePhoto,
+  onUploadPhoto,
   onReorderSelected,
   onPreview,
   hoverTargetKey,
@@ -466,6 +602,10 @@ function ItemRow({
   const [dropActive, setDropActive] = useState(false);
   // Selected-for-report card currently hovered while reordering by drag.
   const [overId, setOverId] = useState<string | null>(null);
+  // File-upload drop highlight (OS file drag over this item) + in-flight state.
+  const [fileDropActive, setFileDropActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const thisKey = item.itemId ?? item.itemCode;
   // Photo/measurement items always show their gallery. A 'check' item shows it
   // only when photos were captured (e.g. items that were 'photo' before becoming
@@ -489,6 +629,34 @@ function ItemRow({
 
   // A photo-bearing item can RECEIVE a moved photo whenever writable.
   const canReceiveMove = hasPhotos && !readOnly && !!onMovePhoto;
+
+  // A photo-bearing item can RECEIVE an UPLOAD (drop files from disk / "+"
+  // button) when writable. Pure 'check' items without photos show no gallery,
+  // so they don't take uploads (same rule as receiving a moved photo).
+  const canUpload = hasPhotos && !readOnly && !!onUploadPhoto;
+
+  // Run the upload for a batch of files, scoping the spinner to THIS item.
+  const runUpload = async (files: File[]) => {
+    if (!canUpload || !onUploadPhoto || files.length === 0) return;
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) return;
+    setUploading(true);
+    try {
+      await onUploadPhoto(images, { itemId: item.itemId, itemCode: item.itemCode });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) void runUpload(Array.from(files));
+    // Reset so the same file can be re-selected.
+    e.target.value = '';
+  };
+
+  // Enable the drag handlers when EITHER move or upload is possible.
+  const dragEnabled = canReceiveMove || canUpload;
 
   const isForeignDrag = (e: React.DragEvent) => {
     const origin = activeDragOriginItemCode ?? e.dataTransfer.getData(ITEM_MIME);
@@ -529,10 +697,22 @@ function ItemRow({
 
   return (
     <div
-      style={{ ...itemCard, ...(itemDropActive ? itemDropActiveStyle : {}) }}
+      style={{
+        ...itemCard,
+        ...(itemDropActive ? itemDropActiveStyle : {}),
+        ...(fileDropActive ? itemDropActiveStyle : {}),
+      }}
       onDragOver={
-        canReceiveMove
+        dragEnabled
           ? (e) => {
+              // OS file drags (upload) take priority over internal photo moves.
+              if (canUpload && isFileDrag(e)) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                setFileDropActive(true);
+                return;
+              }
+              if (!canReceiveMove) return;
               if (!isForeignDrag(e)) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
@@ -540,10 +720,28 @@ function ItemRow({
             }
           : undefined
       }
-      // No onDragLeave on purpose (same reasoning as CleaningWorkflow ZoneRow).
-      onDrop={
-        canReceiveMove
+      // onDragLeave only clears the FILE-upload highlight; the move highlight
+      // is never cleared here (same reasoning as RepairWorkflow StageRow).
+      onDragLeave={
+        canUpload
           ? (e) => {
+              const related = e.relatedTarget as Node | null;
+              if (!related || !e.currentTarget.contains(related)) setFileDropActive(false);
+            }
+          : undefined
+      }
+      onDrop={
+        dragEnabled
+          ? (e) => {
+              // OS file drop → upload into this item.
+              if (canUpload && isFileDrag(e)) {
+                e.preventDefault();
+                setFileDropActive(false);
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) void runUpload(Array.from(files));
+                return;
+              }
+              if (!canReceiveMove) return;
               const origin =
                 e.dataTransfer.getData(ITEM_MIME) || (activeDragOriginItemCode ?? '');
               if (origin === item.itemCode) return; // same-item → inner column handles it
@@ -573,7 +771,44 @@ function ItemRow({
             {photos.length} {t('hoist.photos')} · {selected.length} {t('hoist.selected')}
           </span>
         )}
+        {/* "Add photo" button + hidden input — alternative to drag&drop. */}
+        {canUpload && (
+          <>
+            <button
+              type="button"
+              style={itemAddBtn}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title={t('hoist.addPhoto')}
+            >
+              {uploading ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Plus size={13} />
+              )}
+              {t('hoist.addPhoto')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              multiple
+              onChange={handleFileInput}
+              style={{ display: 'none' }}
+              aria-label={t('hoist.addPhoto')}
+            />
+          </>
+        )}
       </div>
+
+      {/* File-drop hint: visible while an OS file drag hovers this item, or a
+          subtle persistent dropzone affordance when the item is empty. */}
+      {canUpload && (fileDropActive || photos.length === 0) && (
+        <div style={{ ...itemDropHint, ...(fileDropActive ? itemDropHintActive : {}) }}>
+          <Upload size={15} />
+          <span>{uploading ? t('hoist.uploading') : t('hoist.dropToUpload')}</span>
+        </div>
+      )}
 
       {/* Photo items: two-column selection grid. Check items: no gallery. */}
       {!hasPhotos ? null : photos.length === 0 ? (
@@ -760,6 +995,8 @@ function PhotoCard({
   onCardDragOver,
   onCardDrop,
 }: PhotoCardProps) {
+  const { t } = useLanguage();
+  const uploaderLabel = `${t('hoist.uploadedByShort')}: ${photo.uploadedBy ?? '—'}`;
   const interactive = !readOnly && !pending;
   return (
     <div
@@ -838,6 +1075,8 @@ function PhotoCard({
           </div>
         )}
       </div>
+      {/* Uploader label: who uploaded this photo (sits below the image). */}
+      <span style={photoUploader} title={uploaderLabel}>{uploaderLabel}</span>
     </div>
   );
 }
@@ -955,6 +1194,10 @@ const photoCard: React.CSSProperties = {
   position: 'relative', border: `2px solid ${C.border}`, borderRadius: 8, overflow: 'hidden',
   cursor: 'grab', aspectRatio: '4 / 3', background: '#f3f4f6',
 };
+const photoUploader: React.CSSProperties = {
+  fontSize: 11, color: C.muted, lineHeight: 1.3,
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+};
 const photoImg: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'cover', display: 'block' };
 const photoBroken: React.CSSProperties = {
   width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted,
@@ -983,4 +1226,31 @@ const lightboxClose: React.CSSProperties = {
 };
 const lightboxCaption: React.CSSProperties = {
   marginTop: 12, color: '#fff', fontSize: 13, opacity: 0.85, cursor: 'default',
+};
+const lightboxStar: React.CSSProperties = {
+  position: 'fixed', top: 20, right: 72, width: 40, height: 40, borderRadius: '50%',
+  border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const lightboxNav: React.CSSProperties = {
+  position: 'fixed', top: '50%', transform: 'translateY(-50%)',
+  width: 48, height: 48, borderRadius: '50%',
+  background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001,
+};
+// "Add photo" button in the item header (upload alternative to drag&drop).
+const itemAddBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
+  border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer', flexShrink: 0,
+};
+// Dashed hint shown when a file drag hovers the item or the item is empty.
+const itemDropHint: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+  border: `2px dashed ${C.border}`, borderRadius: 10, padding: '14px 10px',
+  color: C.muted, fontSize: 12, fontWeight: 600, marginBottom: 10,
+  transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+};
+const itemDropHintActive: React.CSSProperties = {
+  borderColor: C.brand, background: 'rgba(90,143,90,0.08)', color: C.brand,
 };
