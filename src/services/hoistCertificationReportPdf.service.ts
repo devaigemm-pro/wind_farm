@@ -10,6 +10,8 @@ import type {
 } from '@/services/hoistCertification.service';
 import { getHoistLabel } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
+import { documentManagerSignatureService } from '@/services/document-manager-signature.service';
+import { renderManagerSignaturePage } from '@/services/reportSignaturePage';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -44,6 +46,11 @@ interface HoistPdfContext {
   turbineModel: string;
   manufacturer: string;
   reportedBy: string;
+  /** wind_farm.manager_name / manager_role (from DB) — signer on the signature page. */
+  managerName: string;
+  managerRole: string;
+  /** JPEG data URL of the manager's signature (null = blank line). */
+  managerSignature: string | null;
   tree: HoistTree;
 }
 
@@ -169,7 +176,7 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
     .from('campaign')
     .select(`
       id, name, status, created_at,
-      wind_farm:wind_farm_id ( name, location, country, client ),
+      wind_farm:wind_farm_id ( name, location, manager_name, manager_role, country, client ),
       turbine:turbine_id ( name, model, manufacturer )
     `)
     .eq('id', campaignId)
@@ -236,6 +243,11 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
     turbineModel: (turbine.model as string) ?? NA,
     manufacturer: (turbine.manufacturer as string) ?? '',
     reportedBy,
+    managerName: (wf.manager_name as string) ?? '',
+    managerRole: (wf.manager_role as string) ?? '',
+    managerSignature: await documentManagerSignatureService.getDataUrl(
+      (wf.manager_name as string) ?? '',
+    ),
     tree,
   };
 }
@@ -533,7 +545,17 @@ export async function generateAndDownloadHoistCertificationReport(
   for (const step of ctx.tree) {
     await renderStepSection(doc, step, locale);
   }
-  // 4. Footers.
+  // 4. Signature + legal page (same as the repair report).
+  renderManagerSignaturePage(doc, {
+    windFarmName: ctx.windFarmName,
+    purpose: 'Certificación de polipastos de turbina eólica',
+    managerName: ctx.managerName,
+    managerRole: ctx.managerRole,
+    managerSignature: ctx.managerSignature,
+    titleColor: hexToRgb(COLOR_PRIMARY),
+  });
+
+  // 5. Footers.
   addFooters(doc, ctx.windFarmName);
 
   const dateStr = formatDateES(ctx.createdAt).replace(/\//g, '-');
