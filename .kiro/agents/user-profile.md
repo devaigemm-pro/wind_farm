@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 416
-- **Última actualización**: 2026-11-18
+- **Sesiones analizadas**: 424
+- **Última actualización**: 2026-11-20
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -3192,3 +3192,13 @@
   - Probado en local: finalizada → Reabrir → confirmar → base en hoist_in_progress, chip "En progreso", botón deshabilitado. Estado original restaurado.
   - Supuesto no verificable: que la app móvil oculta las certificaciones 'hoist_done' y muestra las 'hoist_in_progress'. No tengo el código de la app; lo dije.
 - **Patrones confirmados**: español, directo, comunicación ultra-mínima, describe la funcionalidad por su efecto en el usuario final (el técnico), replicar patrón existente (reabrir defecto de reparación).
+
+### Sesión 423 - 2026-11-20
+- **Tarea principal**: "pasar a prod" y "aplica el cargado por también a prod": deploy de paridad de fotos limpieza/polipasto + migración de RPCs uploader.
+- **Observaciones nuevas**: El usuario interrumpió el deploy para repetir la orden; el `vercel --prod` ya estaba corriendo y completó (Ready). Tras una interrupción, NO relanzar: revisar `vercel ls` y la migración en prod (pg_proc) antes de repetir. Flujo ok: migración a prod (additive) → rebase → merge main → push → vercel --prod --yes → verificar hash index-*.js y grep de strings en los chunks lazy (CleaningWorkflow/HoistCertificationWorkflow). Un `git stash -u` previo al rebase evita ensuciar con archivos de .kiro.
+- **Patrones confirmados**: español, órdenes de 3-4 palabras, "pasar a prod" = deploy manual completo, aprobación de migraciones a prod llega como instrucción explícita.
+
+### Sesión 424 - 2026-11-20
+- **Tarea principal**: Agregar la página de firma + derechos de informe a los PDF de limpieza y polipasto, igual que en reparaciones.
+- **Observaciones nuevas**: Tras un deploy el repo queda en main: volver a la rama de sesión (`git checkout session/...; git merge --ff-only main`) antes de tocar código. La firma sale de wind_farm.manager_name/role + documentManagerSignatureService.getDataUrl (bucket asset-documents); se extrajo un renderer compartido (src/services/reportSignaturePage.ts) sin tocar reparaciones. Verificación del PDF en local: hookear URL.createObjectURL y HTMLAnchorElement.click con `agent-browser eval -b` (script base64 desde /tmp), luego leer el blob y buscar textos; las tildes no coinciden por codificación WinAnsi. Docker puede estar apagado: `open -a Docker` y `docker start supabase_edge_runtime_wind-blade-inspection`. Trabajé directo sin delegar al desarrollador porque el cambio era pequeño y el desarrollador no tuvo shell la vez anterior.
+- **Patrones confirmados**: español, "de la misma manera que reparaciones" = replicar patrón existente, activa con "compañero".
