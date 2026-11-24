@@ -79,3 +79,11 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 - En la fase 2 se ven las fotos reales, pero las 3 miniaturas de la cara LE de la pala A salen rotas también en producción.
 - La fase 3 no cambia: la anotación A25 no muestra imagen en producción.
 - Siguen en datos locales: cotización (slides 9 a 11), reparación, limpieza y certificación (slides 12 a 14). Pendiente cambiarlas si se quieren con fotos reales.
+
+## Actualización final: todo con capturas de producción
+
+- Todas las capturas del deck son de producción (usuario gmunoz, solo lectura): fases 1 a 4, cotización (lista, detalle WTG23 con 10.350.000 CLP, trazabilidad), reparación (WTG23, defecto A1), limpieza (WTG01, 55 fotos, 17 seleccionadas), certificación (WTG03, Preparativos) y parque Fila de Mogote.
+- Certificación: las fotos de producción en Preparativos incluyen una foto de un teclado de laptop (subida por "Tecnico", parece de prueba). Considerar reemplazar esa captura o elegir otro paso con fotos reales.
+- Fase 2: 3 miniaturas de la cara LE salen rotas en producción.
+- Fase 3: la anotación A25 no muestra imagen en producción.
+- Confirmar con el cliente que se pueden mostrar los nombres de parques, montos y fotos de técnicos antes del evento.
