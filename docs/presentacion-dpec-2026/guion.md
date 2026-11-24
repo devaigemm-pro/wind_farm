@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 0-3 | Apertura | 1 | Quién es CORE-TEC, qué hace en cuerdas, qué verán hoy. |
 | 3-6 | Problema | 2 | Carpetas de fotos, criterios distintos, cotizaciones sin vínculo con el defecto. |
-| 6-9 | Plataforma | 3, 4 | Cuatro fases más cuatro servicios. El parque como punto de partida. |
+| 6-9 | Plataforma | 3 | Cuatro fases más cuatro servicios. |
 | 9-23 | **Las 4 fases de la inspección** | 5, 6, 7, 8 | Ver detalle abajo. Es el bloque central. |
 | 23-31 | **Flujo de cotización** | 9, 10, 11 | Del defecto al costo. Ver detalle abajo. |
 | 31-39 | Reparación, limpieza, certificación | 12, 13, 14 | 2 a 3 min por servicio. |
@@ -107,3 +107,5 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 - Se agregó después de la Fase 4. Muestra la portada y el resumen ejecutivo del informe real de FDM-T02, WindFarm Test (PDF de 23 páginas, generado desde la plataforma en español).
 - Mensaje: el dato capturado en las 4 fases termina en un informe entregable, con tabla de defectos por pala y categoría y su posición en la pala.
 - Los slides posteriores se desplazan una posición (el deck tiene 21 slides).
+
+> Se eliminó el slide "Punto de partida" (parque Fila de Mogote). El deck tiene 20 slides y los números posteriores se corren en -1. La tabla de tiempos de arriba aún usa la numeración anterior.
