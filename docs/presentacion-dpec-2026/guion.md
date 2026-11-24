@@ -94,3 +94,8 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 - Las fotos cargan completas en las fases 2 y 3. Las notas anteriores sobre miniaturas rotas ya no aplican a estas fases.
 - El mapa de la fase 1 muestra una ubicación urbana (coordenadas de prueba de la turbina). Si no quieres mostrarla, recortar esa zona de la captura `img/w1-inspect.png`.
 - Las fases se explican con 13 defectos en lugar de 82. Ajustar las cifras si las mencionas al hablar.
+
+## Cambio: campañas de reparación con Talinay
+
+- Nuevo slide 12: campaña de reparación CI791 en WTG23 de PTO Talinay Oriente (pestaña Reparación del parque, en progreso, 869 fotos, 19 defectos), de producción. El deck pasa a 20 slides; los números de slide posteriores se corren en +1.
+- El slide siguiente (reparación por etapas, defecto A1) ya usa Talinay. Contar la historia en este orden: parque, campaña, defecto, etapas.
