@@ -72,3 +72,10 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 - Decir claramente que está en desarrollo. No hay fotos ni especificaciones en el deck.
 - Por definir: especificaciones del carrito, tipo de pala donde se probó, resultados. Si tienes fotos o video del prototipo, agregarlos al slide 16.
 - Los números de slide de la tabla de cronograma anterior se corren en +2 desde el slide 16 (beneficios pasa al 18 y cierre al 19). Recortar 3 min del bloque de reparación, limpieza y certificación para acomodar la sección.
+
+## Actualización: capturas de producción (24-nov)
+
+- Las 4 fases de la inspección (slides 5 a 8) ya usan capturas de producción de PTO Talinay Oriente, WTG23, inspección del 20/8/2026.
+- En la fase 2 se ven las fotos reales, pero las 3 miniaturas de la cara LE de la pala A salen rotas también en producción.
+- La fase 3 no cambia: la anotación A25 no muestra imagen en producción.
+- Siguen en datos locales: cotización (slides 9 a 11), reparación, limpieza y certificación (slides 12 a 14). Pendiente cambiarlas si se quieren con fotos reales.
