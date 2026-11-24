@@ -99,3 +99,6 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 
 - Nuevo slide 12: campaña de reparación CI791 en WTG23 de PTO Talinay Oriente (pestaña Reparación del parque, en progreso, 869 fotos, 19 defectos), de producción. El deck pasa a 20 slides; los números de slide posteriores se corren en +1.
 - El slide siguiente (reparación por etapas, defecto A1) ya usa Talinay. Contar la historia en este orden: parque, campaña, defecto, etapas.
+
+
+> Nota Fase 1 (slide 5): la imagen es la portada del informe de inspección con el haz verde del dron editado digitalmente para apuntar a la pala. Es ilustrativa, no una fotografía original.
