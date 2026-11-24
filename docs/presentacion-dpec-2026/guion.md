@@ -111,5 +111,5 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 > Se eliminó el slide "Punto de partida" (parque Fila de Mogote). El deck tiene 20 slides y los números posteriores se corren en -1. La tabla de tiempos de arriba aún usa la numeración anterior.
 
 ## Slide nuevo: App del técnico (reparación)
-- Va después de "Evidencia por defecto y por etapa". Muestra 3 capturas de la app móvil: 1) campañas de reparación (Fila de Mogote), 2) defectos por pala de WTG06, 3) captura de fotos por etapa (etapa 14 de 21, Laminación exterior).
+- Va antes de "Evidencia por defecto y por etapa" (después de la campaña de reparación). Muestra 3 capturas de la app móvil: 1) campañas de reparación (Fila de Mogote), 2) defectos por pala de WTG06, 3) captura de fotos por etapa (etapa 14 de 21, Laminación exterior).
 - Mensaje: el técnico captura la evidencia en terreno y llega a la plataforma ya ordenada por defecto y etapa. El deck pasa a 21 slides.
