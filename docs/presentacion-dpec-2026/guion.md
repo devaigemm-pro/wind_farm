@@ -101,4 +101,4 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 - El slide siguiente (reparación por etapas, defecto A1) ya usa Talinay. Contar la historia en este orden: parque, campaña, defecto, etapas.
 
 
-> Nota Fase 1 (slide 5): la imagen es la portada del informe de inspección con el haz verde del dron editado digitalmente para apuntar a la pala. Es ilustrativa, no una fotografía original.
+> Nota Fase 1 (slide 5): la imagen es ilustrativa (Etapa_inspeccion.png), no una fotografía original de campo.
