@@ -62,3 +62,13 @@ Mensaje: el dueño ve cuánto cuesta cada defecto y qué se hizo con él.
 | ¿Cómo se clasifican los defectos? | Tipo y categoría de 1 a 5, con distancia a raíz y cara de la pala. |
 | ¿La cotización sale sola? | No. Se arma por defecto con horas hombre, técnicos, tarifa y materiales. |
 | ¿Funciona sin internet en torre? | La captura es móvil. Confirmar el comportamiento sin conexión antes de afirmarlo. |
+
+## Sección nueva: inspección interna de palas (slides 16 y 17, 3 a 4 min)
+
+Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona dentro de la pala, recorre cada zona y captura imágenes.
+
+- Slide 16: esquema ilustrativo del carrito dentro de la pala y qué hace.
+- Slide 17: flujo propuesto, del carrito a la plataforma. Lo de integrarse al mismo flujo de inspección es la meta, no algo ya construido.
+- Decir claramente que está en desarrollo. No hay fotos ni especificaciones en el deck.
+- Por definir: especificaciones del carrito, tipo de pala donde se probó, resultados. Si tienes fotos o video del prototipo, agregarlos al slide 16.
+- Los números de slide de la tabla de cronograma anterior se corren en +2 desde el slide 16 (beneficios pasa al 18 y cierre al 19). Recortar 3 min del bloque de reparación, limpieza y certificación para acomodar la sección.

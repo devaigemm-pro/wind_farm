@@ -289,6 +289,63 @@
   <div class="foot"><span>CORE Insight</span><span>DPEC 2026</span></div>
 </section>
 
+<!-- 15b Inspeccion interna: problema y solucion -->
+<section class="slide"><div class="bar"></div>
+  <div class="tag"><span class="chip">En desarrollo</span>Inspección interna de palas</div>
+  <h2>Ver el interior de la pala sin abrirla</h2>
+  <p class="sub">La inspección con dron o cuerdas cubre la superficie exterior. El interior de la pala es de difícil acceso.</p>
+  <svg viewBox="0 0 1150 250" width="1150" height="250" style="display:block;margin:6px 0 0">
+    <!-- pala vista longitudinal: raiz a la izquierda, punta a la derecha -->
+    <path d="M20 40 L20 210 L1100 150 L1100 120 Z" fill="#eef1ee" stroke="#9aa3a0" stroke-width="3"/>
+    <path d="M30 62 L30 190 L1085 140 L1085 128 Z" fill="#ffffff" stroke="#c4cbc8" stroke-width="2" stroke-dasharray="8 6"/>
+    <!-- carrito -->
+    <rect x="290" y="128" width="120" height="44" rx="8" fill="#4f8a4f"/>
+    <circle cx="315" cy="178" r="10" fill="#26282a"/><circle cx="385" cy="178" r="10" fill="#26282a"/>
+    <rect x="372" y="112" width="30" height="16" rx="3" fill="#26282a"/>
+    <path d="M410 140 L520 120 M410 150 L520 150 M410 160 L520 180" stroke="#4f8a4f" stroke-width="3" fill="none"/>
+    <!-- trayectoria -->
+    <path d="M60 150 L290 150" stroke="#4f8a4f" stroke-width="4" stroke-dasharray="3 8" stroke-linecap="round"/>
+    <path d="M410 150 L1060 150" stroke="#9aa3a0" stroke-width="4" stroke-dasharray="3 8" stroke-linecap="round"/>
+    <!-- zonas -->
+    <g font-size="17" fill="#4b5563" font-family="Inter, sans-serif">
+      <line x1="20" y1="30" x2="20" y2="228" stroke="#26282a" stroke-width="2"/><text x="26" y="24" fill="#26282a" font-weight="700">Raíz</text>
+      <line x1="1100" y1="100" x2="1100" y2="170" stroke="#26282a" stroke-width="2"/><text x="1062" y="92" fill="#26282a" font-weight="700">Punta</text>
+      <text x="270" y="226" fill="#2f6b2f" font-weight="700">Carrito con telemetría</text>
+      <text x="520" y="226">Zona 3</text><text x="720" y="214">Zona 4</text><text x="920" y="204">Zona 5</text>
+      <text x="60" y="226">Zona 1</text><text x="160" y="226">Zona 2</text>
+    </g>
+    <g stroke="#9aa3a0" stroke-width="1.5">
+      <line x1="120" y1="215" x2="120" y2="85"/><line x1="230" y1="215" x2="230" y2="85"/><line x1="500" y1="205" x2="500" y2="95"/><line x1="700" y1="190" x2="700" y2="100"/><line x1="900" y1="175" x2="900" y2="110"/>
+    </g>
+  </svg>
+  <ul style="font-size:22px;margin-top:6px">
+    <li>Carrito automatizado que se posiciona dentro de la pala.</li>
+    <li>Recorre cada zona y captura imágenes.</li>
+    <li>La telemetría registra dónde está cada imagen a lo largo de la pala.</li>
+  </ul>
+  <div class="foot"><span>Esquema ilustrativo. Proyecto en desarrollo.</span><span>DPEC 2026</span></div>
+</section>
+
+<!-- 15c Inspeccion interna: flujo -->
+<section class="slide"><div class="bar"></div>
+  <div class="tag"><span class="chip">En desarrollo</span>Inspección interna de palas</div>
+  <h2>Del carrito a la plataforma</h2>
+  <p class="sub">La meta es que las imágenes internas lleguen al mismo flujo de inspección que ya se usa.</p>
+  <div class="steps">
+    <div class="step">1. Posicionar<small>El carrito entra y se ubica en la pala</small></div>
+    <div class="step">2. Recorrer<small>Avanza por cada zona de forma automatizada</small></div>
+    <div class="step">3. Capturar<small>Imágenes con la posición que informa la telemetría</small></div>
+    <div class="step">4. Subir y analizar<small>Anotar, categorizar y reportar como una inspección externa</small></div>
+  </div>
+  <div class="grid4" style="grid-template-columns:repeat(3,1fr);margin-top:30px">
+    <div class="card"><b>Posición conocida</b><span>Cada imagen queda asociada a una zona de la pala</span></div>
+    <div class="card"><b>Misma plataforma</b><span>Defectos internos y externos en un solo registro por pala</span></div>
+    <div class="card"><b>Comparable en el tiempo</b><span>Mismo recorrido, misma zona, distinta fecha</span></div>
+  </div>
+  <p class="sub" style="margin-top:30px">Estado: proyecto en desarrollo.</p>
+  <div class="foot"><span>Proyecto en desarrollo</span><span>DPEC 2026</span></div>
+</section>
+
 <!-- 16 Beneficios -->
 <section class="slide"><div class="bar"></div>
   <div class="tag">Qué gana el dueño del parque</div>
