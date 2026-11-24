@@ -4,41 +4,54 @@
 **Fecha**: miércoles 25 de noviembre de 2026, 3:45 a 4:30 p.m.
 **Expositor**: Risto Martínez Ramírez, CORE-TEC SPA
 **Público**: dueños de parques eólicos de Centroamérica (decisores, no técnicos de campo)
+**Ejemplos usados**: PTO Talinay Oriente (inspección, reparación, cotización) y Fila de Mogote (limpieza y certificación de polipastos). Son datos de demostración.
 
 ## Cronograma
 
 | Min | Bloque | Slides | Qué decir |
 |---|---|---|---|
 | 0-3 | Apertura | 1 | Quién es CORE-TEC, qué hace en cuerdas, qué verán hoy. |
-| 3-8 | Problema | 2 | Carpetas de fotos, criterios distintos, reparaciones sin evidencia. Pedir que levanten la mano quién recibe informes en PDF sin datos comparables. |
-| 8-12 | Plataforma | 3 | Los cuatro pasos y las cuatro campañas. |
-| 12-16 | Panel, parque y turbina | 4, 5, 6 | Del panel a la turbina: historial y buzón de documentos. |
-| 16-28 | **Demo en vivo** | 7, 8 | Ver guion de demo abajo. |
-| 28-35 | Reparación | 9 | Las 11 etapas. Mostrar fotos reales de un trabajo propio. |
-| 35-39 | Polipastos, limpieza, dron | 10, 11 | Mismo registro para todos los servicios. |
-| 39-41 | Beneficios | 12 | Trazabilidad, comparabilidad, evidencia, rapidez. |
-| 41-45 | Cierre y preguntas | 13 | Ofrecer demo con sus datos. |
+| 3-6 | Problema | 2 | Carpetas de fotos, criterios distintos, cotizaciones sin vínculo con el defecto. |
+| 6-9 | Plataforma | 3, 4 | Cuatro fases más cuatro servicios. El parque como punto de partida. |
+| 9-23 | **Las 4 fases de la inspección** | 5, 6, 7, 8 | Ver detalle abajo. Es el bloque central. |
+| 23-31 | **Flujo de cotización** | 9, 10, 11 | Del defecto al costo. Ver detalle abajo. |
+| 31-39 | Reparación, limpieza, certificación | 12, 13, 14 | 2 a 3 min por servicio. |
+| 39-41 | Captura en campo y beneficios | 15, 16 | App móvil y dron. |
+| 41-45 | Cierre y preguntas | 17 | Ofrecer demo con sus datos. |
 
-## Guion de demo (12 min)
+## Fases de la inspección (14 min)
 
-Ambiente: preview local con datos de prueba (`npx vite build --mode development`). Usuario `dev@local.test`. Para la charla real, preferible un parque de producción con fotos reales. Las miniaturas de las fotos no cargan en el ambiente local porque el Storage local está vacío.
+Inspección de PTO Talinay Oriente, WTG23, 20/8/2026: 85 fotos, 82 defectos, 25 de categoría 5.
 
-1. **Panel** (`/dashboard`): pipeline, dispersión de defectos, filtros por parque y severidad. 1 min.
-2. **Parques eólicos** (`/assets-wind`): tabla con potencia, inspecciones y fechas. Abrir un parque. 1 min.
-3. **Parque**: mostrar las cuatro pestañas de campañas y la pestaña Defectos. 1 min.
-4. **Turbina**: abrir WindFarm Test > FDM-T02. Tabla de inspecciones, fotos subidas, % visto, defectos y buzón de documentos. 1 min.
-5. **Paso 2 Anotar**: abrir la inspección. Mostrar selector de pala y cara, zoom, brillo y contraste, modo avance rápido, marcar un defecto. 3 min.
-6. **Paso 3 Analizar**: arrastrar una anotación al editor, asignar tipo, categoría, distancia a raíz, causa y siguiente paso. 2 min.
-7. **Paso 4 Resultados**: posición de defectos en la pala, gráficos, tabla resumen. Pulsar Exportar y Compartir. 2 min.
-8. **Certificación de polipastos** (`/hoist-certification/<id>`): pasos, selección de fotos, Generar informe. 1 min.
+1. **Fase 1, Inspeccionar** (3 min): qué se voló y qué se subió. Fotos subidas y pendientes, estado RTK, mapa, documentos.
+2. **Fase 2, Anotar** (4 min): pala y cara, marcas sobre la foto, modo de avance rápido, comparación con la inspección anterior. Si es demo en vivo, marcar un defecto.
+3. **Fase 3, Analizar** (4 min): arrastrar la anotación al editor. Tipo, categoría de 1 a 5, distancia a raíz, causa raíz y siguiente paso. Numeración A1, A2, B1.
+4. **Fase 4, Resultados** (3 min): posición en la pala, desglose por pala, categoría y tipo. Exportar y compartir.
 
-## Riesgos a cubrir antes del evento
+Mensaje de la sección: el defecto queda con tipo, categoría y posición. Eso alimenta la cotización.
 
-- Internet del hotel: tener la demo en un parque local con datos precargados y capturas de respaldo en `img/`.
-- Fotos: usar un parque con fotos reales para la demo. Con datos locales las miniaturas aparecen rotas.
-- Reparación: el ambiente local no tiene campañas de reparación con defectos vinculados. Para el slide 9 agregar capturas de una reparación real de producción.
-- Datos de clientes: no mostrar nombres de parques ni turbinas de clientes sin su autorización.
-- Dron: el slide 11 lo presenta como en desarrollo. Confirmar el estado antes de presentarlo.
+## Flujo de cotización (8 min)
+
+1. **Lista**: cotizaciones por aerogenerador y parque, con defectos, estado y total.
+2. **Detalle**: cada defecto con horas hombre, número de técnicos, tarifa por hora y materiales. Ejemplo: WTG23 de Talinay, total 10.350.000 CLP, dos defectos tipo CRACK categoría 4.
+3. **Trazabilidad de costos**: costo por parque y por aerogenerador, órdenes de trabajo y reparaciones en el tiempo.
+
+Mensaje: el dueño ve cuánto cuesta cada defecto y qué se hizo con él.
+
+## Reparación, limpieza y certificación (8 min)
+
+- **Reparación** (Talinay, WTG23, defecto A1 SHELL DELAMINATION): 11 etapas con fotos elegidas para el informe. 88 fotos, 34 seleccionadas.
+- **Limpieza** (Fila de Mogote, WTG01): zonas palas, nacelle, hub y torre. Nacelle con 49 fotos, 6 seleccionadas.
+- **Certificación de polipastos** (Fila de Mogote, WTG03): seis pasos, ítems de foto, verificación y medición.
+
+## Pendientes antes del evento
+
+- **Fotos**: en el ambiente local no hay imágenes en Storage, así que las miniaturas salen rotas en los slides 6 (Anotar), 12, 13 y 14. Reemplazar esas capturas por otras de producción con fotos reales. Las rutas están en `img/`: `t2-annotate.png`, `r1b-talinay-etapas.png`, `c2-nacelle.png`, `h2-criticas.png`. Los demás slides no dependen de fotos.
+- **Valores de cotización**: son de demostración. Confirmar que no corresponden a una oferta real de un cliente.
+- **Nombres de parques**: Talinay y Fila de Mogote aparecen con su nombre. Confirmar que puedes mostrarlos en un evento público.
+- **Dron**: el slide 15 lo presenta como en desarrollo. Confirmar el estado.
+- **Respuestas comerciales**: precio, uso por otros proveedores y funcionamiento sin internet en torre.
+- **Internet del hotel**: dejar la demo en un preview local y el PDF como respaldo.
 
 ## Preguntas probables
 
@@ -46,6 +59,6 @@ Ambiente: preview local con datos de prueba (`npx vite build --mode development`
 |---|---|
 | ¿Quién es el dueño de los datos? | El cliente. Los datos viven en su cuenta y se exportan en PDF y XLSX. |
 | ¿Sirve para otros proveedores de inspección? | Las fotos se pueden subir desde cualquier fuente. Confirmar política comercial antes. |
-| ¿Cómo se clasifican los defectos? | Tipo y categoría de 1 a 5 con distancia a raíz y cara de la pala. |
-| ¿Funciona sin internet en torre? | La captura es móvil. Confirmar el comportamiento sin conexión de la app antes de afirmarlo. |
-| ¿Qué cuesta? | Definir respuesta comercial antes del evento. |
+| ¿Cómo se clasifican los defectos? | Tipo y categoría de 1 a 5, con distancia a raíz y cara de la pala. |
+| ¿La cotización sale sola? | No. Se arma por defecto con horas hombre, técnicos, tarifa y materiales. |
+| ¿Funciona sin internet en torre? | La captura es móvil. Confirmar el comportamiento sin conexión antes de afirmarlo. |
