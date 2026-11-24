@@ -42,7 +42,7 @@ Mensaje: el dueño ve cuánto cuesta cada defecto y qué se hizo con él.
 
 - **Reparación** (Talinay, WTG23, defecto A1 SHELL DELAMINATION): 11 etapas con fotos elegidas para el informe. 88 fotos, 34 seleccionadas.
 - **Limpieza** (Fila de Mogote, WTG02): zonas palas, nacelle, hub y torre. Nacelle con 24 fotos, 15 seleccionadas.
-- **Certificación de polipastos** (Fila de Mogote, WTG03): seis pasos, ítems de foto, verificación y medición.
+- **Certificación de polipastos** (Los Cururos, A34): seis pasos, ítems de foto, verificación y medición.
 
 ## Pendientes antes del evento
 
@@ -82,7 +82,7 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 
 ## Actualización final: todo con capturas de producción
 
-- Todas las capturas del deck son de producción (usuario gmunoz, solo lectura): fases 1 a 4, cotización (lista, detalle WTG23 con 10.350.000 CLP, trazabilidad), reparación (WTG23, defecto A1), limpieza (WTG02, 24 fotos, 15 seleccionadas), certificación (WTG03, Preparativos) y parque Fila de Mogote.
+- Todas las capturas del deck son de producción (usuario gmunoz, solo lectura): fases 1 a 4, cotización (lista, detalle WTG23 con 10.350.000 CLP, trazabilidad), reparación (WTG23, defecto A1), limpieza (WTG02, 24 fotos, 15 seleccionadas), certificación (A34 Los Cururos, Inspección visual y mecánica) y parque Fila de Mogote.
 - Certificación: las fotos de producción en Preparativos incluyen una foto de un teclado de laptop (subida por "Tecnico", parece de prueba). Considerar reemplazar esa captura o elegir otro paso con fotos reales.
 - Fase 2: 3 miniaturas de la cara LE salen rotas en producción.
 - Fase 3: la anotación A25 no muestra imagen en producción.
@@ -102,3 +102,8 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 
 
 > Nota Fase 1 (slide 5): la imagen es ilustrativa (Etapa_inspeccion.png), no una fotografía original de campo.
+
+## Slide 9 (nuevo): Ejemplo de informe
+- Se agregó después de la Fase 4. Muestra la portada y el resumen ejecutivo del informe real de FDM-T02, WindFarm Test (PDF de 23 páginas, generado desde la plataforma en español).
+- Mensaje: el dato capturado en las 4 fases termina en un informe entregable, con tabla de defectos por pala y categoría y su posición en la pala.
+- Los slides posteriores se desplazan una posición (el deck tiene 21 slides).
