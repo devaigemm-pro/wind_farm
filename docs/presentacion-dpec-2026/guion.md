@@ -87,3 +87,10 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 - Fase 2: 3 miniaturas de la cara LE salen rotas en producción.
 - Fase 3: la anotación A25 no muestra imagen en producción.
 - Confirmar con el cliente que se pueden mostrar los nombres de parques, montos y fotos de técnicos antes del evento.
+
+## Cambio: fases de inspección con WindFarm Test
+
+- Los slides 5 a 8 (fases 1 a 4) ahora usan la inspección de WindFarm Test, turbina FDM-T02, 9/8/2026, de producción: 469 fotos, 94 marcadas, 13 defectos (2 de categoría 5).
+- Las fotos cargan completas en las fases 2 y 3. Las notas anteriores sobre miniaturas rotas ya no aplican a estas fases.
+- El mapa de la fase 1 muestra una ubicación urbana (coordenadas de prueba de la turbina). Si no quieres mostrarla, recortar esa zona de la captura `img/w1-inspect.png`.
+- Las fases se explican con 13 defectos en lugar de 82. Ajustar las cifras si las mencionas al hablar.
