@@ -113,3 +113,8 @@ Proyecto en desarrollo. Un carrito automatizado con telemetría se posiciona den
 ## Slide nuevo: App del técnico (reparación)
 - Va antes de "Evidencia por defecto y por etapa" (después de la campaña de reparación). Muestra 3 capturas de la app móvil: 1) campañas de reparación (Fila de Mogote), 2) defectos por pala de WTG06, 3) captura de fotos por etapa (etapa 14 de 21, Laminación exterior).
 - Mensaje: el técnico captura la evidencia en terreno y llega a la plataforma ya ordenada por defecto y etapa. El deck pasa a 21 slides.
+
+## Slides nuevos: App del técnico (limpieza y certificación)
+- Limpieza (antes de "Fotos por zona"): campañas de limpieza, recorrido por zonas (Zona 7 de 10, Nacelle lado izquierdo) y captura de fotos por zona (Zona 5 de 10, lado derecho, WTG02 Fila de Mogote).
+- Certificación (antes de "Verificación, medición y foto"): campañas de certificación, ítem con foto (Certificado de peso patrón, ítem 3 de 23) y verificación cumple / no cumple (Lubricación de cadena, ítem 9 de 23), Los Cururos C20.
+- El deck pasa a 23 slides.
