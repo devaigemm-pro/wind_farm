@@ -941,6 +941,20 @@ export const hoistCertificationService = {
   },
 
   /**
+   * Set (or clear with null) the cumple / no cumple result of a check item from
+   * the web. Same upsert as setItemValue (keyed by campaign_id, item_code), so
+   * it overrides what the mobile app sent.
+   */
+  async setItemPassed(campaignId: string, itemCode: string, passed: boolean | null): Promise<void> {
+    const { error } = await db
+      .from('hoist_cert_item')
+      .upsert(
+        { campaign_id: campaignId, item_code: itemCode, item_type: 'check', passed },
+        { onConflict: 'campaign_id,item_code' },
+      );
+    if (error) throw new HoistCertificationServiceError(error.message, error.code);
+  },
+  /**
    * Parent campaign + its turbines with progress, in ONE pass (items and photo
    * counts of every child fetched together instead of one RPC per turbine).
    */

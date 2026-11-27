@@ -32,6 +32,7 @@ import {
   useUpdateHoistStatus,
   useUploadHoistPhoto,
   useSetHoistItemValue,
+  useSetHoistItemPassed,
   useSetHoistReportText,
   useSetHoistDetails,
   useHoistLabelPhoto,
@@ -835,7 +836,12 @@ function ItemRow({
         </span>
         <h3 style={itemRowTitle}>{getHoistLabel(item.itemCode, locale)}</h3>
         {/* State badge for check / measurement */}
-        {item.itemType === 'check' && <CheckBadge passed={item.passed} t={t} />}
+        {item.itemType === 'check' &&
+          (readOnly ? (
+            <CheckBadge passed={item.passed} t={t} />
+          ) : (
+            <EditableCheck itemCode={item.itemCode} passed={item.passed} t={t} />
+          ))}
         {item.itemType === 'measurement' &&
           (isWebEditable && !readOnly ? (
             <EditableValue itemCode={item.itemCode} value={item.measurementValue} t={t} />
@@ -1265,6 +1271,51 @@ function ReportTextArea({
   );
 }
 
+/** Cumple / No cumple / Sin dato selector of a check item (web override). */
+function EditableCheck({
+  itemCode,
+  passed,
+  t,
+}: {
+  itemCode: string;
+  passed: boolean | null;
+  t: (k: string) => string;
+}) {
+  const campaignId = useContext(HoistCampaignIdContext);
+  const toast = useToast();
+  const setPassed = useSetHoistItemPassed(campaignId);
+  const value = passed === true ? 'pass' : passed === false ? 'fail' : '';
+  const color =
+    passed === true
+      ? { background: C.passBg, color: C.pass }
+      : passed === false
+        ? { background: C.failBg, color: C.fail }
+        : { background: C.naBg, color: C.na };
+  return (
+    <select
+      aria-label={t('hoist.editCheck')}
+      title={t('hoist.editCheck')}
+      value={value}
+      disabled={setPassed.isPending}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const v = e.target.value;
+        setPassed.mutate(
+          { itemCode, passed: v === 'pass' ? true : v === 'fail' ? false : null },
+          {
+            onSuccess: () => toast.success(t('hoist.valueSaved')),
+            onError: (err) => toast.error((err as Error)?.message || t('hoist.valueError')),
+          },
+        );
+      }}
+      style={{ ...stateBadge, ...color, border: 'none', cursor: 'pointer', fontWeight: 600 }}
+    >
+      <option value="">{t('hoist.noData')}</option>
+      <option value="pass">{t('hoist.pass')}</option>
+      <option value="fail">{t('hoist.fail')}</option>
+    </select>
+  );
+}
 function CheckBadge({ passed, t }: { passed: boolean | null; t: (k: string) => string }) {
   if (passed === true) {
     return (

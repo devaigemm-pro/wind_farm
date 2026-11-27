@@ -259,6 +259,20 @@ export function useSetHoistItemValue(campaignId: string | undefined) {
   });
 }
 
+/** Set / clear the cumple – no cumple result of a check item from the web. */
+export function useSetHoistItemPassed(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemCode, passed }: { itemCode: string; passed: boolean | null }) =>
+      hoistCertificationService.setItemPassed(campaignId!, itemCode, passed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
+    },
+  });
+}
+
 /** First hoist label photo (for OCR and the inspection date). */
 export function useHoistLabelPhoto(campaignId: string | undefined) {
   return useQuery({
