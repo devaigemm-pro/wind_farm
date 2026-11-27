@@ -177,7 +177,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 
 // ─── Data fetching ──────────────────────────────────────────────────────────
 
-async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
+async function fetchHoistData(campaignId: string, labelOnly: boolean): Promise<HoistPdfContext> {
   const { data: campaign, error } = await db
     .from('campaign')
     .select(`
@@ -196,12 +196,15 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   // shows (and degrades gracefully to empty items when no data yet).
   const fullTree = await hoistCertificationService.getHoistTree(campaignId);
 
-  // Only the hoist label photo goes in the report. Keep its photos selected
-  // for the report; if none of them is selected, keep them all. Check and
-  // measurement STATE is always kept (used for the condition).
+  // Keep only the photos selected for the report. If NONE are selected, fall
+  // back to ALL photos (same rule as cleaning). Only photo-capture items carry
+  // photos; in Anexo II (labelOnly) only the hoist label photo. Check and
+  // measurement STATE is always kept regardless of photo selection.
+  const inReport = (it: HoistItemNode) =>
+    labelOnly ? it.itemCode === LABEL_ITEM_CODE : it.itemType === 'photo';
   const allPhotos: HoistPhoto[] = [];
   const walk = (it: HoistItemNode) => {
-    if (it.itemCode === LABEL_ITEM_CODE) allPhotos.push(...it.photos);
+    if (inReport(it)) allPhotos.push(...it.photos);
   };
   for (const step of fullTree) {
     for (const it of step.items) walk(it);
@@ -211,7 +214,7 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const keep = (p: HoistPhoto) => (anySelected ? p.hoistSelected : true);
   const filterItem = (it: HoistItemNode): HoistItemNode => ({
     ...it,
-    photos: it.itemCode === LABEL_ITEM_CODE ? it.photos.filter(keep) : [],
+    photos: inReport(it) ? it.photos.filter(keep) : [],
   });
   const tree: HoistTree = fullTree.map((step) => ({
     ...step,
@@ -383,7 +386,13 @@ function resultItems(tree: HoistTree): HoistItemNode[] {
   return out;
 }
 
-/** Catalog item of the hoist label photo — the only photo shown in the report. */
+/** Brake clearance ranges (mm) of the "verificación holgura de freno" items. */
+const BRAKE_RANGES: Record<string, [number, number]> = {
+  freno_holgura_020_050: [0.2, 0.5],
+  freno_holgura_050_100: [0.5, 1],
+};
+
+/** Catalog item of the hoist label photo — the only photo of the Anexo II sheet. */
 const LABEL_ITEM_CODE = 'prep_etiqueta_polipasto';
 
 /**
@@ -392,12 +401,13 @@ const LABEL_ITEM_CODE = 'prep_etiqueta_polipasto';
  * fabricante / modelo, serie / fabricación, comentarios, recomendación), then
  * the result of every check/measurement item and one hoist photo in a box.
  */
-async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
+async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext, variant: HoistReportVariant) {
   doc.addPage();
   const d = ctx.details ?? {};
   const items = resultItems(ctx.tree);
   const condition = hoistCondition(d, items.some((it) => it.itemType === 'check' && it.passed === false));
   const LIGHT_GREEN: RGB = [146, 208, 80];
+  const DARK_GREEN: RGB = [0, 176, 80];
   const RED: RGB = [255, 0, 0];
   const conditionLabel = {
     certificado: 'CERTIFICADO',
@@ -416,11 +426,13 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   const BORDER = { lineColor: [0, 0, 0] as RGB, lineWidth: 0.3 };
   const label = { fontStyle: 'bold' as const };
 
-  // Only the hoist LABEL photo goes in the sheet (one row, before COMENTARIOS);
-  // the other photo items are not part of the report. Up to 3 report photos.
+  // Photo-capture items go in the sheet, one row each (title + photos), before
+  // COMENTARIOS. Up to 3 report photos per item. Anexo II (not certified): only
+  // the hoist LABEL photo row, and no results table.
+  const notCertified = variant === 'not_certified';
   const PHOTO_ROW_H = 40;
   const photoItems = ctx.tree.flatMap((st) => [...st.items, ...st.groups.flatMap((g) => g.items)])
-    .filter((it) => it.itemType === 'photo' && it.itemCode === LABEL_ITEM_CODE);
+    .filter((it) => it.itemType === 'photo' && (!notCertified || it.itemCode === LABEL_ITEM_CODE));
   const photoImgs: { data: string; w: number; h: number }[][] = [];
   for (const it of photoItems) {
     const imgs: { data: string; w: number; h: number }[] = [];
@@ -505,7 +517,47 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
     },
   });
 
-  // No check list / results table in the report (only the sheet above).
+  // Anexo II has no check list / results table (only the sheet above).
+  if (notCertified) return;
+
+  const result = (it: HoistItemNode): string => {
+    if (it.itemType === 'measurement') {
+      if (it.measurementValue === null || it.measurementValue === '') return '—';
+      const v = `${it.measurementValue}${it.measurementUnit ? ' ' + it.measurementUnit : ''}`;
+      const range = BRAKE_RANGES[it.itemCode];
+      const n = parseFloat(String(it.measurementValue).replace(',', '.'));
+      if (range && !isNaN(n)) return `${v} / ${n >= range[0] && n <= range[1] ? 'OK' : 'NO OK'}`;
+      return v;
+    }
+    if (it.passed === true) return 'OK';
+    if (it.passed === false) return 'NO CUMPLE';
+    return '—';
+  };
+
+  // The results table always starts on its own page, after the sheet header.
+  doc.addPage();
+  autoTable(doc, {
+    startY: 14,
+    theme: 'plain',
+    body: items.map((it) => [it.itemLabel, result(it)]),
+    styles: { fontSize: 8.5, cellPadding: 1.1, textColor: [0, 0, 0], ...BORDER },
+    columnStyles: {
+      0: { cellWidth: W * 0.77 },
+      1: { halign: 'center', fontStyle: 'bold' },
+    },
+    margin: { left: MARGIN, right: MARGIN, top: 14, bottom: 20 },
+    didParseCell: (hook) => {
+      if (hook.section !== 'body' || hook.column.index !== 1) return;
+      const it = items[hook.row.index];
+      if (!it) return;
+      if (it.itemType === 'measurement' && !BRAKE_RANGES[it.itemCode] && result(it) !== '—') {
+        hook.cell.styles.fillColor = DARK_GREEN;
+      } else if (it.itemType === 'check' && it.passed === false) {
+        hook.cell.styles.fillColor = [255, 199, 206];
+      }
+    },
+  });
+  // Photos are only inside the sheet (photo-item rows); none below the table.
 }
 
 /** A run of text with its style (rich paragraph). */
@@ -738,11 +790,16 @@ export async function generateAndDownloadHoistCertificationReport(
   if (data.campaignIds.length === 0) throw new Error('No hay turbinas para el informe.');
 
   // Turbine contexts, a few at a time (each one reads its tree and photos).
-  const ctxs: HoistPdfContext[] = [];
-  for (let i = 0; i < data.campaignIds.length; i += 4) {
-    const batch = data.campaignIds.slice(i, i + 4);
-    ctxs.push(...(await Promise.all(batch.map((id) => fetchHoistData(id)))));
-  }
+  // Anexo II keeps only the label photo (its own report-selection fallback).
+  const fetchAll = async (labelOnly: boolean) => {
+    const out: HoistPdfContext[] = [];
+    for (let i = 0; i < data.campaignIds.length; i += 4) {
+      const batch = data.campaignIds.slice(i, i + 4);
+      out.push(...(await Promise.all(batch.map((id) => fetchHoistData(id, labelOnly)))));
+    }
+    return out;
+  };
+  let ctxs = await fetchAll(data.variant === 'not_certified');
   ctxs.sort((a, b) => a.turbineName.localeCompare(b.turbineName, 'es', { numeric: true }));
   const first = ctxs[0]!;
   const multi = ctxs.length > 1;
@@ -754,6 +811,11 @@ export async function generateAndDownloadHoistCertificationReport(
   const notCertifiedCount = conditions.filter((c) => c === 'no_certificado').length;
   const variant: HoistReportVariant =
     data.variant ?? (notCertifiedCount === ctxs.length ? 'not_certified' : 'certified');
+  // Variant decided from the data (single turbine): re-read label-only photos.
+  if (!data.variant && variant === 'not_certified') {
+    ctxs = await fetchAll(true);
+    ctxs.sort((a, b) => a.turbineName.localeCompare(b.turbineName, 'es', { numeric: true }));
+  }
   const meta: HoistReportMeta = {
     campaignName: data.campaignName || first.campaignName,
     turbines: ctxs.map((c) => c.turbineName),
@@ -777,7 +839,7 @@ export async function generateAndDownloadHoistCertificationReport(
   // 4. Per turbine: revision detail sheet, then its report photos.
   for (const ctx of ctxs) {
     // Photos of photo-capture items are inside the sheet (no separate photo pages).
-    await renderRevisionDetail(doc, ctx);
+    await renderRevisionDetail(doc, ctx, variant);
   }
   // 5. Signature + legal page (same as the repair report).
   renderManagerSignaturePage(doc, {
