@@ -9,6 +9,7 @@ import { NewHoistCertificationModal } from '@/components/organisms/NewHoistCerti
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { HoistCertificationWorkflow } from '@/pages/HoistCertificationWorkflow';
 import type { HoistGroupTurbine } from '@/services/hoistCertification.service';
+import type { HoistReportVariant } from '@/services/hoistCertificationReportPdf.service';
 
 const C = {
   brand: '#5A8F5A',
@@ -51,7 +52,7 @@ export function HoistCampaignGroup() {
   const { role } = useAuth();
   const isClient = role === 'client';
   const { data: group, isLoading } = useHoistGroup(groupId);
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading] = useState<HoistReportVariant | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const initialOpen = searchParams.get('turbine');
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(initialOpen ? [initialOpen] : []));
@@ -65,24 +66,29 @@ export function HoistCampaignGroup() {
     });
 
   const turbines = group?.turbines ?? [];
-  const completeIds = turbines.filter((tb) => tb.complete).map((tb) => tb.campaignId);
+  const complete = turbines.filter((tb) => tb.complete);
+  // Main report: certified / certified with observations. Anexo II: no certificado.
+  const certifiedIds = complete.filter((tb) => tb.condition !== 'no_certificado').map((tb) => tb.campaignId);
+  const notCertifiedIds = complete.filter((tb) => tb.condition === 'no_certificado').map((tb) => tb.campaignId);
 
-  const handleReport = async () => {
+  const handleReport = async (variant: HoistReportVariant) => {
     if (!group || downloading) return;
-    if (completeIds.length === 0) {
+    const ids = variant === 'not_certified' ? notCertifiedIds : certifiedIds;
+    if (ids.length === 0) {
       toast.error(t('hoist.noCompleteTurbines'));
       return;
     }
-    setDownloading(true);
+    setDownloading(variant);
     try {
       await generateAndDownloadHoistCertificationReport({
-        campaignIds: completeIds,
+        campaignIds: ids,
         campaignName: group.name,
+        variant,
       });
     } catch (err) {
       toast.error((err as Error)?.message || t('hoist.pdfError'));
     } finally {
-      setDownloading(false);
+      setDownloading(null);
     }
   };
 
@@ -122,20 +128,38 @@ export function HoistCampaignGroup() {
           <button
             type="button"
             style={{ ...reportBtn, opacity: downloading ? 0.5 : 1, cursor: downloading ? 'not-allowed' : 'pointer' }}
-            onClick={handleReport}
-            disabled={downloading}
+            onClick={() => void handleReport('certified')}
+            disabled={!!downloading}
             title={t('hoist.reportIncludes')}
           >
-            {downloading ? (
+            {downloading === 'certified' ? (
               <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
             ) : (
               <Download size={14} />
             )}
-            {t('hoist.generateReport')} ({completeIds.length}/{turbines.length})
+            {t('hoist.generateReport')} ({certifiedIds.length}/{turbines.length})
+          </button>
+          <button
+            type="button"
+            style={{
+              ...notCertifiedBtn,
+              opacity: downloading || notCertifiedIds.length === 0 ? 0.5 : 1,
+              cursor: downloading || notCertifiedIds.length === 0 ? 'not-allowed' : 'pointer',
+            }}
+            onClick={() => void handleReport('not_certified')}
+            disabled={!!downloading || notCertifiedIds.length === 0}
+            title={t('hoist.notCertifiedReportIncludes')}
+          >
+            {downloading === 'not_certified' ? (
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <Download size={14} />
+            )}
+            {t('hoist.generateNotCertifiedReport')} ({notCertifiedIds.length})
           </button>
         </div>
       </div>
-      <p style={hint}>{t('hoist.reportIncludes')}.</p>
+      <p style={hint}>{t('hoist.reportIncludes')}. {t('hoist.notCertifiedReportIncludes')}.</p>
 
       {turbines.length === 0 ? (
         <p style={{ color: C.muted, padding: 24 }}>{t('hoist.noTurbines')}</p>
@@ -157,6 +181,9 @@ export function HoistCampaignGroup() {
                     <span style={turbineCount}>
                       {tb.photosCount} {t('hoist.photos')} · {t('hoist.colItems')} {tb.itemsWithData}/{tb.totalItems}
                     </span>
+                    {tb.condition === 'no_certificado' && (
+                      <span style={notCertifiedChip}>{t('hoist.notCertified')}</span>
+                    )}
                     <span style={tb.complete ? completeChip : incompleteChip}>
                       {tb.complete ? t('hoist.complete') : t('hoist.incomplete')}
                     </span>
@@ -211,6 +238,7 @@ const reportBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: C.brand, color: '#fff',
   border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600,
 };
+const notCertifiedBtn: React.CSSProperties = { ...reportBtn, background: '#B91C1C' };
 const secondaryBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', color: C.brand,
   border: `1px solid ${C.brand}`, borderRadius: 8, padding: '7px 14px', fontSize: 12,
@@ -234,6 +262,9 @@ const turbineTitle: React.CSSProperties = {
 const turbineCount: React.CSSProperties = { fontSize: 12, color: C.muted, flexShrink: 0 };
 const completeChip: React.CSSProperties = {
   ...statusChip, marginLeft: 0, background: '#DEF7EC', color: '#03543F',
+};
+const notCertifiedChip: React.CSSProperties = {
+  ...statusChip, marginLeft: 0, background: '#FEE2E2', color: '#B91C1C',
 };
 const incompleteChip: React.CSSProperties = {
   ...statusChip, marginLeft: 0, background: '#F3F4F6', color: '#6B7280',

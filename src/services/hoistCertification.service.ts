@@ -114,7 +114,7 @@ export interface HoistDetails {
   serialNumber?: string | null;
   year?: string | null;
   /** Manual override; null/absent = computed from the check results. */
-  condition?: 'certificado' | 'certificado_con_observaciones' | null;
+  condition?: HoistConditionValue | null;
   /** When OCR of the label photo last ran (so it doesn't run on every visit). */
   ocrAt?: string | null;
 }
@@ -127,13 +127,19 @@ export interface HoistLabelPhoto {
   uploadedAt: string | null;
 }
 
-/** Report condition of the hoist: manual override, else "con observaciones" if any check failed. */
+export type HoistConditionValue = 'certificado' | 'certificado_con_observaciones' | 'no_certificado';
+
+/**
+ * Report condition of the hoist: manual override, else "no certificado" if any
+ * verification (check) failed. "Certificado con observaciones" is set by hand.
+ * No-certificado hoists go to the "Anexo II — equipos no certificados" report.
+ */
 export function hoistCondition(
   details: HoistDetails | null | undefined,
   anyFailed: boolean,
-): 'certificado' | 'certificado_con_observaciones' {
+): HoistConditionValue {
   if (details?.condition) return details.condition;
-  return anyFailed ? 'certificado_con_observaciones' : 'certificado';
+  return anyFailed ? 'no_certificado' : 'certificado';
 }
 
 export interface HoistCampaignDetail {
@@ -590,6 +596,8 @@ export interface HoistGroupTurbine {
   totalItems: number;
   /** Every catalog item has its data → included in the campaign report. */
   complete: boolean;
+  /** Report condition (no_certificado → Anexo II report). */
+  condition: HoistConditionValue;
 }
 
 /** Parent hoist campaign (type='hoist_certification_group') with its turbines. */
@@ -947,7 +955,7 @@ export const hoistCertificationService = {
     }
     const { data: kids, error: kidsErr } = await db
       .from('campaign')
-      .select('id, status, turbine_id, turbine:turbine_id ( name )')
+      .select('id, status, turbine_id, hoist_details, turbine:turbine_id ( name )')
       .eq('parent_campaign_id', groupId)
       .eq('type', 'hoist_certification');
     if (kidsErr) throw new HoistCertificationServiceError(kidsErr.message, kidsErr.code);
@@ -989,10 +997,12 @@ export const hoistCertificationService = {
       const id = k.id as string;
       let itemsWithData = 0;
       let photosCount = 0;
+      let anyFailed = false;
       for (const e of catalogItems) {
         const row = itemMap.get(itemKey(id, e.code));
         const n = photoCount.get(itemKey(id, e.code)) ?? 0;
         if (e.itemType === 'photo') photosCount += n;
+        if (e.itemType === 'check' && normalizePassed(row?.passed) === false) anyFailed = true;
         const has =
           e.itemType === 'photo'
             ? n > 0
@@ -1010,6 +1020,7 @@ export const hoistCertificationService = {
         itemsWithData,
         totalItems: catalogItems.length,
         complete: itemsWithData === catalogItems.length,
+        condition: hoistCondition(k.hoist_details as HoistDetails | null, anyFailed),
       };
     });
     turbines.sort((a, b) => a.turbineName.localeCompare(b.turbineName, 'es', { numeric: true }));

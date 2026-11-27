@@ -43,6 +43,7 @@ import { byReportOrder } from '@/utils/reportOrder';
 import { readHoistLabel, hoistLabelScore } from '@/utils/hoistLabel';
 import { hoistCondition } from '@/services/hoistCertification.service';
 import type {
+  HoistConditionValue,
   HoistDetails,
   HoistPhoto,
   HoistStepNode,
@@ -1099,7 +1100,8 @@ function HoistDetailsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labelPhoto?.url, details?.ocrAt, readOnly]);
 
-  const condition = hoistCondition(details, anyFailed);
+  // Computed condition (ignores the manual override) for the "Automática" option.
+  const autoCondition = hoistCondition(null, anyFailed);
   const field = (k: 'tag' | 'manufacturer' | 'model' | 'serialNumber' | 'year', label: string) => (
     <DetailInput
       key={k}
@@ -1160,10 +1162,11 @@ function HoistDetailsPanel({
             }
           >
             <option value="">
-              {t('hoist.conditionAuto')}: {t(condition === 'certificado' ? 'hoist.certified' : 'hoist.certifiedWithObs')}
+              {t('hoist.conditionAuto')}: {t(CONDITION_KEY[autoCondition])}
             </option>
             <option value="certificado">{t('hoist.certified')}</option>
             <option value="certificado_con_observaciones">{t('hoist.certifiedWithObs')}</option>
+            <option value="no_certificado">{t('hoist.notCertified')}</option>
           </select>
         </label>
       </div>
@@ -1171,6 +1174,11 @@ function HoistDetailsPanel({
   );
 }
 
+const CONDITION_KEY: Record<HoistConditionValue, string> = {
+  certificado: 'hoist.certified',
+  certificado_con_observaciones: 'hoist.certifiedWithObs',
+  no_certificado: 'hoist.notCertified',
+};
 /** Text box that saves on blur, only when the value changed. */
 function DetailInput({
   label,

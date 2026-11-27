@@ -32,7 +32,15 @@ export interface HoistReportData {
   campaignIds: string[];
   /** Parent campaign name (multi-turbine report); defaults to the first campaign's name. */
   campaignName?: string;
+  /**
+   * 'certified' = main report (certified / certified with observations).
+   * 'not_certified' = "Anexo II — equipos no certificados" (some verification
+   * failed). Default: not_certified when every turbine is no certificado.
+   */
+  variant?: HoistReportVariant;
 }
+
+export type HoistReportVariant = 'certified' | 'not_certified';
 
 /** Report-level data shared by every turbine of the report. */
 interface HoistReportMeta {
@@ -42,6 +50,8 @@ interface HoistReportMeta {
   manufacturers: string;
   certifiedCount: number;
   observedCount: number;
+  notCertifiedCount: number;
+  variant: HoistReportVariant;
 }
 
 type RGB = [number, number, number];
@@ -329,6 +339,7 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
   const titleLines = ['Polipastos de turbina eólica', 'Informe de Certificación'];
+  if (meta.variant === 'not_certified') titleLines.push('Anexo II');
   let titleY = pageH * 0.42;
   for (const line of titleLines) {
     doc.text(line, pageW - margin, titleY, { align: 'right' });
@@ -347,6 +358,10 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
   doc.text(ctx.windFarmName, pageW - margin, titleY + 6, { align: 'right' });
   doc.text(turbineLine, pageW - margin, titleY + 14, { align: 'right' });
   doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
+  if (meta.variant === 'not_certified') {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Equipos no certificados', pageW - margin, titleY + 30, { align: 'right' });
+  }
 
   // Footer — two columns, white text.
   const footerStartY = pageH - 15;
@@ -387,10 +402,21 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   const d = ctx.details ?? {};
   const items = resultItems(ctx.tree);
   const condition = hoistCondition(d, items.some((it) => it.itemType === 'check' && it.passed === false));
-  const conditionLabel = condition === 'certificado' ? 'CERTIFICADO' : 'CERTIFICADO CON OBSERVACIONES';
   const LIGHT_GREEN: RGB = [146, 208, 80];
   const DARK_GREEN: RGB = [0, 176, 80];
-  const conditionFill: RGB = condition === 'certificado' ? LIGHT_GREEN : [255, 192, 0];
+  const RED: RGB = [255, 0, 0];
+  const conditionLabel = {
+    certificado: 'CERTIFICADO',
+    certificado_con_observaciones: 'CERTIFICADO CON OBSERVACIONES',
+    no_certificado: 'NO CERTIFICADO',
+  }[condition];
+  const conditionFill: RGB = {
+    certificado: LIGHT_GREEN,
+    certificado_con_observaciones: [255, 192, 0] as RGB,
+    no_certificado: RED,
+  }[condition];
+  // Anexo II (no certificado) sheets have a red WTG header, as in the reference.
+  const headerFill: RGB = condition === 'no_certificado' ? RED : LIGHT_GREEN;
   const val = (v: string | null | undefined) => (v && String(v).trim()) || '';
   const W = PAGE_WIDTH - 2 * MARGIN;
   const BORDER = { lineColor: [0, 0, 0] as RGB, lineWidth: 0.3 };
@@ -426,7 +452,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
     startY: 14,
     theme: 'plain',
     body: [
-      [{ content: `WTG ${ctx.turbineName}`, colSpan: 4, styles: { fillColor: LIGHT_GREEN, fontStyle: 'bold', fontSize: 13, halign: 'center' } }],
+      [{ content: `WTG ${ctx.turbineName}`, colSpan: 4, styles: { fillColor: headerFill, fontStyle: 'bold', fontSize: 13, halign: 'center' } }],
       [
         { content: 'TAG', rowSpan: 2, styles: { fontStyle: 'bold', fontSize: 14, halign: 'center', valign: 'middle' } },
         { content: val(d.tag), rowSpan: 2, styles: { fontStyle: 'bold', fontSize: 14, halign: 'center', valign: 'middle' } },
@@ -685,6 +711,40 @@ function renderCertifiedSummary(doc: jsPDF, meta: HoistReportMeta) {
   bullets([[N('Atender y considerar las observaciones o recomendaciones realizadas.')], lubrication, nominal, angle]);
 }
 
+/**
+ * Anexo II page 2: "EQUIPOS NO CERTIFICADOS" — text of the reference docx
+ * (docs/informe-polipastos-no-certificados.md). Dynamic: number of hoists that
+ * did not pass the inspection.
+ */
+function renderNotCertifiedSummary(doc: jsPDF, meta: HoistReportMeta) {
+  doc.addPage();
+  const W = PAGE_WIDTH - 2 * MARGIN - 6;
+  const X = MARGIN + 3;
+  const BU = (text: string): Run => ({ text, bold: true, underline: true });
+  const B = (text: string): Run => ({ text, bold: true });
+  const N = (text: string): Run => ({ text });
+
+  let y = 26;
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('EQUIPOS NO CERTIFICADOS', PAGE_WIDTH / 2, y, { align: 'center' });
+  y += 18;
+
+  y = drawRichParagraph(doc, [
+    N('Terminado el proceso de Inspección y certificación de Polipastos, se determinó que '),
+    BU(`${meta.notCertifiedCount} ${meta.notCertifiedCount === 1 ? 'polipasto NO pasó' : 'polipastos NO pasaron'} la inspección.`),
+  ], X, y, W);
+  y += 5.3;
+  drawRichParagraph(doc, [
+    N('A continuación, se entrega un detalle de las unidades NO certificadas. Las unidades catalogadas como “'),
+    B('NO CERTIFICADO'),
+    N('” se entenderán “'),
+    B('NO APTOS'),
+    N('” para realizar maniobras hasta que las observaciones sean subsanadas y se proceda a su recertificación.'),
+  ], X, y, W);
+}
+
 function addFooters(doc: jsPDF, windFarmName: string) {
   const totalPages = doc.getNumberOfPages();
   const footMargin = 20;
@@ -730,25 +790,31 @@ export async function generateAndDownloadHoistCertificationReport(
   const first = ctxs[0]!;
   const multi = ctxs.length > 1;
   const uniq = (xs: string[]) => [...new Set(xs.map((x) => x.trim()).filter((x) => x && x !== NA))].join(', ');
-  const isObserved = (c: HoistPdfContext) =>
-    hoistCondition(c.details, resultItems(c.tree).some((it) => it.itemType === 'check' && it.passed === false)) !==
-    'certificado';
-  const observedCount = ctxs.filter(isObserved).length;
+  const conditionOf = (c: HoistPdfContext) =>
+    hoistCondition(c.details, resultItems(c.tree).some((it) => it.itemType === 'check' && it.passed === false));
+  const conditions = ctxs.map(conditionOf);
+  const observedCount = conditions.filter((c) => c === 'certificado_con_observaciones').length;
+  const notCertifiedCount = conditions.filter((c) => c === 'no_certificado').length;
+  const variant: HoistReportVariant =
+    data.variant ?? (notCertifiedCount === ctxs.length ? 'not_certified' : 'certified');
   const meta: HoistReportMeta = {
     campaignName: data.campaignName || first.campaignName,
     turbines: ctxs.map((c) => c.turbineName),
     models: uniq(ctxs.map((c) => c.turbineModel)),
     manufacturers: uniq(ctxs.map((c) => c.manufacturer)),
-    certifiedCount: ctxs.length - observedCount,
+    certifiedCount: conditions.filter((c) => c === 'certificado').length,
     observedCount,
+    notCertifiedCount,
+    variant,
   };
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
   // 1. Cover page.
   await renderCoverPage(doc, first, meta);
-  // 2. Certified / certified-with-observations summary.
-  renderCertifiedSummary(doc, meta);
+  // 2. Summary: certified / with observations, or Anexo II "no certificados".
+  if (variant === 'not_certified') renderNotCertifiedSummary(doc, meta);
+  else renderCertifiedSummary(doc, meta);
   // 3. General data.
   // (General data page removed from this report.)
   // 4. Per turbine: revision detail sheet, then its report photos.
@@ -771,7 +837,8 @@ export async function generateAndDownloadHoistCertificationReport(
 
   const dateStr = formatDateES(first.createdAt).replace(/\//g, '-');
   const subject = multi ? meta.campaignName : first.turbineName;
-  const filename = `Informe_Certificacion_Polipastos_${subject}_${dateStr}.pdf`.replace(/[\s/\\]+/g, '_');
+  const prefix = variant === 'not_certified' ? 'Anexo_II_No_Certificados_Polipastos' : 'Informe_Certificacion_Polipastos';
+  const filename = `${prefix}_${subject}_${dateStr}.pdf`.replace(/[\s/\\]+/g, '_');
 
   const blob = doc.output('blob') as Blob;
   const url = URL.createObjectURL(blob);
