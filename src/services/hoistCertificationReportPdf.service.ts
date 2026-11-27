@@ -196,14 +196,12 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   // shows (and degrades gracefully to empty items when no data yet).
   const fullTree = await hoistCertificationService.getHoistTree(campaignId);
 
-  // Keep only the photos selected for the report. If NONE are selected across
-  // the whole campaign, fall back to ALL photos (same rule as cleaning). Check
-  // and measurement STATE is always kept regardless of photo selection.
+  // Only the hoist label photo goes in the report. Keep its photos selected
+  // for the report; if none of them is selected, keep them all. Check and
+  // measurement STATE is always kept (used for the condition).
   const allPhotos: HoistPhoto[] = [];
-  // Only photo-capture items carry photos in the report (verification and
-  // measurement items show none, even if old photos exist).
   const walk = (it: HoistItemNode) => {
-    if (it.itemType === 'photo') allPhotos.push(...it.photos);
+    if (it.itemCode === LABEL_ITEM_CODE) allPhotos.push(...it.photos);
   };
   for (const step of fullTree) {
     for (const it of step.items) walk(it);
@@ -213,7 +211,7 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const keep = (p: HoistPhoto) => (anySelected ? p.hoistSelected : true);
   const filterItem = (it: HoistItemNode): HoistItemNode => ({
     ...it,
-    photos: it.itemType === 'photo' ? it.photos.filter(keep) : [],
+    photos: it.itemCode === LABEL_ITEM_CODE ? it.photos.filter(keep) : [],
   });
   const tree: HoistTree = fullTree.map((step) => ({
     ...step,
@@ -339,7 +337,7 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
   const titleLines = ['Polipastos de turbina eólica', 'Informe de Certificación'];
-  if (meta.variant === 'not_certified') titleLines.push('Anexo II');
+  titleLines.push(meta.variant === 'not_certified' ? 'Anexo II' : 'Anexo I');
   let titleY = pageH * 0.42;
   for (const line of titleLines) {
     doc.text(line, pageW - margin, titleY, { align: 'right' });
@@ -385,11 +383,8 @@ function resultItems(tree: HoistTree): HoistItemNode[] {
   return out;
 }
 
-/** Brake clearance ranges (mm) of the "verificación holgura de freno" items. */
-const BRAKE_RANGES: Record<string, [number, number]> = {
-  freno_holgura_020_050: [0.2, 0.5],
-  freno_holgura_050_100: [0.5, 1],
-};
+/** Catalog item of the hoist label photo — the only photo shown in the report. */
+const LABEL_ITEM_CODE = 'prep_etiqueta_polipasto';
 
 /**
  * "Detalle de la revisión" — one sheet per turbine, same cell layout as the
@@ -403,7 +398,6 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   const items = resultItems(ctx.tree);
   const condition = hoistCondition(d, items.some((it) => it.itemType === 'check' && it.passed === false));
   const LIGHT_GREEN: RGB = [146, 208, 80];
-  const DARK_GREEN: RGB = [0, 176, 80];
   const RED: RGB = [255, 0, 0];
   const conditionLabel = {
     certificado: 'CERTIFICADO',
@@ -422,11 +416,11 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   const BORDER = { lineColor: [0, 0, 0] as RGB, lineWidth: 0.3 };
   const label = { fontStyle: 'bold' as const };
 
-  // Photo-capture items go in the sheet, one row each (title + photos), before
-  // COMENTARIOS. Up to 3 report photos per item, side by side.
+  // Only the hoist LABEL photo goes in the sheet (one row, before COMENTARIOS);
+  // the other photo items are not part of the report. Up to 3 report photos.
   const PHOTO_ROW_H = 40;
   const photoItems = ctx.tree.flatMap((st) => [...st.items, ...st.groups.flatMap((g) => g.items)])
-    .filter((it) => it.itemType === 'photo');
+    .filter((it) => it.itemType === 'photo' && it.itemCode === LABEL_ITEM_CODE);
   const photoImgs: { data: string; w: number; h: number }[][] = [];
   for (const it of photoItems) {
     const imgs: { data: string; w: number; h: number }[] = [];
@@ -511,44 +505,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
     },
   });
 
-  const result = (it: HoistItemNode): string => {
-    if (it.itemType === 'measurement') {
-      if (it.measurementValue === null || it.measurementValue === '') return '—';
-      const v = `${it.measurementValue}${it.measurementUnit ? ' ' + it.measurementUnit : ''}`;
-      const range = BRAKE_RANGES[it.itemCode];
-      const n = parseFloat(String(it.measurementValue).replace(',', '.'));
-      if (range && !isNaN(n)) return `${v} / ${n >= range[0] && n <= range[1] ? 'OK' : 'NO OK'}`;
-      return v;
-    }
-    if (it.passed === true) return 'OK';
-    if (it.passed === false) return 'NO CUMPLE';
-    return '—';
-  };
-
-  // The results table always starts on its own page, after the sheet header.
-  doc.addPage();
-  autoTable(doc, {
-    startY: 14,
-    theme: 'plain',
-    body: items.map((it) => [it.itemLabel, result(it)]),
-    styles: { fontSize: 8.5, cellPadding: 1.1, textColor: [0, 0, 0], ...BORDER },
-    columnStyles: {
-      0: { cellWidth: W * 0.77 },
-      1: { halign: 'center', fontStyle: 'bold' },
-    },
-    margin: { left: MARGIN, right: MARGIN, top: 14, bottom: 20 },
-    didParseCell: (hook) => {
-      if (hook.section !== 'body' || hook.column.index !== 1) return;
-      const it = items[hook.row.index];
-      if (!it) return;
-      if (it.itemType === 'measurement' && !BRAKE_RANGES[it.itemCode] && result(it) !== '—') {
-        hook.cell.styles.fillColor = DARK_GREEN;
-      } else if (it.itemType === 'check' && it.passed === false) {
-        hook.cell.styles.fillColor = [255, 199, 206];
-      }
-    },
-  });
-  // Photos are only inside the sheet (photo-item rows); none below the table.
+  // No check list / results table in the report (only the sheet above).
 }
 
 /** A run of text with its style (rich paragraph). */
@@ -837,7 +794,7 @@ export async function generateAndDownloadHoistCertificationReport(
 
   const dateStr = formatDateES(first.createdAt).replace(/\//g, '-');
   const subject = multi ? meta.campaignName : first.turbineName;
-  const prefix = variant === 'not_certified' ? 'Anexo_II_No_Certificados_Polipastos' : 'Informe_Certificacion_Polipastos';
+  const prefix = variant === 'not_certified' ? 'Anexo_II_No_Certificados_Polipastos' : 'Anexo_I_Certificacion_Polipastos';
   const filename = `${prefix}_${subject}_${dateStr}.pdf`.replace(/[\s/\\]+/g, '_');
 
   const blob = doc.output('blob') as Blob;
