@@ -317,20 +317,20 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
       const logoBase64 = 'data:image/png;base64,' + btoa(binary);
-      // Top-left, same as the repair cover.
-      doc.addImage(logoBase64, 'PNG', margin, 15, 60, 20);
+      // Top-right.
+      doc.addImage(logoBase64, 'PNG', pageW - margin - 60, 15, 60, 20);
     }
   } catch {
     /* ignore */
   }
 
-  // Title — two lines, right-aligned, 30pt bold white, in the lower half
-  // (same layout as the repair cover).
+  // Title + park, turbine(s) and date — right-aligned, white, block centered
+  // around the middle of the page.
   doc.setFontSize(30);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
   const titleLines = ['Polipastos de turbina eólica', 'Informe de Certificación'];
-  let titleY = pageH * 0.73;
+  let titleY = pageH * 0.42;
   for (const line of titleLines) {
     doc.text(line, pageW - margin, titleY, { align: 'right' });
     titleY += 11;
