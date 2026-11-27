@@ -1,8 +1,10 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
-import { hoistCertificationService } from '@/services/hoistCertification.service';
+import { hoistCertificationService, hoistCondition } from '@/services/hoistCertification.service';
 import type {
+  HoistDetails,
+  HoistLabelPhoto,
   HoistTree,
   HoistStepNode,
   HoistItemNode,
@@ -55,6 +57,10 @@ interface HoistPdfContext {
   /** campaign.report_comment / report_recommendation (free text from the web). */
   comment: string;
   recommendation: string;
+  /** campaign.hoist_details (label OCR + manual edits). */
+  details: HoistDetails;
+  /** First label photo (its upload date = inspection date). */
+  labelPhoto: HoistLabelPhoto | null;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -92,28 +98,6 @@ function formatDateShortCL(dateStr: string | null | undefined): string {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return NA;
   return d.toLocaleDateString('es-CL');
-}
-
-/** Localized item-type label for the report tables. */
-function itemTypeLabel(type: HoistItemNode['itemType']): string {
-  if (type === 'check') return 'Verificación';
-  if (type === 'measurement') return 'Medición';
-  return 'Foto';
-}
-
-/** Localized check result for the report ("Cumple" / "No cumple" / "Sin dato"). */
-function checkResultLabel(item: HoistItemNode): string {
-  if (item.itemType !== 'check') return '—';
-  if (item.passed === true) return 'Cumple';
-  if (item.passed === false) return 'No cumple';
-  return 'Sin dato';
-}
-
-/** Localized measurement value for the report (value + optional unit). */
-function measurementLabel(item: HoistItemNode): string {
-  if (item.itemType !== 'measurement') return '—';
-  if (item.measurementValue === null || item.measurementValue === '') return 'Sin dato';
-  return `${item.measurementValue}${item.measurementUnit ? ' ' + item.measurementUnit : ''}`;
 }
 
 /**
@@ -178,7 +162,7 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const { data: campaign, error } = await db
     .from('campaign')
     .select(`
-      id, name, status, created_at, report_comment, report_recommendation,
+      id, name, status, created_at, report_comment, report_recommendation, hoist_details,
       wind_farm:wind_farm_id ( name, location, manager_name, manager_role, country, client ),
       turbine:turbine_id ( name, model, manufacturer )
     `)
@@ -254,20 +238,12 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
     tree,
     comment: ((campaign as Record<string, unknown>).report_comment as string) ?? '',
     recommendation: ((campaign as Record<string, unknown>).report_recommendation as string) ?? '',
+    details: ((campaign as Record<string, unknown>).hoist_details as HoistDetails) ?? {},
+    labelPhoto: await hoistCertificationService.getLabelPhoto(campaignId),
   };
 }
 
 // ─── Renderers ──────────────────────────────────────────────────────────────
-
-function addSectionTitle(doc: jsPDF, title: string, y: number): number {
-  const [r, g, b] = hexToRgb(COLOR_PRIMARY);
-  doc.setTextColor(r, g, b);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(title, MARGIN, y);
-  doc.setTextColor(0, 0, 0);
-  return y + 8;
-}
 
 /** Cover page (page 1) — "Informe de Certificación de Polipastos". */
 async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
@@ -367,7 +343,7 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
   doc.setTextColor(0, 0, 0);
 }
 
-/** General-data + per-item results table (page 2). */
+/** General-data table (page 2). */
 function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext) {
   doc.addPage();
   const [r, g, b] = hexToRgb(COLOR_PRIMARY);
@@ -379,7 +355,7 @@ function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext) {
   doc.text('INFORME DE CERTIFICACIÓN DE POLIPASTOS', PAGE_WIDTH / 2, 20, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
-  let y = 44;
+  const y = 44;
   const anioReporte = ctx.createdAt ? String(new Date(ctx.createdAt).getFullYear()) : NA;
 
   autoTable(doc, {
@@ -404,53 +380,6 @@ function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext) {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  y = (doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 60;
-  y += 8;
-
-  // Per-item results summary: step / sub-group / item / type / result / photos.
-  y = addSectionTitle(doc, 'Resultados por paso', y);
-  const rows: string[][] = [];
-  for (const step of ctx.tree) {
-    const pushItem = (groupLabel: string, it: HoistItemNode) => {
-      const result =
-        it.itemType === 'check'
-          ? checkResultLabel(it)
-          : it.itemType === 'measurement'
-            ? measurementLabel(it)
-            : '—';
-      rows.push([
-        step.stepLabel,
-        groupLabel,
-        it.itemLabel,
-        itemTypeLabel(it.itemType),
-        result,
-        String(it.photos.length),
-      ]);
-    };
-    if (step.hasGroups) {
-      for (const it of step.items) pushItem('', it);
-      for (const grp of step.groups) for (const it of grp.items) pushItem(grp.groupLabel, it);
-    } else {
-      for (const it of step.items) pushItem('', it);
-    }
-  }
-  autoTable(doc, {
-    startY: y,
-    head: [['Paso', 'Sub-grupo', 'Ítem', 'Tipo', 'Resultado', 'Fotos']],
-    body: rows.length > 0 ? rows : [['—', '—', '—', '—', '—', '0']],
-    theme: 'grid',
-    headStyles: { fillColor: COLOR_HEADER_TABLE, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 7.5 },
-    styles: { cellPadding: 2 },
-    columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 28 },
-      3: { cellWidth: 20 },
-      4: { cellWidth: 24 },
-      5: { cellWidth: 12, halign: 'center' },
-    },
-    margin: { left: MARGIN, right: MARGIN },
-  });
 }
 
 /** Render one photo block (header band + full-width image) on its own page. */
@@ -490,31 +419,126 @@ async function renderPhotoBlock(
   }
 }
 
-/** "Comentario" and "Recomendación" written on the web for this turbine. */
-function renderCommentAndRecommendation(doc: jsPDF, ctx: HoistPdfContext) {
-  const blocks = [
-    { title: 'Comentario', text: ctx.comment.trim() },
-    { title: 'Recomendación', text: ctx.recommendation.trim() },
-  ].filter((b) => b.text);
-  if (blocks.length === 0) return;
+/** All check/measurement items of the tree, in catalog order. */
+function resultItems(tree: HoistTree): HoistItemNode[] {
+  const out: HoistItemNode[] = [];
+  for (const step of tree) {
+    const items = [...step.items, ...step.groups.flatMap((g) => g.items)];
+    for (const it of items) if (it.itemType !== 'photo') out.push(it);
+  }
+  return out;
+}
+
+/**
+ * "Detalle de la revisión" — one sheet per turbine (reference: WTG sheet):
+ * hoist data (label OCR / manual), condition, comment, recommendation, the
+ * result of every check/measurement item and one hoist photo.
+ */
+async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   doc.addPage();
-  let y = 25;
-  doc.setFontSize(11);
+  const d = ctx.details ?? {};
+  const items = resultItems(ctx.tree);
+  const condition = hoistCondition(d, items.some((it) => it.itemType === 'check' && it.passed === false));
+  const conditionLabel = condition === 'certificado' ? 'CERTIFICADO' : 'CERTIFICADO CON OBSERVACIONES';
+  const conditionFill: RGB = condition === 'certificado' ? [146, 208, 80] : [255, 192, 0];
+  const GREEN: RGB = [146, 208, 80];
+  const val = (v: string | null | undefined) => (v && String(v).trim()) || '—';
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
+  doc.text(`WTG ${ctx.turbineName}`, PAGE_WIDTH / 2, 22, { align: 'center' });
   doc.setTextColor(0, 0, 0);
-  for (const b of blocks) {
-    y = addSectionTitle(doc, `${b.title} — Turbina ${ctx.turbineName}`, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    const lines = doc.splitTextToSize(b.text, PAGE_WIDTH - 2 * MARGIN) as string[];
-    for (const line of lines) {
-      if (y > PAGE_HEIGHT - 25) {
-        doc.addPage();
-        y = 25;
-      }
-      doc.text(line, MARGIN, y);
-      y += 5;
+
+  const head: [string, string][] = [
+    ['TAG N°', val(d.tag)],
+    ['FECHA INSPECCIÓN', formatDateES(ctx.labelPhoto?.uploadedAt ?? null)],
+    ['CONDICIÓN', conditionLabel],
+    ['FABRICANTE', val(d.manufacturer)],
+    ['MODELO', val(d.model)],
+    ['NÚMERO SERIE', val(d.serialNumber)],
+    ['FABRICACIÓN', val(d.year)],
+    ['COMENTARIOS', val(ctx.comment)],
+    ['RECOMENDACIÓN', val(ctx.recommendation)],
+  ];
+  const result = (it: HoistItemNode): string => {
+    if (it.itemType === 'measurement') {
+      if (it.measurementValue === null || it.measurementValue === '') return '—';
+      return `${it.measurementValue}${it.measurementUnit ? ' ' + it.measurementUnit : ''}`;
     }
-    y += 8;
+    if (it.passed === true) return 'OK';
+    if (it.passed === false) return 'NO CUMPLE';
+    return '—';
+  };
+  const body = [...head, ...items.map((it) => [it.itemLabel, result(it)] as [string, string])];
+
+  autoTable(doc, {
+    startY: 28,
+    body,
+    theme: 'grid',
+    bodyStyles: { fontSize: 7.5, textColor: [0, 0, 0] },
+    styles: { cellPadding: 1.6, lineColor: [150, 150, 150], lineWidth: 0.2 },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 120 },
+      1: { halign: 'center' },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+    didParseCell: (hook) => {
+      if (hook.section !== 'body') return;
+      const row = hook.row.index;
+      if (row < head.length) {
+        hook.cell.styles.fillColor = [242, 242, 242];
+        if (hook.column.index === 1 && row === 2) {
+          hook.cell.styles.fillColor = conditionFill;
+          hook.cell.styles.fontStyle = 'bold';
+        }
+        if (hook.column.index === 1 && row >= 7) hook.cell.styles.halign = 'left';
+        return;
+      }
+      if (hook.column.index !== 1) return;
+      const it = items[row - head.length];
+      if (!it) return;
+      if (it.itemType === 'measurement' && result(it) !== '—') {
+        hook.cell.styles.fillColor = GREEN;
+        hook.cell.styles.fontStyle = 'bold';
+      } else if (it.passed === false) {
+        hook.cell.styles.fillColor = [255, 199, 206];
+        hook.cell.styles.fontStyle = 'bold';
+      }
+    },
+  });
+
+  // One photo of the hoist below the table: first non-label photo, else the label.
+  let photoUrl: string | null = null;
+  for (const step of ctx.tree) {
+    for (const it of [...step.items, ...step.groups.flatMap((g) => g.items)]) {
+      if (it.itemCode === 'prep_etiqueta_polipasto') continue;
+      const p = [...it.photos].sort(byReportOrder)[0];
+      if (p) { photoUrl = p.url; break; }
+    }
+    if (photoUrl) break;
+  }
+  photoUrl = photoUrl ?? ctx.labelPhoto?.url ?? null;
+  if (!photoUrl) return;
+
+  let y = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 28) + 6;
+  const maxW = PAGE_WIDTH - 2 * MARGIN;
+  let maxH = PAGE_HEIGHT - 22 - y;
+  if (maxH < 60) {
+    doc.addPage();
+    y = 25;
+    maxH = PAGE_HEIGHT - 22 - y;
+  }
+  const base64 = await loadImageAsBase64(photoUrl);
+  if (!base64) return;
+  try {
+    const props = doc.getImageProperties(base64);
+    const scale = Math.min(maxW / props.width, maxH / props.height);
+    const w = props.width * scale;
+    const h = props.height * scale;
+    doc.addImage(base64, 'JPEG', (PAGE_WIDTH - w) / 2, y, w, h);
+  } catch {
+    /* skip broken image */
   }
 }
 
@@ -591,8 +615,8 @@ export async function generateAndDownloadHoistCertificationReport(
   await renderCoverPage(doc, ctx);
   // 2. General data + per-item results table.
   renderGeneralData(doc, ctx);
-  // 2b. Comment + recommendation of this turbine (only when written).
-  renderCommentAndRecommendation(doc, ctx);
+  // 2b. Revision detail sheet (hoist data, condition, comment, results, photo).
+  await renderRevisionDetail(doc, ctx);
   // 3. One section per STEP (separator + one block page per photo).
   const locale: 'es' | 'en' = 'es';
   for (const step of ctx.tree) {

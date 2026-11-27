@@ -33,11 +33,16 @@ import {
   useUploadHoistPhoto,
   useSetHoistItemValue,
   useSetHoistReportText,
+  useSetHoistDetails,
+  useHoistLabelPhoto,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
+import { readHoistLabel, hoistLabelScore } from '@/utils/hoistLabel';
+import { hoistCondition } from '@/services/hoistCertification.service';
 import type {
+  HoistDetails,
   HoistPhoto,
   HoistStepNode,
   HoistGroupNode,
@@ -310,6 +315,14 @@ export function HoistCertificationWorkflow() {
       />
 
       <p style={hint}>{t('hoist.workflowHint')}</p>
+      {campaign && (
+        <HoistDetailsPanel
+          details={campaign.hoistDetails}
+          anyFailed={!!tree && tree.some((st) => stepItems(st).some((it) => it.itemType === 'check' && it.passed === false))}
+          readOnly={isClient}
+          t={t}
+        />
+      )}
       {campaign && (
         <div style={reportTextsWrap}>
           <ReportTextArea
@@ -997,6 +1010,171 @@ function EditableValue({
 }
 
 /**
+ * "Datos del polipasto" printed in the revision detail of the report. The label
+ * fields (manufacturer, model, serial, year) are filled ONCE in the background
+ * by OCR of the hoist label photo — same approach as the coating method on
+ * repairs — and stay editable. The inspection date is the upload date of that
+ * photo. The condition is computed from the checks unless set by hand.
+ */
+function HoistDetailsPanel({
+  details,
+  anyFailed,
+  readOnly,
+  t,
+}: {
+  details: HoistDetails | null;
+  anyFailed: boolean;
+  readOnly: boolean;
+  t: (k: string) => string;
+}) {
+  const { campaignId } = useParams();
+  const toast = useToast();
+  const save = useSetHoistDetails(campaignId);
+  const { data: labelPhoto } = useHoistLabelPhoto(campaignId);
+  const [reading, setReading] = useState(false);
+  const autoTried = useRef(false);
+
+  const runOcr = async (manual: boolean) => {
+    if (!labelPhoto?.url || readOnly) return;
+    setReading(true);
+    try {
+      const found = await readHoistLabel(labelPhoto.urls);
+      const cur = details ?? {};
+      // Automatic run fills only empty fields; "Leer etiqueta" overwrites with what it found.
+      const pick = (k: 'manufacturer' | 'model' | 'serialNumber' | 'year') =>
+        found[k] && (manual || !cur[k]) ? { [k]: found[k] } : {};
+      await save.mutateAsync({
+        ...pick('manufacturer'),
+        ...pick('model'),
+        ...pick('serialNumber'),
+        ...pick('year'),
+        ocrAt: new Date().toISOString(),
+      });
+      if (manual) {
+        if (hoistLabelScore(found) > 0) toast.success(t('hoist.labelRead'));
+        else toast.error(t('hoist.labelNotRead'));
+      }
+    } catch (err) {
+      if (manual) toast.error((err as Error)?.message || t('hoist.labelNotRead'));
+    } finally {
+      setReading(false);
+    }
+  };
+
+  // Background OCR once per certification (ocrAt marks it as done).
+  useEffect(() => {
+    if (readOnly || autoTried.current || !labelPhoto?.url || details?.ocrAt) return;
+    autoTried.current = true;
+    void runOcr(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelPhoto?.url, details?.ocrAt, readOnly]);
+
+  const condition = hoistCondition(details, anyFailed);
+  const field = (k: 'tag' | 'manufacturer' | 'model' | 'serialNumber' | 'year', label: string) => (
+    <DetailInput
+      key={k}
+      label={label}
+      value={details?.[k] ?? ''}
+      readOnly={readOnly}
+      onSave={(v) =>
+        save.mutate(
+          { [k]: v },
+          { onError: (err) => toast.error((err as Error)?.message || t('hoist.reportTextError')) },
+        )
+      }
+    />
+  );
+
+  return (
+    <div style={detailsPanel}>
+      <div style={detailsHeader}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>{t('hoist.detailsTitle')}</span>
+        {!readOnly && (
+          <button
+            type="button"
+            style={{ ...reopenBtn, opacity: labelPhoto?.url && !reading ? 1 : 0.5 }}
+            disabled={!labelPhoto?.url || reading}
+            onClick={() => void runOcr(true)}
+            title={labelPhoto?.url ? t('hoist.readLabelHint') : t('hoist.noLabelPhoto')}
+          >
+            {reading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Camera size={14} />}
+            {reading ? t('hoist.readingLabel') : t('hoist.readLabel')}
+          </button>
+        )}
+      </div>
+      <div style={detailsGrid}>
+        {field('tag', t('hoist.tag'))}
+        <label style={reportTextLabel}>
+          <span>{t('hoist.inspectionDate')}</span>
+          <input
+            style={detailInput}
+            readOnly
+            value={labelPhoto?.uploadedAt ? new Date(labelPhoto.uploadedAt).toLocaleDateString('es-CL') : '—'}
+            title={t('hoist.inspectionDateHint')}
+          />
+        </label>
+        {field('manufacturer', t('hoist.manufacturer'))}
+        {field('model', t('hoist.model'))}
+        {field('serialNumber', t('hoist.serialNumber'))}
+        {field('year', t('hoist.manufactureYear'))}
+        <label style={reportTextLabel}>
+          <span>{t('hoist.condition')}</span>
+          <select
+            style={detailInput}
+            disabled={readOnly || save.isPending}
+            value={details?.condition ?? ''}
+            onChange={(e) =>
+              save.mutate({
+                condition: (e.target.value || null) as HoistDetails['condition'],
+              })
+            }
+          >
+            <option value="">
+              {t('hoist.conditionAuto')}: {t(condition === 'certificado' ? 'hoist.certified' : 'hoist.certifiedWithObs')}
+            </option>
+            <option value="certificado">{t('hoist.certified')}</option>
+            <option value="certificado_con_observaciones">{t('hoist.certifiedWithObs')}</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/** Text box that saves on blur, only when the value changed. */
+function DetailInput({
+  label,
+  value,
+  readOnly,
+  onSave,
+}: {
+  label: string;
+  value: string;
+  readOnly: boolean;
+  onSave: (v: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  return (
+    <label style={reportTextLabel}>
+      <span>{label}</span>
+      <input
+        style={detailInput}
+        value={text}
+        readOnly={readOnly}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          if (!readOnly && text.trim() !== value.trim()) onSave(text);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </label>
+  );
+}
+
+/**
  * Free-text "Comentario" / "Recomendación" of the certification, printed in the
  * report of this turbine. Saves when the field loses focus, only if it changed.
  */
@@ -1234,6 +1412,19 @@ const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 12 };
 const totalsLine: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 16 };
+const detailsPanel: React.CSSProperties = {
+  border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', padding: 16, marginBottom: 16,
+};
+const detailsHeader: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12,
+};
+const detailsGrid: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12,
+};
+const detailInput: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '6px 10px', fontSize: 13, fontWeight: 400,
+  fontFamily: 'inherit', borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', color: '#1a1a1a',
+};
 const reportTextsWrap: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16,
   marginBottom: 20,

@@ -101,6 +101,40 @@ const PHOTO_BUCKET = 'inspection-photos';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** Aggregated hoist-certification campaign header (campaign + turbine + wind farm). */
+/**
+ * Data of the hoist printed in the "detalle de la revisión" of the report
+ * (campaign.hoist_details). Label fields are pre-filled by OCR of the hoist
+ * label photo and editable on the web.
+ */
+export interface HoistDetails {
+  tag?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  year?: string | null;
+  /** Manual override; null/absent = computed from the check results. */
+  condition?: 'certificado' | 'certificado_con_observaciones' | null;
+  /** When OCR of the label photo last ran (so it doesn't run on every visit). */
+  ocrAt?: string | null;
+}
+
+/** First hoist label photo (item prep_etiqueta_polipasto) and when it was uploaded. */
+export interface HoistLabelPhoto {
+  url: string;
+  /** Every label photo (OCR tries them all; the first is `url`). */
+  urls: string[];
+  uploadedAt: string | null;
+}
+
+/** Report condition of the hoist: manual override, else "con observaciones" if any check failed. */
+export function hoistCondition(
+  details: HoistDetails | null | undefined,
+  anyFailed: boolean,
+): 'certificado' | 'certificado_con_observaciones' {
+  if (details?.condition) return details.condition;
+  return anyFailed ? 'certificado_con_observaciones' : 'certificado';
+}
+
 export interface HoistCampaignDetail {
   id: string;
   name: string;
@@ -117,6 +151,7 @@ export interface HoistCampaignDetail {
   reportComment: string | null;
   /** Free text written on the web, printed in the report (campaign.report_recommendation). */
   reportRecommendation: string | null;
+  hoistDetails: HoistDetails | null;
 }
 
 /** A hoist-certification photo (from get_hoist_cert_items → photos[]). */
@@ -550,7 +585,7 @@ export const hoistCertificationService = {
       .from('campaign')
       .select(`
         id, name, status, created_at, updated_at, wind_farm_id, turbine_id,
-        report_comment, report_recommendation,
+        report_comment, report_recommendation, hoist_details,
         wind_farm:wind_farm_id ( id, name, location ),
         turbine:turbine_id ( id, name, model )
       `)
@@ -582,6 +617,45 @@ export const hoistCertificationService = {
       turbineModel: (turbine.model as string) ?? null,
       reportComment: (r.report_comment as string) ?? null,
       reportRecommendation: (r.report_recommendation as string) ?? null,
+      hoistDetails: (r.hoist_details as HoistDetails) ?? null,
+    };
+  },
+
+  /**
+   * Merge fields into campaign.hoist_details (reads first so other keys are
+   * kept). Empty strings are stored as null.
+   */
+  async setHoistDetails(campaignId: string, patch: Partial<HoistDetails>): Promise<void> {
+    const { data, error: readErr } = await db
+      .from('campaign')
+      .select('hoist_details')
+      .eq('id', campaignId)
+      .single();
+    if (readErr) throw new HoistCertificationServiceError(readErr.message, readErr.code);
+    const clean = Object.fromEntries(
+      Object.entries(patch).map(([k, v]) => [k, typeof v === 'string' && !v.trim() ? null : v]),
+    );
+    const next = { ...((data?.hoist_details as HoistDetails) ?? {}), ...clean };
+    const { error } = await db.from('campaign').update({ hoist_details: next }).eq('id', campaignId);
+    if (error) throw new HoistCertificationServiceError(error.message, error.code);
+  },
+
+  /** Hoist label photos (prep_etiqueta_polipasto): first one + all URLs, or null. */
+  async getLabelPhoto(campaignId: string): Promise<HoistLabelPhoto | null> {
+    const { data, error } = await db
+      .from('hoist_cert_photo')
+      .select('storage_path, uploaded_at, captured_at, capture_order')
+      .eq('campaign_id', campaignId)
+      .eq('item_code', 'prep_etiqueta_polipasto')
+      .order('capture_order', { ascending: true });
+    if (error) return null;
+    const rows = ((data as Array<Record<string, unknown>> | null) ?? []).filter((r) => r.storage_path);
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      url: publicUrl(row.storage_path as string),
+      urls: rows.map((r) => publicUrl(r.storage_path as string)),
+      uploadedAt: ((row.uploaded_at ?? row.captured_at) as string) ?? null,
     };
   },
 

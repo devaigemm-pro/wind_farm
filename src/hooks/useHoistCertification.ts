@@ -3,6 +3,7 @@ import { hoistCertificationService } from '@/services/hoistCertification.service
 import type {
   HoistCampaignDetail,
   HoistTree,
+  HoistDetails,
   HoistItemNode,
   HoistSummary,
 } from '@/services/hoistCertification.service';
@@ -250,6 +251,27 @@ export function useSetHoistItemValue(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+    },
+  });
+}
+
+/** First hoist label photo (for OCR and the inspection date). */
+export function useHoistLabelPhoto(campaignId: string | undefined) {
+  return useQuery({
+    queryKey: ['hoist-label-photo', campaignId],
+    queryFn: () => hoistCertificationService.getLabelPhoto(campaignId!),
+    enabled: !!campaignId,
+  });
+}
+
+/** Save fields of the hoist data (tag, manufacturer, model, serial, year, condition). */
+export function useSetHoistDetails(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<HoistDetails>) =>
+      hoistCertificationService.setHoistDetails(campaignId!, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
     },
   });
 }
