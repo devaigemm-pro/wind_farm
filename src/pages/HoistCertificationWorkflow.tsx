@@ -42,7 +42,7 @@ import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCer
 import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
 import { readHoistLabel, hoistLabelScore } from '@/utils/hoistLabel';
-import { hoistCondition } from '@/services/hoistCertification.service';
+import { hoistCondition, hoistTreeCompleteness } from '@/services/hoistCertification.service';
 import type {
   HoistConditionValue,
   HoistDetails,
@@ -240,8 +240,19 @@ export function HoistCertificationWorkflow({
     });
   };
 
+  // Individual report only when every item has its data (brake: one is enough).
+  const completeness = tree ? hoistTreeCompleteness(tree) : null;
+  const reportReady = !!completeness?.complete;
   const handleGenerateReport = async () => {
     if (!campaignId || downloading) return;
+    if (!completeness || !completeness.complete) {
+      const names = (completeness?.missing ?? []).map((c) => getHoistLabel(c, locale));
+      toast.error(
+        `${t('hoist.reportIncompleteTitle')} (${completeness?.done ?? 0}/${completeness?.total ?? 0})` +
+          (names.length ? `: ${names.slice(0, 6).join(', ')}${names.length > 6 ? '…' : ''}` : ''),
+      );
+      return;
+    }
     setDownloading(true);
     try {
       await generateAndDownloadHoistCertificationReport({ campaignIds: [campaignId] });
@@ -313,14 +324,18 @@ export function HoistCertificationWorkflow({
             aria-disabled={downloading}
             style={{
               ...reportBtn,
-              opacity: downloading ? 0.5 : 1,
-              cursor: downloading ? 'not-allowed' : 'pointer',
+              opacity: downloading || !reportReady ? 0.5 : 1,
+              cursor: downloading || !reportReady ? 'not-allowed' : 'pointer',
             }}
             onClick={handleGenerateReport}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') handleGenerateReport();
             }}
-            title={t('hoist.generateReport')}
+            title={
+              reportReady
+                ? t('hoist.generateReport')
+                : `${t('hoist.reportIncompleteTitle')} (${completeness?.done ?? 0}/${completeness?.total ?? 0})`
+            }
           >
             {downloading ? (
               <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />

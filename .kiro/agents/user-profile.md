@@ -8,7 +8,7 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 469
+- **Sesiones analizadas**: 471
 - **Última actualización**: 2026-11-27
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
@@ -3459,3 +3459,15 @@
 - **Tarea principal**: Corrección: "solo foto etiqueta + sin tabla de chequeo" era SOLO para Anexo II (no certificados); "Anexo I" era SOLO para el informe de certificados
 - **Observaciones nuevas**: CORRECCIÓN — el agente aplicó a ambos informes cambios pedidos para uno. Las screenshots de evidencia (ficha roja NO CERTIFICADO) indicaban de qué informe hablaba. Corrige citando textualmente sus propios mensajes y asignando cada uno a su destino, cierra con "favor reparar".
 - **Patrones confirmados**: screenshot como spec (alta), corrección directa sin drama (alta), "mínimo cambio necesario / no generalizar" (alta, se suma a "solo ordenar ≠ cambiar lógica")
+- (Sesión 469, cont.) "pasar a prod" = mismo flujo aprobado: backup prod campaign (json) → migraciones vía `supabase db query --linked -f` → commit/rebase/merge/push main → `vercel --prod --yes` → verificar strings en chunks lazy (index + HoistCertificationWorkflow/HoistCampaignGroup). Nota: en el CLI de supabase, columnas con el mismo nombre se colapsan en la tabla de salida → usar alias.
+
+### Sesión 470 - 2026-11-27
+- **Tarea principal**: "pasar a prod" — deploy de campañas padre de polipastos, Anexo I/II y edición cumple/no cumple (con 2 migraciones)
+- **Observaciones nuevas**: Aprueba el deploy con 3 palabras después de varias iteraciones locales; espera que el agente ejecute todo el flujo (backup, migraciones, merge, vercel, verificación) sin más preguntas. A33 sigue sin respuesta: cuando no contesta una pregunta, no insistir en cada turno, mencionarla breve.
+- **Patrones confirmados**: deploy solo con orden explícita (alta), "a prod / pasar a prod" = flujo completo con Vercel CLI (alta), comunicación ultra-mínima (alta)
+- (Sesión 470, cont.) Regla de completitud polipastos: freno holgura 0.20–0.50 / 0.50–1 son alternativos (basta uno; cuenta como 1 ítem → 26 totales). Botón "Generar informe" individual bloquea si falta algo y avisa qué falta. En informe certificado (Anexo I) el freno vacío no aparece en la tabla.
+
+### Sesión 471 - 2026-11-27
+- **Tarea principal**: Botón "Generar informe" individual solo con datos completos; freno = basta una holgura; en Anexo I no mostrar el freno vacío
+- **Observaciones nuevas**: Define reglas de negocio de completitud con ejemplos de dominio ("en el caso del freno debe estar al menos uno") — implica que los ítems alternativos cuentan como uno. Agrega el pedido complementario en un segundo mensaje ("además...") mientras el agente trabaja. Sin correcciones.
+- **Patrones confirmados**: URL exacta como referencia (alta), encadena pedidos con "además" (alta), reglas de negocio breves que el agente debe generalizar a toda la app (lista, contador, botones) (alta)

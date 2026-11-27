@@ -469,6 +469,7 @@ export const translations: TranslationMap = {
   'hoist.certified': { en: 'Certified', es: 'Certificado' },
   'hoist.certifiedWithObs': { en: 'Certified with observations', es: 'Certificado con observaciones' },
   'hoist.notCertified': { en: 'Not certified', es: 'No certificado' },
+  'hoist.reportIncompleteTitle': { en: 'Report available when all data is entered', es: 'El informe se genera cuando todos los datos estén completos' },
   'hoist.editCheck': { en: 'Edit result (pass / fail)', es: 'Editar resultado (cumple / no cumple)' },
   'hoist.generateNotCertifiedReport': { en: 'Annex II · not certified', es: 'Anexo II · no certificados' },
   'hoist.notCertifiedReportIncludes': { en: 'Annex II includes the complete turbines with a failed verification (not certified)', es: 'El Anexo II incluye las turbinas completas con alguna verificación que no cumple (no certificadas)' },
