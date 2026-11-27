@@ -713,8 +713,10 @@ export const hoistCertificationService = {
     let checksPassed = 0;
     let checksEvaluated = 0;
     for (const item of items) {
-      photosCount += item.photos.length;
-      selectedCount += item.photos.filter((p) => p.hoistSelected).length;
+      // Only photo-capture items carry photos (verification items show none).
+      const shown = item.itemType === 'photo' ? item.photos : [];
+      photosCount += shown.length;
+      selectedCount += shown.filter((p) => p.hoistSelected).length;
       if (itemHasData(item)) itemsWithData += 1;
       if (item.itemType === 'check' && item.passed !== null) {
         checksEvaluated += 1;

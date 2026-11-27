@@ -10,7 +10,7 @@ import type {
   HoistItemNode,
   HoistPhoto,
 } from '@/services/hoistCertification.service';
-import { getHoistLabel } from '@/constants/hoist-certification-steps';
+import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
 import { documentManagerSignatureService } from '@/services/document-manager-signature.service';
 import { renderManagerSignaturePage } from '@/services/reportSignaturePage';
@@ -61,6 +61,9 @@ interface HoistPdfContext {
   details: HoistDetails;
   /** First label photo (its upload date = inspection date). */
   labelPhoto: HoistLabelPhoto | null;
+  /** Hoists of the same park + certification name, by condition (summary page). */
+  certifiedCount: number;
+  observedCount: number;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -158,11 +161,61 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 
 // ─── Data fetching ──────────────────────────────────────────────────────────
 
+/**
+ * Count the hoists of the same certification (same park + same campaign name)
+ * by condition: "certificado" vs "certificado con observaciones". The condition
+ * is the one of each detail sheet (manual override, else any failed check).
+ */
+async function countGroupConditions(
+  windFarmId: string | null,
+  name: string,
+  campaignId: string,
+): Promise<{ certifiedCount: number; observedCount: number }> {
+  try {
+    let ids: string[] = [campaignId];
+    const details = new Map<string, HoistDetails | null>();
+    if (windFarmId) {
+      const { data } = await db
+        .from('campaign')
+        .select('id, hoist_details')
+        .eq('type', 'hoist_certification')
+        .eq('wind_farm_id', windFarmId)
+        .eq('name', name);
+      const rows = (data as Array<{ id: string; hoist_details: HoistDetails | null }> | null) ?? [];
+      if (rows.length > 0) ids = rows.map((r) => r.id);
+      for (const r of rows) details.set(r.id, r.hoist_details);
+    }
+    if (!details.has(campaignId)) {
+      const { data } = await db.from('campaign').select('hoist_details').eq('id', campaignId).single();
+      details.set(campaignId, (data?.hoist_details as HoistDetails) ?? null);
+    }
+    const { data: failed } = await db
+      .from('hoist_cert_item')
+      .select('campaign_id, item_code')
+      .in('campaign_id', ids)
+      .eq('passed', false);
+    const withFail = new Set(
+      ((failed as Array<{ campaign_id: string; item_code: string }> | null) ?? [])
+        .filter((r) => HOIST_CERT_BY_CODE[r.item_code]?.itemType === 'check')
+        .map((r) => r.campaign_id),
+    );
+    let certifiedCount = 0;
+    let observedCount = 0;
+    for (const id of ids) {
+      if (hoistCondition(details.get(id), withFail.has(id)) === 'certificado') certifiedCount += 1;
+      else observedCount += 1;
+    }
+    return { certifiedCount, observedCount };
+  } catch {
+    return { certifiedCount: 0, observedCount: 0 };
+  }
+}
+
 async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const { data: campaign, error } = await db
     .from('campaign')
     .select(`
-      id, name, status, created_at, report_comment, report_recommendation, hoist_details,
+      id, name, status, created_at, wind_farm_id, report_comment, report_recommendation, hoist_details,
       wind_farm:wind_farm_id ( name, location, manager_name, manager_role, country, client ),
       turbine:turbine_id ( name, model, manufacturer )
     `)
@@ -181,7 +234,11 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   // the whole campaign, fall back to ALL photos (same rule as cleaning). Check
   // and measurement STATE is always kept regardless of photo selection.
   const allPhotos: HoistPhoto[] = [];
-  const walk = (it: HoistItemNode) => allPhotos.push(...it.photos);
+  // Only photo-capture items carry photos in the report (verification and
+  // measurement items show none, even if old photos exist).
+  const walk = (it: HoistItemNode) => {
+    if (it.itemType === 'photo') allPhotos.push(...it.photos);
+  };
   for (const step of fullTree) {
     for (const it of step.items) walk(it);
     for (const g of step.groups) for (const it of g.items) walk(it);
@@ -190,7 +247,7 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const keep = (p: HoistPhoto) => (anySelected ? p.hoistSelected : true);
   const filterItem = (it: HoistItemNode): HoistItemNode => ({
     ...it,
-    photos: it.photos.filter(keep),
+    photos: it.itemType === 'photo' ? it.photos.filter(keep) : [],
   });
   const tree: HoistTree = fullTree.map((step) => ({
     ...step,
@@ -240,6 +297,11 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
     recommendation: ((campaign as Record<string, unknown>).report_recommendation as string) ?? '',
     details: ((campaign as Record<string, unknown>).hoist_details as HoistDetails) ?? {},
     labelPhoto: await hoistCertificationService.getLabelPhoto(campaignId),
+    ...(await countGroupConditions(
+      (campaign as Record<string, unknown>).wind_farm_id as string | null,
+      (campaign.name as string) ?? '',
+      campaignId,
+    )),
   };
 }
 
@@ -429,10 +491,17 @@ function resultItems(tree: HoistTree): HoistItemNode[] {
   return out;
 }
 
+/** Brake clearance ranges (mm) of the "verificación holgura de freno" items. */
+const BRAKE_RANGES: Record<string, [number, number]> = {
+  freno_holgura_020_050: [0.2, 0.5],
+  freno_holgura_050_100: [0.5, 1],
+};
+
 /**
- * "Detalle de la revisión" — one sheet per turbine (reference: WTG sheet):
- * hoist data (label OCR / manual), condition, comment, recommendation, the
- * result of every check/measurement item and one hoist photo.
+ * "Detalle de la revisión" — one sheet per turbine, same cell layout as the
+ * reference sheet (WTG title, TAG / N° spanning two rows, fecha + condición,
+ * fabricante / modelo, serie / fabricación, comentarios, recomendación), then
+ * the result of every check/measurement item and one hoist photo in a box.
  */
 async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   doc.addPage();
@@ -440,79 +509,97 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   const items = resultItems(ctx.tree);
   const condition = hoistCondition(d, items.some((it) => it.itemType === 'check' && it.passed === false));
   const conditionLabel = condition === 'certificado' ? 'CERTIFICADO' : 'CERTIFICADO CON OBSERVACIONES';
-  const conditionFill: RGB = condition === 'certificado' ? [146, 208, 80] : [255, 192, 0];
-  const GREEN: RGB = [146, 208, 80];
-  const val = (v: string | null | undefined) => (v && String(v).trim()) || '—';
+  const LIGHT_GREEN: RGB = [146, 208, 80];
+  const DARK_GREEN: RGB = [0, 176, 80];
+  const conditionFill: RGB = condition === 'certificado' ? LIGHT_GREEN : [255, 192, 0];
+  const val = (v: string | null | undefined) => (v && String(v).trim()) || '';
+  const W = PAGE_WIDTH - 2 * MARGIN;
+  const BORDER = { lineColor: [0, 0, 0] as RGB, lineWidth: 0.3 };
+  const label = { fontStyle: 'bold' as const };
 
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
-  doc.text(`WTG ${ctx.turbineName}`, PAGE_WIDTH / 2, 22, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
+  autoTable(doc, {
+    startY: 14,
+    theme: 'plain',
+    body: [
+      [{ content: `WTG ${ctx.turbineName}`, colSpan: 4, styles: { fillColor: LIGHT_GREEN, fontStyle: 'bold', fontSize: 13, halign: 'center' } }],
+      [
+        { content: 'TAG', rowSpan: 2, styles: { fontStyle: 'bold', fontSize: 14, halign: 'center', valign: 'middle' } },
+        { content: val(d.tag), rowSpan: 2, styles: { fontStyle: 'bold', fontSize: 14, halign: 'center', valign: 'middle' } },
+        { content: 'FECHA INSPECCIÓN', styles: label },
+        { content: ctx.labelPhoto?.uploadedAt ? formatDateES(ctx.labelPhoto.uploadedAt).replace(/\//g, '-') : '' },
+      ],
+      [
+        { content: 'CONDICIÓN', styles: label },
+        { content: conditionLabel, styles: { fillColor: conditionFill, fontStyle: 'bold', halign: 'center' } },
+      ],
+      [
+        { content: 'FABRICANTE', styles: label },
+        val(d.manufacturer),
+        { content: 'MODELO', styles: label },
+        val(d.model),
+      ],
+      [
+        { content: 'NÚMERO SERIE', styles: label },
+        val(d.serialNumber),
+        { content: 'FABRICACIÓN', styles: label },
+        val(d.year),
+      ],
+      [{ content: 'COMENTARIOS', styles: label }, { content: val(ctx.comment), colSpan: 3 }],
+      [{ content: 'RECOMENDACIÓN', styles: label }, { content: val(ctx.recommendation), colSpan: 3, styles: { minCellHeight: 12 } }],
+    ],
+    styles: { fontSize: 10, cellPadding: 1.4, textColor: [0, 0, 0], ...BORDER },
+    columnStyles: {
+      0: { cellWidth: W * 0.32 },
+      1: { cellWidth: W * 0.17 },
+      2: { cellWidth: W * 0.24 },
+      3: { cellWidth: W * 0.27 },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+  });
 
-  const head: [string, string][] = [
-    ['TAG N°', val(d.tag)],
-    ['FECHA INSPECCIÓN', formatDateES(ctx.labelPhoto?.uploadedAt ?? null)],
-    ['CONDICIÓN', conditionLabel],
-    ['FABRICANTE', val(d.manufacturer)],
-    ['MODELO', val(d.model)],
-    ['NÚMERO SERIE', val(d.serialNumber)],
-    ['FABRICACIÓN', val(d.year)],
-    ['COMENTARIOS', val(ctx.comment)],
-    ['RECOMENDACIÓN', val(ctx.recommendation)],
-  ];
   const result = (it: HoistItemNode): string => {
     if (it.itemType === 'measurement') {
       if (it.measurementValue === null || it.measurementValue === '') return '—';
-      return `${it.measurementValue}${it.measurementUnit ? ' ' + it.measurementUnit : ''}`;
+      const v = `${it.measurementValue}${it.measurementUnit ? ' ' + it.measurementUnit : ''}`;
+      const range = BRAKE_RANGES[it.itemCode];
+      const n = parseFloat(String(it.measurementValue).replace(',', '.'));
+      if (range && !isNaN(n)) return `${v} / ${n >= range[0] && n <= range[1] ? 'OK' : 'NO OK'}`;
+      return v;
     }
     if (it.passed === true) return 'OK';
     if (it.passed === false) return 'NO CUMPLE';
     return '—';
   };
-  const body = [...head, ...items.map((it) => [it.itemLabel, result(it)] as [string, string])];
 
+  const y0 = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 60) + 3;
   autoTable(doc, {
-    startY: 28,
-    body,
-    theme: 'grid',
-    bodyStyles: { fontSize: 7, textColor: [0, 0, 0] },
-    styles: { cellPadding: 0.9, lineColor: [150, 150, 150], lineWidth: 0.2 },
+    startY: y0,
+    theme: 'plain',
+    body: items.map((it) => [it.itemLabel, result(it)]),
+    styles: { fontSize: 8.5, cellPadding: 1.1, textColor: [0, 0, 0], ...BORDER },
     columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 120 },
-      1: { halign: 'center' },
+      0: { cellWidth: W * 0.77 },
+      1: { halign: 'center', fontStyle: 'bold' },
     },
     margin: { left: MARGIN, right: MARGIN },
     didParseCell: (hook) => {
-      if (hook.section !== 'body') return;
-      const row = hook.row.index;
-      if (row < head.length) {
-        hook.cell.styles.fillColor = [242, 242, 242];
-        if (hook.column.index === 1 && row === 2) {
-          hook.cell.styles.fillColor = conditionFill;
-          hook.cell.styles.fontStyle = 'bold';
-        }
-        if (hook.column.index === 1 && row >= 7) hook.cell.styles.halign = 'left';
-        return;
-      }
-      if (hook.column.index !== 1) return;
-      const it = items[row - head.length];
+      if (hook.section !== 'body' || hook.column.index !== 1) return;
+      const it = items[hook.row.index];
       if (!it) return;
-      if (it.itemType === 'measurement' && result(it) !== '—') {
-        hook.cell.styles.fillColor = GREEN;
-        hook.cell.styles.fontStyle = 'bold';
-      } else if (it.passed === false) {
+      if (it.itemType === 'measurement' && !BRAKE_RANGES[it.itemCode] && result(it) !== '—') {
+        hook.cell.styles.fillColor = DARK_GREEN;
+      } else if (it.itemType === 'check' && it.passed === false) {
         hook.cell.styles.fillColor = [255, 199, 206];
-        hook.cell.styles.fontStyle = 'bold';
       }
     },
   });
 
-  // One photo of the hoist below the table: first non-label photo, else the label.
+  // One hoist photo in a bordered box below the table: first photo of a
+  // photo-capture item (not the label), else the label photo.
   let photoUrl: string | null = null;
   for (const step of ctx.tree) {
     for (const it of [...step.items, ...step.groups.flatMap((g) => g.items)]) {
-      if (it.itemCode === 'prep_etiqueta_polipasto') continue;
+      if (it.itemType !== 'photo' || it.itemCode === 'prep_etiqueta_polipasto') continue;
       const p = [...it.photos].sort(byReportOrder)[0];
       if (p) { photoUrl = p.url; break; }
     }
@@ -521,25 +608,81 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   photoUrl = photoUrl ?? ctx.labelPhoto?.url ?? null;
   if (!photoUrl) return;
 
-  let y = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 28) + 6;
-  const maxW = PAGE_WIDTH - 2 * MARGIN;
-  let maxH = PAGE_HEIGHT - 22 - y;
-  if (maxH < 50) {
+  let y = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 60) + 3;
+  let boxH = PAGE_HEIGHT - 20 - y;
+  if (boxH < 50) {
     doc.addPage();
-    y = 25;
-    maxH = PAGE_HEIGHT - 22 - y;
+    y = 20;
+    boxH = PAGE_HEIGHT - 20 - y;
   }
   const base64 = await loadImageAsBase64(photoUrl);
   if (!base64) return;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(MARGIN, y, W, boxH);
   try {
     const props = doc.getImageProperties(base64);
-    const scale = Math.min(maxW / props.width, maxH / props.height);
+    const pad = 4;
+    const scale = Math.min((W - 2 * pad) / props.width, (boxH - 2 * pad) / props.height);
     const w = props.width * scale;
     const h = props.height * scale;
-    doc.addImage(base64, 'JPEG', (PAGE_WIDTH - w) / 2, y, w, h);
+    doc.addImage(base64, 'JPEG', (PAGE_WIDTH - w) / 2, y + (boxH - h) / 2, w, h);
   } catch {
     /* skip broken image */
   }
+}
+
+/**
+ * Page 2: "EQUIPOS CERTIFICADOS Y EQUIPOS CERTIFICADOS CON OBSERVACIONES" —
+ * counts of the hoists of this certification (same park + name) by condition,
+ * with the general recommendations for each group.
+ */
+function renderCertifiedSummary(doc: jsPDF, ctx: HoistPdfContext) {
+  doc.addPage();
+  const W = PAGE_WIDTH - 2 * MARGIN;
+  const nn = (n: number) => String(n).padStart(2, '0');
+  const common = [
+    'Mantener la cadena de carga limpia y lubricada.',
+    'No levantar cargas superiores a la carga nominal del equipo (800 kilos).',
+    'No operar el polipasto con un ángulo de tiro superior a 15°.',
+  ];
+  let y = 28;
+  doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  const title = doc.splitTextToSize('EQUIPOS CERTIFICADOS Y EQUIPOS CERTIFICADOS CON OBSERVACIONES', W) as string[];
+  doc.text(title, PAGE_WIDTH / 2, y, { align: 'center' });
+  y += title.length * 7 + 8;
+  doc.setTextColor(0, 0, 0);
+
+  const para = (text: string, bold = false, size = 11) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(text, W) as string[];
+    doc.text(lines, MARGIN, y);
+    y += lines.length * (size * 0.45) + 3;
+  };
+  const bullets = (list: string[]) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    for (const b of list) {
+      const lines = doc.splitTextToSize(b, W - 8) as string[];
+      doc.text('•', MARGIN + 2, y);
+      doc.text(lines, MARGIN + 7, y);
+      y += lines.length * 5 + 1.5;
+    }
+    y += 6;
+  };
+
+  para('EQUIPOS CERTIFICADOS (APTOS)', true, 12);
+  para(`${nn(ctx.certifiedCount)} polipastos pasaron la inspección de manera satisfactoria, quedando CERTIFICADOS (APTOS).`);
+  para('Recomendaciones:', true);
+  bullets(common);
+
+  para('EQUIPOS CERTIFICADOS CON OBSERVACIONES', true, 12);
+  para(`${nn(ctx.observedCount)} polipastos pasaron la inspección, pero mantienen observaciones, quedando CERTIFICADOS CON OBSERVACIONES.`);
+  para('Recomendaciones:', true);
+  bullets(['Atender las observaciones indicadas en el detalle de la revisión de cada equipo.', ...common]);
 }
 
 /** One separator page per STEP, then one block page per selected photo. */
@@ -613,7 +756,9 @@ export async function generateAndDownloadHoistCertificationReport(
 
   // 1. Cover page.
   await renderCoverPage(doc, ctx);
-  // 2. General data + per-item results table.
+  // 2. Certified / certified-with-observations summary.
+  renderCertifiedSummary(doc, ctx);
+  // 3. General data.
   renderGeneralData(doc, ctx);
   // 2b. Revision detail sheet (hoist data, condition, comment, results, photo).
   await renderRevisionDetail(doc, ctx);

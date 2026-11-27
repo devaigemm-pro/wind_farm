@@ -450,15 +450,20 @@ function stepItems(step: HoistStepNode): HoistItemNode[] {
   return step.items;
 }
 
+/** Photos shown on screen / in the report: only photo-capture items carry them. */
+function shownPhotos(it: HoistItemNode): HoistPhoto[] {
+  return it.itemType === 'photo' ? it.photos : [];
+}
+
 function countPhotos(tree: HoistStepNode[]): number {
   let n = 0;
-  for (const step of tree) for (const it of stepItems(step)) n += it.photos.length;
+  for (const step of tree) for (const it of stepItems(step)) n += shownPhotos(it).length;
   return n;
 }
 function countSelected(tree: HoistStepNode[]): number {
   let n = 0;
   for (const step of tree)
-    for (const it of stepItems(step)) n += it.photos.filter((p) => p.hoistSelected).length;
+    for (const it of stepItems(step)) n += shownPhotos(it).filter((p) => p.hoistSelected).length;
   return n;
 }
 
@@ -537,7 +542,7 @@ function StepSection({
 
   const label = getHoistLabel(step.stepCode, locale);
   const items = stepItems(step);
-  const stepPhotoCount = items.reduce((acc, it) => acc + it.photos.length, 0);
+  const stepPhotoCount = items.reduce((acc, it) => acc + shownPhotos(it).length, 0);
 
   const renderItem = (item: HoistItemNode) => (
     <ItemRow
@@ -646,13 +651,11 @@ function ItemRow({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thisKey = item.itemId ?? item.itemCode;
-  // Photo/measurement items always show their gallery. A 'check' item shows it
-  // only when photos were captured (e.g. items that were 'photo' before becoming
-  // 'check'), so already-uploaded photos never disappear from the screen.
-  // Web-editable items carry a value from the app (a text box here); their
-  // gallery only shows when the app actually sent photos.
+  // Only photo-capture items show a gallery. Verification ('check') and
+  // measurement items show no photos, even if old photos exist (e.g. items that
+  // were 'photo' before becoming 'check'); those photos stay in the DB.
   const isWebEditable = !!HOIST_CERT_BY_CODE[item.itemCode]?.webEditable;
-  const hasPhotos = (item.itemType !== 'check' && !isWebEditable) || item.photos.length > 0;
+  const hasPhotos = item.itemType === 'photo';
   const itemDropActive = hoverTargetKey != null && hoverTargetKey === thisKey;
 
   useEffect(() => {
