@@ -10,7 +10,7 @@ import type {
   HoistItemNode,
   HoistPhoto,
 } from '@/services/hoistCertification.service';
-import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
+import { getHoistLabel } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
 import { documentManagerSignatureService } from '@/services/document-manager-signature.service';
 import { renderManagerSignaturePage } from '@/services/reportSignaturePage';
@@ -31,7 +31,20 @@ const db = supabase as any;
 type JsPDFWithAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
 export interface HoistReportData {
-  campaignId: string;
+  /** Turbine (child) campaigns to include, in order. */
+  campaignIds: string[];
+  /** Parent campaign name (multi-turbine report); defaults to the first campaign's name. */
+  campaignName?: string;
+}
+
+/** Report-level data shared by every turbine of the report. */
+interface HoistReportMeta {
+  campaignName: string;
+  turbines: string[];
+  models: string;
+  manufacturers: string;
+  certifiedCount: number;
+  observedCount: number;
 }
 
 type RGB = [number, number, number];
@@ -61,9 +74,6 @@ interface HoistPdfContext {
   details: HoistDetails;
   /** First label photo (its upload date = inspection date). */
   labelPhoto: HoistLabelPhoto | null;
-  /** Hoists of the same park + certification name, by condition (summary page). */
-  certifiedCount: number;
-  observedCount: number;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -161,61 +171,11 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 
 // ─── Data fetching ──────────────────────────────────────────────────────────
 
-/**
- * Count the hoists of the same certification (same park + same campaign name)
- * by condition: "certificado" vs "certificado con observaciones". The condition
- * is the one of each detail sheet (manual override, else any failed check).
- */
-async function countGroupConditions(
-  windFarmId: string | null,
-  name: string,
-  campaignId: string,
-): Promise<{ certifiedCount: number; observedCount: number }> {
-  try {
-    let ids: string[] = [campaignId];
-    const details = new Map<string, HoistDetails | null>();
-    if (windFarmId) {
-      const { data } = await db
-        .from('campaign')
-        .select('id, hoist_details')
-        .eq('type', 'hoist_certification')
-        .eq('wind_farm_id', windFarmId)
-        .eq('name', name);
-      const rows = (data as Array<{ id: string; hoist_details: HoistDetails | null }> | null) ?? [];
-      if (rows.length > 0) ids = rows.map((r) => r.id);
-      for (const r of rows) details.set(r.id, r.hoist_details);
-    }
-    if (!details.has(campaignId)) {
-      const { data } = await db.from('campaign').select('hoist_details').eq('id', campaignId).single();
-      details.set(campaignId, (data?.hoist_details as HoistDetails) ?? null);
-    }
-    const { data: failed } = await db
-      .from('hoist_cert_item')
-      .select('campaign_id, item_code')
-      .in('campaign_id', ids)
-      .eq('passed', false);
-    const withFail = new Set(
-      ((failed as Array<{ campaign_id: string; item_code: string }> | null) ?? [])
-        .filter((r) => HOIST_CERT_BY_CODE[r.item_code]?.itemType === 'check')
-        .map((r) => r.campaign_id),
-    );
-    let certifiedCount = 0;
-    let observedCount = 0;
-    for (const id of ids) {
-      if (hoistCondition(details.get(id), withFail.has(id)) === 'certificado') certifiedCount += 1;
-      else observedCount += 1;
-    }
-    return { certifiedCount, observedCount };
-  } catch {
-    return { certifiedCount: 0, observedCount: 0 };
-  }
-}
-
 async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const { data: campaign, error } = await db
     .from('campaign')
     .select(`
-      id, name, status, created_at, wind_farm_id, report_comment, report_recommendation, hoist_details,
+      id, name, status, created_at, report_comment, report_recommendation, hoist_details,
       wind_farm:wind_farm_id ( name, location, manager_name, manager_role, country, client ),
       turbine:turbine_id ( name, model, manufacturer )
     `)
@@ -297,18 +257,13 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
     recommendation: ((campaign as Record<string, unknown>).report_recommendation as string) ?? '',
     details: ((campaign as Record<string, unknown>).hoist_details as HoistDetails) ?? {},
     labelPhoto: await hoistCertificationService.getLabelPhoto(campaignId),
-    ...(await countGroupConditions(
-      (campaign as Record<string, unknown>).wind_farm_id as string | null,
-      (campaign.name as string) ?? '',
-      campaignId,
-    )),
   };
 }
 
 // ─── Renderers ──────────────────────────────────────────────────────────────
 
 /** Cover page (page 1) — "Informe de Certificación de Polipastos". */
-async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
+async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistReportMeta) {
   const pageW = PAGE_WIDTH;
   const pageH = PAGE_HEIGHT;
   const margin = 20;
@@ -388,7 +343,11 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...coverText);
   doc.text(ctx.windFarmName, pageW - margin, titleY + 6, { align: 'right' });
-  doc.text(`Turbina: ${ctx.turbineName}`, pageW - margin, titleY + 14, { align: 'right' });
+  const turbineLine =
+    meta.turbines.length === 1
+      ? `Turbina: ${meta.turbines[0]}`
+      : `${meta.campaignName} · ${meta.turbines.length} turbinas`;
+  doc.text(turbineLine, pageW - margin, titleY + 14, { align: 'right' });
   doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
   // Footer.
@@ -406,7 +365,7 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
 }
 
 /** General-data table (page 2). */
-function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext) {
+function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext, meta: HoistReportMeta) {
   doc.addPage();
   const [r, g, b] = hexToRgb(COLOR_PRIMARY);
   doc.setFillColor(r, g, b);
@@ -428,9 +387,9 @@ function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext) {
       ['Cliente', ctx.client || NA],
       ['Planta (P.E.)', ctx.windFarmName],
       ['Año', anioReporte],
-      ['Fabricante', ctx.manufacturer || NA],
-      ['Tipo de turbina', ctx.turbineModel],
-      ['N° de turbina', ctx.turbineName],
+      ['Fabricante', meta.manufacturers || NA],
+      ['Tipo de turbina', meta.models || NA],
+      [meta.turbines.length === 1 ? 'N° de turbina' : `Turbinas (${meta.turbines.length})`, meta.turbines.join(', ') || NA],
       ['Fecha', formatDateES(ctx.createdAt)],
       ['Informe realizado por', ctx.reportedBy],
     ],
@@ -637,7 +596,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
  * counts of the hoists of this certification (same park + name) by condition,
  * with the general recommendations for each group.
  */
-function renderCertifiedSummary(doc: jsPDF, ctx: HoistPdfContext) {
+function renderCertifiedSummary(doc: jsPDF, meta: HoistReportMeta) {
   doc.addPage();
   const W = PAGE_WIDTH - 2 * MARGIN;
   const nn = (n: number) => String(n).padStart(2, '0');
@@ -675,18 +634,24 @@ function renderCertifiedSummary(doc: jsPDF, ctx: HoistPdfContext) {
   };
 
   para('EQUIPOS CERTIFICADOS (APTOS)', true, 12);
-  para(`${nn(ctx.certifiedCount)} polipastos pasaron la inspección de manera satisfactoria, quedando CERTIFICADOS (APTOS).`);
+  para(`${nn(meta.certifiedCount)} polipastos pasaron la inspección de manera satisfactoria, quedando CERTIFICADOS (APTOS).`);
   para('Recomendaciones:', true);
   bullets(common);
 
   para('EQUIPOS CERTIFICADOS CON OBSERVACIONES', true, 12);
-  para(`${nn(ctx.observedCount)} polipastos pasaron la inspección, pero mantienen observaciones, quedando CERTIFICADOS CON OBSERVACIONES.`);
+  para(`${nn(meta.observedCount)} polipastos pasaron la inspección, pero mantienen observaciones, quedando CERTIFICADOS CON OBSERVACIONES.`);
   para('Recomendaciones:', true);
   bullets(['Atender las observaciones indicadas en el detalle de la revisión de cada equipo.', ...common]);
 }
 
 /** One separator page per STEP, then one block page per selected photo. */
-async function renderStepSection(doc: jsPDF, step: HoistStepNode, locale: 'es' | 'en') {
+async function renderStepSection(
+  doc: jsPDF,
+  step: HoistStepNode,
+  locale: 'es' | 'en',
+  /** Multi-turbine report: no separator page, turbine name in each photo header. */
+  turbinePrefix: string | null,
+) {
   // Collect every item of the step (direct or grouped).
   const groups: { label: string | null; items: HoistItemNode[] }[] = step.hasGroups
     ? [
@@ -698,21 +663,29 @@ async function renderStepSection(doc: jsPDF, step: HoistStepNode, locale: 'es' |
   const hasPhotos = groups.some((g) => g.items.some((it) => it.photos.length > 0));
   if (!hasPhotos) return;
 
-  // Separator page with the step name centered.
-  doc.addPage();
-  doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
-  doc.setFontSize(32);
-  doc.setFont('helvetica', 'bold');
-  const stepName = getHoistLabel(step.stepCode, locale).toUpperCase();
-  const wrapped = doc.splitTextToSize(stepName, PAGE_WIDTH - 40);
-  doc.text(wrapped, PAGE_WIDTH / 2, PAGE_HEIGHT / 2, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
+  // Separator page with the step name centered (single-turbine report only).
+  if (turbinePrefix === null) {
+    doc.addPage();
+    doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
+    doc.setFontSize(32);
+    doc.setFont('helvetica', 'bold');
+    const stepName = getHoistLabel(step.stepCode, locale).toUpperCase();
+    const wrapped = doc.splitTextToSize(stepName, PAGE_WIDTH - 40);
+    doc.text(wrapped, PAGE_WIDTH / 2, PAGE_HEIGHT / 2, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+  }
 
   for (const grp of groups) {
     for (const item of grp.items) {
       const photos = [...item.photos].sort(byReportOrder);
       for (const photo of photos) {
-        await renderPhotoBlock(doc, step.stepLabel, grp.label, item.itemLabel, photo);
+        await renderPhotoBlock(
+          doc,
+          turbinePrefix ? `${turbinePrefix} · ${step.stepLabel}` : step.stepLabel,
+          grp.label,
+          item.itemLabel,
+          photo,
+        );
       }
     }
   }
@@ -751,37 +724,63 @@ export async function generateAndDownloadHoistCertificationReport(
     throw new Error('Sesión expirada. Por favor inicie sesión nuevamente.');
   }
 
-  const ctx = await fetchHoistData(data.campaignId);
+  if (data.campaignIds.length === 0) throw new Error('No hay turbinas para el informe.');
+
+  // Turbine contexts, a few at a time (each one reads its tree and photos).
+  const ctxs: HoistPdfContext[] = [];
+  for (let i = 0; i < data.campaignIds.length; i += 4) {
+    const batch = data.campaignIds.slice(i, i + 4);
+    ctxs.push(...(await Promise.all(batch.map((id) => fetchHoistData(id)))));
+  }
+  ctxs.sort((a, b) => a.turbineName.localeCompare(b.turbineName, 'es', { numeric: true }));
+  const first = ctxs[0]!;
+  const multi = ctxs.length > 1;
+  const uniq = (xs: string[]) => [...new Set(xs.map((x) => x.trim()).filter((x) => x && x !== NA))].join(', ');
+  const isObserved = (c: HoistPdfContext) =>
+    hoistCondition(c.details, resultItems(c.tree).some((it) => it.itemType === 'check' && it.passed === false)) !==
+    'certificado';
+  const observedCount = ctxs.filter(isObserved).length;
+  const meta: HoistReportMeta = {
+    campaignName: data.campaignName || first.campaignName,
+    turbines: ctxs.map((c) => c.turbineName),
+    models: uniq(ctxs.map((c) => c.turbineModel)),
+    manufacturers: uniq(ctxs.map((c) => c.manufacturer)),
+    certifiedCount: ctxs.length - observedCount,
+    observedCount,
+  };
+
   const doc = new jsPDF('p', 'mm', 'a4');
 
   // 1. Cover page.
-  await renderCoverPage(doc, ctx);
+  await renderCoverPage(doc, first, meta);
   // 2. Certified / certified-with-observations summary.
-  renderCertifiedSummary(doc, ctx);
+  renderCertifiedSummary(doc, meta);
   // 3. General data.
-  renderGeneralData(doc, ctx);
-  // 2b. Revision detail sheet (hoist data, condition, comment, results, photo).
-  await renderRevisionDetail(doc, ctx);
-  // 3. One section per STEP (separator + one block page per photo).
+  renderGeneralData(doc, first, meta);
+  // 4. Per turbine: revision detail sheet, then its report photos.
   const locale: 'es' | 'en' = 'es';
-  for (const step of ctx.tree) {
-    await renderStepSection(doc, step, locale);
+  for (const ctx of ctxs) {
+    await renderRevisionDetail(doc, ctx);
+    for (const step of ctx.tree) {
+      await renderStepSection(doc, step, locale, multi ? ctx.turbineName : null);
+    }
   }
-  // 4. Signature + legal page (same as the repair report).
+  // 5. Signature + legal page (same as the repair report).
   renderManagerSignaturePage(doc, {
-    windFarmName: ctx.windFarmName,
+    windFarmName: first.windFarmName,
     purpose: 'Certificación de polipastos de turbina eólica',
-    managerName: ctx.managerName,
-    managerRole: ctx.managerRole,
-    managerSignature: ctx.managerSignature,
+    managerName: first.managerName,
+    managerRole: first.managerRole,
+    managerSignature: first.managerSignature,
     titleColor: hexToRgb(COLOR_PRIMARY),
   });
 
-  // 5. Footers.
-  addFooters(doc, ctx.windFarmName);
+  // 6. Footers.
+  addFooters(doc, first.windFarmName);
 
-  const dateStr = formatDateES(ctx.createdAt).replace(/\//g, '-');
-  const filename = `Informe_Certificacion_Polipastos_${ctx.turbineName}_${dateStr}.pdf`.replace(/\s+/g, '_');
+  const dateStr = formatDateES(first.createdAt).replace(/\//g, '-');
+  const subject = multi ? meta.campaignName : first.turbineName;
+  const filename = `Informe_Certificacion_Polipastos_${subject}_${dateStr}.pdf`.replace(/[\s/\\]+/g, '_');
 
   const blob = doc.output('blob') as Blob;
   const url = URL.createObjectURL(blob);

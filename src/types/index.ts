@@ -274,7 +274,13 @@ export interface TurbineSubassetRow {
 }
 
 /** Campaign discriminator: inspection (drone photos) vs repair (from approved quote) vs cleaning (turbine cleaning) vs hoist_certification (hoist certification) */
-export type CampaignType = 'inspection' | 'repair' | 'cleaning' | 'hoist_certification';
+export type CampaignType =
+  | 'inspection'
+  | 'repair'
+  | 'cleaning'
+  | 'hoist_certification'
+  /** Parent hoist campaign holding many turbines (children are 'hoist_certification'). */
+  | 'hoist_certification_group';
 
 /** Repair campaign workflow status */
 export type RepairCampaignStatus = 'repair_open' | 'repair_in_progress' | 'repair_done';
@@ -297,6 +303,8 @@ export interface Campaign {
   turbineId?: string | null;
   quoteId?: string | null;
   status?: string | null;
+  /** Hoist turbine campaigns: the parent campaign ('hoist_certification_group'). */
+  parentCampaignId?: string | null;
 }
 
 /** Repair campaign created when a quote is approved */

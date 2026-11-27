@@ -24,6 +24,8 @@ El flujo es el mismo de reparación/limpieza, renombrado a `hoist_certification`
 
 El app móvil **no crea** la campaña; solo lee `campaign.id` (el `campaign_id`) y su `turbine_id`.
 
+**Campaña con varias turbinas (padre).** En la web una campaña agrupa muchas turbinas: hay una fila padre `type = 'hoist_certification_group'` (sin `turbine_id`) y una fila hija `type = 'hoist_certification'` por turbina, con `parent_campaign_id` = id del padre. El app móvil sigue trabajando igual, con la fila **hija** (su `campaign_id` y `turbine_id`). Debe ignorar las filas `hoist_certification_group`.
+
 ---
 
 ## 3. Tipos de ítem (`item_type`)

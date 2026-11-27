@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
-import { fetchInChunks, DEFAULT_CHUNK_SIZE } from '@/utils/chunk';
+import { fetchInChunks, DEFAULT_CHUNK_SIZE, chunkArray } from '@/utils/chunk';
 import {
   HOIST_CERT_STEPS,
+  HOIST_CERT_CATALOG,
   HOIST_CERT_BY_CODE,
   getHoistGroups,
   getHoistItems,
@@ -566,11 +567,40 @@ function allItems(tree: HoistTree): HoistItemNode[] {
 }
 
 /** Whether an item carries any captured data (photos, a check result, or a measurement). */
+/**
+ * An item "has its data" according to its type: a photo item needs a photo, a
+ * verification needs cumple/no cumple, a measurement needs a value. Photos on
+ * verification/measurement items don't count (they are not shown).
+ */
 function itemHasData(item: HoistItemNode): boolean {
-  if (item.photos.length > 0) return true;
-  if (item.itemType === 'check' && item.passed !== null) return true;
-  if (item.itemType === 'measurement' && item.measurementValue !== null) return true;
-  return false;
+  if (item.itemType === 'photo') return item.photos.length > 0;
+  if (item.itemType === 'check') return item.passed !== null;
+  return item.measurementValue !== null && String(item.measurementValue).trim() !== '';
+}
+
+/** One turbine (child campaign) of a parent hoist campaign, with its progress. */
+export interface HoistGroupTurbine {
+  /** Child campaign id (the one the mobile app writes to). */
+  campaignId: string;
+  turbineId: string | null;
+  turbineName: string;
+  status: HoistCertificationStatus;
+  photosCount: number;
+  itemsWithData: number;
+  totalItems: number;
+  /** Every catalog item has its data → included in the campaign report. */
+  complete: boolean;
+}
+
+/** Parent hoist campaign (type='hoist_certification_group') with its turbines. */
+export interface HoistGroupDetail {
+  id: string;
+  name: string;
+  status: HoistCertificationStatus;
+  createdAt: string;
+  windFarmId: string;
+  windFarmName: string | null;
+  turbines: HoistGroupTurbine[];
 }
 
 // ─── Service ────────────────────────────────────────────────────────────────
@@ -900,6 +930,144 @@ export const hoistCertificationService = {
         { onConflict: 'campaign_id,item_code' },
       );
     if (error) throw new HoistCertificationServiceError(error.message, error.code);
+  },
+
+  /**
+   * Parent campaign + its turbines with progress, in ONE pass (items and photo
+   * counts of every child fetched together instead of one RPC per turbine).
+   */
+  async getHoistGroup(groupId: string): Promise<HoistGroupDetail> {
+    const { data: g, error } = await db
+      .from('campaign')
+      .select('id, name, status, created_at, wind_farm_id, wind_farm:wind_farm_id ( name )')
+      .eq('id', groupId)
+      .single();
+    if (error || !g) {
+      throw new HoistCertificationServiceError(error?.message || 'Hoist campaign not found', error?.code);
+    }
+    const { data: kids, error: kidsErr } = await db
+      .from('campaign')
+      .select('id, status, turbine_id, turbine:turbine_id ( name )')
+      .eq('parent_campaign_id', groupId)
+      .eq('type', 'hoist_certification');
+    if (kidsErr) throw new HoistCertificationServiceError(kidsErr.message, kidsErr.code);
+    const children = (kids as Array<Record<string, unknown>> | null) ?? [];
+    const ids = children.map((k) => k.id as string);
+
+    // Paged reads (PostgREST returns at most 1000 rows per request).
+    const readAll = async (table: string, cols: string): Promise<Array<Record<string, unknown>>> => {
+      const out: Array<Record<string, unknown>> = [];
+      for (const chunk of chunkArray(ids, 50)) {
+        for (let from = 0; ; from += 1000) {
+          const { data, error: e } = await db
+            .from(table)
+            .select(cols)
+            .in('campaign_id', chunk)
+            .order('id')
+            .range(from, from + 999);
+          if (e) throw new HoistCertificationServiceError(e.message, e.code);
+          const rows = (data as Array<Record<string, unknown>> | null) ?? [];
+          out.push(...rows);
+          if (rows.length < 1000) break;
+        }
+      }
+      return out;
+    };
+    const items = ids.length ? await readAll('hoist_cert_item', 'campaign_id, item_code, passed, measurement_value') : [];
+    const photos = ids.length ? await readAll('hoist_cert_photo', 'campaign_id, item_code') : [];
+
+    const catalogItems = HOIST_CERT_CATALOG.filter((e) => e.isItem);
+    const itemKey = (c: unknown, code: unknown) => `${c}|${code}`;
+    const itemMap = new Map(items.map((r) => [itemKey(r.campaign_id, r.item_code), r]));
+    const photoCount = new Map<string, number>();
+    for (const p of photos) {
+      const k = itemKey(p.campaign_id, p.item_code);
+      photoCount.set(k, (photoCount.get(k) ?? 0) + 1);
+    }
+
+    const turbines: HoistGroupTurbine[] = children.map((k) => {
+      const id = k.id as string;
+      let itemsWithData = 0;
+      let photosCount = 0;
+      for (const e of catalogItems) {
+        const row = itemMap.get(itemKey(id, e.code));
+        const n = photoCount.get(itemKey(id, e.code)) ?? 0;
+        if (e.itemType === 'photo') photosCount += n;
+        const has =
+          e.itemType === 'photo'
+            ? n > 0
+            : e.itemType === 'check'
+              ? row?.passed != null
+              : row?.measurement_value != null && String(row.measurement_value).trim() !== '';
+        if (has) itemsWithData += 1;
+      }
+      return {
+        campaignId: id,
+        turbineId: (k.turbine_id as string) ?? null,
+        turbineName: ((k.turbine as Record<string, unknown> | null)?.name as string) ?? '—',
+        status: ((k.status as string) ?? 'hoist_open') as HoistCertificationStatus,
+        photosCount,
+        itemsWithData,
+        totalItems: catalogItems.length,
+        complete: itemsWithData === catalogItems.length,
+      };
+    });
+    turbines.sort((a, b) => a.turbineName.localeCompare(b.turbineName, 'es', { numeric: true }));
+
+    return {
+      id: g.id as string,
+      name: (g.name as string) ?? '',
+      status: ((g.status as string) ?? 'hoist_open') as HoistCertificationStatus,
+      createdAt: g.created_at as string,
+      windFarmId: g.wind_farm_id as string,
+      windFarmName: ((g.wind_farm as Record<string, unknown> | null)?.name as string) ?? null,
+      turbines,
+    };
+  },
+
+  /**
+   * Add turbines to a parent campaign: one child campaign per turbine
+   * (type='hoist_certification', what the mobile app reads), skipping turbines
+   * already in the parent.
+   */
+  async addTurbinesToGroup(groupId: string, turbineIds: string[]): Promise<number> {
+    const { data: g, error } = await db
+      .from('campaign')
+      .select('id, name, wind_farm_id')
+      .eq('id', groupId)
+      .single();
+    if (error || !g) throw new HoistCertificationServiceError(error?.message || 'Hoist campaign not found', error?.code);
+    const { data: existing } = await db
+      .from('campaign')
+      .select('turbine_id')
+      .eq('parent_campaign_id', groupId);
+    const have = new Set(((existing as Array<{ turbine_id: string }> | null) ?? []).map((r) => r.turbine_id));
+    const toAdd = [...new Set(turbineIds)].filter((id) => !have.has(id));
+    if (toAdd.length === 0) return 0;
+    const user = (await db.auth.getUser()).data.user;
+    const { error: insErr } = await db.from('campaign').insert(
+      toAdd.map((turbineId) => ({
+        wind_farm_id: g.wind_farm_id,
+        turbine_id: turbineId,
+        name: g.name,
+        type: 'hoist_certification',
+        status: 'hoist_open',
+        parent_campaign_id: groupId,
+        created_by: user?.id ?? null,
+      })),
+    );
+    if (insErr) throw new HoistCertificationServiceError(insErr.message, insErr.code);
+    return toAdd.length;
+  },
+
+  /** Parent campaign id of a turbine (child) campaign, or null. */
+  async getParentId(campaignId: string): Promise<string | null> {
+    const { data } = await db
+      .from('campaign')
+      .select('parent_campaign_id')
+      .eq('id', campaignId)
+      .single();
+    return (data?.parent_campaign_id as string) ?? null;
   },
 
   async updateHoistStatus(

@@ -6,7 +6,7 @@ import { useLanguage } from '@/components/design-system';
 import { useCampaignInspections } from '@/hooks/useWindFarmDetail';
 import { useRepairSummary } from '@/hooks/useRepair';
 import { useCleaningSummary } from '@/hooks/useCleaning';
-import { useHoistSummary } from '@/hooks/useHoistCertification';
+import { useHoistSummary, useHoistGroup } from '@/hooks/useHoistCertification';
 import { generateAndDownloadReport } from '@/services/reportPdf.service';
 import type { Campaign, CampaignInspection } from '@/types';
 
@@ -30,13 +30,15 @@ export function CampaignAccordion({
   filterBySubasset,
 }: CampaignAccordionProps) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const isRepair = campaign.type === 'repair';
   const isCleaning = campaign.type === 'cleaning';
-  const isHoist = campaign.type === 'hoist_certification';
+  const isHoistGroup = campaign.type === 'hoist_certification_group';
+  const isHoist = campaign.type === 'hoist_certification' || isHoistGroup;
   const isInspection = !isRepair && !isCleaning && !isHoist;
 
   // When a filter is active, always load inspections to show filtered results
@@ -99,6 +101,16 @@ export function CampaignAccordion({
         </button>
 
         <div style={actionsStyle}>
+          {isHoistGroup && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(`/hoist-certification/campaign/${campaign.id}`)}
+              style={{ backgroundColor: '#5A8F5A' }}
+            >
+              {t('hoist.openCampaign')}
+            </Button>
+          )}
           {isInspection && (
             <Button
               variant="primary"
@@ -165,7 +177,7 @@ export function CampaignAccordion({
       {/* Expanded Table — hoist-certification variant */}
       {effectiveExpanded && isHoist && (
         <div style={tableWrapperStyle}>
-          <HoistCampaignRows campaign={campaign} />
+          {isHoistGroup ? <HoistGroupRows campaign={campaign} /> : <HoistCampaignRows campaign={campaign} />}
         </div>
       )}
 
@@ -447,6 +459,73 @@ function HoistCampaignRows({ campaign }: { campaign: Campaign }) {
               : `${summary?.itemsWithData ?? 0}/${summary?.totalItems ?? 0}`}
           </td>
         </tr>
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Hoist-certification PARENT campaign: one row per turbine ───────────────────
+
+function HoistGroupRows({ campaign }: { campaign: Campaign }) {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { data: group, isLoading } = useHoistGroup(campaign.id);
+
+  const badge = (status: string) => {
+    const map: Record<string, { bg: string; color: string; key: string }> = {
+      hoist_open: { bg: '#FEF9C3', color: '#854D0E', key: 'hoist.statusOpen' },
+      hoist_in_progress: { bg: '#DBEAFE', color: '#1E40AF', key: 'hoist.statusInProgress' },
+      hoist_done: { bg: '#DEF7EC', color: '#03543F', key: 'hoist.statusDone' },
+    };
+    const c = map[status] || map.hoist_open!;
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: c.bg, color: c.color }}>
+        {t(c.key)}
+      </span>
+    );
+  };
+
+  const open = (turbineCampaignId?: string) =>
+    navigate(
+      `/hoist-certification/campaign/${campaign.id}${turbineCampaignId ? `?turbine=${turbineCampaignId}` : ''}`,
+    );
+
+  if (isLoading) return <p style={loadingStyle}>{t('general.loading')}</p>;
+  const turbines = group?.turbines ?? [];
+  if (turbines.length === 0) {
+    return (
+      <p style={{ ...loadingStyle, cursor: 'pointer' }} onClick={() => open()}>
+        {t('hoist.noTurbines')}
+      </p>
+    );
+  }
+  const completeCount = turbines.filter((tb) => tb.complete).length;
+
+  return (
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>{t('repair.colTurbine')}</th>
+          <th style={thStyle}>{t('subassetDetail.colStatus')}</th>
+          <th style={thStyle}>{t('subassetDetail.colPhotos')}</th>
+          <th style={thStyle}>{t('hoist.colItems')}</th>
+          <th style={thStyle}>
+            {t('hoist.complete')} ({completeCount}/{turbines.length})
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {turbines.map((tb) => (
+          <tr key={tb.campaignId} style={{ cursor: 'pointer' }} onClick={() => open(tb.campaignId)}>
+            <td style={tdStyle}>{tb.turbineName}</td>
+            <td style={tdStyle}>{badge(tb.status)}</td>
+            <td style={tdStyle}>{tb.photosCount}</td>
+            <td style={tdStyle}>
+              {tb.itemsWithData}/{tb.totalItems}
+            </td>
+            <td style={tdStyle}>{tb.complete ? '✓' : '—'}</td>
+          </tr>
+        ))}
       </tbody>
     </table>
   );

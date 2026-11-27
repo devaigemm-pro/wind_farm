@@ -6,6 +6,7 @@ import type {
   HoistDetails,
   HoistItemNode,
   HoistSummary,
+  HoistGroupDetail,
 } from '@/services/hoistCertification.service';
 import type { HoistCertificationStatus } from '@/types';
 
@@ -131,6 +132,7 @@ export function useSetHoistPhotoSelected(campaignId: string | undefined) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
       queryClient.invalidateQueries({
         queryKey: ['hoist-cert-tree', campaignId],
         refetchType: 'none',
@@ -229,6 +231,7 @@ export function useMoveHoistPhoto(campaignId: string | undefined) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
       queryClient.invalidateQueries({
         queryKey: ['hoist-cert-tree', campaignId],
         refetchType: 'none',
@@ -251,6 +254,7 @@ export function useSetHoistItemValue(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
     },
   });
 }
@@ -301,6 +305,7 @@ export function useUpdateHoistStatus(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
@@ -331,6 +336,40 @@ export function useUploadHoistPhoto(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
+    },
+  });
+}
+
+// ─── Parent campaign (many turbines) ────────────────────────────────────────────
+
+/** Parent hoist campaign with its turbines and their progress. */
+export function useHoistGroup(groupId: string | undefined) {
+  return useQuery<HoistGroupDetail>({
+    queryKey: ['hoist-cert-group', groupId],
+    queryFn: () => hoistCertificationService.getHoistGroup(groupId!),
+    enabled: !!groupId,
+  });
+}
+
+/** Parent campaign id of a turbine campaign (null = standalone). */
+export function useHoistParentId(campaignId: string | undefined) {
+  return useQuery<string | null>({
+    queryKey: ['hoist-cert-parent', campaignId],
+    queryFn: () => hoistCertificationService.getParentId(campaignId!),
+    enabled: !!campaignId,
+  });
+}
+
+/** Add turbines (one child campaign each) to a parent campaign. */
+export function useAddHoistTurbines(groupId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (turbineIds: string[]) =>
+      hoistCertificationService.addTurbinesToGroup(groupId!, turbineIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
 }

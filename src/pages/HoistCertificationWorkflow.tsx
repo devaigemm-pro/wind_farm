@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -35,6 +35,7 @@ import {
   useSetHoistReportText,
   useSetHoistDetails,
   useHoistLabelPhoto,
+  useHoistParentId,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
@@ -62,8 +63,26 @@ const C = {
   naBg: '#F3F4F6',
 };
 
-export function HoistCertificationWorkflow() {
-  const { campaignId } = useParams();
+/**
+ * Turbine campaign shown by this workflow. Sub-components read it from here
+ * (not from the URL) so the workflow also works embedded in the parent
+ * campaign page, where the URL holds the parent id.
+ */
+const HoistCampaignIdContext = createContext<string | undefined>(undefined);
+
+export interface HoistCertificationWorkflowProps {
+  /** Turbine campaign to show (default: the :campaignId route param). */
+  campaignId?: string;
+  /** Rendered inside the parent campaign page: no back button / page title. */
+  embedded?: boolean;
+}
+
+export function HoistCertificationWorkflow({
+  campaignId: campaignIdProp,
+  embedded = false,
+}: HoistCertificationWorkflowProps = {}) {
+  const params = useParams();
+  const campaignId = campaignIdProp ?? params.campaignId;
   const navigate = useNavigate();
   const { t, locale } = useLanguage();
   const toast = useToast();
@@ -74,6 +93,7 @@ export function HoistCertificationWorkflow() {
 
   const { data: campaign, isLoading: campaignLoading } = useHoistCampaignDetail(campaignId);
   const { data: tree, isLoading: treeLoading } = useHoistTree(campaignId);
+  const { data: parentId } = useHoistParentId(embedded ? undefined : campaignId);
   const setSelected = useSetHoistPhotoSelected(campaignId);
   const movePhoto = useMoveHoistPhoto(campaignId);
   const reorderReport = useReorderHoistReportPhotos(campaignId);
@@ -222,7 +242,7 @@ export function HoistCertificationWorkflow() {
     if (!campaignId || downloading) return;
     setDownloading(true);
     try {
-      await generateAndDownloadHoistCertificationReport({ campaignId });
+      await generateAndDownloadHoistCertificationReport({ campaignIds: [campaignId] });
     } catch (err) {
       toast.error((err as Error)?.message || t('hoist.pdfError'));
     } finally {
@@ -238,13 +258,19 @@ export function HoistCertificationWorkflow() {
   const selectedPhotos = tree ? countSelected(tree) : 0;
 
   return (
-    <div style={page}>
-      <div style={header}>
-        <button style={backBtn} onClick={() => navigate(-1)}>
-          <ArrowLeft size={16} /> {t('general.back')}
-        </button>
-        <div style={headerRow}>
-          <div>
+    <HoistCampaignIdContext.Provider value={campaignId}>
+    <div style={embedded ? embeddedPage : page}>
+      <div style={embedded ? embeddedHeader : header}>
+        {!embedded && (
+          <button
+            style={backBtn}
+            onClick={() => (parentId ? navigate(`/hoist-certification/campaign/${parentId}`) : navigate(-1))}
+          >
+            <ArrowLeft size={16} /> {parentId ? t('hoist.backToCampaign') : t('general.back')}
+          </button>
+        )}
+        <div style={embedded ? { ...headerRow, justifyContent: 'flex-end' } : headerRow}>
+          <div style={embedded ? { display: 'none' } : undefined}>
             <h1 style={title}>
               {t('hoist.workflowTitle')}
               {campaign?.status && (
@@ -440,6 +466,7 @@ export function HoistCertificationWorkflow() {
         </div>
       )}
     </div>
+    </HoistCampaignIdContext.Provider>
   );
 }
 
@@ -973,7 +1000,7 @@ function EditableValue({
   value: number | string | null;
   t: (k: string) => string;
 }) {
-  const { campaignId } = useParams();
+  const campaignId = useContext(HoistCampaignIdContext);
   const toast = useToast();
   const setValue = useSetHoistItemValue(campaignId);
   const saved = value === null || value === undefined ? '' : String(value);
@@ -1030,7 +1057,7 @@ function HoistDetailsPanel({
   readOnly: boolean;
   t: (k: string) => string;
 }) {
-  const { campaignId } = useParams();
+  const campaignId = useContext(HoistCampaignIdContext);
   const toast = useToast();
   const save = useSetHoistDetails(campaignId);
   const { data: labelPhoto } = useHoistLabelPhoto(campaignId);
@@ -1194,7 +1221,7 @@ function ReportTextArea({
   readOnly: boolean;
   t: (k: string) => string;
 }) {
-  const { campaignId } = useParams();
+  const campaignId = useContext(HoistCampaignIdContext);
   const toast = useToast();
   const save = useSetHoistReportText(campaignId);
   const saved = value ?? '';
@@ -1404,6 +1431,8 @@ function PhotoCard({
 
 const page: React.CSSProperties = { padding: 24, fontFamily: 'var(--font-family-sans)' };
 const header: React.CSSProperties = { marginBottom: 12 };
+const embeddedPage: React.CSSProperties = { padding: '12px 16px 16px', fontFamily: 'var(--font-family-sans)' };
+const embeddedHeader: React.CSSProperties = { marginBottom: 8 };
 const headerRow: React.CSSProperties = {
   display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
 };
