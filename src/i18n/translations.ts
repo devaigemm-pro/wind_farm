@@ -438,6 +438,8 @@ export const translations: TranslationMap = {
   'hoist.type.check': { en: 'Check', es: 'Verificación' },
   'hoist.type.measurement': { en: 'Measurement', es: 'Medición' },
   // Check result + no data
+  'hoist.editResult': { en: 'Set result', es: 'Definir resultado' },
+  'hoist.editResultError': { en: 'Could not save the result', es: 'No se pudo guardar el resultado' },
   'hoist.pass': { en: 'Pass', es: 'Cumple' },
   'hoist.fail': { en: 'Fail', es: 'No cumple' },
   'hoist.noData': { en: 'No data', es: 'Sin dato' },

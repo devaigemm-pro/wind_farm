@@ -787,6 +787,22 @@ export const hoistCertificationService = {
   },
 
   /** Update the hoist-certification campaign workflow status. */
+  /**
+   * Set a check item's result (cumple / no cumple / sin dato) from the web, for
+   * catalog items marked webEditable. Upserts the hoist_cert_item row keyed by
+   * (campaign_id, item_code), so it works whether or not the mobile app already
+   * created it. RLS allows technician/inspector/admin/supervisor to write.
+   */
+  async setItemPassed(campaignId: string, itemCode: string, passed: boolean | null): Promise<void> {
+    const { error } = await db
+      .from('hoist_cert_item')
+      .upsert(
+        { campaign_id: campaignId, item_code: itemCode, item_type: 'check', passed },
+        { onConflict: 'campaign_id,item_code' },
+      );
+    if (error) throw new HoistCertificationServiceError(error.message, error.code);
+  },
+
   async updateHoistStatus(
     campaignId: string,
     status: HoistCertificationStatus,

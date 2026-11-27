@@ -149,6 +149,14 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 | `ojales_arandela_seguro`    | Reemplazar arandela y seguro                              | check |
 | `ojales_distancia`          | Medir distancia de ojales y suspensión (menor a 2mm)      | check |
 
+#### Sub-grupo `freno_embrague` — Freno y embrague (resultado editable también desde la web)
+| `item_code`                  | Ítem                                                   | Tipo  |
+|------------------------------|--------------------------------------------------------|-------|
+| `freno_holgura_020_050`      | Verificación holgura de freno entre 0.20mm a 0.50mm    | check |
+| `freno_holgura_050_100`      | Verificación holgura de freno entre 0.50mm a 1mm       | check |
+| `embrague_pruebas_iniciales` | Pruebas iniciales de conjunto de embrague              | check |
+| `embrague_pruebas_finales`   | Pruebas finales de conjunto de embrague                | check |
+
 ### Paso 4 — `verificacion_torques`
 | `item_code`              | Ítem                          | Tipo  |
 |--------------------------|-------------------------------|-------|

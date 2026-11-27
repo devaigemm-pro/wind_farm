@@ -31,9 +31,10 @@ import {
   useReorderHoistReportPhotos,
   useUpdateHoistStatus,
   useUploadHoistPhoto,
+  useSetHoistItemPassed,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
-import { getHoistLabel } from '@/constants/hoist-certification-steps';
+import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
 import type {
   HoistPhoto,
@@ -762,7 +763,12 @@ function ItemRow({
         </span>
         <h3 style={itemRowTitle}>{getHoistLabel(item.itemCode, locale)}</h3>
         {/* State badge for check / measurement */}
-        {item.itemType === 'check' && <CheckBadge passed={item.passed} t={t} />}
+        {item.itemType === 'check' &&
+          (HOIST_CERT_BY_CODE[item.itemCode]?.webEditable && !readOnly ? (
+            <EditableCheck itemCode={item.itemCode} passed={item.passed} t={t} />
+          ) : (
+            <CheckBadge passed={item.passed} t={t} />
+          ))}
         {item.itemType === 'measurement' && (
           <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
         )}
@@ -910,6 +916,55 @@ function ItemRow({
 }
 
 // ─── State badges (check / measurement) ─────────────────────────────────────────
+
+/**
+ * Result selector for web-editable check items: the user sets cumple / no cumple
+ * / sin dato before generating the report. Saves immediately.
+ */
+function EditableCheck({
+  itemCode,
+  passed,
+  t,
+}: {
+  itemCode: string;
+  passed: boolean | null;
+  t: (k: string) => string;
+}) {
+  const { campaignId } = useParams();
+  const toast = useToast();
+  const setPassed = useSetHoistItemPassed(campaignId);
+  const value = passed === true ? 'pass' : passed === false ? 'fail' : '';
+  const color = passed === true ? C.pass : passed === false ? C.fail : C.na;
+  const bg = passed === true ? C.passBg : passed === false ? C.failBg : C.naBg;
+  return (
+    <select
+      aria-label={t('hoist.editResult')}
+      title={t('hoist.editResult')}
+      value={value}
+      disabled={setPassed.isPending}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const v = e.target.value;
+        setPassed.mutate(
+          { itemCode, passed: v === 'pass' ? true : v === 'fail' ? false : null },
+          { onError: (err) => toast.error((err as Error)?.message || t('hoist.editResultError')) },
+        );
+      }}
+      style={{
+        ...stateBadge,
+        background: bg,
+        color,
+        border: `1px solid ${color}`,
+        cursor: setPassed.isPending ? 'progress' : 'pointer',
+        paddingRight: 6,
+      }}
+    >
+      <option value="">{t('hoist.noData')}</option>
+      <option value="pass">{t('hoist.pass')}</option>
+      <option value="fail">{t('hoist.fail')}</option>
+    </select>
+  );
+}
 
 function CheckBadge({ passed, t }: { passed: boolean | null; t: (k: string) => string }) {
   if (passed === true) {
