@@ -292,7 +292,10 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
       canvas.height = sh;
       const cctx = canvas.getContext('2d')!;
       cctx.drawImage(heroImg, sx, sy, sw, sh, 0, 0, sw, sh);
-      const coverBase64 = canvas.toDataURL('image/jpeg', 0.9);
+      // Green overlay baked in, same as the repair and inspection covers.
+      cctx.fillStyle = 'rgba(90, 143, 90, 0.55)';
+      cctx.fillRect(0, 0, sw, sh);
+      const coverBase64 = canvas.toDataURL('image/jpeg', 0.92);
       doc.addImage(coverBase64, 'JPEG', 0, 0, pageW, pageH);
       coverImageLoaded = true;
     }
@@ -314,48 +317,45 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
       const logoBase64 = 'data:image/png;base64,' + btoa(binary);
-      // Top-right, on the white area of the cover.
-      doc.addImage(logoBase64, 'PNG', pageW - margin - 60, 15, 60, 20);
+      // Top-left, same as the repair cover.
+      doc.addImage(logoBase64, 'PNG', margin, 15, 60, 20);
     }
   } catch {
     /* ignore */
   }
 
-  // Title — two lines, right-aligned, dark text on the white area of the cover
-  // (white on the solid-color fallback).
-  doc.setFontSize(28);
+  // Title — two lines, right-aligned, 30pt bold white, in the lower half
+  // (same layout as the repair cover).
+  doc.setFontSize(30);
   doc.setFont('helvetica', 'bold');
-  const coverText: RGB = coverImageLoaded ? [26, 26, 26] : [255, 255, 255];
-  doc.setTextColor(...coverText);
+  doc.setTextColor(255, 255, 255);
   const titleLines = ['Polipastos de turbina eólica', 'Informe de Certificación'];
-  let titleY = pageH * 0.3;
+  let titleY = pageH * 0.73;
   for (const line of titleLines) {
     doc.text(line, pageW - margin, titleY, { align: 'right' });
     titleY += 11;
   }
 
-  // Subtitles.
+  // Subtitles — right-aligned, 14pt white: wind farm, turbine(s), date.
   const dateStr = formatDateShortCL(ctx.createdAt);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...coverText);
-  doc.text(ctx.windFarmName, pageW - margin, titleY + 6, { align: 'right' });
+  doc.setTextColor(255, 255, 255);
   const turbineLine =
     meta.turbines.length === 1
       ? `Turbina: ${meta.turbines[0]}`
       : `${meta.campaignName} · ${meta.turbines.length} turbinas`;
+  doc.text(ctx.windFarmName, pageW - margin, titleY + 6, { align: 'right' });
   doc.text(turbineLine, pageW - margin, titleY + 14, { align: 'right' });
   doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
 
-  // Footer.
+  // Footer — two columns, white text.
   const footerStartY = pageH - 15;
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(255, 255, 255);
   doc.text('Generado por', margin + 10, footerStartY);
   doc.text(ctx.reportedBy, margin + 10, footerStartY + 5);
-  // Right footer sits on the light part of the designed cover: dark text there.
-  if (coverImageLoaded) doc.setTextColor(26, 26, 26);
   doc.text('Con tecnología', pageW - margin - 10, footerStartY, { align: 'right' });
   doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
   doc.setTextColor(0, 0, 0);
@@ -522,43 +522,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
       }
     },
   });
-
-  // One hoist photo in a bordered box below the table: first photo of a
-  // photo-capture item (not the label), else the label photo.
-  let photoUrl: string | null = null;
-  for (const step of ctx.tree) {
-    for (const it of [...step.items, ...step.groups.flatMap((g) => g.items)]) {
-      if (it.itemType !== 'photo' || it.itemCode === 'prep_etiqueta_polipasto') continue;
-      const p = [...it.photos].sort(byReportOrder)[0];
-      if (p) { photoUrl = p.url; break; }
-    }
-    if (photoUrl) break;
-  }
-  photoUrl = photoUrl ?? ctx.labelPhoto?.url ?? null;
-  if (!photoUrl) return;
-
-  let y = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 60) + 3;
-  let boxH = PAGE_HEIGHT - 20 - y;
-  if (boxH < 50) {
-    doc.addPage();
-    y = 20;
-    boxH = PAGE_HEIGHT - 20 - y;
-  }
-  const base64 = await loadImageAsBase64(photoUrl);
-  if (!base64) return;
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.3);
-  doc.rect(MARGIN, y, W, boxH);
-  try {
-    const props = doc.getImageProperties(base64);
-    const pad = 4;
-    const scale = Math.min((W - 2 * pad) / props.width, (boxH - 2 * pad) / props.height);
-    const w = props.width * scale;
-    const h = props.height * scale;
-    doc.addImage(base64, 'JPEG', (PAGE_WIDTH - w) / 2, y + (boxH - h) / 2, w, h);
-  } catch {
-    /* skip broken image */
-  }
+  // Photos are only inside the sheet (photo-item rows); none below the table.
 }
 
 /** A run of text with its style (rich paragraph). */
