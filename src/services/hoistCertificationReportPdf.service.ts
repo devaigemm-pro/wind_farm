@@ -476,8 +476,8 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
     startY: 28,
     body,
     theme: 'grid',
-    bodyStyles: { fontSize: 7.5, textColor: [0, 0, 0] },
-    styles: { cellPadding: 1.6, lineColor: [150, 150, 150], lineWidth: 0.2 },
+    bodyStyles: { fontSize: 7, textColor: [0, 0, 0] },
+    styles: { cellPadding: 0.9, lineColor: [150, 150, 150], lineWidth: 0.2 },
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 120 },
       1: { halign: 'center' },
@@ -524,7 +524,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   let y = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 28) + 6;
   const maxW = PAGE_WIDTH - 2 * MARGIN;
   let maxH = PAGE_HEIGHT - 22 - y;
-  if (maxH < 60) {
+  if (maxH < 50) {
     doc.addPage();
     y = 25;
     maxH = PAGE_HEIGHT - 22 - y;
