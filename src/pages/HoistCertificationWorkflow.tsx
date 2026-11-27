@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,11 +31,21 @@ import {
   useReorderHoistReportPhotos,
   useUpdateHoistStatus,
   useUploadHoistPhoto,
+  useSetHoistItemValue,
+  useSetHoistItemPassed,
+  useSetHoistReportText,
+  useSetHoistDetails,
+  useHoistLabelPhoto,
+  useHoistParentId,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
-import { getHoistLabel } from '@/constants/hoist-certification-steps';
+import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
+import { readHoistLabel, hoistLabelScore } from '@/utils/hoistLabel';
+import { hoistCondition } from '@/services/hoistCertification.service';
 import type {
+  HoistConditionValue,
+  HoistDetails,
   HoistPhoto,
   HoistStepNode,
   HoistGroupNode,
@@ -55,8 +65,26 @@ const C = {
   naBg: '#F3F4F6',
 };
 
-export function HoistCertificationWorkflow() {
-  const { campaignId } = useParams();
+/**
+ * Turbine campaign shown by this workflow. Sub-components read it from here
+ * (not from the URL) so the workflow also works embedded in the parent
+ * campaign page, where the URL holds the parent id.
+ */
+const HoistCampaignIdContext = createContext<string | undefined>(undefined);
+
+export interface HoistCertificationWorkflowProps {
+  /** Turbine campaign to show (default: the :campaignId route param). */
+  campaignId?: string;
+  /** Rendered inside the parent campaign page: no back button / page title. */
+  embedded?: boolean;
+}
+
+export function HoistCertificationWorkflow({
+  campaignId: campaignIdProp,
+  embedded = false,
+}: HoistCertificationWorkflowProps = {}) {
+  const params = useParams();
+  const campaignId = campaignIdProp ?? params.campaignId;
   const navigate = useNavigate();
   const { t, locale } = useLanguage();
   const toast = useToast();
@@ -67,6 +95,7 @@ export function HoistCertificationWorkflow() {
 
   const { data: campaign, isLoading: campaignLoading } = useHoistCampaignDetail(campaignId);
   const { data: tree, isLoading: treeLoading } = useHoistTree(campaignId);
+  const { data: parentId } = useHoistParentId(embedded ? undefined : campaignId);
   const setSelected = useSetHoistPhotoSelected(campaignId);
   const movePhoto = useMoveHoistPhoto(campaignId);
   const reorderReport = useReorderHoistReportPhotos(campaignId);
@@ -215,7 +244,7 @@ export function HoistCertificationWorkflow() {
     if (!campaignId || downloading) return;
     setDownloading(true);
     try {
-      await generateAndDownloadHoistCertificationReport({ campaignId });
+      await generateAndDownloadHoistCertificationReport({ campaignIds: [campaignId] });
     } catch (err) {
       toast.error((err as Error)?.message || t('hoist.pdfError'));
     } finally {
@@ -231,13 +260,19 @@ export function HoistCertificationWorkflow() {
   const selectedPhotos = tree ? countSelected(tree) : 0;
 
   return (
-    <div style={page}>
-      <div style={header}>
-        <button style={backBtn} onClick={() => navigate(-1)}>
-          <ArrowLeft size={16} /> {t('general.back')}
-        </button>
-        <div style={headerRow}>
-          <div>
+    <HoistCampaignIdContext.Provider value={campaignId}>
+    <div style={embedded ? embeddedPage : page}>
+      <div style={embedded ? embeddedHeader : header}>
+        {!embedded && (
+          <button
+            style={backBtn}
+            onClick={() => (parentId ? navigate(`/hoist-certification/campaign/${parentId}`) : navigate(-1))}
+          >
+            <ArrowLeft size={16} /> {parentId ? t('hoist.backToCampaign') : t('general.back')}
+          </button>
+        )}
+        <div style={embedded ? { ...headerRow, justifyContent: 'flex-end' } : headerRow}>
+          <div style={embedded ? { display: 'none' } : undefined}>
             <h1 style={title}>
               {t('hoist.workflowTitle')}
               {campaign?.status && (
@@ -308,6 +343,32 @@ export function HoistCertificationWorkflow() {
       />
 
       <p style={hint}>{t('hoist.workflowHint')}</p>
+      {campaign && (
+        <HoistDetailsPanel
+          details={campaign.hoistDetails}
+          anyFailed={!!tree && tree.some((st) => stepItems(st).some((it) => it.itemType === 'check' && it.passed === false))}
+          readOnly={isClient}
+          t={t}
+        />
+      )}
+      {campaign && (
+        <div style={reportTextsWrap}>
+          <ReportTextArea
+            field="report_comment"
+            label={t('hoist.comment')}
+            value={campaign.reportComment}
+            readOnly={isClient}
+            t={t}
+          />
+          <ReportTextArea
+            field="report_recommendation"
+            label={t('hoist.recommendation')}
+            value={campaign.reportRecommendation}
+            readOnly={isClient}
+            t={t}
+          />
+        </div>
+      )}
 
       {treeLoading ? (
         <p style={{ color: C.muted, padding: 24 }}>{t('general.loading')}</p>
@@ -407,25 +468,31 @@ export function HoistCertificationWorkflow() {
         </div>
       )}
     </div>
+    </HoistCampaignIdContext.Provider>
   );
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function stepItems(step: HoistStepNode): HoistItemNode[] {
-  if (step.hasGroups) return step.groups.flatMap((g) => g.items);
+  if (step.hasGroups) return [...step.items, ...step.groups.flatMap((g) => g.items)];
   return step.items;
+}
+
+/** Photos shown on screen / in the report: only photo-capture items carry them. */
+function shownPhotos(it: HoistItemNode): HoistPhoto[] {
+  return it.itemType === 'photo' ? it.photos : [];
 }
 
 function countPhotos(tree: HoistStepNode[]): number {
   let n = 0;
-  for (const step of tree) for (const it of stepItems(step)) n += it.photos.length;
+  for (const step of tree) for (const it of stepItems(step)) n += shownPhotos(it).length;
   return n;
 }
 function countSelected(tree: HoistStepNode[]): number {
   let n = 0;
   for (const step of tree)
-    for (const it of stepItems(step)) n += it.photos.filter((p) => p.hoistSelected).length;
+    for (const it of stepItems(step)) n += shownPhotos(it).filter((p) => p.hoistSelected).length;
   return n;
 }
 
@@ -504,7 +571,7 @@ function StepSection({
 
   const label = getHoistLabel(step.stepCode, locale);
   const items = stepItems(step);
-  const stepPhotoCount = items.reduce((acc, it) => acc + it.photos.length, 0);
+  const stepPhotoCount = items.reduce((acc, it) => acc + shownPhotos(it).length, 0);
 
   const renderItem = (item: HoistItemNode) => (
     <ItemRow
@@ -537,12 +604,18 @@ function StepSection({
       {open && (
         <div style={stepGroupBody}>
           {step.hasGroups ? (
-            step.groups.map((group: HoistGroupNode) => (
-              <div key={group.groupCode} style={subGroupBlock}>
-                <div style={subGroupTitle}>{getHoistLabel(group.groupCode, locale)}</div>
-                <div style={subGroupItems}>{group.items.map(renderItem)}</div>
-              </div>
-            ))
+            <>
+              {/* Items hanging directly from the step go first, before the sub-groups. */}
+              {step.items.length > 0 && (
+                <div style={subGroupItems}>{step.items.map(renderItem)}</div>
+              )}
+              {step.groups.map((group: HoistGroupNode) => (
+                <div key={group.groupCode} style={subGroupBlock}>
+                  <div style={subGroupTitle}>{getHoistLabel(group.groupCode, locale)}</div>
+                  <div style={subGroupItems}>{group.items.map(renderItem)}</div>
+                </div>
+              ))}
+            </>
           ) : (
             <div style={subGroupItems}>{items.map(renderItem)}</div>
           )}
@@ -607,10 +680,11 @@ function ItemRow({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thisKey = item.itemId ?? item.itemCode;
-  // Photo/measurement items always show their gallery. A 'check' item shows it
-  // only when photos were captured (e.g. items that were 'photo' before becoming
-  // 'check'), so already-uploaded photos never disappear from the screen.
-  const hasPhotos = item.itemType !== 'check' || item.photos.length > 0;
+  // Only photo-capture items show a gallery. Verification ('check') and
+  // measurement items show no photos, even if old photos exist (e.g. items that
+  // were 'photo' before becoming 'check'); those photos stay in the DB.
+  const isWebEditable = !!HOIST_CERT_BY_CODE[item.itemCode]?.webEditable;
+  const hasPhotos = item.itemType === 'photo';
   const itemDropActive = hoverTargetKey != null && hoverTargetKey === thisKey;
 
   useEffect(() => {
@@ -762,10 +836,18 @@ function ItemRow({
         </span>
         <h3 style={itemRowTitle}>{getHoistLabel(item.itemCode, locale)}</h3>
         {/* State badge for check / measurement */}
-        {item.itemType === 'check' && <CheckBadge passed={item.passed} t={t} />}
-        {item.itemType === 'measurement' && (
-          <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
-        )}
+        {item.itemType === 'check' &&
+          (readOnly ? (
+            <CheckBadge passed={item.passed} t={t} />
+          ) : (
+            <EditableCheck itemCode={item.itemCode} passed={item.passed} t={t} />
+          ))}
+        {item.itemType === 'measurement' &&
+          (isWebEditable && !readOnly ? (
+            <EditableValue itemCode={item.itemCode} value={item.measurementValue} t={t} />
+          ) : (
+            <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
+          ))}
         {hasPhotos && (
           <span style={itemRowCount}>
             {photos.length} {t('hoist.photos')} · {selected.length} {t('hoist.selected')}
@@ -911,6 +993,329 @@ function ItemRow({
 
 // ─── State badges (check / measurement) ─────────────────────────────────────────
 
+/**
+ * Text box for web-editable items: shows the value sent by the app and lets the
+ * user correct it before generating the report. Saves on blur or Enter, only
+ * when the text changed; an empty box clears the value.
+ */
+function EditableValue({
+  itemCode,
+  value,
+  t,
+}: {
+  itemCode: string;
+  value: number | string | null;
+  t: (k: string) => string;
+}) {
+  const campaignId = useContext(HoistCampaignIdContext);
+  const toast = useToast();
+  const setValue = useSetHoistItemValue(campaignId);
+  const saved = value === null || value === undefined ? '' : String(value);
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const commit = () => {
+    if (text.trim() === saved.trim()) return;
+    setValue.mutate(
+      { itemCode, value: text },
+      {
+        onSuccess: () => toast.success(t('hoist.valueSaved')),
+        onError: (err) => {
+          setText(saved);
+          toast.error((err as Error)?.message || t('hoist.valueError'));
+        },
+      },
+    );
+  };
+  return (
+    <input
+      type="text"
+      aria-label={t('hoist.editValue')}
+      title={t('hoist.editValue')}
+      placeholder={t('hoist.noData')}
+      value={text}
+      disabled={setValue.isPending}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setText(saved);
+      }}
+      style={valueInput}
+    />
+  );
+}
+
+/**
+ * "Datos del polipasto" printed in the revision detail of the report. The label
+ * fields (manufacturer, model, serial, year) are filled ONCE in the background
+ * by OCR of the hoist label photo — same approach as the coating method on
+ * repairs — and stay editable. The inspection date is the upload date of that
+ * photo. The condition is computed from the checks unless set by hand.
+ */
+function HoistDetailsPanel({
+  details,
+  anyFailed,
+  readOnly,
+  t,
+}: {
+  details: HoistDetails | null;
+  anyFailed: boolean;
+  readOnly: boolean;
+  t: (k: string) => string;
+}) {
+  const campaignId = useContext(HoistCampaignIdContext);
+  const toast = useToast();
+  const save = useSetHoistDetails(campaignId);
+  const { data: labelPhoto } = useHoistLabelPhoto(campaignId);
+  const [reading, setReading] = useState(false);
+  const autoTried = useRef(false);
+
+  const runOcr = async (manual: boolean) => {
+    if (!labelPhoto?.url || readOnly) return;
+    setReading(true);
+    try {
+      const found = await readHoistLabel(labelPhoto.urls);
+      const cur = details ?? {};
+      // Automatic run fills only empty fields; "Leer etiqueta" overwrites with what it found.
+      const pick = (k: 'manufacturer' | 'model' | 'serialNumber' | 'year') =>
+        found[k] && (manual || !cur[k]) ? { [k]: found[k] } : {};
+      await save.mutateAsync({
+        ...pick('manufacturer'),
+        ...pick('model'),
+        ...pick('serialNumber'),
+        ...pick('year'),
+        ocrAt: new Date().toISOString(),
+      });
+      if (manual) {
+        if (hoistLabelScore(found) > 0) toast.success(t('hoist.labelRead'));
+        else toast.error(t('hoist.labelNotRead'));
+      }
+    } catch (err) {
+      if (manual) toast.error((err as Error)?.message || t('hoist.labelNotRead'));
+    } finally {
+      setReading(false);
+    }
+  };
+
+  // Background OCR once per certification (ocrAt marks it as done).
+  useEffect(() => {
+    if (readOnly || autoTried.current || !labelPhoto?.url || details?.ocrAt) return;
+    autoTried.current = true;
+    void runOcr(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelPhoto?.url, details?.ocrAt, readOnly]);
+
+  // Computed condition (ignores the manual override) for the "Automática" option.
+  const autoCondition = hoistCondition(null, anyFailed);
+  const field = (k: 'tag' | 'manufacturer' | 'model' | 'serialNumber' | 'year', label: string) => (
+    <DetailInput
+      key={k}
+      label={label}
+      value={details?.[k] ?? ''}
+      readOnly={readOnly}
+      onSave={(v) =>
+        save.mutate(
+          { [k]: v },
+          { onError: (err) => toast.error((err as Error)?.message || t('hoist.reportTextError')) },
+        )
+      }
+    />
+  );
+
+  return (
+    <div style={detailsPanel}>
+      <div style={detailsHeader}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>{t('hoist.detailsTitle')}</span>
+        {!readOnly && (
+          <button
+            type="button"
+            style={{ ...reopenBtn, opacity: labelPhoto?.url && !reading ? 1 : 0.5 }}
+            disabled={!labelPhoto?.url || reading}
+            onClick={() => void runOcr(true)}
+            title={labelPhoto?.url ? t('hoist.readLabelHint') : t('hoist.noLabelPhoto')}
+          >
+            {reading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Camera size={14} />}
+            {reading ? t('hoist.readingLabel') : t('hoist.readLabel')}
+          </button>
+        )}
+      </div>
+      <div style={detailsGrid}>
+        {field('tag', t('hoist.tag'))}
+        <label style={reportTextLabel}>
+          <span>{t('hoist.inspectionDate')}</span>
+          <input
+            style={detailInput}
+            readOnly
+            value={labelPhoto?.uploadedAt ? new Date(labelPhoto.uploadedAt).toLocaleDateString('es-CL') : '—'}
+            title={t('hoist.inspectionDateHint')}
+          />
+        </label>
+        {field('manufacturer', t('hoist.manufacturer'))}
+        {field('model', t('hoist.model'))}
+        {field('serialNumber', t('hoist.serialNumber'))}
+        {field('year', t('hoist.manufactureYear'))}
+        <label style={reportTextLabel}>
+          <span>{t('hoist.condition')}</span>
+          <select
+            style={detailInput}
+            disabled={readOnly || save.isPending}
+            value={details?.condition ?? ''}
+            onChange={(e) =>
+              save.mutate({
+                condition: (e.target.value || null) as HoistDetails['condition'],
+              })
+            }
+          >
+            <option value="">
+              {t('hoist.conditionAuto')}: {t(CONDITION_KEY[autoCondition])}
+            </option>
+            <option value="certificado">{t('hoist.certified')}</option>
+            <option value="certificado_con_observaciones">{t('hoist.certifiedWithObs')}</option>
+            <option value="no_certificado">{t('hoist.notCertified')}</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+const CONDITION_KEY: Record<HoistConditionValue, string> = {
+  certificado: 'hoist.certified',
+  certificado_con_observaciones: 'hoist.certifiedWithObs',
+  no_certificado: 'hoist.notCertified',
+};
+/** Text box that saves on blur, only when the value changed. */
+function DetailInput({
+  label,
+  value,
+  readOnly,
+  onSave,
+}: {
+  label: string;
+  value: string;
+  readOnly: boolean;
+  onSave: (v: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  return (
+    <label style={reportTextLabel}>
+      <span>{label}</span>
+      <input
+        style={detailInput}
+        value={text}
+        readOnly={readOnly}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          if (!readOnly && text.trim() !== value.trim()) onSave(text);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </label>
+  );
+}
+
+/**
+ * Free-text "Comentario" / "Recomendación" of the certification, printed in the
+ * report of this turbine. Saves when the field loses focus, only if it changed.
+ */
+function ReportTextArea({
+  field,
+  label,
+  value,
+  readOnly,
+  t,
+}: {
+  field: 'report_comment' | 'report_recommendation';
+  label: string;
+  value: string | null;
+  readOnly: boolean;
+  t: (k: string) => string;
+}) {
+  const campaignId = useContext(HoistCampaignIdContext);
+  const toast = useToast();
+  const save = useSetHoistReportText(campaignId);
+  const saved = value ?? '';
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const commit = () => {
+    if (readOnly || text.trim() === saved.trim()) return;
+    save.mutate(
+      { field, value: text },
+      {
+        onSuccess: () => toast.success(t('hoist.reportTextSaved')),
+        onError: (err) => {
+          setText(saved);
+          toast.error((err as Error)?.message || t('hoist.reportTextError'));
+        },
+      },
+    );
+  };
+  return (
+    <label style={reportTextLabel}>
+      <span>{label}</span>
+      <textarea
+        value={text}
+        rows={3}
+        readOnly={readOnly}
+        disabled={save.isPending}
+        placeholder={readOnly ? '' : t('hoist.reportTextPlaceholder')}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        style={reportTextArea}
+      />
+    </label>
+  );
+}
+
+/** Cumple / No cumple / Sin dato selector of a check item (web override). */
+function EditableCheck({
+  itemCode,
+  passed,
+  t,
+}: {
+  itemCode: string;
+  passed: boolean | null;
+  t: (k: string) => string;
+}) {
+  const campaignId = useContext(HoistCampaignIdContext);
+  const toast = useToast();
+  const setPassed = useSetHoistItemPassed(campaignId);
+  const value = passed === true ? 'pass' : passed === false ? 'fail' : '';
+  const color =
+    passed === true
+      ? { background: C.passBg, color: C.pass }
+      : passed === false
+        ? { background: C.failBg, color: C.fail }
+        : { background: C.naBg, color: C.na };
+  return (
+    <select
+      aria-label={t('hoist.editCheck')}
+      title={t('hoist.editCheck')}
+      value={value}
+      disabled={setPassed.isPending}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const v = e.target.value;
+        setPassed.mutate(
+          { itemCode, passed: v === 'pass' ? true : v === 'fail' ? false : null },
+          {
+            onSuccess: () => toast.success(t('hoist.valueSaved')),
+            onError: (err) => toast.error((err as Error)?.message || t('hoist.valueError')),
+          },
+        );
+      }}
+      style={{ ...stateBadge, ...color, border: 'none', cursor: 'pointer', fontWeight: 600 }}
+    >
+      <option value="">{t('hoist.noData')}</option>
+      <option value="pass">{t('hoist.pass')}</option>
+      <option value="fail">{t('hoist.fail')}</option>
+    </select>
+  );
+}
 function CheckBadge({ passed, t }: { passed: boolean | null; t: (k: string) => string }) {
   if (passed === true) {
     return (
@@ -1085,6 +1490,8 @@ function PhotoCard({
 
 const page: React.CSSProperties = { padding: 24, fontFamily: 'var(--font-family-sans)' };
 const header: React.CSSProperties = { marginBottom: 12 };
+const embeddedPage: React.CSSProperties = { padding: '12px 16px 16px', fontFamily: 'var(--font-family-sans)' };
+const embeddedHeader: React.CSSProperties = { marginBottom: 8 };
 const headerRow: React.CSSProperties = {
   display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
 };
@@ -1096,6 +1503,35 @@ const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 12 };
 const totalsLine: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 16 };
+const detailsPanel: React.CSSProperties = {
+  border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', padding: 16, marginBottom: 16,
+};
+const detailsHeader: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12,
+};
+const detailsGrid: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12,
+};
+const detailInput: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '6px 10px', fontSize: 13, fontWeight: 400,
+  fontFamily: 'inherit', borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', color: '#1a1a1a',
+};
+const reportTextsWrap: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16,
+  marginBottom: 20,
+};
+const reportTextLabel: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a1a1a',
+};
+const reportTextArea: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', minHeight: 80, padding: '8px 10px', fontSize: 13,
+  fontFamily: 'inherit', fontWeight: 400, borderRadius: 8, border: `1px solid ${C.border}`,
+  background: '#fff', color: '#1a1a1a', resize: 'vertical',
+};
+const valueInput: React.CSSProperties = {
+  width: 180, padding: '4px 8px', fontSize: 12, borderRadius: 6,
+  border: `1px solid ${C.border}`, background: '#fff', color: '#1a1a1a',
+};
 const headerActions: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0,
 };

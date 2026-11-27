@@ -143,6 +143,8 @@ export const assetDetailService = {
         updatedAt: row.updated_at as string,
         type: ((row.type as string) ?? 'inspection') as Campaign['type'],
         status: (row.status as string) ?? 'awaiting_photos',
+        turbineId: (row.turbine_id as string) ?? null,
+        parentCampaignId: (row.parent_campaign_id as string) ?? null,
       };
     });
   },
@@ -207,16 +209,17 @@ export const assetDetailService = {
   },
 
   /**
-   * Create a HOIST-CERTIFICATION ("Certificación de polipastos") campaign.
-   * Inserts a `campaign` row with type='hoist_certification',
-   * status='hoist_open' and the selected turbine. Mirrors createCleaningCampaign
-   * — the items/photos themselves are later uploaded by the technician mobile
-   * app into hoist_cert_item / hoist_cert_photo (see
-   * hoistCertification.service.ts for the data contract).
+   * Create a HOIST-CERTIFICATION ("Certificación de polipastos") campaign that
+   * holds MANY turbines: one PARENT row (type='hoist_certification_group', no
+   * turbine) plus one CHILD row per turbine (type='hoist_certification',
+   * parent_campaign_id = parent) — the child is what the technician mobile app
+   * reads and writes items/photos to (see hoistCertification.service.ts). If
+   * the children insert fails, the parent is removed so no empty campaign is
+   * left behind.
    */
   async createHoistCertificationCampaign(
     windFarmId: string,
-    turbineId: string,
+    turbineIds: string[],
     name: string,
   ): Promise<Campaign> {
     const user = (await db.auth.getUser()).data.user;
@@ -224,9 +227,8 @@ export const assetDetailService = {
       .from('campaign')
       .insert({
         wind_farm_id: windFarmId,
-        turbine_id: turbineId,
         name,
-        type: 'hoist_certification',
+        type: 'hoist_certification_group',
         status: 'hoist_open',
         created_by: user?.id ?? null,
       })
@@ -234,19 +236,37 @@ export const assetDetailService = {
       .single();
     if (error) throw new AssetDetailServiceError(error.message, error.code);
     const r = data as Record<string, unknown>;
+    const parentId = r.id as string;
+    const unique = [...new Set(turbineIds)];
+    if (unique.length > 0) {
+      const { error: kidsErr } = await db.from('campaign').insert(
+        unique.map((turbineId) => ({
+          wind_farm_id: windFarmId,
+          turbine_id: turbineId,
+          name,
+          type: 'hoist_certification',
+          status: 'hoist_open',
+          parent_campaign_id: parentId,
+          created_by: user?.id ?? null,
+        })),
+      );
+      if (kidsErr) {
+        await db.from('campaign').delete().eq('id', parentId);
+        throw new AssetDetailServiceError(kidsErr.message, kidsErr.code);
+      }
+    }
     return {
-      id: r.id as string,
+      id: parentId,
       name: r.name as string,
       windFarmId: r.wind_farm_id as string,
       createdBy: r.created_by as string | null,
       createdAt: r.created_at as string,
       updatedAt: r.updated_at as string,
-      type: 'hoist_certification',
-      turbineId: (r.turbine_id as string) ?? null,
+      type: 'hoist_certification_group',
+      turbineId: null,
       status: (r.status as string) ?? 'hoist_open',
     };
   },
-
   /**
    * Create a REPAIR ("Reparación") campaign. Same shape the repair import and
    * quotes.service use: an APPROVED quote (total 0, no items yet) plus a

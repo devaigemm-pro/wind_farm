@@ -92,13 +92,13 @@ export function useCreateHoistCertificationCampaign() {
   return useMutation({
     mutationFn: ({
       windFarmId,
-      turbineId,
+      turbineIds,
       name,
     }: {
       windFarmId: string;
-      turbineId: string;
+      turbineIds: string[];
       name: string;
-    }) => assetDetailService.createHoistCertificationCampaign(windFarmId, turbineId, name),
+    }) => assetDetailService.createHoistCertificationCampaign(windFarmId, turbineIds, name),
     onSuccess: (_, { windFarmId }) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', windFarmId] });
     },

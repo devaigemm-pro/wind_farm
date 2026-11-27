@@ -24,6 +24,8 @@ El flujo es el mismo de reparación/limpieza, renombrado a `hoist_certification`
 
 El app móvil **no crea** la campaña; solo lee `campaign.id` (el `campaign_id`) y su `turbine_id`.
 
+**Campaña con varias turbinas (padre).** En la web una campaña agrupa muchas turbinas: hay una fila padre `type = 'hoist_certification_group'` (sin `turbine_id`) y una fila hija `type = 'hoist_certification'` por turbina, con `parent_campaign_id` = id del padre. El app móvil sigue trabajando igual, con la fila **hija** (su `campaign_id` y `turbine_id`). Debe ignorar las filas `hoist_certification_group`.
+
 ---
 
 ## 3. Tipos de ítem (`item_type`)
@@ -133,7 +135,15 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 | `visual_nivel_aceite`       | Nivel de aceite               | check |
 | `visual_switch_limite`      | Switch de límite de carrera   | check |
 
-### Paso 3 — `inspeccion_critica` (con dos sub-grupos)
+### Paso 3 — `inspeccion_critica` (con tres sub-grupos)
+
+**Sub-grupo `freno_embrague` (Freno y embrague) — va PRIMERO.** El app envía el dato en `measurement_value` (texto); la web lo puede corregir antes del informe:
+| `item_code`                  | Ítem                                                   | Tipo        |
+|------------------------------|--------------------------------------------------------|-------------|
+| `freno_holgura_020_050`      | Verificación holgura de freno entre 0.20mm a 0.50mm    | measurement |
+| `freno_holgura_050_100`      | Verificación holgura de freno entre 0.50mm a 1mm       | measurement |
+| `embrague_pruebas_iniciales` | Pruebas iniciales de conjunto de embrague              | measurement |
+| `embrague_pruebas_finales`   | Pruebas finales de conjunto de embrague                | measurement |
 **Sub-grupo `cadena_carga` (Cadena de carga):**
 | `item_code`            | Ítem                                                               | Tipo        |
 |------------------------|--------------------------------------------------------------------|-------------|

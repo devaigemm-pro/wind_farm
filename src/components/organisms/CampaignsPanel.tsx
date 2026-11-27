@@ -50,7 +50,13 @@ export function CampaignsPanel({
     [campaigns],
   );
   const hoistCampaigns = useMemo(
-    () => campaigns.filter((c) => c.type === 'hoist_certification'),
+    // Parent campaigns (many turbines) plus any turbine campaign without a parent.
+    () =>
+      campaigns.filter(
+        (c) =>
+          c.type === 'hoist_certification_group' ||
+          (c.type === 'hoist_certification' && !c.parentCampaignId),
+      ),
     [campaigns],
   );
   const visibleCampaigns =

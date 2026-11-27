@@ -74,6 +74,9 @@ const RepairWorkflowPage = lazy(() =>
 const CleaningWorkflowPage = lazy(() =>
   import('@/pages/CleaningWorkflow').then((m) => ({ default: m.CleaningWorkflow })),
 );
+const HoistCampaignGroupPage = lazy(() =>
+  import('@/pages/HoistCampaignGroup').then((m) => ({ default: m.HoistCampaignGroup })),
+);
 const HoistCertificationWorkflowPage = lazy(() =>
   import('@/pages/HoistCertificationWorkflow').then((m) => ({
     default: m.HoistCertificationWorkflow,
@@ -204,6 +207,11 @@ function AppRoutes() {
 
         {/* Hoist certification workflow — parallel to cleaning. client is
             read-only for photo selection (RLS also blocks the write). */}
+        {/* Hoist certification campaign holding many turbines. */}
+        <Route
+          path="/hoist-certification/campaign/:groupId"
+          element={<HoistCampaignGroupPage />}
+        />
         <Route
           path="/hoist-certification/:campaignId"
           element={<HoistCertificationWorkflowPage />}

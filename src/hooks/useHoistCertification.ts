@@ -3,8 +3,10 @@ import { hoistCertificationService } from '@/services/hoistCertification.service
 import type {
   HoistCampaignDetail,
   HoistTree,
+  HoistDetails,
   HoistItemNode,
   HoistSummary,
+  HoistGroupDetail,
 } from '@/services/hoistCertification.service';
 import type { HoistCertificationStatus } from '@/types';
 
@@ -130,6 +132,7 @@ export function useSetHoistPhotoSelected(campaignId: string | undefined) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
       queryClient.invalidateQueries({
         queryKey: ['hoist-cert-tree', campaignId],
         refetchType: 'none',
@@ -228,6 +231,7 @@ export function useMoveHoistPhoto(campaignId: string | undefined) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
       queryClient.invalidateQueries({
         queryKey: ['hoist-cert-tree', campaignId],
         refetchType: 'none',
@@ -241,6 +245,72 @@ export function useMoveHoistPhoto(campaignId: string | undefined) {
  * the wind farm campaigns list (so the panel status badge updates without a
  * reload).
  */
+/** Set the value of a web-editable item, then refresh the tree. */
+export function useSetHoistItemValue(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemCode, value }: { itemCode: string; value: string | null }) =>
+      hoistCertificationService.setItemValue(campaignId!, itemCode, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
+    },
+  });
+}
+
+/** Set / clear the cumple – no cumple result of a check item from the web. */
+export function useSetHoistItemPassed(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemCode, passed }: { itemCode: string; passed: boolean | null }) =>
+      hoistCertificationService.setItemPassed(campaignId!, itemCode, passed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
+    },
+  });
+}
+
+/** First hoist label photo (for OCR and the inspection date). */
+export function useHoistLabelPhoto(campaignId: string | undefined) {
+  return useQuery({
+    queryKey: ['hoist-label-photo', campaignId],
+    queryFn: () => hoistCertificationService.getLabelPhoto(campaignId!),
+    enabled: !!campaignId,
+  });
+}
+
+/** Save fields of the hoist data (tag, manufacturer, model, serial, year, condition). */
+export function useSetHoistDetails(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<HoistDetails>) =>
+      hoistCertificationService.setHoistDetails(campaignId!, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
+    },
+  });
+}
+
+/** Save the comment / recommendation printed in the report. */
+export function useSetHoistReportText(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      field,
+      value,
+    }: {
+      field: 'report_comment' | 'report_recommendation';
+      value: string;
+    }) => hoistCertificationService.setReportText(campaignId!, field, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
+    },
+  });
+}
+
 export function useUpdateHoistStatus(campaignId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -249,6 +319,7 @@ export function useUpdateHoistStatus(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
@@ -279,6 +350,40 @@ export function useUploadHoistPhoto(campaignId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group'] });
+    },
+  });
+}
+
+// ─── Parent campaign (many turbines) ────────────────────────────────────────────
+
+/** Parent hoist campaign with its turbines and their progress. */
+export function useHoistGroup(groupId: string | undefined) {
+  return useQuery<HoistGroupDetail>({
+    queryKey: ['hoist-cert-group', groupId],
+    queryFn: () => hoistCertificationService.getHoistGroup(groupId!),
+    enabled: !!groupId,
+  });
+}
+
+/** Parent campaign id of a turbine campaign (null = standalone). */
+export function useHoistParentId(campaignId: string | undefined) {
+  return useQuery<string | null>({
+    queryKey: ['hoist-cert-parent', campaignId],
+    queryFn: () => hoistCertificationService.getParentId(campaignId!),
+    enabled: !!campaignId,
+  });
+}
+
+/** Add turbines (one child campaign each) to a parent campaign. */
+export function useAddHoistTurbines(groupId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (turbineIds: string[]) =>
+      hoistCertificationService.addTurbinesToGroup(groupId!, turbineIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-group', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
 }
