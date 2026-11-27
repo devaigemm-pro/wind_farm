@@ -6,11 +6,9 @@ import type {
   HoistDetails,
   HoistLabelPhoto,
   HoistTree,
-  HoistStepNode,
   HoistItemNode,
   HoistPhoto,
 } from '@/services/hoistCertification.service';
-import { getHoistLabel } from '@/constants/hoist-certification-steps';
 import { byReportOrder } from '@/utils/reportOrder';
 import { documentManagerSignatureService } from '@/services/document-manager-signature.service';
 import { renderManagerSignaturePage } from '@/services/reportSignaturePage';
@@ -80,7 +78,6 @@ interface HoistPdfContext {
 
 const COLOR_PRIMARY = '#5A8F5A';
 const COLOR_COVER_BG = '#5A8F5A';
-const COLOR_HEADER_TABLE: RGB = [90, 143, 90];
 const NA = 'N/A';
 
 const PAGE_WIDTH = 210;
@@ -364,82 +361,6 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
   doc.setTextColor(0, 0, 0);
 }
 
-/** General-data table (page 2). */
-function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext, meta: HoistReportMeta) {
-  doc.addPage();
-  const [r, g, b] = hexToRgb(COLOR_PRIMARY);
-  doc.setFillColor(r, g, b);
-  doc.rect(0, 0, PAGE_WIDTH, 34, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(15);
-  doc.setFont('helvetica', 'bold');
-  doc.text('INFORME DE CERTIFICACIÓN DE POLIPASTOS', PAGE_WIDTH / 2, 20, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
-
-  const y = 44;
-  const anioReporte = ctx.createdAt ? String(new Date(ctx.createdAt).getFullYear()) : NA;
-
-  autoTable(doc, {
-    startY: y,
-    head: [['Datos generales', '']],
-    body: [
-      ['País', ctx.country || NA],
-      ['Cliente', ctx.client || NA],
-      ['Planta (P.E.)', ctx.windFarmName],
-      ['Año', anioReporte],
-      ['Fabricante', meta.manufacturers || NA],
-      ['Tipo de turbina', meta.models || NA],
-      [meta.turbines.length === 1 ? 'N° de turbina' : `Turbinas (${meta.turbines.length})`, meta.turbines.join(', ') || NA],
-      ['Fecha', formatDateES(ctx.createdAt)],
-      ['Informe realizado por', ctx.reportedBy],
-    ],
-    theme: 'grid',
-    headStyles: { fillColor: COLOR_HEADER_TABLE, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 8 },
-    styles: { cellPadding: 2.5 },
-    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 78 } },
-    margin: { left: MARGIN, right: MARGIN },
-  });
-
-}
-
-/** Render one photo block (header band + full-width image) on its own page. */
-async function renderPhotoBlock(
-  doc: jsPDF,
-  stepLabel: string,
-  subLabel: string | null,
-  itemLabel: string,
-  photo: HoistPhoto,
-) {
-  doc.addPage();
-
-  const headerY = 20;
-  const headerH = 9;
-  const totalW = PAGE_WIDTH - 2 * MARGIN;
-  doc.setFillColor(224, 237, 247);
-  doc.rect(MARGIN, headerY, totalW, headerH, 'F');
-  doc.setTextColor(0, 0, 0);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  const parts = [stepLabel, subLabel, itemLabel].filter(Boolean);
-  doc.text(parts.join(' · '), MARGIN + 3, headerY + headerH / 2 + 1.5);
-
-  const imgTop = headerY + headerH + 6;
-  const imgW = PAGE_WIDTH - 2 * MARGIN;
-  const imgBottom = PAGE_HEIGHT - 16;
-  const imgH = Math.max(0, imgBottom - imgTop);
-  if (imgH > 20) {
-    const base64 = await loadImageAsBase64(photo.url);
-    if (base64) {
-      try {
-        doc.addImage(base64, 'JPEG', MARGIN, imgTop, imgW, imgH);
-      } catch {
-        /* skip broken image */
-      }
-    }
-  }
-}
-
 /** All check/measurement items of the tree, in catalog order. */
 function resultItems(tree: HoistTree): HoistItemNode[] {
   const out: HoistItemNode[] = [];
@@ -476,6 +397,32 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   const BORDER = { lineColor: [0, 0, 0] as RGB, lineWidth: 0.3 };
   const label = { fontStyle: 'bold' as const };
 
+  // Photo-capture items go in the sheet, one row each (title + photos), before
+  // COMENTARIOS. Up to 3 report photos per item, side by side.
+  const PHOTO_ROW_H = 40;
+  const photoItems = ctx.tree.flatMap((st) => [...st.items, ...st.groups.flatMap((g) => g.items)])
+    .filter((it) => it.itemType === 'photo');
+  const photoImgs: { data: string; w: number; h: number }[][] = [];
+  for (const it of photoItems) {
+    const imgs: { data: string; w: number; h: number }[] = [];
+    for (const ph of [...it.photos].sort(byReportOrder).slice(0, 3)) {
+      const data = await loadImageAsBase64(ph.url);
+      if (!data) continue;
+      try {
+        const pr = doc.getImageProperties(data);
+        imgs.push({ data, w: pr.width, h: pr.height });
+      } catch {
+        /* skip broken image */
+      }
+    }
+    photoImgs.push(imgs);
+  }
+  const PHOTO_ROW0 = 5; // rows before the photo rows: title, tag×2, fabricante, serie
+  const photoRows = photoItems.map((it) => [
+    { content: it.itemLabel.toUpperCase(), styles: { ...label, valign: 'middle' as const } },
+    { content: '', colSpan: 3, styles: { minCellHeight: PHOTO_ROW_H } },
+  ]);
+
   autoTable(doc, {
     startY: 14,
     theme: 'plain',
@@ -503,6 +450,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
         { content: 'FABRICACIÓN', styles: label },
         val(d.year),
       ],
+      ...photoRows,
       [{ content: 'COMENTARIOS', styles: label }, { content: val(ctx.comment), colSpan: 3 }],
       [{ content: 'RECOMENDACIÓN', styles: label }, { content: val(ctx.recommendation), colSpan: 3, styles: { minCellHeight: 12 } }],
     ],
@@ -513,7 +461,29 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
       2: { cellWidth: W * 0.24 },
       3: { cellWidth: W * 0.27 },
     },
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: MARGIN, right: MARGIN, top: 14, bottom: 20 },
+    didDrawCell: (hook) => {
+      if (hook.section !== 'body' || hook.column.index !== 1) return;
+      const imgs = photoImgs[hook.row.index - PHOTO_ROW0];
+      if (!imgs || imgs.length === 0) return;
+      const pad = 2;
+      const gap = 3;
+      const cellW = hook.cell.width - 2 * pad;
+      const cellH = hook.cell.height - 2 * pad;
+      const slotW = (cellW - gap * (imgs.length - 1)) / imgs.length;
+      imgs.forEach((im, i) => {
+        const scale = Math.min(slotW / im.w, cellH / im.h);
+        const w = im.w * scale;
+        const h = im.h * scale;
+        const x = hook.cell.x + pad + i * (slotW + gap) + (slotW - w) / 2;
+        const y = hook.cell.y + pad + (cellH - h) / 2;
+        try {
+          doc.addImage(im.data, 'JPEG', x, y, w, h);
+        } catch {
+          /* skip broken image */
+        }
+      });
+    },
   });
 
   const result = (it: HoistItemNode): string => {
@@ -540,7 +510,7 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
       0: { cellWidth: W * 0.77 },
       1: { halign: 'center', fontStyle: 'bold' },
     },
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: MARGIN, right: MARGIN, top: 14, bottom: 20 },
     didParseCell: (hook) => {
       if (hook.section !== 'body' || hook.column.index !== 1) return;
       const it = items[hook.row.index];
@@ -591,104 +561,164 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
   }
 }
 
+/** A run of text with its style (rich paragraph). */
+interface Run {
+  text: string;
+  bold?: boolean;
+  underline?: boolean;
+}
+
+/**
+ * Draw a rich paragraph (bold / underlined runs) wrapped to `width`, justified
+ * except its last line. Returns the y below the paragraph.
+ */
+function drawRichParagraph(
+  doc: jsPDF,
+  runs: Run[],
+  x: number,
+  y: number,
+  width: number,
+  size = 11,
+  lineH = 5.3,
+): number {
+  type Frag = { text: string; bold: boolean; underline: boolean; w: number };
+  const measure = (t: string, bold: boolean) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    return doc.getTextWidth(t);
+  };
+  // Words = fragments with no whitespace between them (a word can mix styles).
+  const words: Frag[][] = [];
+  let cur: Frag[] = [];
+  for (const r of runs) {
+    for (const piece of r.text.split(/(\s+)/)) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) {
+        if (cur.length) words.push(cur);
+        cur = [];
+        continue;
+      }
+      cur.push({ text: piece, bold: !!r.bold, underline: !!r.underline, w: measure(piece, !!r.bold) });
+    }
+  }
+  if (cur.length) words.push(cur);
+  const wordW = (w: Frag[]) => w.reduce((acc, f) => acc + f.w, 0);
+  const space = measure(' ', false);
+
+  const lines: Frag[][][] = [];
+  let line: Frag[][] = [];
+  let lineW = 0;
+  for (const w of words) {
+    const ww = wordW(w);
+    if (line.length && lineW + space + ww > width) {
+      lines.push(line);
+      line = [];
+      lineW = 0;
+    }
+    lineW += (line.length ? space : 0) + ww;
+    line.push(w);
+  }
+  if (line.length) lines.push(line);
+
+  doc.setLineWidth(0.25);
+  doc.setDrawColor(0, 0, 0);
+  lines.forEach((ln, li) => {
+    const last = li === lines.length - 1;
+    const total = ln.reduce((acc, w) => acc + wordW(w), 0);
+    const gap = !last && ln.length > 1 ? (width - total) / (ln.length - 1) : space;
+    let cx = x;
+    ln.forEach((w, wi) => {
+      for (const f of w) {
+        doc.setFont('helvetica', f.bold ? 'bold' : 'normal');
+        doc.setFontSize(size);
+        doc.text(f.text, cx, y);
+        if (f.underline) doc.line(cx, y + 0.9, cx + f.w, y + 0.9);
+        cx += f.w;
+      }
+      const next = ln[wi + 1];
+      // Underline continues across the space between two underlined words.
+      if (next && w[w.length - 1]!.underline && next[0]!.underline) {
+        doc.line(cx, y + 0.9, cx + gap, y + 0.9);
+      }
+      cx += gap;
+    });
+    y += lineH;
+  });
+  return y;
+}
+
 /**
  * Page 2: "EQUIPOS CERTIFICADOS Y EQUIPOS CERTIFICADOS CON OBSERVACIONES" —
- * counts of the hoists of this certification (same park + name) by condition,
- * with the general recommendations for each group.
+ * the text given by the user (docs/informe-polipastos-pagina2.md). Dynamic: the
+ * number of certified hoists and of hoists certified with observations.
  */
 function renderCertifiedSummary(doc: jsPDF, meta: HoistReportMeta) {
   doc.addPage();
-  const W = PAGE_WIDTH - 2 * MARGIN;
+  const W = PAGE_WIDTH - 2 * MARGIN - 6;
+  const X = MARGIN + 3;
   const nn = (n: number) => String(n).padStart(2, '0');
-  const common = [
-    'Mantener la cadena de carga limpia y lubricada.',
-    'No levantar cargas superiores a la carga nominal del equipo (800 kilos).',
-    'No operar el polipasto con un ángulo de tiro superior a 15°.',
+  const BU = (text: string): Run => ({ text, bold: true, underline: true });
+  const B = (text: string): Run => ({ text, bold: true });
+  const N = (text: string): Run => ({ text });
+  const lubrication: Run[] = [
+    N('Mantener limpia y lubricada la cadena de carga. La falta de lubricación acelera el desgate en eslabones de cadena, generara una condición insegura de trabajo y desgaste en nuez de carga de tecle y gancho.'),
   ];
-  let y = 28;
-  doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  const title = doc.splitTextToSize('EQUIPOS CERTIFICADOS Y EQUIPOS CERTIFICADOS CON OBSERVACIONES', W) as string[];
-  doc.text(title, PAGE_WIDTH / 2, y, { align: 'center' });
-  y += title.length * 7 + 8;
+  const nominal: Run[] = [
+    N('Realizar maniobras solo con cargas iguales o inferior a la carga nominal recomendada por el fabricante, esto es '),
+    BU('800 kilos'),
+    N('.'),
+  ];
+  const angle: Run[] = [N('No realizar maniobras con carga en un ángulo superior a 15°.')];
+
+  let y = 26;
   doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  const title = doc.splitTextToSize('EQUIPOS CERTIFICADOS Y EQUIPOS CERTIFICADOS CON OBSERVACIONES', W - 20) as string[];
+  doc.text(title, PAGE_WIDTH / 2, y, { align: 'center' });
+  y += title.length * 6.5 + 12;
 
-  const para = (text: string, bold = false, size = 11) => {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(size);
-    const lines = doc.splitTextToSize(text, W) as string[];
-    doc.text(lines, MARGIN, y);
-    y += lines.length * (size * 0.45) + 3;
-  };
-  const bullets = (list: string[]) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    for (const b of list) {
-      const lines = doc.splitTextToSize(b, W - 8) as string[];
-      doc.text('•', MARGIN + 2, y);
-      doc.text(lines, MARGIN + 7, y);
-      y += lines.length * 5 + 1.5;
-    }
-    y += 6;
-  };
-
-  para('EQUIPOS CERTIFICADOS (APTOS)', true, 12);
-  para(`${nn(meta.certifiedCount)} polipastos pasaron la inspección de manera satisfactoria, quedando CERTIFICADOS (APTOS).`);
-  para('Recomendaciones:', true);
-  bullets(common);
-
-  para('EQUIPOS CERTIFICADOS CON OBSERVACIONES', true, 12);
-  para(`${nn(meta.observedCount)} polipastos pasaron la inspección, pero mantienen observaciones, quedando CERTIFICADOS CON OBSERVACIONES.`);
-  para('Recomendaciones:', true);
-  bullets(['Atender las observaciones indicadas en el detalle de la revisión de cada equipo.', ...common]);
-}
-
-/** One separator page per STEP, then one block page per selected photo. */
-async function renderStepSection(
-  doc: jsPDF,
-  step: HoistStepNode,
-  locale: 'es' | 'en',
-  /** Multi-turbine report: no separator page, turbine name in each photo header. */
-  turbinePrefix: string | null,
-) {
-  // Collect every item of the step (direct or grouped).
-  const groups: { label: string | null; items: HoistItemNode[] }[] = step.hasGroups
-    ? [
-        ...(step.items.length > 0 ? [{ label: null, items: step.items }] : []),
-        ...step.groups.map((g) => ({ label: g.groupLabel, items: g.items })),
-      ]
-    : [{ label: null, items: step.items }];
-
-  const hasPhotos = groups.some((g) => g.items.some((it) => it.photos.length > 0));
-  if (!hasPhotos) return;
-
-  // Separator page with the step name centered (single-turbine report only).
-  if (turbinePrefix === null) {
-    doc.addPage();
-    doc.setTextColor(...hexToRgb(COLOR_PRIMARY));
-    doc.setFontSize(32);
+  const heading = (text: string) => {
     doc.setFont('helvetica', 'bold');
-    const stepName = getHoistLabel(step.stepCode, locale).toUpperCase();
-    const wrapped = doc.splitTextToSize(stepName, PAGE_WIDTH - 40);
-    doc.text(wrapped, PAGE_WIDTH / 2, PAGE_HEIGHT / 2, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-  }
-
-  for (const grp of groups) {
-    for (const item of grp.items) {
-      const photos = [...item.photos].sort(byReportOrder);
-      for (const photo of photos) {
-        await renderPhotoBlock(
-          doc,
-          turbinePrefix ? `${turbinePrefix} · ${step.stepLabel}` : step.stepLabel,
-          grp.label,
-          item.itemLabel,
-          photo,
-        );
-      }
+    doc.setFontSize(11);
+    doc.text(text, X, y);
+    y += 8;
+  };
+  const bullets = (list: Run[][]) => {
+    for (const b of list) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text('•', X + 6, y);
+      y = drawRichParagraph(doc, b, X + 13, y, W - 13);
     }
-  }
+    y += 3;
+  };
+
+  y = drawRichParagraph(doc, [
+    N('Terminado el proceso de Inspección y certificación de Polipastos, se determinó que '),
+    BU(`${nn(meta.certifiedCount)} polipastos pasaron la inspección de manera satisfactoria`),
+    N('. Las unidades catalogadas como “'),
+    B('CERTIFICADOS'),
+    N('” se entenderán “'),
+    B('APTOS'),
+    N('” para realizar maniobras hasta su próxima revisión contado un año desde la fecha de revisión, indicada en TAG.'),
+  ], X, y, W);
+  y += 3;
+  heading('Recomendaciones generales para unidades certificadas');
+  bullets([lubrication, nominal, angle]);
+
+  y = drawRichParagraph(doc, [
+    N('De igual forma, terminado el proceso de Inspección y certificación de Polipastos, se determinó que '),
+    BU(`${nn(meta.observedCount)} polipastos pasaron la inspección, pero mantienen observaciones`),
+    N('. Las unidades catalogadas como “'),
+    B('CERTIFICADO CON OBSERVACIONES'),
+    N('” se entenderán “'),
+    B('APTOS'),
+    N('” para realizar maniobras hasta su próxima revisión contado un año desde la fecha de revisión, indicada en TAG, sin embargo, se deberán atender y considerar las observaciones o recomendaciones realizadas.'),
+  ], X, y, W);
+  y += 3;
+  heading('Recomendaciones generales para unidades certificadas con observaciones');
+  bullets([[N('Atender y considerar las observaciones o recomendaciones realizadas.')], lubrication, nominal, angle]);
 }
 
 function addFooters(doc: jsPDF, windFarmName: string) {
@@ -756,14 +786,11 @@ export async function generateAndDownloadHoistCertificationReport(
   // 2. Certified / certified-with-observations summary.
   renderCertifiedSummary(doc, meta);
   // 3. General data.
-  renderGeneralData(doc, first, meta);
+  // (General data page removed from this report.)
   // 4. Per turbine: revision detail sheet, then its report photos.
-  const locale: 'es' | 'en' = 'es';
   for (const ctx of ctxs) {
+    // Photos of photo-capture items are inside the sheet (no separate photo pages).
     await renderRevisionDetail(doc, ctx);
-    for (const step of ctx.tree) {
-      await renderStepSection(doc, step, locale, multi ? ctx.turbineName : null);
-    }
   }
   // 5. Signature + legal page (same as the repair report).
   renderManagerSignaturePage(doc, {
