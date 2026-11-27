@@ -26,7 +26,6 @@ const db = supabase as any;
  * report (metadata.selected_for_report).
  */
 
-type JsPDFWithAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
 export interface HoistReportData {
   /** Turbine (child) campaigns to include, in order. */
@@ -500,9 +499,10 @@ async function renderRevisionDetail(doc: jsPDF, ctx: HoistPdfContext) {
     return '—';
   };
 
-  const y0 = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? 60) + 3;
+  // The results table always starts on its own page, after the sheet header.
+  doc.addPage();
   autoTable(doc, {
-    startY: y0,
+    startY: 14,
     theme: 'plain',
     body: items.map((it) => [it.itemLabel, result(it)]),
     styles: { fontSize: 8.5, cellPadding: 1.1, textColor: [0, 0, 0], ...BORDER },
