@@ -133,7 +133,15 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 | `visual_nivel_aceite`       | Nivel de aceite               | check |
 | `visual_switch_limite`      | Switch de límite de carrera   | check |
 
-### Paso 3 — `inspeccion_critica` (con dos sub-grupos)
+### Paso 3 — `inspeccion_critica` (con tres sub-grupos)
+
+**Sub-grupo `freno_embrague` (Freno y embrague) — va PRIMERO.** El app envía el dato en `measurement_value` (texto); la web lo puede corregir antes del informe:
+| `item_code`                  | Ítem                                                   | Tipo        |
+|------------------------------|--------------------------------------------------------|-------------|
+| `freno_holgura_020_050`      | Verificación holgura de freno entre 0.20mm a 0.50mm    | measurement |
+| `freno_holgura_050_100`      | Verificación holgura de freno entre 0.50mm a 1mm       | measurement |
+| `embrague_pruebas_iniciales` | Pruebas iniciales de conjunto de embrague              | measurement |
+| `embrague_pruebas_finales`   | Pruebas finales de conjunto de embrague                | measurement |
 **Sub-grupo `cadena_carga` (Cadena de carga):**
 | `item_code`            | Ítem                                                               | Tipo        |
 |------------------------|--------------------------------------------------------------------|-------------|
@@ -148,14 +156,6 @@ La estructura es fija e igual para toda turbina. El app debe escribir `item_code
 | `ojales_tintas_penetrantes` | Inspección de grietas tintas penetrantes                  | check |
 | `ojales_arandela_seguro`    | Reemplazar arandela y seguro                              | check |
 | `ojales_distancia`          | Medir distancia de ojales y suspensión (menor a 2mm)      | check |
-
-#### Sub-grupo `freno_embrague` — Freno y embrague (resultado editable también desde la web)
-| `item_code`                  | Ítem                                                   | Tipo  |
-|------------------------------|--------------------------------------------------------|-------|
-| `freno_holgura_020_050`      | Verificación holgura de freno entre 0.20mm a 0.50mm    | check |
-| `freno_holgura_050_100`      | Verificación holgura de freno entre 0.50mm a 1mm       | check |
-| `embrague_pruebas_iniciales` | Pruebas iniciales de conjunto de embrague              | check |
-| `embrague_pruebas_finales`   | Pruebas finales de conjunto de embrague                | check |
 
 ### Paso 4 — `verificacion_torques`
 | `item_code`              | Ítem                          | Tipo  |

@@ -486,7 +486,10 @@ function buildTree(
         stepLabel: step.labelEs,
         sortOrder: step.sortOrder,
         hasGroups: true,
-        items: [],
+        // Items hanging directly from the step (shown BEFORE its sub-groups).
+        items: getHoistItems(step.code).map((it) =>
+          buildItemNode(it.code, rowsByCode, selectedIds, reportOrderById),
+        ),
         groups: groups.map((g) => ({
           groupCode: g.code,
           groupLabel: g.labelEs,
@@ -788,16 +791,18 @@ export const hoistCertificationService = {
 
   /** Update the hoist-certification campaign workflow status. */
   /**
-   * Set a check item's result (cumple / no cumple / sin dato) from the web, for
-   * catalog items marked webEditable. Upserts the hoist_cert_item row keyed by
+   * Set (or clear) the value of a web-editable item from the web, before the
+   * report is generated. Upserts the hoist_cert_item row keyed by
    * (campaign_id, item_code), so it works whether or not the mobile app already
-   * created it. RLS allows technician/inspector/admin/supervisor to write.
+   * sent it; an empty value clears it. RLS allows technician/inspector/admin/
+   * supervisor to write.
    */
-  async setItemPassed(campaignId: string, itemCode: string, passed: boolean | null): Promise<void> {
+  async setItemValue(campaignId: string, itemCode: string, value: string | null): Promise<void> {
+    const v = value?.trim() ? value.trim() : null;
     const { error } = await db
       .from('hoist_cert_item')
       .upsert(
-        { campaign_id: campaignId, item_code: itemCode, item_type: 'check', passed },
+        { campaign_id: campaignId, item_code: itemCode, item_type: 'measurement', measurement_value: v },
         { onConflict: 'campaign_id,item_code' },
       );
     if (error) throw new HoistCertificationServiceError(error.message, error.code);

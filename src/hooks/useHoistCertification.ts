@@ -241,12 +241,12 @@ export function useMoveHoistPhoto(campaignId: string | undefined) {
  * the wind farm campaigns list (so the panel status badge updates without a
  * reload).
  */
-/** Set the result of a web-editable check item, then refresh the tree. */
-export function useSetHoistItemPassed(campaignId: string | undefined) {
+/** Set the value of a web-editable item, then refresh the tree. */
+export function useSetHoistItemValue(campaignId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemCode, passed }: { itemCode: string; passed: boolean | null }) =>
-      hoistCertificationService.setItemPassed(campaignId!, itemCode, passed),
+    mutationFn: ({ itemCode, value }: { itemCode: string; value: string | null }) =>
+      hoistCertificationService.setItemValue(campaignId!, itemCode, value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-tree', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['hoist-cert-summary', campaignId] });

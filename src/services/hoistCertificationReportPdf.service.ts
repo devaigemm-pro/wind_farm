@@ -409,6 +409,7 @@ function renderGeneralData(doc: jsPDF, ctx: HoistPdfContext) {
       ]);
     };
     if (step.hasGroups) {
+      for (const it of step.items) pushItem('', it);
       for (const grp of step.groups) for (const it of grp.items) pushItem(grp.groupLabel, it);
     } else {
       for (const it of step.items) pushItem('', it);
@@ -474,7 +475,10 @@ async function renderPhotoBlock(
 async function renderStepSection(doc: jsPDF, step: HoistStepNode, locale: 'es' | 'en') {
   // Collect every item of the step (direct or grouped).
   const groups: { label: string | null; items: HoistItemNode[] }[] = step.hasGroups
-    ? step.groups.map((g) => ({ label: g.groupLabel, items: g.items }))
+    ? [
+        ...(step.items.length > 0 ? [{ label: null, items: step.items }] : []),
+        ...step.groups.map((g) => ({ label: g.groupLabel, items: g.items })),
+      ]
     : [{ label: null, items: step.items }];
 
   const hasPhotos = groups.some((g) => g.items.some((it) => it.photos.length > 0));

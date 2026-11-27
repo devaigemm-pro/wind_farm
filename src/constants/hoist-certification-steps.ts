@@ -52,9 +52,9 @@ export interface HoistCertCatalogEntry {
    */
   itemType: HoistItemType | null;
   /**
-   * When true, a web user (not client) can set the check result on the
-   * certification screen before generating the report, even if the mobile app
-   * never captured it. Only meaningful for itemType 'check'.
+   * When true, the value captured by the mobile app (measurement_value) can be
+   * edited from the web, in a text box, before generating the report. Used with
+   * itemType 'measurement'.
    */
   webEditable?: boolean;
 }
@@ -93,6 +93,12 @@ export const HOIST_CERT_CATALOG: readonly HoistCertCatalogEntry[] = [
 
   // ── Paso 3: Inspección Crítica (dos sub-grupos) ───────────────────────────
   { code: 'inspeccion_critica', labelEs: 'Inspección Crítica', labelEn: 'Critical inspection', sortOrder: 20, parentCode: null, isStep: true, isGroup: false, isItem: false, itemType: null },
+  // Sub-grupo: Freno y embrague (PRIMERO). Datos que vienen desde la app y se pueden editar en la web antes del informe (caja de texto).
+  { code: 'freno_embrague', labelEs: 'Freno y embrague', labelEn: 'Brake and clutch', sortOrder: 20.1, parentCode: 'inspeccion_critica', isStep: false, isGroup: true, isItem: false, itemType: null },
+  { code: 'freno_holgura_020_050', labelEs: 'Verificación holgura de freno entre 0.20mm a 0.50mm', labelEn: 'Brake clearance check between 0.20mm and 0.50mm', sortOrder: 20.2, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'measurement', webEditable: true },
+  { code: 'freno_holgura_050_100', labelEs: 'Verificación holgura de freno entre 0.50mm a 1mm', labelEn: 'Brake clearance check between 0.50mm and 1mm', sortOrder: 20.3, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'measurement', webEditable: true },
+  { code: 'embrague_pruebas_iniciales', labelEs: 'Pruebas iniciales de conjunto de embrague', labelEn: 'Initial clutch assembly tests', sortOrder: 20.4, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'measurement', webEditable: true },
+  { code: 'embrague_pruebas_finales', labelEs: 'Pruebas finales de conjunto de embrague', labelEn: 'Final clutch assembly tests', sortOrder: 20.5, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'measurement', webEditable: true },
   // Sub-grupo: Cadena de carga
   { code: 'cadena_carga', labelEs: 'Cadena de carga', labelEn: 'Load chain', sortOrder: 21, parentCode: 'inspeccion_critica', isStep: false, isGroup: true, isItem: false, itemType: null },
   { code: 'cadena_sin_desgaste', labelEs: 'Sin desgaste, abrasión, grietas, deformación ni eslabones rígidos', labelEn: 'No wear, abrasion, cracks, deformation or rigid links', sortOrder: 22, parentCode: 'cadena_carga', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
@@ -104,12 +110,6 @@ export const HOIST_CERT_CATALOG: readonly HoistCertCatalogEntry[] = [
   { code: 'ojales_tintas_penetrantes', labelEs: 'Inspección de grietas tintas penetrantes', labelEn: 'Dye penetrant crack inspection', sortOrder: 27, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'ojales_arandela_seguro', labelEs: 'Reemplazar arandela y seguro', labelEn: 'Replace washer and lock', sortOrder: 28, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
   { code: 'ojales_distancia', labelEs: 'Medir distancia de ojales y suspensión (menor a 2mm)', labelEn: 'Measure eyelet and suspension distance (less than 2mm)', sortOrder: 29, parentCode: 'ojales_aluminio', isStep: false, isGroup: false, isItem: true, itemType: 'check' },
-  // Sub-grupo: Freno y embrague — resultado editable desde la web antes del informe
-  { code: 'freno_embrague', labelEs: 'Freno y embrague', labelEn: 'Brake and clutch', sortOrder: 30, parentCode: 'inspeccion_critica', isStep: false, isGroup: true, isItem: false, itemType: null },
-  { code: 'freno_holgura_020_050', labelEs: 'Verificación holgura de freno entre 0.20mm a 0.50mm', labelEn: 'Brake clearance check between 0.20mm and 0.50mm', sortOrder: 31, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'check', webEditable: true },
-  { code: 'freno_holgura_050_100', labelEs: 'Verificación holgura de freno entre 0.50mm a 1mm', labelEn: 'Brake clearance check between 0.50mm and 1mm', sortOrder: 32, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'check', webEditable: true },
-  { code: 'embrague_pruebas_iniciales', labelEs: 'Pruebas iniciales de conjunto de embrague', labelEn: 'Initial clutch assembly tests', sortOrder: 33, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'check', webEditable: true },
-  { code: 'embrague_pruebas_finales', labelEs: 'Pruebas finales de conjunto de embrague', labelEn: 'Final clutch assembly tests', sortOrder: 34, parentCode: 'freno_embrague', isStep: false, isGroup: false, isItem: true, itemType: 'check', webEditable: true },
 
   // ── Paso 4: Verificación de Torques ───────────────────────────────────────
   { code: 'verificacion_torques', labelEs: 'Verificación de Torques', labelEn: 'Torque verification', sortOrder: 40, parentCode: null, isStep: true, isGroup: false, isItem: false, itemType: null },

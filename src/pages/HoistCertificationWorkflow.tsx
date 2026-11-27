@@ -31,7 +31,7 @@ import {
   useReorderHoistReportPhotos,
   useUpdateHoistStatus,
   useUploadHoistPhoto,
-  useSetHoistItemPassed,
+  useSetHoistItemValue,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
@@ -414,7 +414,7 @@ export function HoistCertificationWorkflow() {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function stepItems(step: HoistStepNode): HoistItemNode[] {
-  if (step.hasGroups) return step.groups.flatMap((g) => g.items);
+  if (step.hasGroups) return [...step.items, ...step.groups.flatMap((g) => g.items)];
   return step.items;
 }
 
@@ -538,12 +538,18 @@ function StepSection({
       {open && (
         <div style={stepGroupBody}>
           {step.hasGroups ? (
-            step.groups.map((group: HoistGroupNode) => (
-              <div key={group.groupCode} style={subGroupBlock}>
-                <div style={subGroupTitle}>{getHoistLabel(group.groupCode, locale)}</div>
-                <div style={subGroupItems}>{group.items.map(renderItem)}</div>
-              </div>
-            ))
+            <>
+              {/* Items hanging directly from the step go first, before the sub-groups. */}
+              {step.items.length > 0 && (
+                <div style={subGroupItems}>{step.items.map(renderItem)}</div>
+              )}
+              {step.groups.map((group: HoistGroupNode) => (
+                <div key={group.groupCode} style={subGroupBlock}>
+                  <div style={subGroupTitle}>{getHoistLabel(group.groupCode, locale)}</div>
+                  <div style={subGroupItems}>{group.items.map(renderItem)}</div>
+                </div>
+              ))}
+            </>
           ) : (
             <div style={subGroupItems}>{items.map(renderItem)}</div>
           )}
@@ -611,7 +617,10 @@ function ItemRow({
   // Photo/measurement items always show their gallery. A 'check' item shows it
   // only when photos were captured (e.g. items that were 'photo' before becoming
   // 'check'), so already-uploaded photos never disappear from the screen.
-  const hasPhotos = item.itemType !== 'check' || item.photos.length > 0;
+  // Web-editable items carry a value from the app (a text box here); their
+  // gallery only shows when the app actually sent photos.
+  const isWebEditable = !!HOIST_CERT_BY_CODE[item.itemCode]?.webEditable;
+  const hasPhotos = (item.itemType !== 'check' && !isWebEditable) || item.photos.length > 0;
   const itemDropActive = hoverTargetKey != null && hoverTargetKey === thisKey;
 
   useEffect(() => {
@@ -763,15 +772,13 @@ function ItemRow({
         </span>
         <h3 style={itemRowTitle}>{getHoistLabel(item.itemCode, locale)}</h3>
         {/* State badge for check / measurement */}
-        {item.itemType === 'check' &&
-          (HOIST_CERT_BY_CODE[item.itemCode]?.webEditable && !readOnly ? (
-            <EditableCheck itemCode={item.itemCode} passed={item.passed} t={t} />
+        {item.itemType === 'check' && <CheckBadge passed={item.passed} t={t} />}
+        {item.itemType === 'measurement' &&
+          (isWebEditable && !readOnly ? (
+            <EditableValue itemCode={item.itemCode} value={item.measurementValue} t={t} />
           ) : (
-            <CheckBadge passed={item.passed} t={t} />
+            <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
           ))}
-        {item.itemType === 'measurement' && (
-          <MeasurementBadge value={item.measurementValue} unit={item.measurementUnit} t={t} />
-        )}
         {hasPhotos && (
           <span style={itemRowCount}>
             {photos.length} {t('hoist.photos')} · {selected.length} {t('hoist.selected')}
@@ -918,51 +925,55 @@ function ItemRow({
 // ─── State badges (check / measurement) ─────────────────────────────────────────
 
 /**
- * Result selector for web-editable check items: the user sets cumple / no cumple
- * / sin dato before generating the report. Saves immediately.
+ * Text box for web-editable items: shows the value sent by the app and lets the
+ * user correct it before generating the report. Saves on blur or Enter, only
+ * when the text changed; an empty box clears the value.
  */
-function EditableCheck({
+function EditableValue({
   itemCode,
-  passed,
+  value,
   t,
 }: {
   itemCode: string;
-  passed: boolean | null;
+  value: number | string | null;
   t: (k: string) => string;
 }) {
   const { campaignId } = useParams();
   const toast = useToast();
-  const setPassed = useSetHoistItemPassed(campaignId);
-  const value = passed === true ? 'pass' : passed === false ? 'fail' : '';
-  const color = passed === true ? C.pass : passed === false ? C.fail : C.na;
-  const bg = passed === true ? C.passBg : passed === false ? C.failBg : C.naBg;
+  const setValue = useSetHoistItemValue(campaignId);
+  const saved = value === null || value === undefined ? '' : String(value);
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const commit = () => {
+    if (text.trim() === saved.trim()) return;
+    setValue.mutate(
+      { itemCode, value: text },
+      {
+        onSuccess: () => toast.success(t('hoist.valueSaved')),
+        onError: (err) => {
+          setText(saved);
+          toast.error((err as Error)?.message || t('hoist.valueError'));
+        },
+      },
+    );
+  };
   return (
-    <select
-      aria-label={t('hoist.editResult')}
-      title={t('hoist.editResult')}
-      value={value}
-      disabled={setPassed.isPending}
+    <input
+      type="text"
+      aria-label={t('hoist.editValue')}
+      title={t('hoist.editValue')}
+      placeholder={t('hoist.noData')}
+      value={text}
+      disabled={setValue.isPending}
       onClick={(e) => e.stopPropagation()}
-      onChange={(e) => {
-        const v = e.target.value;
-        setPassed.mutate(
-          { itemCode, passed: v === 'pass' ? true : v === 'fail' ? false : null },
-          { onError: (err) => toast.error((err as Error)?.message || t('hoist.editResultError')) },
-        );
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setText(saved);
       }}
-      style={{
-        ...stateBadge,
-        background: bg,
-        color,
-        border: `1px solid ${color}`,
-        cursor: setPassed.isPending ? 'progress' : 'pointer',
-        paddingRight: 6,
-      }}
-    >
-      <option value="">{t('hoist.noData')}</option>
-      <option value="pass">{t('hoist.pass')}</option>
-      <option value="fail">{t('hoist.fail')}</option>
-    </select>
+      style={valueInput}
+    />
   );
 }
 
@@ -1151,6 +1162,10 @@ const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 12 };
 const totalsLine: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 16 };
+const valueInput: React.CSSProperties = {
+  width: 180, padding: '4px 8px', fontSize: 12, borderRadius: 6,
+  border: `1px solid ${C.border}`, background: '#fff', color: '#1a1a1a',
+};
 const headerActions: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0,
 };
