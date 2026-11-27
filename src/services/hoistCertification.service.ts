@@ -584,6 +584,45 @@ function itemHasData(item: HoistItemNode): boolean {
   return item.measurementValue !== null && String(item.measurementValue).trim() !== '';
 }
 
+/**
+ * Brake clearance items: the hoist has one brake or the other, so ONE of them
+ * with a value is enough for the turbine to be complete (counted as one item).
+ */
+export const HOIST_BRAKE_ALTERNATIVES = ['freno_holgura_020_050', 'freno_holgura_050_100'];
+
+/**
+ * Completeness of a turbine's certification: every catalog item must have data
+ * (photo ≥1, check cumple/no cumple, measurement value), except the brake pair
+ * where one is enough. `missing` = catalog codes still without data (for the
+ * brake pair, both codes when neither has data).
+ */
+export function hoistCompleteness(hasData: (code: string) => boolean): {
+  done: number;
+  total: number;
+  complete: boolean;
+  missing: string[];
+} {
+  const codes = HOIST_CERT_CATALOG.filter((e) => e.isItem).map((e) => e.code);
+  const brake = codes.filter((c) => HOIST_BRAKE_ALTERNATIVES.includes(c));
+  const others = codes.filter((c) => !HOIST_BRAKE_ALTERNATIVES.includes(c));
+  const missing = others.filter((c) => !hasData(c));
+  const brakeOk = brake.length === 0 || brake.some(hasData);
+  if (!brakeOk) missing.push(...brake);
+  const total = others.length + (brake.length ? 1 : 0);
+  const done = others.length - others.filter((c) => !hasData(c)).length + (brake.length && brakeOk ? 1 : 0);
+  return { done, total, complete: done === total, missing };
+}
+
+/** Completeness of a loaded tree (same rule as the campaign list). */
+export function hoistTreeCompleteness(tree: HoistTree) {
+  const byCode = new Map<string, HoistItemNode>();
+  for (const st of tree) for (const it of [...st.items, ...st.groups.flatMap((g) => g.items)]) byCode.set(it.itemCode, it);
+  return hoistCompleteness((code) => {
+    const it = byCode.get(code);
+    return !!it && itemHasData(it);
+  });
+}
+
 /** One turbine (child campaign) of a parent hoist campaign, with its progress. */
 export interface HoistGroupTurbine {
   /** Child campaign id (the one the mobile app writes to). */
@@ -744,10 +783,11 @@ export const hoistCertificationService = {
     const tree = buildTree(itemRows, selectedIds);
 
     const items = allItems(tree);
-    const totalItems = items.length;
+    const completeness = hoistTreeCompleteness(tree);
+    const totalItems = completeness.total;
+    const itemsWithData = completeness.done;
     let photosCount = 0;
     let selectedCount = 0;
-    let itemsWithData = 0;
     let checksPassed = 0;
     let checksEvaluated = 0;
     for (const item of items) {
@@ -755,7 +795,6 @@ export const hoistCertificationService = {
       const shown = item.itemType === 'photo' ? item.photos : [];
       photosCount += shown.length;
       selectedCount += shown.filter((p) => p.hoistSelected).length;
-      if (itemHasData(item)) itemsWithData += 1;
       if (item.itemType === 'check' && item.passed !== null) {
         checksEvaluated += 1;
         if (item.passed) checksPassed += 1;
@@ -1009,9 +1048,9 @@ export const hoistCertificationService = {
 
     const turbines: HoistGroupTurbine[] = children.map((k) => {
       const id = k.id as string;
-      let itemsWithData = 0;
       let photosCount = 0;
       let anyFailed = false;
+      const withData = new Set<string>();
       for (const e of catalogItems) {
         const row = itemMap.get(itemKey(id, e.code));
         const n = photoCount.get(itemKey(id, e.code)) ?? 0;
@@ -1023,17 +1062,18 @@ export const hoistCertificationService = {
             : e.itemType === 'check'
               ? row?.passed != null
               : row?.measurement_value != null && String(row.measurement_value).trim() !== '';
-        if (has) itemsWithData += 1;
+        if (has) withData.add(e.code);
       }
+      const completeness = hoistCompleteness((code) => withData.has(code));
       return {
         campaignId: id,
         turbineId: (k.turbine_id as string) ?? null,
         turbineName: ((k.turbine as Record<string, unknown> | null)?.name as string) ?? '—',
         status: ((k.status as string) ?? 'hoist_open') as HoistCertificationStatus,
         photosCount,
-        itemsWithData,
-        totalItems: catalogItems.length,
-        complete: itemsWithData === catalogItems.length,
+        itemsWithData: completeness.done,
+        totalItems: completeness.total,
+        complete: completeness.complete,
         condition: hoistCondition(k.hoist_details as HoistDetails | null, anyFailed),
       };
     });

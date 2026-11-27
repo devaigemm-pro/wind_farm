@@ -1,7 +1,11 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '@/lib/supabase';
-import { hoistCertificationService, hoistCondition } from '@/services/hoistCertification.service';
+import {
+  HOIST_BRAKE_ALTERNATIVES,
+  hoistCertificationService,
+  hoistCondition,
+} from '@/services/hoistCertification.service';
 import type {
   HoistDetails,
   HoistLabelPhoto,
@@ -376,12 +380,21 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext, meta: HoistRepo
   doc.setTextColor(0, 0, 0);
 }
 
-/** All check/measurement items of the tree, in catalog order. */
+/**
+ * All check/measurement items of the tree, in catalog order. The brake
+ * clearance pair is one-or-the-other: an EMPTY brake item is left out (only the
+ * brake that was measured appears).
+ */
 function resultItems(tree: HoistTree): HoistItemNode[] {
   const out: HoistItemNode[] = [];
   for (const step of tree) {
     const items = [...step.items, ...step.groups.flatMap((g) => g.items)];
-    for (const it of items) if (it.itemType !== 'photo') out.push(it);
+    for (const it of items) {
+      if (it.itemType === 'photo') continue;
+      const empty = it.measurementValue === null || String(it.measurementValue).trim() === '';
+      if (HOIST_BRAKE_ALTERNATIVES.includes(it.itemCode) && empty) continue;
+      out.push(it);
+    }
   }
   return out;
 }
