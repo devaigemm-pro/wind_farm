@@ -8,8 +8,8 @@
 
 ## Metadata
 
-- **Sesiones analizadas**: 424
-- **Última actualización**: 2026-11-20
+- **Sesiones analizadas**: 469
+- **Última actualización**: 2026-11-27
 - **Confianza general del perfil**: alta (patrones sólidos confirmados en 7+ sesiones)
 
 ---
@@ -96,6 +96,9 @@
 ---
 
 - **"un ejemplo concreto = especificación exacta"** — cuando el usuario da un ejemplo de datos (ej. códigos "A1, A34, B4, B6" no consecutivos), ese ejemplo DEFINE el comportamiento esperado al detalle. Los números no consecutivos indicaban que el código debía ser el ORIGINAL de la pantalla de referencia (ANALYZE), no un correlativo nuevo. No interpretar de forma laxa: reproducir el patrón exacto que el ejemplo implica. Correlaciona con "usar el mismo método que X" y "diagnosticar más profundo".
+- **texto en imagen = texto literal** — transcribir palabra por palabra (negritas, subrayados, comillas, typos incluidos) y guardarlo en un archivo del repo apenas llega; nunca reconstruirlo de memoria.
+- **verificar antes de preguntar por borrados** — nunca plantear "X está duplicado, ¿lo borro?" sin consultar la DB primero. Si contesta "elimínala" sobre una premisa falsa, NO ejecutar: corregir y volver a confirmar.
+- **"reenvía la imagen" = replicar la distribución de celdas exacta** — si vuelve a adjuntar una imagen de referencia, la implementación anterior no respetó el layout (celdas combinadas, anchos, fondos). Replicar estructura, no solo contenido.
 - **"aplicar en prod" = deploy manual con Vercel CLI** — en este proyecto el push a `main` NO dispara deploy automático de Vercel. Cuando el usuario aprueba deploy ("aplicar en prod", "mergea", "libera"): rebase sobre origin/main → merge a main → push origin main → `vercel --prod --yes` (CLI ya autenticado, proyecto dev-ai2/wind-farm, alias `wind-farm-eight.vercel.app`). Verificar comparando el hash del chunk `index-*.js` servido en prod y grep de la cadena nueva del feature. NO asumir que el push solo basta.
 
 - **"arrastrar fotos" = subir desde el disco** — cuando el usuario pide "arrastrar/agregar fotos" en una pantalla que ya tiene drag interno, se refiere a subir archivos locales del laptop (drag & drop de OS files), NO al drag interno existente de mover elementos. No preguntar por diseño/UX cuando la intención es literal y simple: asumir subida desde disco y proceder. Solo preguntar si hay ambigüedad REAL de datos.
@@ -123,6 +126,10 @@
 - **revisar el acceso a la DB de prod en el momento, antes de pedirle al usuario que corra SQL** — un 401 del CLI en un turno anterior no significa que siga sin acceso (el usuario puede haber dejado SUPABASE_ACCESS_TOKEN en el entorno). Probar `supabase db query --linked "select 1"` justo antes; si responde, aplicar con `supabase db query --linked -f <archivo.sql>` y verificar. Solo pedirle el SQL Editor si la prueba falla en ese momento. Para simular como un usuario: archivo SQL con begin; set_config('request.jwt.claims', '{"sub":"<uid>","role":"authenticated"}', true); set local role authenticated; ...; rollback.
 - **el token de Supabase para prod está en .env.production.local, no en el entorno** — cada execute_bash arranca sin él. Antes de `supabase db query --linked` hacer en el MISMO comando `set -a; . ./.env.production.local; set +a`. Sin eso el CLI responde 401 "Invalid access token" y parece que no hay acceso.
 - **cambio de tipo = solo ese tipo a la vista** — cuando pide que unos ítems "sean verificación" (u otro tipo), deben mostrarse SOLO como ese tipo: no mezclar restos del tipo anterior (p.ej. medición "0 %" con ícono de regla junto a "Sin dato"). Conservar datos ya capturados solo si no cambian lo que se ve del tipo nuevo (las fotos sí se pueden seguir mostrando). Si un dato viejo se va a ocultar, decirlo en el reporte en vez de mostrarlo mezclado.
+
+- **tipo de ítem nuevo: no inferirlo del resto de la etapa; posición: donde él diga** — al agregar ítems a la certificación de polipastos, "editable" con datos que vienen de la app = valor en caja de texto (measurement + webEditable), no verificación aunque el resto de la etapa sea verificación. Si no dice dónde van, preguntar en vez de ponerlos al final. En una etapa con sub-grupos, los ítems nuevos van en un sub-grupo con título, igual que los demás.
+
+- **"cada instrucción aplica al informe del que se habla"** — cuando hay dos variantes de un entregable (Anexo I certificados / Anexo II no certificados) y el usuario manda evidencia (screenshots) de una, los cambios aplican SOLO a esa variante. No generalizar a ambas. Si el mensaje mezcla instrucciones, asignar cada una a su informe; ante duda preguntar.
 
 ## 8. Historial de Observaciones por Sesión
 
@@ -3202,3 +3209,253 @@
 - **Tarea principal**: Agregar la página de firma + derechos de informe a los PDF de limpieza y polipasto, igual que en reparaciones.
 - **Observaciones nuevas**: Tras un deploy el repo queda en main: volver a la rama de sesión (`git checkout session/...; git merge --ff-only main`) antes de tocar código. La firma sale de wind_farm.manager_name/role + documentManagerSignatureService.getDataUrl (bucket asset-documents); se extrajo un renderer compartido (src/services/reportSignaturePage.ts) sin tocar reparaciones. Verificación del PDF en local: hookear URL.createObjectURL y HTMLAnchorElement.click con `agent-browser eval -b` (script base64 desde /tmp), luego leer el blob y buscar textos; las tildes no coinciden por codificación WinAnsi. Docker puede estar apagado: `open -a Docker` y `docker start supabase_edge_runtime_wind-blade-inspection`. Trabajé directo sin delegar al desarrollador porque el cambio era pequeño y el desarrollador no tuvo shell la vez anterior.
 - **Patrones confirmados**: español, "de la misma manera que reparaciones" = replicar patrón existente, activa con "compañero".
+
+### Sesión 425 - 2026-11-23
+- **Tarea principal**: "pasar a prod" tras agregar la página de firma a los informes de limpieza y polipasto.
+- **Observaciones nuevas**: Flujo de deploy repetido y estable: commit de .kiro antes del rebase (evita "Please commit or stash"), merge --no-ff a main, push, `vercel --prod --yes` en segundo plano con log en /tmp y `sleep` en vez de bloquear (evita la interrupción del turno), verificar el chunk lazy nuevo en prod (reportSignaturePage-*.js con "Derechos de informe"). Los chunks lazy se localizan buscando su nombre dentro del chunk de la página, no del index. Volver a la rama de sesión al terminar.
+- **Patrones confirmados**: español, "pasar a prod" = deploy manual completo sin preguntar (3ª vez), mensajes de 3 palabras.
+
+### Sesión 426 - 2026-11-24
+- **Tarea principal**: Preparar presentación para el Encuentro Anual DPEC 2026 (25-nov, 3:45-4:30pm, CORE-TEC SPA, "Mantenimiento y reparación de aspas mediante acceso por cuerdas") sobre el sistema y sus funcionalidades. Adjuntó imagen de la agenda.
+- **Observaciones nuevas**: primera tarea de presentación/evento (no código). Compañero preguntó formato de entregable (slides, guion de demo o ambos); recomendó ambos usando datos del ambiente local.
+- **Patrones confirmados**: imagen como spec, instrucción conceptual breve, modo compañero.
+
+### Sesión 427 - 2026-11-24
+- **Tarea principal**: Continuación de sesión 426. Respondió "opcion 3" (slides + guion). Se generó deck de 13 slides (HTML + PDF), guion de 45 min y capturas en docs/presentacion-dpec-2026/.
+- **Observaciones nuevas**: ante una pregunta con opciones numeradas responde solo el número. El ambiente local no tiene fotos en Storage ni campañas de reparación con defectos: las capturas de anotar/analizar/reparación salen rotas o vacías; para charlas hay que usar prod con fotos reales o avisar. agent-browser guarda screenshots relativos al cwd del daemon (repo), usar rutas absolutas. El build `--mode development` deja dist/ apuntando a datos locales.
+- **Patrones confirmados**: respuestas ultra-breves, alta autonomía, modo compañero, confía en la recomendación del agente.
+
+### Sesión 428 - 2026-11-24
+- **Tarea principal**: Rehacer el deck DPEC 2026 con énfasis en las 4 fases de inspección, flujo de cotización, reparación, limpieza y certificación de polipastos, usando los ejemplos de PTO Talinay Oriente y Fila de Mogote.
+- **Observaciones nuevas**: Docker Desktop estaba apagado al empezar el turno: `open -a Docker` y esperar ~40s. El preview (LaunchAgent) también hay que re-cargar tras reiniciar. Campañas de reparación/limpieza/certificación usan `campaign.id` (tabla campaign, type), no el id de repair ni de quote. Para exportar slides HTML a PDF 16:9 sin franjas blancas usar Chrome headless `--print-to-pdf --no-pdf-header-footer` (agent-browser pdf agrega márgenes). Las miniaturas locales salen rotas por falta de Storage: marcar en el guion qué capturas reemplazar con prod.
+- **Patrones confirmados**: instrucciones breves, da el énfasis y los ejemplos concretos ("usar talinay y fila de mogote"), alta autonomía.
+
+### Sesión 429 - 2026-11-24
+- **Tarea principal**: Continuación del deck DPEC 2026. Pidió usar datos de producción y agregar una sección sobre inspecciones internas de palas (proyecto en desarrollo: carrito automatizado con telemetría que se posiciona dentro de la pala y recorre cada zona capturando imágenes).
+- **Observaciones nuevas**: Se agregaron 2 slides (esquema SVG ilustrativo + flujo) marcados "En desarrollo", sin inventar especificaciones. No hay credencial de usuario de prod conocida (solo la service role en .env.production.local): se le pidió elegir entre pasar un usuario de solo lectura o autorizar una sesión temporal. Pendiente: recapturar con prod.
+- **Patrones confirmados**: instrucciones breves con varias tareas en un mensaje, alta autonomía, contenido de presentación afirmado con cuidado (marcar lo que es meta vs lo ya construido).
+
+### Sesión 430 - 2026-11-24
+- **Tarea principal**: Insistió en que las fases de inspección del deck DPEC usen imágenes de producción ("estás usando de local"), sin elegir entre las dos opciones de acceso que se le ofrecieron.
+- **Observaciones nuevas**: No hay usuario propio en prod: los únicos admins son arojas/jnunez/gmunoz@windfarm.dev, no se entró como ninguno sin permiso. Prod tiene la misma inspección Talinay WTG23 (325edf67, 86 fotos, 90 defectos) que local; Fila de Mogote en prod tiene 0 fotos de inspección, así que para las 4 fases solo sirve Talinay. Consulta de solo lectura con `set -a; . ./.env.production.local; set +a; supabase db query --linked -f /tmp/q.sql` funciona. Cuando el usuario repite una instrucción sin responder la pregunta de acceso, hay que pedir la decisión de forma más corta (una línea con las dos opciones) en vez de repetir el contexto.
+- **Patrones confirmados**: instrucciones breves, espera que el agente resuelva sin preguntar, corrige cuando usé local en vez de prod.
+
+### Sesión 431 - 2026-11-24
+- **Tarea principal**: Dio acceso a prod (gmunoz@windfarm.dev, admin) para capturar las 4 fases de inspección del deck DPEC con fotos reales. Eligió la opción "usuario y clave" cuando se le dieron las dos opciones.
+- **Observaciones nuevas**: Login de prod en https://wind-farm-eight.vercel.app funciona con agent-browser (fill @e3/@e4, click @e5, tras snapshot -i). Para seleccionar una miniatura en el visor de la fase 2 sirve `agent-browser eval "document.querySelectorAll('img')[9].parentElement.click()"` (el click en el img no basta). En prod, la inspección Talinay WTG23 muestra fotos reales en cara TE pero las 3 miniaturas de LE salen rotas; la anotación A25 de la fase 3 no tiene imagen. No guardar la clave en archivos. Sesión de prod queda abierta en el navegador del agente.
+- **Patrones confirmados**: responde con datos mínimos (usuario; clave) cuando se le piden credenciales, prefiere dar el acceso directo antes que autorizar impersonación.
+
+### Sesión 432 - 2026-11-24
+- **Tarea principal**: "si, rehaz": rehacer con producción las capturas de cotización, reparación, limpieza, certificación y parque del deck DPEC.
+- **Observaciones nuevas**: Al relanzarse agent-browser se pierde la sesión de prod y los screenshots salen de la pantalla de login (~46 KB): comprobar `agent-browser get url` y el tamaño del PNG tras cada captura. La herramienta read_file devuelve contenido viejo ("unchanged") para PNG que se sobrescriben: copiar a un nombre nuevo en /tmp y leerlo (la primera lectura de un archivo nuevo a veces falla con ENOENT, repetirla). Las fotos de prod sí cargan (reparación, limpieza, certificación). Las rutas de campaña (repair/cleaning/hoist) tienen los mismos ids en local y prod. El paso Preparativos de certificación en prod tiene una foto de teclado de laptop de prueba.
+- **Patrones confirmados**: responde "si" a propuestas concretas del agente, espera que se rehaga sin más preguntas.
+
+### Sesión 433 - 2026-11-24
+- **Tarea principal**: "usa WindFarm Test para las imagenes de cada fase": cambiar las capturas de las 4 fases de inspección del deck DPEC a la inspección de WindFarm Test (FDM-T02, abe05885, prod).
+- **Observaciones nuevas**: WindFarm Test FDM-T02 en prod tiene 469 fotos reales que cargan bien en fases 2 y 3, 13 defectos; es mejor demo que Talinay (miniaturas rotas). La sesión de prod persistía entre turnos esta vez. Confirma que el usuario elige el parque/inspección con mejores fotos para presentar.
+- **Patrones confirmados**: instrucciones de una línea, corrige el dato de origen del contenido, espera que se rehaga de punta a punta (slides, pies de página, PDF).
+
+### Sesión 434 - 2026-11-24
+- **Tarea principal**: "usar talinay para mostrar campañas de reparacion": agregar al deck DPEC un slide con la campaña de reparación de PTO Talinay Oriente (prod).
+- **Observaciones nuevas**: En prod, el parque Talinay (5af008ad) tiene una sola campaña de reparación: CI791 - WTG-23 - 11-09-2026, en progreso, 869 fotos, 19 defectos. La pestaña "Reparación (1)" y el acordeón se abren con los refs del snapshot. Una campaña de reparación es por turbina y se crea con cotización aprobada (NewRepairCampaignModal).
+- **Patrones confirmados**: elige el parque cuyo ejemplo muestra mejor cada funcionalidad, instrucción de una línea.
+
+### Sesión 435 - 2026-11-24
+- **Tarea principal**: "en el primer slide agregar el logo de coreinsight" en el deck DPEC.
+- **Observaciones nuevas**: El logo con fondo transparente y texto blanco es public/core-insight-logo.png (el mismo del Sidebar); core-insight-logo3.png trae fondo oscuro opaco. El usuario edita slides.html a mano entre turnos (cambió el título de la portada a "Core-Insight Platataforma de Inspeccion, reparación y mantención de turbinas mediante acceso por cuerdas", con typos "Platataforma" e "Inspeccion"): leer el archivo antes de tocarlo y no pisar sus ediciones, solo señalar los typos.
+- **Patrones confirmados**: instrucciones de una línea, edita el contenido él mismo cuando quiere una redacción exacta.
+
+### Sesión 436 - 2026-11-24
+- **Tarea principal**: Fase 1 del deck DPEC: reemplazar captura por la portada del informe con el haz verde del dron apuntando a la pala
+- **Observaciones nuevas**: pide edición de imagen concreta en una frase; se resolvió rotando el haz alrededor del dron, se verificó viendo la imagen y el slide renderizado
+- **Patrones confirmados**: instrucción mínima, alta autonomía, verificación visual antes de reportar
+
+### Sesión 437 - 2026-11-24
+- **Tarea principal**: cambiar la foto de la lámina Fase 1 por la imagen que él provee (Etapa_inspeccion.png en public/)
+- **Observaciones nuevas**: reemplaza la edición hecha por el agente con su propia imagen; prefiere aportar el asset final
+- **Patrones confirmados**: instrucción mínima con nombre de archivo, alta autonomía
+- **Aprendizaje sesión 437**: el usuario edita `slides.html` a mano entre turnos. Releer el archivo antes de editar y no usar sed global sobre textos repetidos (un pie de página repetido en 3 láminas se cambió por error y hubo que restaurarlo).
+
+### Sesión 438 - 2026-11-24
+- **Tarea principal**: (1) Agregar lámina con ejemplo de informe después de la Fase 4 del deck DPEC (quedó interrumpida). (2) Lámina de limpieza: mostrar una campaña donde se vean todas las imágenes; la actual tiene fotos rotas (pasó captura como evidencia).
+- **Observaciones nuevas**: cambia de tarea a mitad de turno y espera que se priorice la última instrucción. Pasa screenshots como evidencia del problema. Causa de las fotos rotas: 12 de 65 fotos de la campaña WTG01 no existen en Storage (verificado con join cleaning_photo/storage.objects vía supabase db query). Las campañas WTG02 y WTG05 están completas. La sesión de agent-browser en prod se pierde entre turnos, hay que pedir la contraseña de nuevo.
+- **Patrones confirmados**: instrucción mínima, evidencia por imagen, verificar datos en la DB antes de culpar al front, deck DPEC como proyecto continuo.
+- **Nota sesión 438**: el usuario entregó la contraseña de prod al pedírsela; la captura de limpieza se rehízo con WTG02 (todas las fotos cargan). Para scroll en la app usar `document.querySelector("main").scrollTop` (el scroll del agent-browser no mueve el contenedor interno).
+
+### Sesión 439 - 2026-11-24
+- **Tarea principal**: Deck DPEC: lámina de limpieza con captura donde todas las fotos carguen (WTG02 en vez de WTG01); lámina con ejemplo de informe tras la Fase 4 sigue pendiente.
+- **Observaciones nuevas**: responde solo con el dato pedido (la contraseña) sin más texto; espera que el agente continúe solo. Verificó visualmente cada captura antes de reportar.
+- **Patrones confirmados**: comunicación mínima, alta autonomía, evidencia por imagen, verificar datos en DB antes de culpar al front.
+
+### Sesión 440 - 2026-11-24
+- **Tarea principal**: Deck DPEC: generar el informe de inspección real (FDM-T02, 23 págs) y agregar lámina tras la Fase 4; usar A34 Los Cururos como evidencia de certificación de polipastos.
+- **Observaciones nuevas**: "generalo y agregala" = ejecutar de punta a punta sin preguntar. Los PDF de inspección viven en IndexedDB del navegador (no en Storage); se generan con Exportar > Generate PDF en workflow step 4 y se ven abriendo el blob en el visor de agent-browser (botón PDF). El visor se cae si se navega muchas páginas: capturar las páginas necesarias primero. fetch hacia un servidor local desde la app de prod falla.
+- **Patrones confirmados**: instrucción mínima, alta autonomía, evidencia real de prod, verificar cada lámina visualmente.
+
+### Sesión 441 - 2026-11-24
+- **Tarea principal**: eliminar la lámina "Punto de partida" (parque) del deck DPEC
+- **Observaciones nuevas**: referencia láminas por su etiqueta visible (tag), no por número
+- **Patrones confirmados**: instrucción mínima, alta autonomía
+
+### Sesión 442 - 2026-11-24
+- **Tarea principal**: agregar lámina de reparación con la app móvil del técnico (Rep1, Rep2, Rep3) después de "Evidencia por defecto y por etapa".
+- **Observaciones nuevas**: nombra los assets por su nombre de archivo (ya en img/) y la lámina de referencia por su título visible. Las capturas no vienen en orden de nombre: identificar cada una por su contenido y hora (Rep1 campañas, Rep2 defectos, Rep3 captura apaisada).
+- **Patrones confirmados**: instrucción mínima, alta autonomía, material propio como evidencia.
+
+### Sesión 443 - 2026-11-24
+- **Tarea principal**: mover la lámina "La app del técnico captura la evidencia" un lugar arriba, antes de "Evidencia por defecto y por etapa"
+- **Observaciones nuevas**: reordena láminas con una frase, citándolas por su título
+- **Patrones confirmados**: instrucción mínima, alta autonomía
+
+### Sesión 444 - 2026-11-24
+- **Tarea principal**: replicar la lámina "app del técnico" para limpieza (Lim1-3) y certificación de polipastos (Cer1-3), con el mismo formato que la de reparación.
+- **Observaciones nuevas**: "hacer lo mismo" = replicar el formato de la lámina anterior con otros assets. Los nombres de archivo no siguen el orden del flujo: identificar cada captura por contenido (pixel/hora) antes de rotularla. Dos capturas apaisadas no caben a 360 px de alto: usar ancho fijo (~465 px).
+- **Patrones confirmados**: instrucción mínima, alta autonomía, material propio como evidencia, replicar patrón existente.
+
+### Sesión 445 - 2026-11-24
+- **Tarea principal**: agrandar la palabra "Gracias" de la última lámina del deck DPEC
+- **Observaciones nuevas**: ajustes visuales puntuales en una frase; no pide tamaño exacto
+- **Patrones confirmados**: instrucción mínima, alta autonomía
+
+### Sesión 446 - 2026-11-24
+- **Tarea principal**: igualar el color de "CORE Insight by CORE-TEC" al de la línea "Encuentro Anual DPEC 2026 · 25 de noviembre" en la portada
+- **Observaciones nuevas**: cita textos de la lámina entre comillas para señalar el elemento; pide igualar colores entre elementos
+- **Patrones confirmados**: instrucción mínima, alta autonomía
+
+### Sesión 447 - 2026-11-24
+- **Tarea principal**: exportar el PDF del deck DPEC a PowerPoint (.pptx).
+- **Observaciones nuevas**: no hay LibreOffice ni pdftoppm en el equipo. Método usado: venv en /tmp con python-pptx, capturas de cada slide con agent-browser (viewport 1920x1080 y body zoom 1.5, mostrando una sección a la vez) y una imagen a pantalla completa por diapositiva. El resultado no es editable. Si el usuario quiere texto editable, hay que reconstruir cada slide con shapes.
+- **Patrones confirmados**: instrucción mínima como pregunta ("puedes ...?"), espera que se haga.
+
+### Sesión 448 - 2026-11-24
+- **Tarea principal**: rediseñar lámina 3 (Plataforma) del deck DPEC: Cotización al centro y debajo Reparación, Limpieza y Certificación de polipastos unidos con líneas verdes (conector SVG en árbol).
+- **Observaciones nuevas**: describe layouts por posición ("en el centro", "bajo", "de izquierda a derecha"). Tras cambiar slides.html el .pptx exportado queda desactualizado.
+- **Patrones confirmados**: instrucción visual mínima, alta autonomía.
+
+### Sesión 449 - 2026-11-24
+- **Tarea principal**: lámina 8 del deck DPEC: reemplazar la portada del informe por rep_def.png (página de detalle de defecto A1), y regenerar el pptx con todos los cambios.
+- **Observaciones nuevas**: interrumpió mi turno anterior con una instrucción nueva ("luego generar nuevamente el pptx"), que quedó como continuación de la anterior. Regenerar el pptx: /tmp/shots.sh (capturas 1920x1080) + python-pptx en /tmp/pptenv. Si /tmp se borró, rehacer el venv.
+- **Patrones confirmados**: instrucciones encadenadas ("reemplaza X... luego genera el pptx"), alta autonomía.
+
+### Sesión 450 - 2026-11-27
+- **Tarea principal**: Modo compañero. Agregar a "Inspección Crítica" 4 ítems (2 de holgura de freno y 2 de pruebas de embrague), editables antes de generar el informe.
+- **Observaciones nuevas**:
+  - Interrumpió un primer mensaje incompleto y lo reenvió con más detalle ("editables antes de generar el reporte").
+  - Inspección Crítica solo tiene sub-grupos, así que los 4 ítems necesitaban uno: creé "Freno y embrague" (freno_embrague). Tipo 'check' (sesión 412: todo lo de esa etapa es verificación).
+  - "Editables" = la persona en la web define Cumple / No cumple / Sin dato. Hasta ahora la web nunca escribía hoist_cert_item: agregué un flag webEditable en el catálogo y un selector que hace upsert por (campaign_id, item_code); RLS ya permite escribir a technician/inspector/admin/supervisor. El informe toma el valor del mismo árbol.
+  - El último texto llegó cortado ("…de conjunto de embrague a la"): lo dejé como "Pruebas finales de conjunto de embrague" y pregunté cómo termina.
+  - Probado en local con una certificación copiada de prod: 4 ítems con selector; Cumple/No cumple guardados en la base y persistentes tras recargar. Limpié los datos de prueba.
+  - El local volvió a caerse por reinicio (uptime 31 min): recrear el plist en /tmp, bootstrap, y `docker start supabase_edge_runtime_wind-blade-inspection`.
+- **Patrones confirmados**: español, directo, modo compañero, comunicación ultra-mínima, reenvía mensajes cortados.
+
+### Sesión 451 - 2026-11-27
+- **Tarea principal**: Corrección de los 4 ítems de freno y embrague: van al INICIO de Inspección Crítica, no son verificaciones sino datos que vienen de la app y se editan en una caja de texto; luego pidió el título "FRENO Y EMBRAGUE" igual que "CADENA DE CARGA". Confirmó el texto: "Pruebas finales de conjunto de embrague".
+- **Observaciones nuevas**:
+  - CORRECCIÓN 1: asumí 'check' porque toda esa etapa era verificación (sesión 412). Error: "editable" con datos de la app = valor (caja de texto). Ahora: itemType 'measurement' + webEditable, input que guarda measurement_value con upsert (al salir de la caja o Enter).
+  - CORRECCIÓN 2: lo puse al final de la etapa. Lo nuevo de una lista va donde él diga; si no lo dice, preguntar o usar el orden de su mensaje, no asumir "al final".
+  - Primero los dejé como ítems sueltos al inicio (sin título) y pidió agruparlos con título, igual que los otros sub-grupos: en una etapa con sub-grupos, todo va en sub-grupo con título.
+  - Probado en local: título "FRENO Y EMBRAGUE" antes de "CADENA DE CARGA", 4 cajas de texto, valor "0.35 mm" guardado en la base y visible tras recargar. Datos de prueba borrados.
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, corrección directa sin drama, "al igual que X" = replicar patrón existente.
+
+### Sesión 452 - 2026-11-27
+- **Tarea principal**: Tres pedidos en un mensaje para certificación de polipastos: (1) portada con public/Portada_polipasto.png; (2) campos "Comentario" y "Recomendación" (text area) que salgan en el informe por turbina; (3) lista de certificaciones agrupada, turbinas contraídas, desplegando las etapas por turbina, como el Flujo de Reparación (screenshot).
+- **Observaciones nuevas**:
+  - Hice (1) y (2) y pregunté por (3). (1): la imagen es una portada diseñada con zona blanca; sin velo verde, recortada a A4, textos oscuros en la zona blanca y pie derecho oscuro (el blanco no se leía). Revisado renderizando el PDF a PNG con `qlmanage -t -s 800` (útil para ver PDFs generados). (2): columnas nuevas campaign.report_comment / report_recommendation (migración 20261127183945, aplicada solo en LOCAL; prod al desplegar), textarea que guarda al salir; en el PDF una página con ambos textos para la turbina.
+  - (3) es un cambio de estructura: hoy cada turbina es una campaña aparte (prod/local: 55 campañas "Certificación 2026" en Los Cururos, una por turbina, y C01 con otro nombre). No hay campo que las agrupe. Pregunté cómo agruparlas y si el informe pasa a ser uno por grupo.
+  - Descargar un PDF generado en la app: `agent-browser download @<botón> /tmp/x.pdf`; validar texto descomprimiendo streams con zlib.
+  - Detalle visto (no tocado): el logo CORE en el PDF pesa ~4.6 MB (PNG 2172x724 sin comprimir).
+- **Patrones confirmados**: español, directo, varias tareas en un mensaje, screenshot de otra pantalla como referencia ("al igual que" reparaciones), modo compañero.
+
+### Sesión 453 - 2026-11-27
+- **Tarea principal**: Con screenshot de un texto: después de la portada del informe de polipastos debe ir la página "EQUIPOS CERTIFICADOS Y EQUIPOS CERTIFICADOS CON OBSERVACIONES" (54 polipastos certificados, 03 con observaciones, recomendaciones generales para cada grupo, carga nominal 800 kilos).
+- **Observaciones nuevas**:
+  - No respondió las dos preguntas pendientes (agrupar por parque+nombre; informe por turbina o por grupo); este pedido las responde en parte: el texto cuenta 57 polipastos, así que el informe es UNO para el grupo de certificaciones, no uno por turbina.
+  - Pasa el contenido del informe como imagen del documento que quiere replicar (igual que DOM/imagen como spec en otras sesiones): copiar el texto literal, con negritas y subrayados, y hacer dinámicos solo los números.
+  - No implementé: falta saber qué hace que una turbina sea "certificada con observaciones" y si los 800 kilos son fijos. Pregunté proponiendo respuestas por defecto para que pueda contestar "sí".
+- **Patrones confirmados**: español, directo, comunicación ultra-mínima, imagen como spec, encadena pedidos sin responder preguntas abiertas.
+
+### Sesión 454 - 2026-11-27
+- **Tarea principal**: Modo compañero. Eliminar todas las fotos de los pasos de VERIFICACION de todas las campañas de certificación de polipastos en prod.
+- **Observaciones nuevas**: Pedido destructivo e irreversible con alcance ambiguo ("pasos de verificación" puede ser tipo de ítem o nombre de etapa; borrar filas vs archivos de storage). Hice solo lectura en prod (conteo de hoist_cert_photo por item_code: 94 fotos en ítems de verificación de Visual/Crítica, 57 en Preparativos, 25 en Cierre) y pregunté alcance antes de borrar. Quedó pendiente la confirmación del usuario.
+- **Patrones confirmados**: modo compañero con una frase; operaciones sobre prod; usar `set -a; . ./.env.production.local; set +a` antes de `supabase db query --linked`.
+
+### Sesión 455 - 2026-11-27
+- **Tarea principal**: Continuación: confirmó "elimina solo aquellas que están en los pasos de verificación; los pasos de captura de fotos deben mantenerse". Ejecuté el borrado en prod.
+- **Observaciones nuevas**: Respondió solo la pregunta de alcance (ítems de tipo verificación, no pasos de captura) y no la de storage; borré solo filas de hoist_cert_photo (94), dejé los archivos en el bucket y respaldé en backups/hoist_verification_photos_backup.json. Quedan 82 fotos (prep 57, cierre 25). Para borrados en prod: respaldo antes, borrar con RETURNING, verificar conteo por item_code.
+- **Patrones confirmados**: responde breve a preguntas de alcance; acepta la opción reversible cuando no responde algo; "verificación" = tipo de ítem check, "captura de fotos" = tipo photo.
+
+### Sesión 456 - 2026-11-27
+- **Tarea principal**: hoja "detalle de la revisión" del informe de polipastos (datos OCR de etiqueta, condición, comentario/recomendación, resultados por ítem, foto)
+- **Observaciones nuevas**: OCR tesseract en navegador lee etiquetas LIFTKET completas solo a ~2000 px (1600 y 2800 fallan); probar TODAS las fotos de etiqueta, no solo la primera. Fotos de etiqueta del entorno local pueden ser fotos de prueba (no etiquetas). `pnpm run build` falla por deps check (tesseract.js ignored builds) → usar `npx tsc -b && npx vite build`. Render de páginas PDF: pypdf en venv /tmp/pdfvenv + qlmanage.
+- **Patrones confirmados**: imagen de referencia como spec, verificación real antes de reportar, deploy solo con "a prod"
+- **Cierre**: sin correcciones del usuario en este turno. Quedan pendientes 2 preguntas de diseño (agrupar por parque+nombre / criterios página "Equipos certificados" y 800 kg) y la migración `hoist_details` para prod.
+
+### Sesión 457 - 2026-11-27
+- **Tarea principal**: informe polipastos: quitar imágenes de los ítems de verificación (solo ítems foto), replicar distribución exacta de celdas de la hoja WTG (imagen reenviada), página 2 con texto "Equipos certificados…"
+- **Observaciones nuevas**: cuando reenvía la imagen de referencia = la distribución de celdas debe ser IGUAL (rowSpan/colSpan, anchos), no solo los mismos datos. "la segunda página debe tener el texto" sin responder las preguntas = acepta las propuestas por defecto (conteo por parque+nombre, 800 kg fijo). Ojo: el texto exacto de una imagen se pierde en la compactación → transcribirlo a un archivo apenas llega.
+- **Patrones confirmados**: imagen como spec exacta, no responde preguntas si la propuesta le parece bien, varias tareas en un mensaje
+
+### Sesión 458 - 2026-11-27
+- **Tarea principal**: unir todas las campañas de polipastos en una sola campaña con todas las turbinas; al entrar, listar turbinas; informe con todas las turbinas certificadas
+- **Observaciones nuevas**: pedido de cambio de modelo de datos descrito en 3 frases conceptuales, sin detalle técnico. Impacta la app móvil (escribe por campaign_id) y datos de prod (54 campañas, 21 con datos), así que pregunté antes de implementar: campaña padre (recomendada, reversible) o fusión real, una por parque, duplicado A33 y si van todas las turbinas o solo las que tienen datos. Retoma la idea anterior de "certificaciones juntas, listar por turbina".
+- **Patrones confirmados**: instrucciones conceptuales breves, visión de producto (flujo unificado), preguntar antes de cambios de arquitectura o de datos de prod
+
+### Sesión 459 - 2026-11-28
+- **Tarea principal**: campaña de polipastos padre con muchas turbinas (migración parent_campaign_id + tipo hoist_certification_group), página de campaña con turbinas desplegables, crear o agregar varias turbinas, informe único con las turbinas completas
+- **Observaciones nuevas**: responde las preguntas numeradas en una línea ("1.- … 2.- …"). Agrega modelo de dominio por su cuenta ("un parque puede tener muchas campañas en el tiempo"). ERROR MÍO: afirmé que A33 estaba duplicada sin verificarlo y él respondió "elimínala" sobre una premisa falsa → no borré y lo corregí. Verificar los datos antes de plantear una pregunta que lleve a borrar algo.
+- **Patrones confirmados**: elige la opción recomendada, visión de producto unificada, alta autonomía, cambios grandes en local antes de prod
+
+### Sesión 460 - 2026-11-28
+- **Tarea principal**: informe polipastos: página 2 con el texto exacto de la imagen (conteos dinámicos), quitar la página 3 (datos generales), fotos de los ítems de foto dentro de la tabla de detalle antes de COMENTARIOS
+- **Observaciones nuevas**: reenvió la imagen del texto porque mi versión reconstruida no era la exacta → cuando pasa texto en imagen, quiere ese texto literal, con negritas y subrayados y conservando sus typos ("desgate", "generara"). Transcribí el texto a docs/informe-polipastos-pagina2.md para no perderlo. Indica los datos dinámicos de forma explícita ("ojo con los datos que son dinámicos").
+- **Patrones confirmados**: imagen como spec exacta (alta), varias tareas en un mensaje, iteración incremental sobre el mismo informe
+
+### Sesión 461 - 2026-11-28
+- **Tarea principal**: informe polipastos: quitar la foto que quedaba fuera de la tabla de detalle (la caja bajo los resultados) y poner en la portada la sombra verde igual que en reparaciones e inspecciones
+- **Observaciones nuevas**: reporta con screenshot como evidencia ("te dejo evidencia"). Antes había elegido una portada sin tinte; ahora pide "tal cual" las otras portadas → la consistencia visual entre informes pesa más que el diseño propio de la imagen. Copié el método de repairReportPdf (overlay rgba(90,143,90,0.55) horneado en canvas, logo arriba a la izquierda, título blanco al 73% de la altura). Si hay fotos en la tabla, no quiere fotos fuera de ella.
+- **Patrones confirmados**: "tal cual X" = replicar exactamente el método existente (alta), screenshot como evidencia, iteración incremental sobre el informe
+
+### Sesión 462 - 2026-11-28
+- **Tarea principal**: portada de polipastos: logo arriba a la derecha y bloque de título, parque, turbina y fecha a media página
+- **Observaciones nuevas**: después de pedir la portada "tal cual reparaciones", ajusta las posiciones al verla. "Tal cual" se refería a la sombra verde; la ubicación del logo y del texto la define él. Ajustes visuales en una frase, con posiciones relativas ("arriba a la derecha", "a la mitad de la página").
+- **Patrones confirmados**: iteración estética rápida al ver el resultado (alta), comunicación ultra-mínima
+
+### Sesión 463 - 2026-11-28
+- **Tarea principal**: informe polipastos: la tabla de resultados debe empezar en su propia página (página 4), no a continuación de la cabecera de la hoja
+- **Observaciones nuevas**: indica el cambio con un screenshot del fragmento y una frase ("esta parte de la tabla debería comenzar en la página 4"). Prefiere bloques que no queden partidos entre páginas.
+- **Patrones confirmados**: screenshot como spec, comunicación ultra-mínima, micro-iteraciones sobre el mismo informe (alta)
+
+### Sesión 464 - 2026-11-28
+- **Tarea principal**: Informe "ANEXO II (equipos no certificados)" de polipastos a partir de un docx de referencia
+- **Observaciones nuevas**:
+  - Entrega un .docx como spec de informe; "usa la misma portada y estructura" = reutilizar el renderer existente y cambiar solo el texto de la página 2 y los colores (rojo) que muestra el docx
+  - "se genera cuando alguna verificación no cumple" se interpretó como regla de negocio: check fallido → NO CERTIFICADO (antes era "con observaciones", que pasa a ser solo manual)
+- **Patrones confirmados**: documento/imagen como spec exacta, iteración incremental sobre el mismo informe, todo local hasta "a prod"
+
+### Sesión 465 - 2026-11-27
+- **Tarea principal**: Cierre de la sesión del Anexo II (equipos no certificados) de polipastos
+- **Observaciones nuevas**: Sin correcciones en esta iteración. Quedó pendiente que confirme la regla "check fallido → NO CERTIFICADO", la eliminación de A33 y el deploy ("a prod").
+- **Patrones confirmados**: docx/imagen como spec exacta (alta), reutilizar estructura existente (alta), todo local hasta aprobación explícita (alta)
+- (Sesión 465, cont.) Pidió "editar los valores de cumple o no cumple" desde la web → selector Cumple / No cumple / Sin dato en cada verificación (upsert hoist_cert_item.passed); la condición se recalcula al instante. Patrón: quiere poder corregir en la web lo que captura la app móvil (igual que mediciones).
+
+### Sesión 466 - 2026-11-27
+- **Tarea principal**: Editar desde la web los valores cumple / no cumple de las verificaciones de polipastos
+- **Observaciones nuevas**: Pedido de una línea ("además quisiera poder editar...") encadenado al feature anterior; espera override web de los datos que captura la app móvil. Sin correcciones.
+- **Patrones confirmados**: comunicación ultra-mínima (alta), iteración incremental sobre la misma pantalla (alta), web como capa de corrección de datos de la app (alta: mediciones, condición, ahora checks), todo local hasta "a prod" (alta)
+- (Sesión 466, cont.) Confirmó la regla de negocio de polipastos: cualquier verificación "no cumple" → NO CERTIFICADO (Anexo II); "certificado con observaciones" solo manual.
+
+### Sesión 467 - 2026-11-27
+- **Tarea principal**: Confirmar la regla de condición de polipastos ("si la regla me sirve")
+- **Observaciones nuevas**: Responde las preguntas pendientes de a una y en una línea; contesta solo lo que tiene claro y deja el resto (A33, deploy) para después. Sin correcciones.
+- **Patrones confirmados**: comunicación ultra-mínima (alta), valida reglas de negocio propuestas por el agente sin pedir cambios (alta), deploy solo con orden explícita (alta)
+- (Sesión 467, cont.) Informe polipastos: en la ficha solo la foto de ETIQUETA (resto de fotos fuera) y se eliminó la lista/tabla de chequeo del PDF; portada del informe certificado lleva "Anexo I" (el no certificado "Anexo II"). Usa screenshots del PDF actual como evidencia de lo que sobra. Interrumpe para sumar pedidos ("además...") — encadena cambios en el mismo turno.
+
+### Sesión 468 - 2026-11-27
+- **Tarea principal**: Simplificar informe de polipastos (solo foto de etiqueta, sin lista/tabla de chequeo) y agregar "Anexo I" al título del informe de certificados
+- **Observaciones nuevas**: Usa screenshots del PDF actual como evidencia de lo que sobra; "no debe aparecer" = eliminar del PDF, no del sistema (los checks siguen en la web y definen la condición). Numera los informes como anexos (I certificados, II no certificados).
+- **Patrones confirmados**: screenshot como spec (alta), iteración incremental sobre el mismo informe (alta), encadena pedidos con "además" (alta), todo local hasta "a prod" (alta)
+
+### Sesión 469 - 2026-11-27
+- **Tarea principal**: Corrección: "solo foto etiqueta + sin tabla de chequeo" era SOLO para Anexo II (no certificados); "Anexo I" era SOLO para el informe de certificados
+- **Observaciones nuevas**: CORRECCIÓN — el agente aplicó a ambos informes cambios pedidos para uno. Las screenshots de evidencia (ficha roja NO CERTIFICADO) indicaban de qué informe hablaba. Corrige citando textualmente sus propios mensajes y asignando cada uno a su destino, cierra con "favor reparar".
+- **Patrones confirmados**: screenshot como spec (alta), corrección directa sin drama (alta), "mínimo cambio necesario / no generalizar" (alta, se suma a "solo ordenar ≠ cambiar lógica")
