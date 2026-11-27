@@ -32,6 +32,7 @@ import {
   useUpdateHoistStatus,
   useUploadHoistPhoto,
   useSetHoistItemValue,
+  useSetHoistReportText,
 } from '@/hooks/useHoistCertification';
 import { generateAndDownloadHoistCertificationReport } from '@/services/hoistCertificationReportPdf.service';
 import { getHoistLabel, HOIST_CERT_BY_CODE } from '@/constants/hoist-certification-steps';
@@ -309,6 +310,24 @@ export function HoistCertificationWorkflow() {
       />
 
       <p style={hint}>{t('hoist.workflowHint')}</p>
+      {campaign && (
+        <div style={reportTextsWrap}>
+          <ReportTextArea
+            field="report_comment"
+            label={t('hoist.comment')}
+            value={campaign.reportComment}
+            readOnly={isClient}
+            t={t}
+          />
+          <ReportTextArea
+            field="report_recommendation"
+            label={t('hoist.recommendation')}
+            value={campaign.reportRecommendation}
+            readOnly={isClient}
+            t={t}
+          />
+        </div>
+      )}
 
       {treeLoading ? (
         <p style={{ color: C.muted, padding: 24 }}>{t('general.loading')}</p>
@@ -977,6 +996,59 @@ function EditableValue({
   );
 }
 
+/**
+ * Free-text "Comentario" / "Recomendación" of the certification, printed in the
+ * report of this turbine. Saves when the field loses focus, only if it changed.
+ */
+function ReportTextArea({
+  field,
+  label,
+  value,
+  readOnly,
+  t,
+}: {
+  field: 'report_comment' | 'report_recommendation';
+  label: string;
+  value: string | null;
+  readOnly: boolean;
+  t: (k: string) => string;
+}) {
+  const { campaignId } = useParams();
+  const toast = useToast();
+  const save = useSetHoistReportText(campaignId);
+  const saved = value ?? '';
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const commit = () => {
+    if (readOnly || text.trim() === saved.trim()) return;
+    save.mutate(
+      { field, value: text },
+      {
+        onSuccess: () => toast.success(t('hoist.reportTextSaved')),
+        onError: (err) => {
+          setText(saved);
+          toast.error((err as Error)?.message || t('hoist.reportTextError'));
+        },
+      },
+    );
+  };
+  return (
+    <label style={reportTextLabel}>
+      <span>{label}</span>
+      <textarea
+        value={text}
+        rows={3}
+        readOnly={readOnly}
+        disabled={save.isPending}
+        placeholder={readOnly ? '' : t('hoist.reportTextPlaceholder')}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        style={reportTextArea}
+      />
+    </label>
+  );
+}
+
 function CheckBadge({ passed, t }: { passed: boolean | null; t: (k: string) => string }) {
   if (passed === true) {
     return (
@@ -1162,6 +1234,18 @@ const title: React.CSSProperties = { fontSize: 22, fontWeight: 700, color: '#1a1
 const subtitle: React.CSSProperties = { fontSize: 13, color: C.muted, margin: '4px 0 0' };
 const hint: React.CSSProperties = { fontSize: 13, color: C.muted, marginBottom: 12 };
 const totalsLine: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 16 };
+const reportTextsWrap: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16,
+  marginBottom: 20,
+};
+const reportTextLabel: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a1a1a',
+};
+const reportTextArea: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', minHeight: 80, padding: '8px 10px', fontSize: 13,
+  fontFamily: 'inherit', fontWeight: 400, borderRadius: 8, border: `1px solid ${C.border}`,
+  background: '#fff', color: '#1a1a1a', resize: 'vertical',
+};
 const valueInput: React.CSSProperties = {
   width: 180, padding: '4px 8px', fontSize: 12, borderRadius: 6,
   border: `1px solid ${C.border}`, background: '#fff', color: '#1a1a1a',

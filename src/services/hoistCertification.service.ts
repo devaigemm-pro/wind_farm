@@ -113,6 +113,10 @@ export interface HoistCampaignDetail {
   turbineId: string | null;
   turbineName: string | null;
   turbineModel: string | null;
+  /** Free text written on the web, printed in the report (campaign.report_comment). */
+  reportComment: string | null;
+  /** Free text written on the web, printed in the report (campaign.report_recommendation). */
+  reportRecommendation: string | null;
 }
 
 /** A hoist-certification photo (from get_hoist_cert_items → photos[]). */
@@ -546,6 +550,7 @@ export const hoistCertificationService = {
       .from('campaign')
       .select(`
         id, name, status, created_at, updated_at, wind_farm_id, turbine_id,
+        report_comment, report_recommendation,
         wind_farm:wind_farm_id ( id, name, location ),
         turbine:turbine_id ( id, name, model )
       `)
@@ -575,7 +580,20 @@ export const hoistCertificationService = {
       turbineId: (r.turbine_id as string) ?? null,
       turbineName: (turbine.name as string) ?? null,
       turbineModel: (turbine.model as string) ?? null,
+      reportComment: (r.report_comment as string) ?? null,
+      reportRecommendation: (r.report_recommendation as string) ?? null,
     };
+  },
+
+  /** Save the comment or the recommendation of the certification (empty = clear). */
+  async setReportText(
+    campaignId: string,
+    field: 'report_comment' | 'report_recommendation',
+    value: string,
+  ): Promise<void> {
+    const v = value.trim() ? value.trim() : null;
+    const { error } = await db.from('campaign').update({ [field]: v }).eq('id', campaignId);
+    if (error) throw new HoistCertificationServiceError(error.message, error.code);
   },
 
   /**

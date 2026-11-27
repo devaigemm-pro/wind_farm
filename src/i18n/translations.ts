@@ -438,6 +438,11 @@ export const translations: TranslationMap = {
   'hoist.type.check': { en: 'Check', es: 'Verificación' },
   'hoist.type.measurement': { en: 'Measurement', es: 'Medición' },
   // Check result + no data
+  'hoist.comment': { en: 'Comment', es: 'Comentario' },
+  'hoist.recommendation': { en: 'Recommendation', es: 'Recomendación' },
+  'hoist.reportTextPlaceholder': { en: 'Shown in this turbine\'s report', es: 'Aparece en el informe de esta turbina' },
+  'hoist.reportTextSaved': { en: 'Saved', es: 'Guardado' },
+  'hoist.reportTextError': { en: 'Could not save', es: 'No se pudo guardar' },
   'hoist.editValue': { en: 'Edit value', es: 'Editar valor' },
   'hoist.valueSaved': { en: 'Value saved', es: 'Valor guardado' },
   'hoist.valueError': { en: 'Could not save the value', es: 'No se pudo guardar el valor' },

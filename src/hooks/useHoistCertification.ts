@@ -254,6 +254,23 @@ export function useSetHoistItemValue(campaignId: string | undefined) {
   });
 }
 
+/** Save the comment / recommendation printed in the report. */
+export function useSetHoistReportText(campaignId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      field,
+      value,
+    }: {
+      field: 'report_comment' | 'report_recommendation';
+      value: string;
+    }) => hoistCertificationService.setReportText(campaignId!, field, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoist-cert-campaign-detail', campaignId] });
+    },
+  });
+}
+
 export function useUpdateHoistStatus(campaignId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({

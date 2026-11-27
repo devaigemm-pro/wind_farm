@@ -52,6 +52,9 @@ interface HoistPdfContext {
   /** JPEG data URL of the manager's signature (null = blank line). */
   managerSignature: string | null;
   tree: HoistTree;
+  /** campaign.report_comment / report_recommendation (free text from the web). */
+  comment: string;
+  recommendation: string;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -175,7 +178,7 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
   const { data: campaign, error } = await db
     .from('campaign')
     .select(`
-      id, name, status, created_at,
+      id, name, status, created_at, report_comment, report_recommendation,
       wind_farm:wind_farm_id ( name, location, manager_name, manager_role, country, client ),
       turbine:turbine_id ( name, model, manufacturer )
     `)
@@ -249,6 +252,8 @@ async function fetchHoistData(campaignId: string): Promise<HoistPdfContext> {
       (wf.manager_name as string) ?? '',
     ),
     tree,
+    comment: ((campaign as Record<string, unknown>).report_comment as string) ?? '',
+    recommendation: ((campaign as Record<string, unknown>).report_recommendation as string) ?? '',
   };
 }
 
@@ -278,17 +283,26 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
     const heroLoaded = await new Promise<boolean>((resolve) => {
       heroImg.onload = () => resolve(true);
       heroImg.onerror = () => resolve(false);
-      heroImg.src = '/repairs.png';
+      heroImg.src = '/Portada_polipasto.png';
     });
     if (heroLoaded && heroImg.naturalWidth > 0) {
+      // Designed cover (no tint): crop it to the A4 ratio, centered, so it
+      // fills the page without stretching.
+      const pageRatio = pageW / pageH;
+      const imgW = heroImg.naturalWidth;
+      const imgH = heroImg.naturalHeight;
+      let sw = imgW;
+      let sh = imgH;
+      if (imgW / imgH > pageRatio) sw = Math.round(imgH * pageRatio);
+      else sh = Math.round(imgW / pageRatio);
+      const sx = Math.round((imgW - sw) / 2);
+      const sy = Math.round((imgH - sh) / 2);
       const canvas = document.createElement('canvas');
-      canvas.width = heroImg.naturalWidth;
-      canvas.height = heroImg.naturalHeight;
+      canvas.width = sw;
+      canvas.height = sh;
       const cctx = canvas.getContext('2d')!;
-      cctx.drawImage(heroImg, 0, 0);
-      cctx.fillStyle = 'rgba(90, 143, 90, 0.55)';
-      cctx.fillRect(0, 0, canvas.width, canvas.height);
-      const coverBase64 = canvas.toDataURL('image/jpeg', 0.92);
+      cctx.drawImage(heroImg, sx, sy, sw, sh, 0, 0, sw, sh);
+      const coverBase64 = canvas.toDataURL('image/jpeg', 0.9);
       doc.addImage(coverBase64, 'JPEG', 0, 0, pageW, pageH);
       coverImageLoaded = true;
     }
@@ -310,18 +324,21 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
       const logoBase64 = 'data:image/png;base64,' + btoa(binary);
-      doc.addImage(logoBase64, 'PNG', margin, 15, 60, 20);
+      // Top-right, on the white area of the cover.
+      doc.addImage(logoBase64, 'PNG', pageW - margin - 60, 15, 60, 20);
     }
   } catch {
     /* ignore */
   }
 
-  // Title — two lines, right-aligned, white.
+  // Title — two lines, right-aligned, dark text on the white area of the cover
+  // (white on the solid-color fallback).
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
+  const coverText: RGB = coverImageLoaded ? [26, 26, 26] : [255, 255, 255];
+  doc.setTextColor(...coverText);
   const titleLines = ['Polipastos de turbina eólica', 'Informe de Certificación'];
-  let titleY = pageH * 0.73;
+  let titleY = pageH * 0.3;
   for (const line of titleLines) {
     doc.text(line, pageW - margin, titleY, { align: 'right' });
     titleY += 11;
@@ -331,7 +348,7 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
   const dateStr = formatDateShortCL(ctx.createdAt);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...coverText);
   doc.text(ctx.windFarmName, pageW - margin, titleY + 6, { align: 'right' });
   doc.text(`Turbina: ${ctx.turbineName}`, pageW - margin, titleY + 14, { align: 'right' });
   doc.text(dateStr, pageW - margin, titleY + 22, { align: 'right' });
@@ -343,6 +360,8 @@ async function renderCoverPage(doc: jsPDF, ctx: HoistPdfContext) {
   doc.setTextColor(255, 255, 255);
   doc.text('Generado por', margin + 10, footerStartY);
   doc.text(ctx.reportedBy, margin + 10, footerStartY + 5);
+  // Right footer sits on the light part of the designed cover: dark text there.
+  if (coverImageLoaded) doc.setTextColor(26, 26, 26);
   doc.text('Con tecnología', pageW - margin - 10, footerStartY, { align: 'right' });
   doc.text('CORE Insight', pageW - margin - 10, footerStartY + 5, { align: 'right' });
   doc.setTextColor(0, 0, 0);
@@ -471,6 +490,34 @@ async function renderPhotoBlock(
   }
 }
 
+/** "Comentario" and "Recomendación" written on the web for this turbine. */
+function renderCommentAndRecommendation(doc: jsPDF, ctx: HoistPdfContext) {
+  const blocks = [
+    { title: 'Comentario', text: ctx.comment.trim() },
+    { title: 'Recomendación', text: ctx.recommendation.trim() },
+  ].filter((b) => b.text);
+  if (blocks.length === 0) return;
+  doc.addPage();
+  let y = 25;
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+  for (const b of blocks) {
+    y = addSectionTitle(doc, `${b.title} — Turbina ${ctx.turbineName}`, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const lines = doc.splitTextToSize(b.text, PAGE_WIDTH - 2 * MARGIN) as string[];
+    for (const line of lines) {
+      if (y > PAGE_HEIGHT - 25) {
+        doc.addPage();
+        y = 25;
+      }
+      doc.text(line, MARGIN, y);
+      y += 5;
+    }
+    y += 8;
+  }
+}
+
 /** One separator page per STEP, then one block page per selected photo. */
 async function renderStepSection(doc: jsPDF, step: HoistStepNode, locale: 'es' | 'en') {
   // Collect every item of the step (direct or grouped).
@@ -544,6 +591,8 @@ export async function generateAndDownloadHoistCertificationReport(
   await renderCoverPage(doc, ctx);
   // 2. General data + per-item results table.
   renderGeneralData(doc, ctx);
+  // 2b. Comment + recommendation of this turbine (only when written).
+  renderCommentAndRecommendation(doc, ctx);
   // 3. One section per STEP (separator + one block page per photo).
   const locale: 'es' | 'en' = 'es';
   for (const step of ctx.tree) {
